@@ -38,7 +38,8 @@ npm run import -- ./respaldo.json          # hashea claves en claro, conserva to
 - Reglas en servidor: alumno recibe 403 al listar usuarios o escribir ventas;
   cuentas GM no las borra nadie (verificado en tests).
 - Ninguna respuesta API incluye contraseñas ni hashes.
-- Rate-limit de login (10 intentos/10 min/IP), auditoría server-side, escritura
+- Rate-limit de login (10 intentos FALLIDOS/10 min/IP; el éxito perdona: los
+  usuarios legítimos jamás se bloquean), auditoría server-side, escritura
   atómica del `db.json`, cabeceras duras (`nosniff`, `DENY` frame, `no-store` en API).
 - Sin backend (doble clic al `index.html`, otro hosting estático), el portal sigue
   funcionando en modo local legacy: paridad total, cero regresiones.
@@ -133,6 +134,13 @@ pero los eventos llegan sin imagen (el backend reintenta sin esas columnas).
    el socket realtime antepone cada novedad con foto/video/documento + toast.
 5. Sin Supabase (dev local): `POST /api/media` multipart guarda en
    `data/uploads` (servido en `/uploads` solo en local).
+
+Sync offline-first ([`js/core/sync.js`](../portal-modular/js/core/sync.js)): al entrar
+trae colecciones+usuarios al `db` legacy; cada `saveDB` difunde el diff a la API
+(POST upsert por id / PUT / DELETE; `users` por `/api/users` con hash en servidor).
+Supabase devuelve TEXT pero el legacy compara con `===` numérico: al traer se
+normalizan `id`/`…Id`/`students`/`readBy`… a Number (sin esto reventaba Mensajes).
+Conflictos: last-write-wins por registro; pulls serializados con mutex.
 
 Frontend: [`js/core/media.js`](../portal-modular/js/core/media.js) (`Media.subir` /
 `subirMuchos`, con fallback a base64 si no hay backend). Los formularios de
