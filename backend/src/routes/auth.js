@@ -21,10 +21,12 @@ module.exports = (store) => {
         ? passwords.verify(password, stored)
         : String(stored) === String(password));
       if (!valid) {
+        mw.noteFailedLogin(req);
         db.audit(store.get(), 'login_fallido', null, { username: String(username) });
         await store.persist().catch(() => {});
         return res.status(401).json({ ok: false, error: 'Credenciales incorrectas' });
       }
+      mw.forgiveLogin(req);
       const token = await sessions.create(u.id);
       res.setHeader('Set-Cookie', sessions.cookieHeader(token));
       db.audit(store.get(), 'login', db.safeUser(u), {});

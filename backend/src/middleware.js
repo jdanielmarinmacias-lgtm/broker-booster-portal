@@ -58,20 +58,35 @@ const requireRole = (...allowed) => (req, res, next) => {
   next();
 };
 
-/* Rate-limit en memoria para /login: N intentos / 10 min por IP
- * (LOGIN_RATE_MAX, default 10; los tests lo suben). */
+/* Rate-limit en memoria para /login: N intentos FALLIDOS / 10 min por IP
+ * (LOGIN_RATE_MAX, default 10; los tests lo suben). Solo cuentan los fallos:
+ * un login válido perdona uno (los usuarios legítimos jamás se bloquean). */
 const attempts = new Map();
 const LOGIN_RATE_MAX = Number(process.env.LOGIN_RATE_MAX || 10);
 function loginRateLimit(req, res, next) {
   const ip = req.ip || req.socket.remoteAddress || '?';
   const now = Date.now();
   const list = (attempts.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
+  attempts.set(ip, list);
+  req._rlIp = ip;
   if (list.length >= LOGIN_RATE_MAX) {
     return res.status(429).json({ ok: false, error: 'Demasiados intentos. Espera 10 minutos.' });
   }
-  list.push(now);
-  attempts.set(ip, list);
   next();
+}
+function noteFailedLogin(req) {
+  try {
+    const list = attempts.get(req._rlIp) || [];
+    list.push(Date.now());
+    attempts.set(req._rlIp, list);
+  } catch (e) { /* nunca romper el login */ }
+}
+function forgiveLogin(req) {
+  try {
+    const list = attempts.get(req._rlIp) || [];
+    list.shift();
+    attempts.set(req._rlIp, list);
+  } catch (e) { /* nunca romper el login */ }
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -80,4 +95,4 @@ function errorHandler(err, req, res, next) {
   res.status(500).json({ ok: false, error: 'Error interno' });
 }
 
-module.exports = { securityHeaders, noStorePrivate, loadSession, refreshCache, requireAuth, requireRole, loginRateLimit, errorHandler };
+module.exports = { securityHeaders, noStorePrivate, loadSession, refreshCache, requireAuth, requireRole, loginRateLimit, noteFailedLogin, forgiveLogin, errorHandler };

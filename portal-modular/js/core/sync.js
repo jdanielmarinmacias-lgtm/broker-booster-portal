@@ -32,6 +32,32 @@
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
+  /* El legacy vive en mundo numérico (id: 1, students: [3], === estricto) pero
+   * Supabase devuelve TEXT ("1"). Sin normalizar, find/filter con === fallan
+   * (ej. openChat: otro usuario undefined → el chat no abre). Se reconvierte
+   * a Number todo id numérico al traer del servidor; el push ya tolera ambos.
+   * OJO: solo claves id/…Id y arrays conocidos — jamás phone, títulos, etc. */
+  var ID_ARRAYS = { students: 1, assignedTo: 1, readBy: 1, views: 1, participants: 1, members: 1 };
+  function numIfNumeric(v) {
+    if (typeof v === 'string' && v !== '' && /^[0-9]+$/.test(v)) {
+      const n = Number(v);
+      if (Number.isSafeInteger(n)) return n;
+    }
+    return v;
+  }
+  function normIds(node) {
+    if (Array.isArray(node)) { node.forEach(normIds); return node; }
+    if (node && typeof node === 'object') {
+      Object.keys(node).forEach(function (k) {
+        const v = node[k];
+        if ((k === 'id' || /Id$/.test(k)) && typeof v !== 'object') node[k] = numIfNumeric(v);
+        else if (ID_ARRAYS[k] && Array.isArray(v)) node[k] = v.map(numIfNumeric);
+        else normIds(v);
+      });
+    }
+    return node;
+  }
+
   async function get(path) {
     const res = await fetch(path, { credentials: 'same-origin' });
     let json = null;
@@ -79,7 +105,7 @@
     results.forEach(function ({ n, items }) {
       if (!items) return; // sin permiso: no tocar
       if (!Array.isArray(db[n])) db[n] = [];
-      replaceArray(db[n], items);
+      replaceArray(db[n], normIds(items));
       pulled[n] = true; // verdad del servidor: entra a la sombra
       changed = true;
     });
@@ -93,7 +119,7 @@
       const users = await window.Backend.listUsers();
       if (!Array.isArray(users)) return false;
       if (!Array.isArray(db.users)) db.users = [];
-      replaceArray(db.users, users);
+      replaceArray(db.users, normIds(users));
       usersPulled = true;
       return true;
     } catch (e) { return false; } // sin permiso de listar: espejo local
@@ -243,7 +269,8 @@
     if (!db) return;
     // Unión sombra+local: las colecciones solo-locales (nunca en servidor) también suben.
     const set = {};
-    Object.keys(shadow).forEach(function (n) { set[n] = true; });
+    // users va por /api/users (pushUsers); jamás por /api/data (404).
+    Object.keys(shadow).forEach(function (n) { if (n !== 'users' && !SKIP[n]) set[n] = true; });
     Object.keys(db).forEach(function (n) { if (!SKIP[n] && n !== 'users' && Array.isArray(db[n])) set[n] = true; });
     const names = Object.keys(set);
     const failed = [];
@@ -310,6 +337,7 @@
   }
 
   window.BackendSync = {
+    normUser: function (u) { return normIds(u) || u; },
     pull: pullAll,
     pullShowcase: function () { return pullNames(SHOWCASE); },
     hookSave,

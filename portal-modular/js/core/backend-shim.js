@@ -121,6 +121,7 @@
       const p = ($('password') || {}).value || '';
       try {
         const r = await window.Backend.login(u, p);
+        try { if (window.BackendSync) window.BackendSync.normUser(r.user); } catch (e) {}
         if (!guardCampus(r.user)) return;
         await syncUsersMirror();
         // fase 2b: pull del servidor ANTES del primer render (datos de todos).
@@ -138,6 +139,7 @@
       const me = await window.Backend.me();
       if (me && me.user) {
         await syncUsersMirror();
+        try { if (window.BackendSync) window.BackendSync.normUser(me.user); } catch (e) {}
         // fase 2b: el pull vive en sync.js (boot con sesión); aquí solo espejo.
         enterApp(me.user, 'campus');
       }
