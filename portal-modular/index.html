@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="dynamic-title">Academia - Plataforma</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <!-- FASE 1 - PDF REAL -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+
+
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUmlubyBQb3J0YWwgUHJlbWl1bSIsInNob3J0X25hbWUiOiJSaW5vIiwic3RhcnRfdXJsIjoiLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmOGZhZmMiLCJ0aGVtZV9jb2xvciI6IiMwYTI1NDAiLCJpY29ucyI6W3sic3JjIjoiaHR0cHM6Ly9pLnByYXZhdGFyLmNjLzE5MiIsInNpemVzIjoiMTkyeDE5MiIsInR5cGUiOiJpbWFnZS9wbmcifV19">
+<meta name="theme-color" content="#0a2540">
+<meta name="description" content="Portal de Desarrollo Comercial — Academia con clases en vivo por roles.">
+
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="text-slate-800">
+    <div id="public-portal"></div>
+    <div id="app" class="flex flex-col">
+        <!-- Login Screen -->
+        <div id="login-screen" class="hidden flex justify-center bg-slate-100 p-4 pt-12">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <img id="login-logo" src="" alt="Logo" class="h-20 mx-auto mb-4 object-contain rounded-2xl bg-white p-2 shadow-sm">
+                    <p id="login-subtitle" class="text-slate-500 mt-2">Excelencia académica, diseño premium</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-xl">
+                    <h2 class="text-2xl font-semibold text-center mb-6">Iniciar Sesión</h2>
+                    <form id="login-form" class="space-y-4">
+                        <div>
+                            <label class="text-sm font-medium text-slate-600">Usuario</label>
+                            <input type="text" id="username" required class="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-white text-slate-900" placeholder="Usuario">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-slate-600">Contraseña</label>
+                            <input type="password" id="password" required class="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-white text-slate-900" placeholder="Contraseña">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30">Ingresar</button>
+                    </form>
+                    <p id="login-error" class="text-red-500 text-sm mt-4 text-center hidden"></p>
+                    <div class="mt-6 text-xs text-slate-400 text-center space-y-1">
+                        <p id="login-line1">Plataforma educativa</p>
+                        <p id="login-line2">Certificada ISO 21001</p>
+                        <p id="login-line3">© 2026 Broker Booster By ARYS</p>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button onclick="openSolicitudModal()" class="w-full bg-white border-2 border-slate-200 text-slate-700 py-3.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-indigo-600 hover:text-indigo-600 transition flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fas fa-envelope-open-text text-indigo-600"></i>
+                        Solicita Información
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-app" class="hidden min-h-screen flex-1 flex flex-col ">
+            <!-- Sidebar -->
+            <aside id="sidebar" class="sidebar bg-white w-72 fixed inset-y-0 left-0 z-40 transform -translate-x-full flex flex-col shadow-2xl transition-transform duration-300">
+                <div class="flex items-center gap-3 px-6 py-5 border-b border-slate-200">
+                     <img id="sidebar-logo" src="" alt="Logo" class="h-10 w-auto object-contain rounded-xl">
+                </div>
+                <nav id="nav-menu" class="flex-1 px-5 py-6 space-y-2 overflow-y-auto"></nav>
+                <div class="px-4 py-4 border-t border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <img id="user-avatar" src="https://i.pravatar.cc/40" class="w-10 h-10 rounded-full" alt="avatar">
+                        <div class="flex-1">
+                            <p id="user-name" class="font-semibold text-sm"></p>
+                            <p id="user-role" class="text-xs text-slate-500 capitalize"></p>
+                        </div>
+                        <span id="user-streak" class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium hidden"><i class="fas fa-fire mr-1"></i>0</span>
+                        <button onclick="logout()" class="ml-2 text-slate-400 hover:text-red-500"><i class="fas fa-sign-out-alt"></i></button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <div class="flex-1 flex flex-col min-h-screen lg:min-w-0">
+                <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-20">
+                    <button id="menu-toggle" class="text-slate-600 hover:text-slate-900 p-2 -ml-2 rounded-lg hover:bg-slate-100"><i class="fas fa-bars text-xl"></i></button>
+                    <h2 id="page-title" class="text-xl font-semibold text-slate-800">Dashboard</h2>
+                    <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
+                        <i class="fas fa-bell text-lg"></i>
+                        <span id="badge-solicitudes-header" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white">0</span>
+                    </button>
+                </header>
+                <main id="main-content" class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50"></main>
+                <!-- Barra Noticias - con botón cerrar visible -->
+                <div id="news-ticker-wrapper" class="fixed bottom-0 left-0 right-0 text-white border-t border-slate-700 z-40 transition-all duration-300 translate-y-0" style="background: var(--news-bg, var(--primary));">
+                    <div class="flex items-center">
+                        <div class="text-white px-4 py-2.5 font-semibold text-sm uppercase tracking-wider flex items-center gap-2 shrink-0" style="background: var(--news-accent, #dc2626);">
+                            <i class="fas fa-bullhorn"></i> Noticias
+                            <span id="news-badge-nuevas" class="news-badge-count hidden" title="Noticias nuevas sin ver">0</span>
+                        </div>
+                        <div class="relative overflow-hidden flex-1 h-10 flex items-center">
+                            <div id="news-ticker-content" class="whitespace-nowrap will-change-transform"></div>
+                        </div>
+                        <button onclick="toggleNewsBar()" class="bg-red-600 hover:bg-red-700 px-4 py-2.5 text-white font-bold text-sm transition shrink-0" title="Cerrar barra de noticias">
+                            <i class="fas fa-times"></i> <span class="hidden sm:inline">CERRAR</span>
+                        </button>
+                    </div>
+                </div>
+                <!-- Botón para mostrar noticias (oculto por defecto) -->
+                <button id="show-news-btn" onclick="toggleNewsBar()" class="fixed bottom-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-full shadow-xl font-semibold text-sm hidden items-center gap-2 transition-all" title="Mostrar noticias">
+                    <i class="fas fa-bullhorn"></i> <span>Ver Noticias</span>
+                    <span id="news-badge-btn" class="news-badge-count hidden absolute -top-1.5 -right-1.5 ring-2 ring-white">0</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals Container -->
+    <div id="modal-container"></div>
+
+
+
+
+
+
+
+
+
+
+
+<!-- === NOTIFICACIONES POR EMAIL - GOOGLE APPS SCRIPT === -->
+<!-- === FIN NOTIFICACIONES === -->
+
+<!-- === EN VIVO STUDIO INTEGRADO v6.4 - YOUTUBE STYLE POR ROLES === -->
+
+<!-- === FIN EN VIVO STUDIO INTEGRADO === -->
+
+
+</body>
+    <!-- Paso 1: JS modular (mismo orden que el monolito) -->
+    <script src="js/core/store.js"></script>
+    <script src="js/core/backend.js"></script>
+    <script src="js/core/realtime.js"></script>
+    <script src="js/services/rolesService.js"></script>
+    <script src="js/services/userService.js"></script>
+    <script src="js/services/repository.js"></script>
+    <script src="js/legacy/00-head-utils.js"></script>
+    <script src="js/legacy/01-core-db-roles-portal.js"></script>
+    <script src="js/legacy/02-modulo-b.js"></script>
+    <script src="js/legacy/03-config-73l.js"></script>
+    <script src="js/legacy/04-modulo-d.js"></script>
+    <script src="js/legacy/05-modulo-e.js"></script>
+    <script src="js/legacy/06-modulo-f.js"></script>
+    <script src="js/legacy/07-modulo-g.js"></script>
+    <script src="js/legacy/08-snippet-h.js"></script>
+    <script src="js/legacy/09-modulo-i.js"></script>
+    <script src="js/legacy/10-modulo-j.js"></script>
+    <script src="js/modules/auth-custom.js"></script>
+    <script src="js/modules/dashboard.js"></script>
+    <script src="js/modules/chat.js"></script>
+    <script src="js/modules/ventas.js"></script>
+    <script src="js/modules/inventario.js"></script>
+    <script src="js/core/backend-shim.js"></script>
+    <script src="js/legacy/11-init.js"></script>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "broker-booster-portal",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Portal Broker Booster: frontend modular + backend propio, desplegable en Vercel con Supabase.",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "@supabase/supabase-js": "^2.48.1"
+  }
+}
