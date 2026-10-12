@@ -33,6 +33,10 @@ function createMemoryAdapter(initial) {
       feed.push({ id: Date.now(), created_at: new Date().toISOString(), ...item });
       return feed[feed.length - 1];
     },
+    async listFeed(limit) {
+      return feed.slice(-Math.min(Number(limit) || 20, 50)).reverse();
+    },
+    async ensureMediaBucket() { /* sin Storage en memoria */ },
     _feed: feed,
   };
 }

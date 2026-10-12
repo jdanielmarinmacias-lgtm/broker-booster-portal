@@ -45,6 +45,11 @@ function createJsonFileAdapter(dataDir) {
       delete all[token];
       writeAtomic(SES_FILE, all);
     },
+    async listFeed(limit) {
+      const data = read(DB_FILE, {});
+      return (data.publicFeed || []).slice(-Math.min(Number(limit) || 20, 50)).reverse();
+    },
+    async ensureMediaBucket() { /* sin Storage local: disco */ },
     async pushFeed(item) {
       const data = read(DB_FILE, {});
       data.publicFeed = data.publicFeed || [];

@@ -2110,6 +2110,14 @@ function auAltaUnidad(id){
         if(form) form.onsubmit = (e)=>{ e.preventDefault(); auGuardarUnidad(id); };
     },0);
 }
+/* Paso 4: lectura base64 local (fallback cuando no hay backend/sube falla). */
+function auFotosLocal(primeros, guardar){
+    let pend = primeros.length; const arr = [];
+    primeros.forEach(f=>{ const r=new FileReader(); r.onload=()=>{ arr.push(r.result); pend--; if(pend===0) guardar(arr); }; r.onerror=()=>{ pend--; if(pend===0) guardar(arr); }; r.readAsDataURL(f); });
+}
+function auFileLocal(f, guardar){
+    const r=new FileReader(); r.onload=()=>guardar(r.result); r.onerror=()=>guardar(null); r.readAsDataURL(f);
+}
 function auGuardarUnidad(id){
     const d = auD();
     const lee = (k)=>{ const el=document.getElementById(k); return el?el.value.trim():''; };
@@ -2129,8 +2137,11 @@ function auGuardarUnidad(id){
     };
     if(files && files.length){
         const primeros = [...files].slice(0,8);
-        let pend = primeros.length; const arr = [];
-        primeros.forEach(f=>{ const r=new FileReader(); r.onload=()=>{ arr.push(r.result); pend--; if(pend===0) guardar(arr); }; r.onerror=()=>{ pend--; if(pend===0) guardar(arr); }; r.readAsDataURL(f); });
+        // Paso 4: servidor primero (URLs compartidas en vivo), base64 si falla.
+        if (window.Media && window.Backend && window.Backend.available) {
+            if (window.showToast) window.showToast('Subiendo fotos…','info');
+            window.Media.subirMuchos(primeros, 'autoHub').then(items=>guardar(items.map(x=>x.url))).catch(()=>auFotosLocal(primeros, guardar));
+        } else auFotosLocal(primeros, guardar);
     } else guardar(null);
 }
 function auReservar(id){
@@ -2593,7 +2604,11 @@ function auPautaGuardar(){
     if(!p.titulo){ showToast('Escribe el título de la pieza','warning'); return; }
     const guardar=(img)=>{ if(img) p.imagen=img; d.publicidad.unshift(p); cmLog('Agencia Automotriz','Nueva pieza publicitaria', p.titulo); saveDB(); closeModal(); showToast('Pieza guardada','success'); render(); };
     const f = document.getElementById('au-p-img').files[0];
-    if(f){ const r=new FileReader(); r.onload=()=>guardar(r.result); r.readAsDataURL(f); } else guardar(null);
+    if(f){
+        if (window.Media && window.Backend && window.Backend.available) {
+            window.Media.subir(f, { scope:'autoHub' }).then(item=>guardar(item.url)).catch(()=>auFileLocal(f, guardar));
+        } else auFileLocal(f, guardar);
+    } else guardar(null);
 }
 function auPautaCopiar(id){
     const p = auD().publicidad.find(x=>x.id===id); if(!p) return;

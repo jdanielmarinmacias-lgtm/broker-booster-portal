@@ -21,6 +21,14 @@ function createApp(store) {
   app.use('/api/auth', mw.noStorePrivate, require('./routes/auth')(store));
   app.use('/api/users', mw.noStorePrivate, require('./routes/users')(store));
   app.use('/api', mw.noStorePrivate, require('./routes/collections')(store, config));
+  app.use('/api', mw.noStorePrivate, require('./routes/media')(store, config));
+
+  if (store.adapter.kind !== 'supabase') {
+    // Solo local: sirve lo subido por POST /api/media. En producción los
+    // bytes viven en Supabase Storage ( URLs públicas del bucket).
+    const path = require('path');
+    app.use('/uploads', express.static(path.join(config.dataDir, 'uploads')));
+  }
 
   app.get('/api/salud', (req, res) => res.json({
     ok: true, backend: true, store: store.adapter.kind,
@@ -42,6 +50,8 @@ async function boot(adapter) {
   sessions.bind(adapter);
   const store = createStore(adapter);
   await store.init();
+  // Asegura el bucket público de archivos (no-op salvo supabase; no fatal).
+  try { await store.adapter.ensureMediaBucket(); } catch (e) { console.error('[backend] bucket:', e.message); }
   return { store, app: createApp(store) };
 }
 

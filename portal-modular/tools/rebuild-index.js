@@ -66,7 +66,7 @@ const body = bodyKept.join('\n');
 const legacy = ['00-head-utils.js', '01-core-db-roles-portal.js', '02-modulo-b.js',
   '03-config-73l.js', '04-modulo-d.js', '05-modulo-e.js', '06-modulo-f.js',
   '07-modulo-g.js', '08-snippet-h.js', '09-modulo-i.js', '10-modulo-j.js'];
-const core = ['store.js', 'backend.js', 'realtime.js']; // backend.js: autodetecta API (Paso 2) · realtime.js: feed Supabase (Paso 3), ambos inocuos sin servidor
+const core = ['store.js', 'backend.js', 'media.js', 'realtime.js']; // backend.js: autodetecta API (Paso 2) · media.js: subida de archivos (Paso 4) · realtime.js: feed Supabase (Paso 3+4), todos inocuos sin servidor
 const modules = ['auth-custom.js', 'dashboard.js', 'chat.js', 'ventas.js', 'inventario.js'];
 const shim = ['backend-shim.js']; // puente login legacy<->API: solo actúa si hay backend
 const html = head + '\n' + body + '\n' +

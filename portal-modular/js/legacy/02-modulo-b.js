@@ -250,7 +250,27 @@
             window.uploadImageBase64 = function(input, previewId, hiddenId) {
                 const file = input.files[0];
                 if (!file) return;
-                
+                // Paso 4: si hay backend, la imagen vive en Supabase Storage (URL
+                // compartida en tiempo real). Si falla o no hay backend, base64 local.
+                if (window.Media && window.Backend && window.Backend.available) {
+                    window.Media.subir(file, { scope: 'media' }).then(function(item){
+                        if (previewId && document.getElementById(previewId)) {
+                            const pv = document.getElementById(previewId);
+                            pv.src = item.url; pv.classList.remove('hidden');
+                        }
+                        if (hiddenId && document.getElementById(hiddenId)) {
+                            document.getElementById(hiddenId).value = item.url;
+                        }
+                        if (window.showToast) window.showToast('Imagen subida','success');
+                    }).catch(function(){ uploadImageBase64Local(input, previewId, hiddenId); });
+                    return;
+                }
+                uploadImageBase64Local(input, previewId, hiddenId);
+            };
+            window.uploadImageBase64Local = function(input, previewId, hiddenId) {
+                const file = input.files[0];
+                if (!file) return;
+
                 // Comprimir imagen antes de guardar (para evitar límite localStorage)
                 const maxWidth = 800; // Para fotos de historias
                 const maxHeight = 800;
@@ -599,6 +619,21 @@
                 }).join('') || '<p class="text-xs text-slate-400">Sin propiedades publicadas. Usa "Agregar" para crear la primera.</p>';
             };
             window.propsFoto = function(input, ix){
+                const files = Array.from(input.files||[]); if(!files.length) return;
+                // Paso 4: servidor primero (URLs compartidas en vivo), base64 si falla.
+                if (window.Media && window.Backend && window.Backend.available) {
+                    if (window.showToast) window.showToast('Subiendo fotos…','info');
+                    window.Media.subirMuchos(files, 'inmPublica').then(function(items){
+                        const urls = items.map(function(x){ return x.url; });
+                        window.propsGlobales[ix].fotos = (window.propsGlobales[ix].fotos||[]).concat(urls).slice(0,8);
+                        renderPropsPortada();
+                        if (window.showToast) window.showToast('Fotos subidas','success');
+                    }).catch(function(){ propsFotoLocal(input, ix); });
+                    return;
+                }
+                propsFotoLocal(input, ix);
+            };
+            window.propsFotoLocal = function(input, ix){
                 const files = Array.from(input.files||[]); if(!files.length) return;
                 let pending = files.length; const results = [];
                 files.forEach(function(file){

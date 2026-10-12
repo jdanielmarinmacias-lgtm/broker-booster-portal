@@ -35,6 +35,8 @@ const fromUserRow = (r) => ({
   mustChangePassword: !!r.must_change,
 });
 
+const MEDIA_BUCKET = 'portal-media';
+
 function createSupabaseAdapter({ url, serviceKey }) {
   const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
 
@@ -143,11 +145,45 @@ function createSupabaseAdapter({ url, serviceKey }) {
       await sb.from('app_sessions').delete().eq('token', token);
     },
     async pushFeed(item) {
-      const { data, error } = await sb.from('public_feed')
-        .insert({ kind: item.kind || 'aviso', title: item.title || '', body: item.body || '' })
-        .select().single();
+      const base = { kind: item.kind || 'aviso', title: item.title || '', body: item.body || '' };
+      const full = { ...base };
+      if (item.image_url) full.image_url = item.image_url;
+      if (item.media_kind) full.media_kind = item.media_kind;
+      let { data, error } = await sb.from('public_feed').insert(full).select().single();
+      if (error && /image_url|media_kind|column/i.test(error.message)) {
+        // Pre-migración (sin migration_media.sql): reintenta sin columnas nuevas.
+        ({ data, error } = await sb.from('public_feed').insert(base).select().single());
+      }
       if (error) throw new Error('Supabase feed: ' + error.message);
       return data;
+    },
+    async listFeed(limit) {
+      const { data, error } = await sb.from('public_feed').select('*')
+        .order('created_at', { ascending: false }).limit(Math.min(Number(limit) || 20, 50));
+      if (error) throw new Error('Supabase feed list: ' + error.message);
+      return data || [];
+    },
+    /* ---- Storage de archivos (bucket público; subidas firmadas) ---- */
+    async ensureMediaBucket() {
+      const { error } = await sb.storage.createBucket(MEDIA_BUCKET, { public: true });
+      if (error && !/exists|duplicate|already/i.test(error.message)) {
+        throw new Error('Supabase bucket: ' + error.message);
+      }
+    },
+    async signUpload(storagePath) {
+      const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUploadUrl(storagePath);
+      if (error) throw new Error('Supabase sign: ' + error.message);
+      return { uploadUrl: data.signedUrl, publicUrl: this.publicUrl(storagePath) };
+    },
+    publicUrl(storagePath) {
+      return sb.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+    },
+    async storageExists(storagePath) {
+      const dir = storagePath.split('/').slice(0, -1).join('/') || '';
+      const name = storagePath.split('/').pop();
+      const { data, error } = await sb.storage.from(MEDIA_BUCKET).list(dir || undefined, { search: name });
+      if (error) throw new Error('Supabase storage list: ' + error.message);
+      return (data || []).some((f) => f.name === name && (f.metadata?.size ?? 1) > 0);
     },
   };
 }

@@ -5,6 +5,16 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.SEED_PASSWORD = 'Test1234*';
+// Herméticos y offline: pisan el .env real (config.js solo rellena lo undefined;
+// '' es falsy y deja supabaseUrl/ServiceKey en null).
+process.env.SUPABASE_URL = '';
+process.env.SUPABASE_ANON_KEY = '';
+process.env.SUPABASE_SERVICE_KEY = '';
+// El suite hace >10 logins desde la misma IP: sube el tope (el limitador se
+// verifica aparte en producción con su default de 10).
+process.env.LOGIN_RATE_MAX = '100';
+// Subidas locales de los tests a tmp (no ensucian el repo).
+process.env.DATA_DIR = require('os').tmpdir() + '/bb-test-' + process.pid;
 
 const { createApp } = require('../src/server');
 const { createStore } = require('../src/store');
@@ -116,6 +126,14 @@ describe('roles en servidor', () => {
   });
 });
 
+describe('salud pública (regressión: ningún router la debe 401-izar)', () => {
+  it('/api/salud responde sin sesión', async () => {
+    const r = await api('GET', '/api/salud', null, false);
+    assert.equal(r.status, 200);
+    assert.equal(r.json.ok, true);
+  });
+});
+
 describe('paso 3: config pública y feed', () => {
   it('config pública anuncia realtime=false sin Supabase', async () => {
     const r = await api('GET', '/api/public/config', null, false);
@@ -134,5 +152,70 @@ describe('paso 3: config pública y feed', () => {
     assert.equal(r.status, 201);
     assert.equal(store.adapter._feed.length, 1);
     assert.equal(store.adapter._feed[0].kind, 'autoHub');
+  });
+  it('feed público lista lo publicado (último primero)', async () => {
+    const r = await api('GET', '/api/public/feed', null, false);
+    assert.equal(r.status, 200);
+    assert.ok(Array.isArray(r.json.items));
+    assert.equal(r.json.items[0].kind, 'autoHub');
+  });
+});
+
+describe('paso 4: archivos compartidos (modo local)', () => {
+  async function rawForm(fd, withAuth = true) {
+    const headers = {};
+    if (withAuth && jar.cookie) headers.Cookie = jar.cookie;
+    const res = await fetch(base + '/api/media', { method: 'POST', headers, body: fd });
+    let json = null;
+    try { json = await res.json(); } catch (e) { /* no-json */ }
+    return { status: res.status, json };
+  }
+  const png = (name) => {
+    const fd = new FormData();
+    fd.append('files', new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47])], { type: 'image/png' }), name);
+    fd.append('scope', 'autoHub');
+    fd.append('title', 'Auto con foto');
+    return fd;
+  };
+  it('sign sin Supabase responde 501 con fallback local', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('POST', '/api/media/sign', { filename: 'a.png', mime: 'image/png', size: 100, scope: 'autoHub' });
+    assert.equal(r.status, 501);
+    assert.equal(r.json.fallback, 'local');
+  });
+  it('sin sesión es 401', async () => {
+    const r = await rawForm(png('s.png'), false);
+    assert.equal(r.status, 401);
+  });
+  it('alumno no sube a ventas (403) y se borra el temporal', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const fd = png('x.png');
+    fd.set('scope', 'ventas');
+    const r = await rawForm(fd);
+    assert.equal(r.status, 403);
+  });
+  it('rechaza ejecutables (400)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const fd = new FormData();
+    fd.append('files', new Blob(['x'], { type: 'application/x-msdownload' }), 'mal.exe');
+    fd.append('scope', 'media');
+    const r = await rawForm(fd);
+    assert.equal(r.status, 400);
+  });
+  it('admin sube PNG (201), sirve el archivo y el feed lo incluye', async () => {
+    const r = await rawForm(png('foto.png'));
+    assert.equal(r.status, 201);
+    const item = r.json.items[0];
+    assert.match(item.url, /^\/uploads\//);
+    assert.equal(item.mime, 'image/png');
+    const f = await fetch(base + item.url);
+    assert.equal(f.status, 200);
+    const feed = await api('GET', '/api/public/feed', null, false);
+    const row = feed.json.items.find((x) => x.title === 'Auto con foto');
+    assert.ok(row);
+    assert.equal(row.image_url, item.url);
   });
 });
