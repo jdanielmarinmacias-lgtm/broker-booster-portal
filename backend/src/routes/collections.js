@@ -51,6 +51,16 @@ module.exports = (store, config) => {
   const api = express.Router();
   api.use(mw.requireAuth);
 
+  /* Índice de colecciones sincronizables (el frontend hace pull de estas).
+   * Excluye users/sessions (rutas propias) y todo lo que no sea array. */
+  api.get('/', (req, res) => {
+    const data = store.get();
+    const collections = Object.keys(data).filter(
+      (k) => !FORBIDDEN.has(k) && Array.isArray(data[k])
+    );
+    res.json({ ok: true, collections });
+  });
+
   api.get('/:collection', async (req, res, next) => {
     try {
       const { collection } = req.params;
@@ -70,8 +80,21 @@ module.exports = (store, config) => {
       const { collection } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      const rec = { ...(req.body || {}), id: db.newId() };
-      db.collection(store.get(), collection).push(rec);
+      const col = db.collection(store.get(), collection);
+      const body = req.body || {};
+      // Upsert por id: el frontend crea con id local (Date.now) y sincroniza.
+      // Si el id ya existe se reemplaza (200); si no, se crea (201).
+      if (body.id !== undefined && body.id !== null) {
+        const ix = col.findIndex((x) => String(x.id) === String(body.id));
+        if (ix >= 0) {
+          col[ix] = { ...body, id: col[ix].id };
+          db.audit(store.get(), `edicion_${collection}`, req.user, { id: col[ix].id });
+          await store.persist();
+          return res.json({ ok: true, item: col[ix], upserted: true });
+        }
+      }
+      const rec = { ...body, id: body.id ?? db.newId() };
+      col.push(rec);
       db.audit(store.get(), `creacion_${collection}`, req.user, { id: rec.id });
       await store.persist();
       if (FEED_COLLECTIONS.has(collection)) {

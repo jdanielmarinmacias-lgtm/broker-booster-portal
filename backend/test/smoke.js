@@ -161,6 +161,53 @@ describe('paso 3: config pública y feed', () => {
   });
 });
 
+describe('fase 2b: índice y upsert para sync', () => {
+  it('GET /api/data lista colecciones sin users/sessions', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('GET', '/api/data');
+    assert.equal(r.status, 200);
+    assert.ok(r.json.collections.includes('ventas'));
+    assert.ok(!r.json.collections.includes('users') && !r.json.collections.includes('sessions'));
+  });
+  it('sin sesión el índice es 401', async () => {
+    const r = await api('GET', '/api/data', null, false);
+    assert.equal(r.status, 401);
+  });
+  it('POST con id de cliente crea (201) y re-POST hace upsert (200)', async () => {
+    const c1 = await api('POST', '/api/data/metas', { id: 999001, titulo: 'Meta local' });
+    assert.equal(c1.status, 201);
+    assert.equal(c1.json.item.id, 999001);
+    const c2 = await api('POST', '/api/data/metas', { id: 999001, titulo: 'Meta editada' });
+    assert.equal(c2.status, 200);
+    assert.equal(c2.json.upserted, true);
+    const g = await api('GET', '/api/data/metas');
+    assert.equal(g.json.items.find((x) => x.id === 999001).titulo, 'Meta editada');
+    const d = await api('DELETE', '/api/data/metas/999001');
+    assert.equal(d.status, 200);
+  });
+  it('ids duplicados no tumban el persist (upsert last-wins, no 500)', async () => {
+    // El legacy genera ids con Date.now: pueden repetirse; el adaptador dedupa.
+    const a = await api('POST', '/api/data/metas', { id: 999002, titulo: 'Uno' });
+    assert.equal(a.status, 201);
+    const b = await api('POST', '/api/data/metas', { id: 999002, titulo: 'Dos' });
+    assert.equal(b.status, 200);
+    const g = await api('GET', '/api/data/metas');
+    assert.equal(g.json.items.filter((x) => x.id === 999002).length, 1);
+    await api('DELETE', '/api/data/metas/999002');
+  });
+  it('POST /api/users acepta id de cliente (referencias locales intactas)', async () => {
+    const r = await api('POST', '/api/users', { id: 888001, username: 'sinctest', password: 'Clave1234', role: 'alumno', name: 'Sync Test' });
+    assert.equal(r.status, 201);
+    assert.equal(r.json.user.id, 888001);
+    assert.ok(!('passwordHash' in r.json.user));
+    const dup = await api('POST', '/api/users', { id: 888001, username: 'otro', password: 'Clave1234', role: 'alumno' });
+    assert.equal(dup.status, 409);
+    const del = await api('DELETE', '/api/users/888001');
+    assert.equal(del.status, 200);
+  });
+});
+
 describe('paso 4: archivos compartidos (modo local)', () => {
   async function rawForm(fd, withAuth = true) {
     const headers = {};

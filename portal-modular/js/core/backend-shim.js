@@ -123,6 +123,8 @@
         const r = await window.Backend.login(u, p);
         if (!guardCampus(r.user)) return;
         await syncUsersMirror();
+        // fase 2b: pull del servidor ANTES del primer render (datos de todos).
+        try { if (window.BackendSync) await window.BackendSync.pull(); } catch (e) {}
         const proceed = () => enterApp(r.user);
         if (r.mustChangePassword) askChangePassword(r.user, proceed);
         else proceed();
@@ -136,6 +138,7 @@
       const me = await window.Backend.me();
       if (me && me.user) {
         await syncUsersMirror();
+        // fase 2b: el pull vive en sync.js (boot con sesión); aquí solo espejo.
         enterApp(me.user, 'campus');
       }
     } catch (e) { /* sin sesión: se queda en portada/login */ }

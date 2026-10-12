@@ -22,7 +22,7 @@ module.exports = (store) => {
 
   r.post('/', async (req, res, next) => {
     try {
-    const { username, role, name, email, phone, password } = req.body || {};
+    const { username, role, name, email, phone, password, id } = req.body || {};
     if (!username) return res.status(400).json({ ok: false, error: 'username requerido' });
     if (!roles.ROLES[String(role || '').toLowerCase()]) {
       return res.status(400).json({ ok: false, error: 'Rol inválido' });
@@ -31,8 +31,17 @@ module.exports = (store) => {
     if (users.some((x) => String(x.username).toLowerCase() === String(username).toLowerCase())) {
       return res.status(409).json({ ok: false, error: 'El username ya existe' });
     }
+    // Acepta id del cliente (sincronización offline-first del frontend):
+    // preserva las referencias locales (students, agenteId…).
+    let useId = db.newId();
+    if (id !== undefined && id !== null) {
+      if (users.some((x) => String(x.id) === String(id))) {
+        return res.status(409).json({ ok: false, error: 'El id ya existe' });
+      }
+      useId = id;
+    }
     const rec = {
-      id: db.newId(),
+      id: useId,
       username, role: String(role).toLowerCase(),
       name: name || username, email: email || '', phone: phone || '',
       avatar: `https://i.pravatar.cc/40?u=${encodeURIComponent(username)}`,

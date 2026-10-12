@@ -62,14 +62,18 @@ function createSupabaseAdapter({ url, serviceKey }) {
 
   async function saveDocuments(obj) {
     // Write-through completo (escala del portal: decenas de filas por mutación).
-    const rows = [];
+    // Dedup por (collection, doc_id): el legacy puede traer ids repetidos
+    // (Date.now) y Postgres aborta el upsert si un conflicto se toca 2 veces.
+    const seenRows = new Map();
     for (const [collection, items] of Object.entries(obj || {})) {
       if (collection === 'users') continue;
       if (!Array.isArray(items)) continue;
       for (const item of items) {
-        rows.push({ collection, doc_id: String(item.id ?? Date.now()), data: { ...item, id: undefined } });
+        const doc_id = String(item.id ?? Date.now());
+        seenRows.set(collection + '∅' + doc_id, { collection, doc_id, data: { ...item, id: undefined } });
       }
     }
+    const rows = [...seenRows.values()];
     const seen = new Set();
     for (let i = 0; i < rows.length; i += 500) {
       const chunk = rows[i].collection ? rows.slice(i, i + 500) : [];
