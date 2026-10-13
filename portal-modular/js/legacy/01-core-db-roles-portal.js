@@ -3149,7 +3149,11 @@ function psKeyIA() { return window.psAPIKey || window.IA_BROKER_KEY || ''; }
 /* Comparador/Gu-IA: clave del servidor (sesión) o la que el usuario pegó en
  * el navegador. Así el módulo sirve aunque Vercel aún no tenga GROQ_API_KEY. */
 function guiaIAKey() {
-  try { return GUIA_KEY || (localStorage.getItem('groq_api_key') || ''); } catch (e) { return GUIA_KEY || ''; }
+  try {
+    const pegada = localStorage.getItem('groq_api_key') || '';
+    const confPractica = ((psGetDB().practicaConfig || {}).apiKey) || '';
+    return GUIA_KEY || pegada || confPractica || '';
+  } catch (e) { return GUIA_KEY || ''; }
 }
 const GUIA_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GUIA_MODEL = 'openai/gpt-oss-120b';
@@ -5526,6 +5530,11 @@ async function cpAnalizarIA(){
   if(tA.length<30||tB.length<30){ showToast('Pega o sube el texto de las 2 cotizaciones (mínimo un párrafo por cotización)','warning'); return; }
   const btn=document.getElementById('cp-btn-analizar');
   if(btn){ btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin mr-1"></i> Analizando…'; }
+  if(!guiaIAKey()){
+    cpEstado('IA no configurada: pega tu API key en «Práctica tus sesiones → Config IA» y guarda, o pide al administrador configurar GROQ_API_KEY en el servidor.','error');
+    if(btn){ btn.disabled=false; btn.innerHTML='<i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA'; }
+    return;
+  }
   cpEstado('Gu-IA está analizando las 2 cotizaciones… (10-30 s)');
   try{
     const prompt=[
