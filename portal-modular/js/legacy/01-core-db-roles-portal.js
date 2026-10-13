@@ -3879,6 +3879,7 @@ function renderPublicidad(){
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       ${items.map(p=>`
       <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col hover:shadow-md transition">
+        ${pubEsImagen(p)?`<button type="button" onclick="pubVerImagen('${p.id}')" title="Ver imagen completa" class="mb-3 -mx-1"><img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="h-36 w-full object-cover rounded-xl border border-slate-200" loading="lazy"></button>`:''}
         <div class="flex items-start justify-between mb-2">
           <div class="w-10 h-10 rounded-xl bg-emerald-50 grid place-items-center"><i class="fas ${p.tipo==='enlace'?'fa-link':'fa-file-lines'} text-emerald-600"></i></div>
           ${puede?`<div class="flex gap-2"><button onclick="openPublicidadModal('${p.id}')" class="text-slate-400 hover:text-indigo-600 text-xs"><i class="fas fa-pen"></i></button><button onclick="borrarPublicidad('${p.id}')" class="text-slate-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button></div>`:''}
@@ -3898,14 +3899,36 @@ function renderPublicidad(){
     </div>
   </div>`;
 }
+/* ¿El material subido es una imagen? (data URL image/*) */
+function pubEsImagen(p){ return /^data:image\//.test(String((p&&p.fileData)||'')); }
+/* Vista ampliada de la imagen publicitaria (modal ligero) */
+function pubVerImagen(id){
+  const p=(db.settings&&db.settings.publicidad||[]).find(x=>String(x.id)===String(id));
+  if(!p||!pubEsImagen(p)){ showToast('No hay imagen para mostrar','warning'); return; }
+  showModal(`<div class="p-4 max-w-md w-full text-center">
+    <div class="flex items-center justify-between mb-3"><h3 class="text-base font-bold truncate">${psEscape(p.titulo)}</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="w-full max-h-[60vh] object-contain rounded-xl border border-slate-200 bg-white">
+    ${p.descripcion?`<p class="text-xs text-slate-500 mt-2">${psEscape(p.descripcion)}</p>`:''}
+  </div>`);
+}
 function pubFilaArchivo(p){
   return `<div><label class="text-sm font-medium">Archivo (opcional si usas enlace)</label>
   <div class="flex items-center gap-3 mt-1">
     <label class="px-4 py-2 bg-slate-100 rounded-xl cursor-pointer hover:bg-slate-200 text-sm"><i class="fas fa-upload mr-1"></i> Subir documento
-      <input type="file" class="hidden" onchange="window._pbFileName=this.files[0]?this.files[0].name:'';window._pbFileSel=this.files[0]||null;document.getElementById('pb-file-name').textContent=window._pbFileName||'Ningún archivo seleccionado'">
+      <input type="file" class="hidden" onchange="window._pbFileName=this.files[0]?this.files[0].name:'';window._pbFileSel=this.files[0]||null;pbPreviaArchivo();document.getElementById('pb-file-name').textContent=window._pbFileName||'Ningún archivo seleccionado'">
     </label>
     <span id="pb-file-name" class="text-xs text-slate-500">${psEscape(p&&p.archivoNombre||'Ningún archivo seleccionado')}</span>
-  </div></div>`;
+  </div>
+  <div id="pb-previa" class="empty:hidden"></div></div>`;
+}
+/* Previa compacta en el modal al seleccionar archivo (si es imagen) */
+function pbPreviaArchivo(){
+  const caja=document.getElementById('pb-previa'); if(!caja) return;
+  const f=window._pbFileSel;
+  if(!f||!f.type||!f.type.startsWith('image/')){ caja.innerHTML=''; return; }
+  const reader=new FileReader();
+  reader.onload=ev=>{ if(document.getElementById('pb-previa')) caja.innerHTML=`<img src="${ev.target.result}" class="mt-2 h-32 w-full object-cover rounded-xl border border-slate-200" alt="Vista previa">`; };
+  reader.readAsDataURL(f);
 }
 function openPublicidadModal(id){
   const puede=['admin','gm','editor','desarrollador'].includes((currentUser.role||'').toLowerCase());
