@@ -54,6 +54,13 @@
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
+  /* Colecciones-OBJETO: settings, autoHub, inmPublica, carruselCirculares,
+   * prospectos, expedientesProspectos, notifications, rolePermissions.
+   * Antes sólo viajaban arrays: ban/publicidad/capacitaciones/clientes/autos/
+   * inmuebles guardados dentro de estos objetos NO se compartían entre
+   * equipos (y el pull los reemplazaba por [] vacío = pérdida). */
+  function isPlain(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+
   /* El legacy vive en mundo numérico (id: 1, students: [3], === estricto) pero
    * Supabase devuelve TEXT ("1"). Sin normalizar, find/filter con === fallan
    * (ej. openChat: otro usuario undefined → el chat no abre). Se reconvierte
@@ -105,11 +112,14 @@
     (src || []).forEach(function (x) { dst.push(x); });
   }
 
-  /* Trae una colección; 403 (sin permiso) => null (se conserva lo local). */
+  /* Trae una colección; 403 (sin permiso) => null (se conserva lo local).
+   * Detecta la forma por RESPUESTA: {items:[…]} array · {object:{…}} objeto. */
   async function pullCollection(name) {
     try {
       const r = await get('/api/data/' + encodeURIComponent(name));
-      return r.items || [];
+      if (Array.isArray(r.items)) return { shape: 'array', items: r.items };
+      if (r.object && typeof r.object === 'object') return { shape: 'object', value: r.object };
+      return null;
     } catch (e) {
       if (e.status === 403 || e.status === 404) return null;
       throw e;
@@ -120,14 +130,22 @@
     const db = legDb();
     if (!db) return false;
     const jobs = names.map(function (n) {
-      return pullCollection(n).then(function (items) { return { n, items }; });
+      return pullCollection(n).then(function (v) { return { n, v }; });
     });
     const results = await Promise.all(jobs);
     let changed = false;
-    results.forEach(function ({ n, items }) {
-      if (!items) return; // sin permiso: no tocar
-      if (!Array.isArray(db[n])) db[n] = [];
-      replaceArray(db[n], normIds(items));
+    results.forEach(function ({ n, v }) {
+      if (!v) return; // sin permiso: no tocar
+      if (v.shape === 'array') {
+        if (!Array.isArray(db[n])) db[n] = [];
+        replaceArray(db[n], normIds(v.items));
+      } else {
+        // Objeto: reemplaza por claves (el objeto puede almacenar arrays adentro:
+        // settings.publicidad, comparisons... tocar in-place preserva referencias).
+        if (!isPlain(db[n])) db[n] = {};
+        Object.keys(db[n]).forEach(function (k) { delete db[n][k]; });
+        Object.assign(db[n], normIds(v.value));
+      }
       pulled[n] = true; // verdad del servidor: entra a la sombra
       changed = true;
     });
@@ -154,7 +172,7 @@
     if (!db) return;
     shadow = {};
     Object.keys(pulled).forEach(function (k) {
-      if (Array.isArray(db[k])) shadow[k] = clone(db[k]);
+      if (Array.isArray(db[k]) || isPlain(db[k])) shadow[k] = clone(db[k]);
     });
     if (usersPulled && Array.isArray(db.users)) shadow.users = clone(db.users);
   }
@@ -179,10 +197,12 @@
     if (!db) return false;
     // Foto local previa SIEMPRE: lo que solo existe en este equipo se fusiona
     // y se sube (el servidor gana ante mismo id). Así no se pierde lo offline.
+    // Objetos (settings/autoHub/…) también participan: sus claves top-level
+    // que no existan en el servidor se re-agregan y suben.
     const pre = {};
     Object.keys(db).forEach(function (n) {
-      if (SKIP[n] || n === 'users' || !Array.isArray(db[n])) return;
-      pre[n] = clone(db[n]);
+      if (SKIP[n] || n === 'users') return;
+      if (Array.isArray(db[n]) || isPlain(db[n])) pre[n] = clone(db[n]);
     });
     const names = (idx.collections || []).filter(function (n) { return !SKIP[n]; });
     pulled = {}; usersPulled = false;
@@ -191,12 +211,19 @@
     snapshot(); // foto del servidor ANTES de fusionar lo local
     let merged = 0;
     Object.keys(pre).forEach(function (n) {
-      if (!Array.isArray(db[n])) db[n] = [];
-      const have = {};
-      db[n].forEach(function (x) { have[String(x.id)] = true; });
-      pre[n].forEach(function (x) {
-        if (x && x.id !== undefined && !have[String(x.id)]) { db[n].push(x); merged++; }
-      });
+      if (Array.isArray(db[n])) {
+        const have = {};
+        db[n].forEach(function (x) { have[String(x.id)] = true; });
+        pre[n].forEach(function (x) {
+          if (x && x.id !== undefined && !have[String(x.id)]) { db[n].push(x); merged++; }
+        });
+      } else if (isPlain(db[n])) {
+        let added = false;
+        Object.keys(pre[n]).forEach(function (k) {
+          if (!(k in db[n])) { db[n][k] = pre[n][k]; added = true; }
+        });
+        if (added) merged++;
+      }
     });
     // Lo solo-local (en db pero fuera de la sombra) siempre se sube; el diff
     // no encuentra nada que hacer en lo ya sincronizado.
@@ -269,8 +296,35 @@
   }
 
   async function pushCollection(name, local, old) {
-    // Igual que users: registros sin id se acuñan para que el diff los suba.
+    // Colección-OBJETO: diff por CLAVE top-level (última escritura gana POR
+    // CLAVE, no por objeto entero → dos equipos editando apartados distintos
+    // de settings no se pisan). PUT /:col/:clave {value} · DELETE /:col/:clave.
+    if (isPlain(local)) {
+      const oldObj = (old && isPlain(old)) ? old : {};
+      for (const k of Object.keys(local)) {
+        if (JSON.stringify(local[k]) === JSON.stringify(oldObj[k])) continue;
+        try {
+          await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k), { value: local[k] });
+        } catch (e) {
+          if (e.status === 403 || e.status === 404) {
+            await pullNames([name]);
+            if (window.showToast) window.showToast(pushErrorMsg(e, name), 'warning');
+            return;
+          }
+          throw e;
+        }
+      }
+      for (const k of Object.keys(oldObj)) {
+        if (!(k in local)) {
+          try { await send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k)); }
+          catch (e) { await pullNames([name]); return; }
+        }
+      }
+      return;
+    }
+    // Arrays: igual que users: registros sin id se acuñan para el diff.
     for (const rec of local) {
+      if (!rec) continue;
       if (rec.id === undefined || rec.id === null || rec.id === '') rec.id = Date.now() + Math.floor(Math.random() * 1000);
     }
     const oldMap = byIdMap(old);
@@ -308,14 +362,15 @@
     const set = {};
     // users va por /api/users (pushUsers); jamás por /api/data (404).
     Object.keys(shadow).forEach(function (n) { if (n !== 'users' && !SKIP[n]) set[n] = true; });
-    Object.keys(db).forEach(function (n) { if (!SKIP[n] && n !== 'users' && Array.isArray(db[n])) set[n] = true; });
+    Object.keys(db).forEach(function (n) {
+      if (SKIP[n] || n === 'users') return;
+      if (Array.isArray(db[n]) || isPlain(db[n])) set[n] = true;
+    });
     const names = Object.keys(set);
     const failed = [];
     // Aislado por colección: una que falle no bloquea a las demás. La sombra
     // solo avanza en las que sí se sincronizaron (si no, se volverían invisibles).
-    for (const n of names) {
-      try {
-        await pushCollection(n, db[n] || [], shadow[n] || []);
+    for (const n of names) {        try { await pushCollection(n, db[n] || [], shadow[n] || []);
         shadow[n] = clone(db[n] || []);
       } catch (e) { failed.push(n); }
     }

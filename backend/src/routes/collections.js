@@ -23,6 +23,21 @@ const FEED_COLLECTIONS = new Set([
 const feedTitle = (collection, rec) => rec.titulo || rec.title || rec.nombre || rec.name
   || (`Nuevo en ${collection}`);
 
+/* COLECCIONES-OBJETO: el legacy guarda varias secciones COMO OBJETO, no array
+ * (settings.publicidad, settings.comparadorProductos/casosExito/comisiones,
+ * autoHub.unidades/clientes/publicidad/practica/guion, inmPublica.props,
+ * carruselCirculares, prospectos, expedientesProspectos, notifications).
+ * Antes el sync API sólo entendía arrays: las reemplazaba por [] (pérdida
+ * de contenido, p. ej. publicidad/capacitaciones/clientes no viajaban).
+ * Ahora: GET devuelve { object } · PUT/:clave escribe una clave top-level
+ * (granular, last-write-wins POR CLAVE, no por objeto completo) ·
+ * DELETE/:clave borra la clave · POST mergea claves (no coacciona a []). */
+const KNOWN_OBJECTS = new Set([
+  'settings', 'autoHub', 'inmPublica', 'carruselCirculares',
+  'prospectos', 'expedientesProspectos', 'notifications', 'rolePermissions',
+]);
+const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
 module.exports = (store, config) => {
   const r = express.Router();
 
@@ -70,9 +85,10 @@ module.exports = (store, config) => {
       await store.refreshIfStale(); // lectura: el TTL basta
       const data = store.get();
       const set = new Set(Object.keys(data).filter(
-        (k) => !FORBIDDEN.has(k) && Array.isArray(data[k])
+        (k) => !FORBIDDEN.has(k) && (Array.isArray(data[k]) || isPlain(data[k]))
       ));
       for (const k of KNOWN_EMPTY) if (!FORBIDDEN.has(k)) set.add(k);
+      for (const k of KNOWN_OBJECTS) if (!FORBIDDEN.has(k)) set.add(k);
       res.json({ ok: true, collections: [...set] });
     } catch (e) { next(e); }
   });
@@ -83,7 +99,16 @@ module.exports = (store, config) => {
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canRead(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de lectura' });
       await store.refreshIfStale(); // lectura: el TTL basta
-      let items = db.collection(store.get(), collection).slice();
+      const root = store.get();
+      // Objeto: NUNCA pasar por db.collection (coaccionaría a []).
+      if (isPlain(root[collection])) {
+        return res.json({ ok: true, object: root[collection] });
+      }
+      // Objeto conocido aún vacío: se entrega {} (incógnito/primera vez).
+      if (!root[collection] && KNOWN_OBJECTS.has(collection)) {
+        return res.json({ ok: true, object: {} });
+      }
+      let items = Array.isArray(root[collection]) ? root[collection].slice() : [];
       if (req.query.q) {
         const q = String(req.query.q).toLowerCase();
         items = items.filter((x) => JSON.stringify(x).toLowerCase().includes(q));
@@ -101,8 +126,23 @@ module.exports = (store, config) => {
       // antes, `col` apunta a la caché vieja y el push muta un objeto que el
       // persist ya no guarda (respuesta 201 pero dato perdido en producción).
       await store.refreshForWrite();
-      const col = db.collection(store.get(), collection);
+      const root = store.get();
       const body = req.body || {};
+      // Objeto: merge por claves top-level (protege el objeto; jamás []).
+      if (isPlain(root[collection]) || (!root[collection] && KNOWN_OBJECTS.has(collection))) {
+        root[collection] = root[collection] || {};
+        let merged = 0;
+        for (const [k, v] of Object.entries(body)) {
+          if (v !== undefined) { root[collection][k] = v; merged++; }
+        }
+        db.audit(store.get(), `edicion_${collection}`, req.user, { claves: Object.keys(body) });
+        await store.persistCollections([collection, 'auditoria']);
+        if (FEED_COLLECTIONS.has(collection)) {
+          store.pushFeed({ kind: collection, title: `Actualización en ${collection}` }).catch(() => {});
+        }
+        return res.json({ ok: true, item: root[collection], merged });
+      }
+      const col = db.collection(store.get(), collection);
       // Upsert por id: el frontend crea con id local (Date.now) y sincroniza.
       // Si el id ya existe se reemplaza (200); si no, se crea (201).
       if (body.id !== undefined && body.id !== null) {
@@ -131,6 +171,18 @@ module.exports = (store, config) => {
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
       await store.refreshForWrite();
+      const root = store.get();
+      // Objeto: :id es la CLAVE top-level a escribir/crear. { value }
+      if (isPlain(root[collection]) || (!root[collection] && KNOWN_OBJECTS.has(collection))) {
+        root[collection] = root[collection] || {};
+        if (!('value' in (req.body || {}))) {
+          return res.status(400).json({ ok: false, error: 'Se espera { value }' });
+        }
+        root[collection][id] = req.body.value === null ? null : req.body.value;
+        db.audit(store.get(), `edicion_${collection}`, req.user, { clave: id });
+        await store.persistCollections([collection, 'auditoria']);
+        return res.json({ ok: true, value: root[collection][id] });
+      }
       const col = db.collection(store.get(), collection);
       const rec = db.byId(col, id);
       if (!rec) return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -148,6 +200,14 @@ module.exports = (store, config) => {
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
       await store.refreshForWrite();
       const data = store.get();
+      // Objeto: borra la CLAVE top-level (diff del frontend baja borrados).
+      if (isPlain(data[collection])) {
+        if (!(id in data[collection])) return res.status(404).json({ ok: false, error: 'Clave no encontrada' });
+        delete data[collection][id];
+        db.audit(data, `borrado_${collection}`, req.user, { clave: id });
+        await store.persistCollections([collection, 'auditoria']);
+        return res.json({ ok: true });
+      }
       const before = (data[collection] || []).length;
       data[collection] = (data[collection] || []).filter((x) => String(x.id) !== String(id));
       if (data[collection].length === before) return res.status(404).json({ ok: false, error: 'No encontrado' });

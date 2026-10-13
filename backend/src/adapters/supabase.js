@@ -42,18 +42,26 @@ function createSupabaseAdapter({ url, serviceKey }) {
 
   async function loadDocuments() {
     const out = {};
+    const objects = {}; // colecciones-objeto (doc_id __object__)
     let from = 0;
     const PAGE = 1000;
     for (;;) {
       const { data, error } = await sb.from('documents').select('collection,doc_id,data').range(from, from + PAGE - 1);
       if (error) throw new Error('Supabase documents: ' + error.message);
       for (const row of data) {
-        out[row.collection] = out[row.collection] || [];
-        out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+        if (row.doc_id === '__object__') {
+          // Colección-objeto (settings/autoHub/inmPublica/…): data IS el objeto.
+          objects[row.collection] = row.data || {};
+        } else {
+          out[row.collection] = out[row.collection] || [];
+          out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+        }
       }
       if (data.length < PAGE) break;
       from += PAGE;
     }
+    // El objeto gana si hubiera filas mixtas (colección migrada de array→objeto).
+    for (const [c, v] of Object.entries(objects)) out[c] = v;
     const { data: users, error: uerr } = await sb.from('app_users').select('*');
     if (uerr) throw new Error('Supabase users: ' + uerr.message);
     out.users = (users || []).map(fromUserRow);
@@ -62,7 +70,9 @@ function createSupabaseAdapter({ url, serviceKey }) {
 
   async function saveDocuments(obj) {
     // Fallback total (seed/boot). Las rutas usan saveCollections (quirúrgico).
-    const names = Object.keys(obj || {}).filter((k) => k === 'users' || Array.isArray(obj[k]));
+    const names = Object.keys(obj || {}).filter(
+      (k) => k === 'users' || Array.isArray(obj[k]) || (obj[k] && typeof obj[k] === 'object' && !Array.isArray(obj[k]))
+    );
     await saveCollections(obj, names);
   }
 
@@ -76,10 +86,14 @@ function createSupabaseAdapter({ url, serviceKey }) {
     for (const [collection, items] of Object.entries(obj || {})) {
       if (!wanted.has(collection)) continue;
       if (collection === 'users') continue;
-      if (!Array.isArray(items)) continue;
-      for (const item of items) {
-        const doc_id = String(item.id ?? Date.now());
-        seenRows.set(collection + '∅' + doc_id, { collection, doc_id, data: { ...item, id: undefined } });
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          const doc_id = String(item.id ?? Date.now());
+          seenRows.set(collection + '∅' + doc_id, { collection, doc_id, data: { ...item, id: undefined } });
+        }
+      } else if (items && typeof items === 'object') {
+        // Colección-objeto: UNA fila con el objeto completo (sin id que quitar).
+        seenRows.set(collection + '∅__object__', { collection, doc_id: '__object__', data: items });
       }
     }
     const rows = [...seenRows.values()];
@@ -91,6 +105,9 @@ function createSupabaseAdapter({ url, serviceKey }) {
       if (error) throw new Error('Supabase upsert: ' + error.message);
       chunk.forEach((r) => seen.add(r.collection + '∅' + r.doc_id));
     }
+    // (Comentarios) El bucle siguiente limpia filas huérfanas en AMBOS
+    // sentidos: si la colección pasó de array a objeto, borra sus filas-array
+    // viejas; si volvió a array, borra la fila __object__ vieja.
     // Borra ausentes SOLO dentro de las colecciones tocadas.
     const touched = [...wanted].filter((c) => c !== 'users');
     if (touched.length) {

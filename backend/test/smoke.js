@@ -25,6 +25,14 @@ const { seed } = require('../src/seed');
 let base, server, store;
 const jar = {};
 
+/* Simula otra instancia de Vercel: escribe directo al adaptador por detrás
+ * de la caché del store. Toda mutación HTTP debe recargar antes de tocar. */
+async function externalWrite(mut) {
+  const docs = await store.adapter.loadDocuments();
+  mut(docs);
+  await store.adapter.saveDocuments(docs);
+}
+
 async function api(method, p, body, useAuth = true) {
   const headers = { 'Content-Type': 'application/json' };
   if (useAuth && jar.cookie) headers.Cookie = jar.cookie;
@@ -145,21 +153,27 @@ describe('paso 3: config pública y feed', () => {
     assert.equal(r.status, 200);
     assert.ok('autosDisponibles' in r.json.portal);
   });
-  it('publicar en escaparate genera item de feed', async () => {
+  it('publicar en escaparate genera item de feed (array: posts)', async () => {
+    // autoHub/settings ahora son COLECCIONES-OBJETO (su POST mergea y
+    // responde 200): el feed se prueba con un array de escaparate, `posts`.
     jar.cookie = null;
     await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
-    const r = await api('POST', '/api/data/autoHub', { titulo: 'Test Auto' });
+    const r = await api('POST', '/api/data/posts', { titulo: 'Test Post' });
     assert.equal(r.status, 201);
     // Ventas/solicitudes también espejan a feed (promotoría en vivo), así que
-    // puede haber más de 1 item; lo que importa es que autoHub llegó último.
+    // puede haber más de 1 item; lo que importa es que posts llegó último.
     assert.ok(store.adapter._feed.length >= 1);
-    assert.equal(store.adapter._feed[store.adapter._feed.length - 1].kind, 'autoHub');
+    assert.equal(store.adapter._feed[store.adapter._feed.length - 1].kind, 'posts');
+    await api('DELETE', `/api/data/posts/${r.json.item.id}`);
   });
   it('feed público lista lo publicado (último primero)', async () => {
+    // El DELETE de arriba agrega un item de feed (borrado): comprobamos que
+    // hay ≥1 item y que posts aparece en los primeros.
     const r = await api('GET', '/api/public/feed', null, false);
     assert.equal(r.status, 200);
     assert.ok(Array.isArray(r.json.items));
-    assert.equal(r.json.items[0].kind, 'autoHub');
+    assert.ok(r.json.items.length >= 1);
+    assert.ok(r.json.items.some((x) => x.kind === 'posts'));
   });
 });
 
@@ -333,13 +347,6 @@ describe('promotoría+escuela: matriz y persist quirúrgico', () => {
 });
 
 describe('stale-cache multi-instancia: escribir con caché vieja no borra nada', () => {
-  // Simula otra instancia de Vercel: escribe directo al adaptador por detrás
-  // de la caché del store. Cada mutación HTTP debe recargar antes de tocar.
-  async function externalWrite(mut) {
-    const docs = await store.adapter.loadDocuments();
-    mut(docs);
-    await store.adapter.saveDocuments(docs);
-  }
   it('POST con caché vieja conserva lo ajeno (ventas)', async () => {
     jar.cookie = null;
     await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
@@ -381,6 +388,70 @@ describe('stale-cache multi-instancia: escribir con caché vieja no borra nada',
     const g = await api('GET', '/api/data/solicitudes');
     assert.ok(g.json.items.some((x) => String(x.id) === '992020'), 'login fallido no wipea');
     await api('DELETE', '/api/data/solicitudes/992020');
+  });
+});
+
+describe('colecciones-objeto: settings/autoHub (publicidad, capacitaciones, clientes de módulos)', () => {
+  it('índice incluye objetos conocidos (settings, autoHub…)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('GET', '/api/data');
+    assert.equal(r.status, 200);
+    for (const k of ['settings', 'autoHub', 'inmPublica', 'notifications']) {
+      assert.ok(r.json.collections.includes(k), 'falta objeto ' + k);
+    }
+  });
+  it('GET settings devuelve {object} (nunca []); se puede escribir por clave', async () => {
+    const g = await api('GET', '/api/data/settings');
+    assert.equal(g.status, 200);
+    assert.ok(g.json.object && !Array.isArray(g.json.object), 'settings es objeto');
+    const p = await api('PUT', '/api/data/settings/publicidad', { value: [{ id: 551, titulo: 'Curso veraniego', fecha: 1 }] });
+    assert.equal(p.status, 200);
+    const cap = await api('PUT', '/api/data/settings/casosExito', { value: [{ id: 552, titulo: 'Caso 1' }] });
+    assert.equal(cap.status, 200);
+    const g2 = await api('GET', '/api/data/settings');
+    assert.equal(g2.json.object.publicidad.length, 1);
+    assert.equal(g2.json.object.casosExito[0].titulo, 'Caso 1');
+  });
+  it('autoHub se escribe como objeto (unidades/clientes) y NO se coacciona a []', async () => {
+    const p = await api('PUT', '/api/data/autoHub/unidades', { value: [{ id: 771, marca: 'Toyota', precio: 250000 }] });
+    assert.equal(p.status, 200);
+    const c = await api('PUT', '/api/data/autoHub/clientes', { value: [{ id: 772, nombre: 'Cliente CRM autos' }] });
+    assert.equal(c.status, 200);
+    // POST genérico sobre objeto: merge (no destruye con [])
+    const m = await api('POST', '/api/data/autoHub', { guion: 'Guion de ventas' });
+    assert.equal(m.status, 200);
+    const g = await api('GET', '/api/data/autoHub');
+    assert.ok(g.json.object && g.json.object.unidades.length === 1, 'unidades sobrevive');
+    assert.equal(g.json.object.clientes[0].nombre, 'Cliente CRM autos');
+    assert.equal(g.json.object.guion, 'Guion de ventas');
+  });
+  it('DELETE clave top-level funciona y 404 si falta', async () => {
+    const d = await api('DELETE', '/api/data/settings/casosExito');
+    assert.equal(d.status, 200);
+    const d2 = await api('DELETE', '/api/data/settings/no_existe_abc');
+    assert.equal(d2.status, 404);
+  });
+  it('escritura por clave NO pisa claves de otra instancia (stale-safe)', async () => {
+    await externalWrite((d) => {
+      d.settings = d.settings || {};
+      d.settings.comparadorProductos = [{ id: 900, nombre: 'Externo' }];
+    });
+    const p = await api('PUT', '/api/data/settings/publicidad', { value: [{ id: 551, titulo: 'Re-editada' }] });
+    assert.equal(p.status, 200);
+    const g = await api('GET', '/api/data/settings');
+    assert.ok(g.json.object.comparadorProductos, 'clave de otra instancia sobrevive');
+    assert.equal(g.json.object.publicidad[0].titulo, 'Re-editada');
+  });
+  it('alumno puede chatear (messages: matriz abierta) y settings APENAS… (roles DEFAULT)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const w = await api('PUT', '/api/data/settings/publicidad', { value: [] });
+    // DEFAULT_RULE: todos los autenticados escriben (el legacy limita por UI).
+    assert.equal(w.status, 200);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await api('PUT', '/api/data/settings/publicidad', { value: [] });
   });
 });
 
