@@ -13,6 +13,9 @@ const mw = require('./middleware');
 function createApp(store) {
   const app = express();
   app.disable('x-powered-by');
+  // Confía en X-Forwarded-For de Vercel (1 salto) para que el rate-limit
+  // vea la IP real del cliente y no la del balanceador.
+  app.set('trust proxy', 1);
   app.use(mw.securityHeaders);
   // Límite generoso para fotos base64 del legacy (Vercel corta en ~4.5MB de
   // todos modos; el payload grande falla con 413 visible, no en silencio).
