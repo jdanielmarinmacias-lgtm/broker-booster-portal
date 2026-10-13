@@ -37,9 +37,18 @@
       + '<p style="font-size:11px;color:#94a3b8;margin:0">' + esc(when) + '</p></div></article>';
   }
 
+  /* El strip pertenece SOLO a la portada pública. Antes se insertaba al
+   * inicio del <body> sin importar el estado: al recargar asomaba un instante
+   * sobre el login/aplicación (flash de contenido). Ahora: solo si la portada
+   * está visible, y se atiende al cambio de visibilidad con un observer. */
+  function portalVisible() {
+    var portal = document.getElementById('public-portal');
+    return !!portal && !portal.classList.contains('hidden');
+  }
   function ensureStrip() {
     var list = document.getElementById(LIST_ID);
-    if (list) return list;
+    if (list) return portalVisible() ? list : null;
+    if (!portalVisible()) return null; // login/app: no crear nada (no flash)
     var strip = document.createElement('section');
     strip.id = STRIP_ID;
     strip.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:18px 16px 0">'
@@ -51,6 +60,9 @@
     else main.insertBefore(strip, main.firstChild);
     return strip.querySelector('#' + LIST_ID);
   }
+  /* Cuando la portada vuelve a mostrarse (logout, cierre de sesión), se
+   * pinta el feed inicial; cuando se oculta, el strip desaparece con la
+   * portada porque vive dentro de ella. */
 
   function toast(row) {
     try {
@@ -73,6 +85,7 @@
   function onItem(row) {
     try {
       var list = ensureStrip();
+      if (!list) return; // portada oculta: sin DOM, sin toast (nada que mostrar)
       var tmp = document.createElement('div');
       tmp.innerHTML = card(row);
       var node = tmp.firstChild;
@@ -89,13 +102,33 @@
   async function boot() {
     // 1) Pintado inicial desde el backend (funciona sin socket).
     try {
-      const res = await fetch('/api/public/feed', { credentials: 'same-origin' });
-      const data = await res.json();
-      if (data && Array.isArray(data.items) && data.items.length) {
-        const list = ensureStrip();
-        list.innerHTML = data.items.map(card).join('');
+      if (portalVisible()) {
+        const res = await fetch('/api/public/feed', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (data && Array.isArray(data.items) && data.items.length) {
+          const list = ensureStrip();
+          if (list) list.innerHTML = data.items.map(card).join('');
+        }
       }
     } catch (e) { /* sin backend: nada */ }
+
+    // 1b) Si la portada aparece después (logout), píntala en ese momento.
+    try {
+      var portalEl = document.getElementById('public-portal');
+      if (portalEl) {
+        new MutationObserver(function () {
+          if (!portalVisible()) return;
+          if (document.getElementById(LIST_ID)) return;
+          fetch('/api/public/feed', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              var list = ensureStrip();
+              if (list && data && Array.isArray(data.items)) list.innerHTML = data.items.map(card).join('');
+            })
+            .catch(function () {});
+        }).observe(portalEl, { attributes: true, attributeFilter: ['class'] });
+      }
+    } catch (e2) { /* sin observer: queda el boot inicial */ }
 
     // 2) Realtime Supabase (solo si el backend lo anuncia).
     let cfg = null;
