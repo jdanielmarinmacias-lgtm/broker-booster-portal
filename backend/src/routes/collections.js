@@ -35,6 +35,7 @@ const feedTitle = (collection, rec) => rec.titulo || rec.title || rec.nombre || 
 const KNOWN_OBJECTS = new Set([
   'settings', 'autoHub', 'inmPublica', 'carruselCirculares',
   'prospectos', 'expedientesProspectos', 'notifications', 'rolePermissions',
+  'guiaBase', // {docs:[]} — Gu-IA: base de conocimiento del comercial (legacy 3148)
 ]);
 const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
