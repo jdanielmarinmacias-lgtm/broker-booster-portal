@@ -14,7 +14,9 @@ function createApp(store) {
   const app = express();
   app.disable('x-powered-by');
   app.use(mw.securityHeaders);
-  app.use(express.json({ limit: '2mb' }));
+  // Límite generoso para fotos base64 del legacy (Vercel corta en ~4.5MB de
+  // todos modos; el payload grande falla con 413 visible, no en silencio).
+  app.use(express.json({ limit: '10mb' }));
   app.use(mw.loadSession(store));
   app.use('/api', mw.refreshCache(store));
 
@@ -41,6 +43,14 @@ function createApp(store) {
   }
 
   app.use('/api', (req, res) => res.status(404).json({ ok: false, error: 'Ruta API no encontrada' }));
+  // Body-parser: payload excesivo => 413 JSON (no el HTML default de Express).
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, req, res, next) => {
+    if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+      return res.status(413).json({ ok: false, error: 'Registro demasiado grande (usa Subir archivo en vez de foto embebida)' });
+    }
+    next(err);
+  });
   app.use(mw.errorHandler);
   return app;
 }

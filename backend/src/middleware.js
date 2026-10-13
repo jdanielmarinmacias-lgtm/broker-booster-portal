@@ -58,19 +58,21 @@ const requireRole = (...allowed) => (req, res, next) => {
   next();
 };
 
-/* Rate-limit en memoria para /login: N intentos FALLIDOS / 10 min por IP
- * (LOGIN_RATE_MAX, default 10; los tests lo suben). Solo cuentan los fallos:
- * un login válido perdona uno (los usuarios legítimos jamás se bloquean). */
+/* Rate-limit en memoria para /login: N intentos FALLIDOS / LOGIN_RATE_MIN min por IP
+ * (defaults: 10 fallos / 2 min; LOGIN_RATE_MAX y LOGIN_RATE_MIN lo ajustan;
+ * los tests suben el tope). Solo cuentan los fallos: un login válido perdona
+ * uno (los usuarios legítimos jamás se bloquean). */
 const attempts = new Map();
 const LOGIN_RATE_MAX = Number(process.env.LOGIN_RATE_MAX || 10);
+const LOGIN_RATE_MIN = Number(process.env.LOGIN_RATE_MIN || 2);
 function loginRateLimit(req, res, next) {
   const ip = req.ip || req.socket.remoteAddress || '?';
   const now = Date.now();
-  const list = (attempts.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
+  const list = (attempts.get(ip) || []).filter((t) => now - t < LOGIN_RATE_MIN * 60 * 1000);
   attempts.set(ip, list);
   req._rlIp = ip;
   if (list.length >= LOGIN_RATE_MAX) {
-    return res.status(429).json({ ok: false, error: 'Demasiados intentos. Espera 10 minutos.' });
+    return res.status(429).json({ ok: false, error: `Demasiados intentos. Espera ${LOGIN_RATE_MIN} minutos.` });
   }
   next();
 }

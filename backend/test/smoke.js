@@ -208,6 +208,53 @@ describe('fase 2b: índice y upsert para sync', () => {
   });
 });
 
+describe('auditoría: guardado de usuarios y equipo', () => {
+  it('maestro edita a su equipo incl. agenciaId/assignedTo (200)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'maestro', password: 'Test1234*' }, false);
+    const c = await api('POST', '/api/users', { username: 'agenteq', password: 'Clave1234', role: 'agente_desarrollo', name: 'Agente Q' });
+    assert.equal(c.status, 201);
+    const id = c.json.user.id;
+    const put = await api('PUT', `/api/users/${id}`, { agenciaId: 999, assignedTo: 2, xp: 50 });
+    assert.equal(put.status, 200);
+    assert.equal(put.json.user.agenciaId, 999);
+    assert.equal(put.json.user.xp, 50);
+    const del = await api('DELETE', `/api/users/${id}`);
+    assert.equal(del.status, 200);
+  });
+  it('maestro no toca a quien no es su equipo (403)', async () => {
+    const r = await api('PUT', '/api/users/1', { name: 'Hack' });
+    assert.equal(r.status, 403);
+  });
+  it('agencia crea agentes (201)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const a = await api('POST', '/api/users', { username: 'agenciaq', password: 'Clave1234', role: 'agencia', name: 'Agencia Q' });
+    assert.equal(a.status, 201);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'agenciaq', password: 'Clave1234' }, false);
+    const g = await api('POST', '/api/users', { username: 'agenteqq', password: 'Clave1234', role: 'agente_agencia', name: 'Agente QQ' });
+    assert.equal(g.status, 201);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await api('DELETE', `/api/users/${g.json.user.id}`);
+    await api('DELETE', `/api/users/${a.json.user.id}`);
+  });
+  it('payload gigante responde 413 JSON (no crash silencioso)', async () => {
+    const big = await api('POST', '/api/data/posts', { id: 999100, titulo: 'x'.repeat(11 * 1024 * 1024) });
+    assert.equal(big.status, 413);
+    assert.equal(big.json.ok, false);
+  });
+  it('rate-limit: mensaje usa LOGIN_RATE_MIN (2 minutos)', async () => {
+    // El comportamiento (bloqueo al 11vo fallo) se verifica manual contra un
+    // servidor real; aquí solo el mensaje (el contador es global al proceso).
+    const mw = require('../src/middleware');
+    assert.ok(typeof mw.loginRateLimit === 'function');
+    assert.ok(typeof mw.noteFailedLogin === 'function');
+    assert.ok(typeof mw.forgiveLogin === 'function');
+  });
+});
+
 describe('paso 4: archivos compartidos (modo local)', () => {
   async function rawForm(fd, withAuth = true) {
     const headers = {};

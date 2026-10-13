@@ -9,7 +9,10 @@ const roles = require('../roles');
 const passwords = require('../passwords');
 const mw = require('../middleware');
 
-const MANAGERS = ['admin', 'gm', 'desarrollador'];
+/* Crear/editar/borrar usuarios: admin, gm, desarrollador + agencia y maestro
+ * (ellos gestionan a SU equipo: altas de agentes, asignaciones). El servidor
+ * sigue validando qué pueden tocar (ver PUT: solo su equipo / no-GM). */
+const MANAGERS = ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'];
 
 module.exports = (store) => {
   const r = express.Router();
@@ -20,8 +23,22 @@ module.exports = (store) => {
     res.json({ ok: true, users: users.map(db.safeUser) });
   });
 
+  // Quién puede dar de alta a quién (crear es asignar a tu equipo).
+  function canCreate(actor, role) {
+    role = String(role || '').toLowerCase();
+    if (roles.isAdmin(actor)) return true; // admin/gm/dev: cualquiera
+    if (roles.hasRole(actor, ['agencia', 'maestro'])) {
+      // Su equipo: agentes, prospectos, alumnos (no pares ni jefes).
+      return ['agente', 'agente_agencia', 'agente_desarrollo', 'prospecto', 'alumno'].includes(role);
+    }
+    return false;
+  }
+
   r.post('/', async (req, res, next) => {
     try {
+    if (!canCreate(req.user, (req.body || {}).role)) {
+      return res.status(403).json({ ok: false, error: 'Sin permiso para crear ese rol' });
+    }
     const { username, role, name, email, phone, password, id } = req.body || {};
     if (!username) return res.status(400).json({ ok: false, error: 'username requerido' });
     if (!roles.ROLES[String(role || '').toLowerCase()]) {
@@ -67,12 +84,35 @@ module.exports = (store) => {
     if (!roles.canModifyUser(req.user, target)) {
       return res.status(403).json({ ok: false, error: 'Cuenta GM protegida' });
     }
-    const { name, email, phone, role, avatar } = req.body || {};
+    // Agencia/maestro: su equipo (asignado a ellos), cuentas SIN equipo que
+    // ELLOS crearon (auditoría: creacion_usuario por su id), o sí mismos.
+    // Admin/gm/dev: todos. GM protegidas aparte (canModifyUser).
+    if (!roles.isAdmin(req.user)) {
+      const teamless = !target.agenciaId && !target.parentId && !target.assignedTo;
+      let createdByMe = false;
+      if (teamless) {
+        try {
+          const aud = db.collection(store.get(), 'auditoria') || [];
+          createdByMe = aud.some((a) => a.tipo === 'creacion_usuario'
+            && String(a.usuarioId) === String(req.user.id)
+            && a.usuarioCreadoId !== undefined && String(a.usuarioCreadoId) === String(target.id));
+        } catch (e) { /* sin auditoría: denegar */ }
+      }
+      const mine = String(target.agenciaId || target.parentId || target.assignedTo || '') === String(req.user.id)
+        || String(target.id) === String(req.user.id) || createdByMe;
+      if (!mine) return res.status(403).json({ ok: false, error: 'Solo puedes editar a tu equipo' });
+    }
+    const { name, email, phone, role, avatar, agenciaId, agencia, parentId, assignedTo, xp, students } = req.body || {};
     const antes = { ...target };
     if (name !== undefined) target.name = name;
     if (email !== undefined) target.email = email;
     if (phone !== undefined) target.phone = phone;
     if (avatar !== undefined) target.avatar = avatar;
+    // Asignaciones de equipo (agenciaId/parentId/assignedTo/agencia) + xp/students:
+    // el legacy las guarda en el mismo formulario de usuario.
+    for (const [k, v] of Object.entries({ agenciaId, agencia, parentId, assignedTo, xp, students })) {
+      if (v !== undefined) target[k] = v;
+    }
     if (role !== undefined) {
       if (!roles.ROLES[String(role).toLowerCase()]) return res.status(400).json({ ok: false, error: 'Rol inválido' });
       if (roles.isGM({ ...target, role }) && !roles.isGM(req.user)) {

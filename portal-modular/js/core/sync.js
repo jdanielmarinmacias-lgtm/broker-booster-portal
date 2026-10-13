@@ -198,6 +198,13 @@
   async function pushUsers(local, old) {
     const oldMap = byIdMap(old);
     const seen = {};
+    // Reintento: usuarios que nacieron sin id (form legacy sin guardar) reciben
+    // id local aquí mismo para que el diff los vea y el servidor los cree.
+    let minted = false;
+    for (const u of local) {
+      if (u.id === undefined || u.id === null || u.id === '') { u.id = Date.now() + Math.floor(Math.random() * 1000); minted = true; }
+    }
+    if (minted) { try { window.saveDB && window.saveDB.__syncWrapped ? null : null; } catch (e) {} }
     for (const u of local) {
       const id = String(u.id);
       seen[id] = true;
@@ -222,7 +229,7 @@
       } catch (e) {
         if (e.status === 403 || e.status === 404 || e.status === 409) {
           await pullUsers(); // el servidor manda (GM protegida, duplicado…)
-          if (window.showToast) window.showToast('Aviso usuarios: ' + e.message, 'warning');
+          if (window.showToast) window.showToast(pushErrorMsg(e, 'usuarios'), 'warning');
           return;
         }
         throw e;
@@ -240,6 +247,10 @@
   }
 
   async function pushCollection(name, local, old) {
+    // Igual que users: registros sin id se acuñan para que el diff los suba.
+    for (const rec of local) {
+      if (rec.id === undefined || rec.id === null || rec.id === '') rec.id = Date.now() + Math.floor(Math.random() * 1000);
+    }
     const oldMap = byIdMap(old);
     const seen = {};
     for (const rec of local) {
@@ -252,7 +263,11 @@
         if (!prev) await send('POST', '/api/data/' + encodeURIComponent(name), rec);
         else await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(rec.id), rec);
       } catch (e) {
-        if (e.status === 403 || e.status === 404) { await pullNames([name]); return; }
+        if (e.status === 403 || e.status === 404) {
+          await pullNames([name]);
+          if (window.showToast) window.showToast(pushErrorMsg(e, name), 'warning');
+          return;
+        }
         throw e;
       }
     }
@@ -289,7 +304,10 @@
       } catch (e) { failed.push('users'); }
     }
     if (failed.length && window.showToast) {
-      window.showToast('Sin sincronizar (' + failed.join(', ') + '): se reintentará al guardar', 'warning');
+      const hint = failed.map(function (n) {
+        return n;
+      }).join(', ');
+      window.showToast('Sin sincronizar (' + hint + '): revisa tu sesión o el tamaño de fotos', 'warning');
     }
   }
 
@@ -300,12 +318,27 @@
   }
 
   /* Envuelve el saveDB final del legacy (respeta sus wrappers previos). */
+  /* Traduce fallos de red a mensajes accionables (no "Sin conexión" genérico). */
+  function pushErrorMsg(e, what) {
+    if (e && e.status === 413) return what + ' demasiado grande: usa Subir archivo en vez de foto embebida';
+    if (e && e.status === 403) return 'Sin permiso en servidor para ' + what + ' (se conserva local)';
+    if (e && e.status === 401) return 'Sesión vencida: reingresa para sincronizar ' + what;
+    return 'Sin conexión al servidor, ' + what + ' en este equipo';
+  }
+
   function hookSave() {
     try {
       if (typeof window.saveDB !== 'function' || window.saveDB.__syncWrapped) return;
       const orig = window.saveDB;
       const wrapped = function () {
-        const r = orig.apply(this, arguments);
+        let r;
+        try {
+          r = orig.apply(this, arguments);
+        } catch (e) {
+          // localStorage lleno o corrupto: avisa y aun así intenta el servidor.
+          if (window.showToast) window.showToast('No se pudo guardar local: ' + (e.message || e), 'warning');
+          r = undefined;
+        }
         try { pushSoon(); } catch (e) { /* nunca romper el guardado local */ }
         return r;
       };
