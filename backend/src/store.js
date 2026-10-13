@@ -35,6 +35,14 @@ function createStore(adapter) {
         cacheAt = Date.now();
       }
     },
+    /* Recarga INCONDICIONAL para rutas de escritura: en serverless la caché
+     * puede estar dentro del TTL pero vieja respecto a otra instancia.
+     * Mutar sin esto = reescribir (y borrar) lo ajeno. Un read extra por
+     * escritura es barato frente a perder datos. */
+    async refreshForWrite() {
+      cache = await adapter.loadDocuments();
+      cacheAt = Date.now();
+    },
     async persist() {
       await adapter.saveDocuments(cache);
       cacheAt = Date.now();

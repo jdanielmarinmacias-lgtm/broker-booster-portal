@@ -20,7 +20,7 @@ module.exports = (store) => {
 
   r.get('/', async (req, res, next) => {
     try {
-      await store.refreshIfStale();
+      await store.refreshIfStale(); // lectura: el TTL basta
       const users = db.collection(store.get(), 'users');
       res.json({ ok: true, users: users.map(db.safeUser) });
     } catch (e) { next(e); }
@@ -37,14 +37,24 @@ module.exports = (store) => {
     return false;
   }
 
+  /* Alias de roles del legacy: 'agente' genérico → agente de agencia. */
+  const roleAlias = (r) => {
+    const k = String(r || '').toLowerCase();
+    if (k === 'agente') return 'agente_agencia';
+    return k;
+  };
+
   r.post('/', async (req, res, next) => {
     try {
-    if (!canCreate(req.user, (req.body || {}).role)) {
+    // ORDEN CRÍTICO: refrescar ANTES de leer/duplicar/mutar (ver collections.js).
+    await store.refreshForWrite();
+    if (!canCreate(req.user, roleAlias((req.body || {}).role))) {
       return res.status(403).json({ ok: false, error: 'Sin permiso para crear ese rol' });
     }
     const { username, role, name, email, phone, password, id } = req.body || {};
     if (!username) return res.status(400).json({ ok: false, error: 'username requerido' });
-    if (!roles.ROLES[String(role || '').toLowerCase()]) {
+    const normRole = roleAlias(role);
+    if (!roles.ROLES[normRole]) {
       return res.status(400).json({ ok: false, error: 'Rol inválido' });
     }
     const users = db.collection(store.get(), 'users');
@@ -62,7 +72,7 @@ module.exports = (store) => {
     }
     const rec = {
       id: useId,
-      username, role: String(role).toLowerCase(),
+      username, role: normRole,
       name: name || username, email: email || '', phone: phone || '',
       avatar: `https://i.pravatar.cc/40?u=${encodeURIComponent(username)}`,
       xp: 0, students: [],
@@ -72,7 +82,6 @@ module.exports = (store) => {
       return res.status(403).json({ ok: false, error: 'Solo un GM puede crear cuentas GM' });
     }
     rec.passwordHash = passwords.hash(password || (Math.random().toString(36).slice(2) + 'Aa1!'));
-    await store.refreshIfStale();
     users.push(rec);
     db.audit(store.get(), 'creacion_usuario', req.user, { usuarioCreadoId: rec.id, username });
     await store.persistCollections(['users', 'auditoria']);
@@ -82,6 +91,8 @@ module.exports = (store) => {
 
   r.put('/:id', async (req, res, next) => {
     try {
+    // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
+    await store.refreshForWrite();
     const users = db.collection(store.get(), 'users');
     const target = db.byId(users, req.params.id);
     if (!target) return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -118,13 +129,13 @@ module.exports = (store) => {
       if (v !== undefined) target[k] = v;
     }
     if (role !== undefined) {
-      if (!roles.ROLES[String(role).toLowerCase()]) return res.status(400).json({ ok: false, error: 'Rol inválido' });
-      if (roles.isGM({ ...target, role }) && !roles.isGM(req.user)) {
+      const normRole = roleAlias(role);
+      if (!roles.ROLES[normRole]) return res.status(400).json({ ok: false, error: 'Rol inválido' });
+      if (roles.isGM({ ...target, role: normRole }) && !roles.isGM(req.user)) {
         return res.status(403).json({ ok: false, error: 'Solo un GM puede otorgar rol GM' });
       }
-      target.role = String(role).toLowerCase();
+      target.role = normRole;
     }
-    await store.refreshIfStale();
     db.audit(store.get(), 'edicion_usuario', req.user, { usuarioId: target.id, antes: db.safeUser(antes) });
     await store.persistCollections(['users', 'auditoria']);
     res.json({ ok: true, user: db.safeUser(target) });
@@ -133,6 +144,8 @@ module.exports = (store) => {
 
   r.delete('/:id', async (req, res, next) => {
     try {
+    // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
+    await store.refreshForWrite();
     const data = store.get();
     const users = db.collection(data, 'users');
     const target = db.byId(users, req.params.id);
@@ -140,7 +153,6 @@ module.exports = (store) => {
     if (!roles.canModifyUser(req.user, target)) {
       return res.status(403).json({ ok: false, error: 'No se puede eliminar una cuenta GM' });
     }
-    await store.refreshIfStale();
     data.users = users.filter((x) => String(x.id) !== String(target.id));
     db.audit(data, 'borrado_usuario', req.user, { usuarioId: target.id, username: target.username });
     await store.persistCollections(['users', 'auditoria']);

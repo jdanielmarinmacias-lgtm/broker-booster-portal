@@ -22,15 +22,24 @@ module.exports = (store) => {
         : String(stored) === String(password));
       if (!valid) {
         mw.noteFailedLogin(req);
-        db.audit(store.get(), 'login_fallido', null, { username: String(username) });
-        await store.persist().catch(() => {});
+        // Solo auditoría (quirúrgica y con caché fresca): un login fallido
+        // JAMÁS debe reescribir la base (el persist total con caché vieja
+        // borraba registros ajenos en producción multi-instancia).
+        try {
+          await store.refreshForWrite();
+          db.audit(store.get(), 'login_fallido', null, { username: String(username) });
+          await store.persistCollections(['auditoria']);
+        } catch (e) { /* la auditoría nunca rompe el login */ }
         return res.status(401).json({ ok: false, error: 'Credenciales incorrectas' });
       }
       mw.forgiveLogin(req);
       const token = await sessions.create(u.id);
       res.setHeader('Set-Cookie', sessions.cookieHeader(token));
-      db.audit(store.get(), 'login', db.safeUser(u), {});
-      await store.persist().catch(() => {});
+      try {
+        await store.refreshForWrite();
+        db.audit(store.get(), 'login', db.safeUser(u), {});
+        await store.persistCollections(['auditoria']);
+      } catch (e) { /* idem */ }
       const safe = db.safeUser(u);
       res.json({ ok: true, user: safe, mustChangePassword: !!u.mustChangePassword });
     } catch (e) { next(e); }
@@ -61,6 +70,7 @@ module.exports = (store) => {
         : String(stored) === String(current));
       if (!okCurrent) return res.status(401).json({ ok: false, error: 'La contraseña actual no coincide' });
       const newHash = passwords.hash(nextPw);
+      await store.refreshForWrite();
       const data = store.get();
       const local = db.byId(db.collection(data, 'users'), u.id);
       if (local) {
@@ -71,7 +81,7 @@ module.exports = (store) => {
       // Sincroniza el registro directo (supabase; en json/memory es no-op).
       await store.adapter.upsertUser({ ...u, passwordHash: newHash, mustChangePassword: false });
       db.audit(data, 'cambio_password', db.safeUser(u), {});
-      await store.persist().catch(() => {});
+      await store.persistCollections(['users', 'auditoria']).catch(() => {});
       res.json({ ok: true });
     } catch (e) { next(e); }
   });

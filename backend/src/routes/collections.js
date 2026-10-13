@@ -28,7 +28,7 @@ module.exports = (store, config) => {
 
   r.get('/public/portal', async (req, res, next) => {
     try {
-      await store.refreshIfStale();
+      await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
       const data = store.get();
       const settings = data.settings || {};
       res.json({
@@ -67,7 +67,7 @@ module.exports = (store, config) => {
     'notifications', 'posts', 'auditoria'];
   api.get('/', async (req, res, next) => {
     try {
-      await store.refreshIfStale();
+      await store.refreshIfStale(); // lectura: el TTL basta
       const data = store.get();
       const set = new Set(Object.keys(data).filter(
         (k) => !FORBIDDEN.has(k) && Array.isArray(data[k])
@@ -82,7 +82,7 @@ module.exports = (store, config) => {
       const { collection } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canRead(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de lectura' });
-      await store.refreshIfStale();
+      await store.refreshIfStale(); // lectura: el TTL basta
       let items = db.collection(store.get(), collection).slice();
       if (req.query.q) {
         const q = String(req.query.q).toLowerCase();
@@ -97,11 +97,14 @@ module.exports = (store, config) => {
       const { collection } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
+      // ORDEN CRÍTICO: refrescar ANTES de resolver la colección. Si se resuelve
+      // antes, `col` apunta a la caché vieja y el push muta un objeto que el
+      // persist ya no guarda (respuesta 201 pero dato perdido en producción).
+      await store.refreshForWrite();
       const col = db.collection(store.get(), collection);
       const body = req.body || {};
       // Upsert por id: el frontend crea con id local (Date.now) y sincroniza.
       // Si el id ya existe se reemplaza (200); si no, se crea (201).
-      await store.refreshIfStale();
       if (body.id !== undefined && body.id !== null) {
         const ix = col.findIndex((x) => String(x.id) === String(body.id));
         if (ix >= 0) {
@@ -127,7 +130,7 @@ module.exports = (store, config) => {
       const { collection, id } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      await store.refreshIfStale();
+      await store.refreshForWrite();
       const col = db.collection(store.get(), collection);
       const rec = db.byId(col, id);
       if (!rec) return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -143,7 +146,7 @@ module.exports = (store, config) => {
       const { collection, id } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      await store.refreshIfStale();
+      await store.refreshForWrite();
       const data = store.get();
       const before = (data[collection] || []).length;
       data[collection] = (data[collection] || []).filter((x) => String(x.id) !== String(id));

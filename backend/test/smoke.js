@@ -332,6 +332,58 @@ describe('promotoría+escuela: matriz y persist quirúrgico', () => {
   });
 });
 
+describe('stale-cache multi-instancia: escribir con caché vieja no borra nada', () => {
+  // Simula otra instancia de Vercel: escribe directo al adaptador por detrás
+  // de la caché del store. Cada mutación HTTP debe recargar antes de tocar.
+  async function externalWrite(mut) {
+    const docs = await store.adapter.loadDocuments();
+    mut(docs);
+    await store.adapter.saveDocuments(docs);
+  }
+  it('POST con caché vieja conserva lo ajeno (ventas)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await externalWrite((d) => {
+      d.ventas = d.ventas || [];
+      d.ventas.push({ id: 992001, contratante: 'Otra instancia' });
+    });
+    const r = await api('POST', '/api/data/ventas', { id: 992002, contratante: 'Esta instancia' });
+    assert.equal(r.status, 201);
+    const g = await api('GET', '/api/data/ventas');
+    assert.ok(g.json.items.some((x) => String(x.id) === '992001'), 'sobrevive lo ajeno');
+    assert.ok(g.json.items.some((x) => String(x.id) === '992002'), 'sobrevive lo propio');
+    await api('DELETE', '/api/data/ventas/992001');
+    await api('DELETE', '/api/data/ventas/992002');
+  });
+  it('PUT usuario con caché vieja conserva usuarios ajenos', async () => {
+    await externalWrite((d) => {
+      d.users = d.users || [];
+      d.users.push({ id: 992010, username: 'externo', role: 'alumno', name: 'Externo' });
+    });
+    const me = (await api('GET', '/api/users')).json.users.find((u) => u.username === 'admin');
+    const put = await api('PUT', `/api/users/${me.id}`, { phone: '521111111111' });
+    assert.equal(put.status, 200);
+    const after = (await api('GET', '/api/users')).json.users;
+    assert.ok(after.some((u) => u.username === 'externo'), 'usuario ajeno sobrevive al PUT');
+    assert.equal(after.find((u) => u.username === 'admin').phone, '521111111111');
+    await api('DELETE', '/api/users/992010');
+    await api('PUT', `/api/users/${me.id}`, { phone: '521000000000' });
+  });
+  it('login fallido (401) no borra registros ajenos', async () => {
+    await externalWrite((d) => {
+      d.solicitudes = d.solicitudes || [];
+      d.solicitudes.push({ id: 992020, cliente: 'No tocar' });
+    });
+    jar.cookie = null;
+    const bad = await api('POST', '/api/auth/login', { username: 'admin', password: 'mala-clave' }, false);
+    assert.equal(bad.status, 401);
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const g = await api('GET', '/api/data/solicitudes');
+    assert.ok(g.json.items.some((x) => String(x.id) === '992020'), 'login fallido no wipea');
+    await api('DELETE', '/api/data/solicitudes/992020');
+  });
+});
+
 describe('paso 4: archivos compartidos (modo local)', () => {
   async function rawForm(fd, withAuth = true) {
     const headers = {};

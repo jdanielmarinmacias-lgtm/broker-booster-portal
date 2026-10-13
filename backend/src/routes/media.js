@@ -162,9 +162,12 @@ async function registerMedia(store, user, meta) {
     uploaderName: user.name || user.username,
     createdAt: new Date().toISOString(),
   };
+  // ORDEN CRÍTICO: refrescar ANTES de mutar (ver routes/collections.js).
+  await store.refreshForWrite();
   db.collection(store.get(), 'media').push(rec);
   db.audit(store.get(), 'subida_media', user, { id: rec.id, scope: rec.scope, mime: rec.mime });
-  await store.persist();
+  if (store.persistCollections) await store.persistCollections(['media', 'auditoria']);
+  else await store.persist();
   if (FEED_SCOPES.has(rec.scope)) {
     await store.pushFeed({
       kind: rec.scope,
