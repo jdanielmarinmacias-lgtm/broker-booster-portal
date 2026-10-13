@@ -12,6 +12,13 @@ function createMemoryAdapter(initial) {
     cacheTtlMs: Infinity,
     async loadDocuments() { return JSON.parse(JSON.stringify(docs)); },
     async saveDocuments(obj) { docs = JSON.parse(JSON.stringify(obj)); },
+    async saveCollections(obj, names) {
+      const next = JSON.parse(JSON.stringify(docs));
+      for (const n of (names || [])) {
+        if (n in obj) next[n] = JSON.parse(JSON.stringify(obj[n]));
+      }
+      docs = next;
+    },
     async getUserByUsername(username) {
       return (docs.users || []).find((x) => String(x.username).toLowerCase() === String(username).toLowerCase()) || null;
     },

@@ -34,17 +34,23 @@ function canModifyUser(actor, target) {
 
 /* Matriz de permisos finos por colección para la API genérica.
  * read: roles que pueden leer · write: roles que pueden crear/editar/borrar. */
+/* Promotoría + escuela: agentes crean solicitudes/ventas/siniestros y chatean;
+ * cotizar/procesar queda en cotizadores (maestro/agencia/admin…). Todos los
+ * autenticados leen lo suyo (read null). Escuela: lessons/exams solo docentes. */
+const ALL_ROLES = ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador', 'agencia', 'agente_agencia', 'agente_desarrollo', 'alumno', 'prospecto'];
+const STAFF = ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'];
+const TEACHERS = ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'];
 const COLLECTION_RULES = {
-  ventas:       { read: null, write: ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'] },
-  metas:        { read: null, write: ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'] },
-  solicitudes:  { read: null, write: ['admin', 'gm', 'desarrollador', 'agencia', 'maestro', 'editor', 'capacitador', 'agente_agencia', 'agente_desarrollo', 'alumno'] },
-  cotizaciones: { read: null, write: ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'] },
-  siniestros:   { read: null, write: ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'] },
-  lessons:      { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'] },
-  exams:        { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'] },
+  ventas:       { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
+  metas:        { read: null, write: STAFF },
+  solicitudes:  { read: null, write: ALL_ROLES },
+  cotizaciones: { read: null, write: [...STAFF, 'editor', 'capacitador'] },
+  siniestros:   { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
+  lessons:      { read: null, write: TEACHERS },
+  exams:        { read: null, write: TEACHERS },
   auditoria:    { read: ['admin', 'gm', 'desarrollador'], write: [] }, // solo el servidor escribe
 };
-const DEFAULT_RULE = { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador', 'agencia'] };
+const DEFAULT_RULE = { read: null, write: ALL_ROLES };
 
 function canRead(actor, collection) {
   const rule = COLLECTION_RULES[collection] || DEFAULT_RULE;

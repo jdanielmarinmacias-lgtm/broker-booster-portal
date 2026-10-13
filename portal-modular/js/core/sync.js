@@ -17,6 +17,28 @@
 
   var SKIP = { users: 1, sessions: 1, auditoria: 1 };
   var SHOWCASE = ['inmPublica', 'autoHub', 'posts', 'carruselCirculares', 'media'];
+  /* Promotoría + escuela + chat: si otro equipo publica, el encargado lo ve
+   * en vivo (el backend espeja estas al public_feed). */
+  var LIVE_WORK = ['solicitudes', 'cotizaciones', 'ventas', 'siniestros',
+    'messages', 'groupMessages', 'notifications', 'lessons', 'liveClasses', 'exams'];
+  var KIND_TO_COL = {
+    solicitudes: 'solicitudes', cotizaciones: 'cotizaciones', ventas: 'ventas',
+    siniestros: 'siniestros', messages: 'messages', groupMessages: 'groupMessages',
+    notifications: 'notifications', lessons: 'lessons', liveClasses: 'liveClasses',
+    exams: 'exams', posts: 'posts', inmPublica: 'inmPublica', autoHub: 'autoHub',
+    carruselCirculares: 'carruselCirculares', media: 'media'
+  };
+  var KIND_TOAST = {
+    solicitudes: '🔔 Nueva solicitud de cotización',
+    cotizaciones: '📑 Cotización actualizada',
+    ventas: '💰 Nueva venta registrada',
+    siniestros: '🚨 Nuevo siniestro reportado',
+    messages: '💬 Nuevo mensaje',
+    groupMessages: '👥 Mensaje grupal nuevo',
+    lessons: '📚 Nuevo contenido de escuela',
+    liveClasses: '🎥 Nueva clase en vivo',
+    exams: '📝 Nuevo examen disponible'
+  };
   var pushTimer = null;
   var shadow = null; // {col: [{...}]} última foto DEL SERVIDOR (solo lo traído por pull)
   var pulled = {}; // colecciones confirmadas desde el servidor en el último pull
@@ -360,11 +382,20 @@
         }
       }
     } catch (e) { /* sin sesión: el login hará pull */ }
-    // Novedades de otros usuarios → re-pull escaparate + re-render.
-    document.addEventListener('public-feed', function () {
+    // Novedades de otros usuarios → re-pull escaparate + trabajo + re-render.
+    // Ej: agente carga solicitud → el cotizador la ve en ese momento + toast.
+    document.addEventListener('public-feed', function (e) {
       if (!active) return;
-      pullNames(SHOWCASE).then(function () {
-        try { if (typeof window.render === 'function') window.render(); } catch (e) {}
+      var kind = e && e.detail && e.detail.kind;
+      var cols = SHOWCASE.slice();
+      var target = kind && KIND_TO_COL[kind];
+      if (target && cols.indexOf(target) === -1 && LIVE_WORK.indexOf(target) !== -1) cols.push(target);
+      if (!target) cols = cols.concat(LIVE_WORK.filter(function (c) { return cols.indexOf(c) === -1; }));
+      pullNames(cols).then(function () {
+        try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
+        if (kind && KIND_TOAST[kind] && window.showToast) {
+          try { window.showToast(KIND_TOAST[kind], 'info'); } catch (e3) {}
+        }
       }).catch(function () {});
     });
   }

@@ -150,8 +150,10 @@ describe('paso 3: config pública y feed', () => {
     await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
     const r = await api('POST', '/api/data/autoHub', { titulo: 'Test Auto' });
     assert.equal(r.status, 201);
-    assert.equal(store.adapter._feed.length, 1);
-    assert.equal(store.adapter._feed[0].kind, 'autoHub');
+    // Ventas/solicitudes también espejan a feed (promotoría en vivo), así que
+    // puede haber más de 1 item; lo que importa es que autoHub llegó último.
+    assert.ok(store.adapter._feed.length >= 1);
+    assert.equal(store.adapter._feed[store.adapter._feed.length - 1].kind, 'autoHub');
   });
   it('feed público lista lo publicado (último primero)', async () => {
     const r = await api('GET', '/api/public/feed', null, false);
@@ -252,6 +254,81 @@ describe('auditoría: guardado de usuarios y equipo', () => {
     assert.ok(typeof mw.loginRateLimit === 'function');
     assert.ok(typeof mw.noteFailedLogin === 'function');
     assert.ok(typeof mw.forgiveLogin === 'function');
+  });
+});
+
+describe('promotoría+escuela: matriz y persist quirúrgico', () => {
+  it('índice incluye colecciones vacías conocidas (incógnito no pierde nada)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('GET', '/api/data');
+    assert.equal(r.status, 200);
+    for (const k of ['ventas', 'solicitudes', 'cotizaciones', 'siniestros', 'lessons', 'messages']) {
+      assert.ok(r.json.collections.includes(k), 'falta ' + k);
+    }
+  });
+  it('agente crea solicitud (201) pero no cotización (403); cotizador sí (201)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const s = await api('POST', '/api/data/solicitudes', { id: 991001, ramo: 'auto-ind', cliente: 'Test' });
+    assert.equal(s.status, 201);
+    const c = await api('POST', '/api/data/cotizaciones', { id: 991002, solicitudId: 991001 });
+    assert.equal(c.status, 403);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'maestro', password: 'Test1234*' }, false);
+    const c2 = await api('POST', '/api/data/cotizaciones', { id: 991002, solicitudId: 991001 });
+    assert.equal(c2.status, 201);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await api('DELETE', '/api/data/cotizaciones/991002');
+    await api('DELETE', '/api/data/solicitudes/991001');
+  });
+  it('agente crea venta y mensaje (escuela/chat abiertos a todos)', async () => {
+    // Alta de un agente temporal (el seed no trae agentes).
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const au = await api('POST', '/api/users', { username: 'agentetmp', password: 'Clave1234', role: 'agente_agencia', name: 'Agente Tmp' });
+    assert.equal(au.status, 201);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'agentetmp', password: 'Clave1234' }, false);
+    const v = await api('POST', '/api/data/ventas', { id: 991003, contratante: 'Agente vende' });
+    assert.equal(v.status, 201);
+    const m = await api('POST', '/api/data/messages', { id: 991004, texto: 'hola' });
+    assert.equal(m.status, 201);
+    // Alumno: vende NO (403, es estudiante) pero chatea SÍ (201).
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const v2 = await api('POST', '/api/data/ventas', { id: 991008, contratante: 'Alumno vende' });
+    assert.equal(v2.status, 403);
+    const m2 = await api('POST', '/api/data/messages', { id: 991009, texto: 'hola alumno' });
+    assert.equal(m2.status, 201);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await api('DELETE', '/api/data/ventas/991003');
+    await api('DELETE', '/api/data/messages/991004');
+    await api('DELETE', '/api/data/messages/991009');
+    await api('DELETE', `/api/users/${au.json.user.id}`);
+  });
+  it('persist quirúrgico: editar una colección no borra otra', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await api('POST', '/api/data/solicitudes', { id: 991005, cliente: 'A' });
+    await api('POST', '/api/data/ventas', { id: 991006, contratante: 'B' });
+    const put = await api('PUT', '/api/data/ventas/991006', { contratante: 'B2' });
+    assert.equal(put.status, 200);
+    const g = await api('GET', '/api/data/solicitudes');
+    assert.ok(g.json.items.some((x) => String(x.id) === '991005'), 'solicitud sobrevivió al PUT de ventas');
+    await api('DELETE', '/api/data/solicitudes/991005');
+    await api('DELETE', '/api/data/ventas/991006');
+  });
+  it('solicitud nueva genera item de feed (realtime encargado)', async () => {
+    const n0 = (await api('GET', '/api/public/feed', null, false)).json.items.length;
+    const s = await api('POST', '/api/data/solicitudes', { id: 991007, cliente: 'Feed test' });
+    assert.equal(s.status, 201);
+    const feed = await api('GET', '/api/public/feed', null, false);
+    assert.equal(feed.json.items.length, n0 + 1);
+    assert.equal(feed.json.items[0].kind, 'solicitudes');
+    await api('DELETE', '/api/data/solicitudes/991007');
   });
 });
 

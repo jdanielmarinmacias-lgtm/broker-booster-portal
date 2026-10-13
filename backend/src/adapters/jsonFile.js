@@ -23,6 +23,13 @@ function createJsonFileAdapter(dataDir) {
     cacheTtlMs: Infinity, // un solo proceso: la caché siempre está al día
     async loadDocuments() { ensure(); return read(DB_FILE, {}); },
     async saveDocuments(obj) { writeAtomic(DB_FILE, obj); },
+    async saveCollections(obj, names) {
+      const cur = read(DB_FILE, {});
+      for (const n of (names || [])) {
+        if (n in obj) cur[n] = obj[n];
+      }
+      writeAtomic(DB_FILE, cur);
+    },
     async getUserByUsername(username) {
       const users = read(DB_FILE, {}).users || [];
       return users.find((x) => String(x.username).toLowerCase() === String(username).toLowerCase()) || null;

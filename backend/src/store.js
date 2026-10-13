@@ -39,6 +39,14 @@ function createStore(adapter) {
       await adapter.saveDocuments(cache);
       cacheAt = Date.now();
     },
+    /* Persist quirúrgico: solo las colecciones indicadas (+ auditoría se
+     * incluye cuando el caller la tocó). Si el adaptador no lo soporta,
+     * cae al write-through total. */
+    async persistCollections(names) {
+      if (adapter.saveCollections) await adapter.saveCollections(cache, names);
+      else await adapter.saveDocuments(cache);
+      cacheAt = Date.now();
+    },
     pushFeed: (item) => adapter.pushFeed(item),
   };
 }

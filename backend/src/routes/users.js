@@ -18,9 +18,12 @@ module.exports = (store) => {
   const r = express.Router();
   r.use(mw.requireRole(...MANAGERS));
 
-  r.get('/', (req, res) => {
-    const users = db.collection(store.get(), 'users');
-    res.json({ ok: true, users: users.map(db.safeUser) });
+  r.get('/', async (req, res, next) => {
+    try {
+      await store.refreshIfStale();
+      const users = db.collection(store.get(), 'users');
+      res.json({ ok: true, users: users.map(db.safeUser) });
+    } catch (e) { next(e); }
   });
 
   // Quién puede dar de alta a quién (crear es asignar a tu equipo).
@@ -69,9 +72,10 @@ module.exports = (store) => {
       return res.status(403).json({ ok: false, error: 'Solo un GM puede crear cuentas GM' });
     }
     rec.passwordHash = passwords.hash(password || (Math.random().toString(36).slice(2) + 'Aa1!'));
+    await store.refreshIfStale();
     users.push(rec);
     db.audit(store.get(), 'creacion_usuario', req.user, { usuarioCreadoId: rec.id, username });
-    await store.persist();
+    await store.persistCollections(['users', 'auditoria']);
     res.status(201).json({ ok: true, user: db.safeUser(rec) });
     } catch (e) { next(e); }
   });
@@ -120,8 +124,9 @@ module.exports = (store) => {
       }
       target.role = String(role).toLowerCase();
     }
+    await store.refreshIfStale();
     db.audit(store.get(), 'edicion_usuario', req.user, { usuarioId: target.id, antes: db.safeUser(antes) });
-    await store.persist();
+    await store.persistCollections(['users', 'auditoria']);
     res.json({ ok: true, user: db.safeUser(target) });
     } catch (e) { next(e); }
   });
@@ -135,9 +140,10 @@ module.exports = (store) => {
     if (!roles.canModifyUser(req.user, target)) {
       return res.status(403).json({ ok: false, error: 'No se puede eliminar una cuenta GM' });
     }
+    await store.refreshIfStale();
     data.users = users.filter((x) => String(x.id) !== String(target.id));
     db.audit(data, 'borrado_usuario', req.user, { usuarioId: target.id, username: target.username });
-    await store.persist();
+    await store.persistCollections(['users', 'auditoria']);
     res.json({ ok: true });
     } catch (e) { next(e); }
   });

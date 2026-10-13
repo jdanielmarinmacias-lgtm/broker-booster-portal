@@ -61,11 +61,20 @@ function createSupabaseAdapter({ url, serviceKey }) {
   }
 
   async function saveDocuments(obj) {
-    // Write-through completo (escala del portal: decenas de filas por mutación).
-    // Dedup por (collection, doc_id): el legacy puede traer ids repetidos
-    // (Date.now) y Postgres aborta el upsert si un conflicto se toca 2 veces.
+    // Fallback total (seed/boot). Las rutas usan saveCollections (quirúrgico).
+    const names = Object.keys(obj || {}).filter((k) => k === 'users' || Array.isArray(obj[k]));
+    await saveCollections(obj, names);
+  }
+
+  /* Persist quirúrgico: solo las colecciones tocadas. Cada mutación hace
+   * refreshIfStale() antes, así la caché está fresca y el borrado de
+   * "ausentes" se limita a la colección tocada: dos instancias tocando
+   * colecciones distintas ya no se pisan (fin del write-through total). */
+  async function saveCollections(obj, names) {
+    const wanted = new Set(names || []);
     const seenRows = new Map();
     for (const [collection, items] of Object.entries(obj || {})) {
+      if (!wanted.has(collection)) continue;
       if (collection === 'users') continue;
       if (!Array.isArray(items)) continue;
       for (const item of items) {
@@ -76,32 +85,36 @@ function createSupabaseAdapter({ url, serviceKey }) {
     const rows = [...seenRows.values()];
     const seen = new Set();
     for (let i = 0; i < rows.length; i += 500) {
-      const chunk = rows[i].collection ? rows.slice(i, i + 500) : [];
+      const chunk = rows.slice(i, i + 500);
+      if (!chunk.length || !chunk[0].collection) continue;
       const { error } = await sb.from('documents').upsert(chunk, { onConflict: 'collection,doc_id' });
       if (error) throw new Error('Supabase upsert: ' + error.message);
       chunk.forEach((r) => seen.add(r.collection + '∅' + r.doc_id));
     }
-    // Borra lo que ya no existe en caché.
-    const { data: existing } = await sb.from('documents').select('collection,doc_id');
-    const stale = (existing || []).filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
-    for (let i = 0; i < stale.length; i += 200) {
-      const chunk = stale.slice(i, i + 200);
-      for (const r of chunk) {
+    // Borra ausentes SOLO dentro de las colecciones tocadas.
+    const touched = [...wanted].filter((c) => c !== 'users');
+    if (touched.length) {
+      const { data: existing } = await sb.from('documents').select('collection,doc_id').in('collection', touched);
+      const stale = (existing || []).filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
+      for (const r of stale) {
         await sb.from('documents').delete().eq('collection', r.collection).eq('doc_id', r.doc_id);
       }
     }
-    // Usuarios: upsert + borrado de ausentes.
-    const users = Array.isArray(obj.users) ? obj.users : [];
-    if (users.length) {
-      const { error } = await sb.from('app_users').upsert(users.map(toUserRow), { onConflict: 'id' });
-      if (error) throw new Error('Supabase users upsert: ' + error.message);
-    }
-    const { data: eu } = await sb.from('app_users').select('id');
-    const keep = new Set(users.map((u) => String(u.id)));
-    const gone = (eu || []).map((r) => r.id).filter((id) => !keep.has(String(id)));
-    if (gone.length) {
-      const { error } = await sb.from('app_users').delete().in('id', gone);
-      if (error) throw new Error('Supabase users delete: ' + error.message);
+    // Usuarios: solo si se tocó 'users' (ruta /api/users). Upsert + borrado
+    // de ausentes contra la lista completa (el caller hizo refresh antes).
+    if (wanted.has('users')) {
+      const users = Array.isArray(obj.users) ? obj.users : [];
+      if (users.length) {
+        const { error } = await sb.from('app_users').upsert(users.map(toUserRow), { onConflict: 'id' });
+        if (error) throw new Error('Supabase users upsert: ' + error.message);
+      }
+      const { data: eu } = await sb.from('app_users').select('id');
+      const keep = new Set(users.map((u) => String(u.id)));
+      const gone = (eu || []).map((r) => r.id).filter((id) => !keep.has(String(id)));
+      if (gone.length) {
+        const { error } = await sb.from('app_users').delete().in('id', gone);
+        if (error) throw new Error('Supabase users delete: ' + error.message);
+      }
     }
   }
 
