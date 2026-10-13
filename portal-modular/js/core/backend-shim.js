@@ -22,6 +22,27 @@
     else alert(msg);
   }
 
+  /* IA del portal: pide la clave Groq al servidor CON sesión válida y la
+   * expone a Gu-IA (GUIA_KEY), el comparador y la práctica. Solo se siembra
+   * en localStorage si el usuario no tiene una propia (llamadas del legado). */
+  async function ensureIAKey() {
+    try {
+      const res = await fetch('/api/ia/key', { credentials: 'same-origin' });
+      if (!res.ok) return;
+      const j = await res.json();
+      if (!j || !j.ok || !j.key) return;
+      window.IA_BROKER_KEY = j.key;
+      window.psAPIKey = window.psAPIKey || j.key;
+      try {
+        if (typeof window.IAKeyReady === 'function') window.IAKeyReady(j.key);
+      } catch (e) {}
+      try {
+        const local = (localStorage.getItem('groq_api_key') || '').trim();
+        if (!local.startsWith('gsk_')) localStorage.setItem('groq_api_key', j.key);
+      } catch (e) {}
+    } catch (e) { /* sin backend/red: las funciones de IA siguen con su clave local */ }
+  }
+
   /* --- Flujo de entrada: espejo de login() del legacy (01-core ~línea 471) --- */
   function enterApp(user, destination) {
     destination = destination || sessionStorage.getItem('login_destination') || 'campus';
@@ -107,6 +128,7 @@
         // fase 2b: pull del servidor ANTES del primer render (datos de todos).
         try { if (window.BackendSync) await window.BackendSync.pull(); } catch (e) {}
         // Sin modal de cambio de clave (bloqueaba el ingreso): entra directo.
+        ensureIAKey();
         enterApp(r.user, finalDest);
       } catch (err) {
         loginError(err.message || 'Credenciales incorrectas');
@@ -120,6 +142,7 @@
         await syncUsersMirror();
         try { if (window.BackendSync) window.BackendSync.normUser(me.user); } catch (e) {}
         // fase 2b: el pull vive en sync.js (boot con sesión); aquí solo espejo.
+        ensureIAKey();
         enterApp(me.user, 'campus');
       }
     } catch (e) { /* sin sesión: se queda en portada/login */ }

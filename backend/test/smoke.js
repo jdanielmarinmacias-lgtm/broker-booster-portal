@@ -5,6 +5,9 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.SEED_PASSWORD = 'Test1234*';
+// Hermeticidad: la IA del portal se prueba con una clave de TEST, nunca la
+// real del propietario (que viaja solo como env de Vercel).
+process.env.GROQ_API_KEY = 'gsk_testkey_leaked_offline_test_only_0000';
 // Herméticos y offline: pisan el .env real (config.js solo rellena lo undefined;
 // '' es falsy y deja supabaseUrl/ServiceKey en null).
 process.env.SUPABASE_URL = '';
@@ -152,6 +155,16 @@ describe('paso 3: config pública y feed', () => {
     const r = await api('GET', '/api/public/portal', null, false);
     assert.equal(r.status, 200);
     assert.ok('autosDisponibles' in r.json.portal);
+  });
+  it('IA key: 401 sin sesión; con sesión entrega clave gsk_ (no se loggea)', async () => {
+    jar.cookie = null;
+    const anon = await api('GET', '/api/ia/key', null, false);
+    assert.equal(anon.status, 401);
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('GET', '/api/ia/key');
+    assert.equal(r.status, 200);
+    assert.equal(r.json.ok, true);
+    assert.ok(String(r.json.key || '').startsWith('gsk_'), 'clave Groq con formato correcto');
   });
   it('publicar en escaparate genera item de feed (array: posts)', async () => {
     // autoHub/settings ahora son COLECCIONES-OBJETO (su POST mergea y

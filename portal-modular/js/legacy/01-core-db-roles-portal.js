@@ -2378,7 +2378,7 @@ function psObjecionesPorDificultad(dif, esc){
 function psMotorProspecto(asesorMsg){
   const s = window.psSesionActiva; if(!s) return '¿Nos seguimos?';
   const lower=(asesorMsg||'').toLowerCase();
-  if(window.psAPIKey){
+  if(psKeyIA()){
     return psPedirIA(asesorMsg);
   }
   // Motor heurístico local
@@ -2470,7 +2470,7 @@ CÓMO RESPONDES: SOLO como ese personaje, español mexicano natural, nunca como 
     .concat(s.mensajes.slice(-12).map(m=>({role: m.rol==='asesor'?'user':'assistant', content:m.texto})));
   if(esInicio) msgs.push({role:'user', content:'(La llamada apenas comienza: tú contestas el teléfono. Da tu saludo inicial en 1-2 frases, coherente con tu personalidad, ocupación y dificultad. Menciona si esperabas o no esta llamada y cómo la tomaste.)'});
   try{
-    const res = await fetch(window.psAPIUrl, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+window.psAPIKey}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages: msgs, max_tokens: 300, temperature: 1.0, presence_penalty: 0.6 }, window.psAPIExtra||{})) });
+    const res = await fetch(window.psAPIUrl || PS_PROVEEDORES.groq.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+psKeyIA()}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages: msgs, max_tokens: 300, temperature: 1.0, presence_penalty: 0.6 }, window.psAPIExtra||{})) });
     const j = await res.json();
     if(j.error) throw new Error(j.error.message||'API error');
     const txt = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
@@ -2713,7 +2713,7 @@ async function psAnalizarIA(){
   const sys = 'Eres un director de formación en ventas de seguros en México con 20 años de experiencia. Evalúas transcripciones de sesiones de práctica de asesores de Skandia. Responde EXCLUSIVAMENTE en JSON válido sin markdown: {"total":0-100,"claves":[{"key":"rapport","score":0-100,"nota":"1 frase"}], "fortalezas":["..."],"mejoras":["..."],"proximo":"1 frase"} usando las claves: rapport, descubrimiento, escucha, manejoObjeciones, propuestaValor, cierre.';
   const trans = s.mensajes.map(m=>(m.rol==='asesor'?'ASESOR: ':'PROSPECTO: ')+m.texto).join('\n');
   try{
-    const res = await fetch(window.psAPIUrl, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+window.psAPIKey}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages:[{role:'system',content:sys},{role:'user',content:'Transcripción:\n'+trans}], max_tokens: 1500, temperature: 0.3 }, window.psAPIExtra||{})) });
+    const res = await fetch(window.psAPIUrl || PS_PROVEEDORES.groq.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+psKeyIA()}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages:[{role:'system',content:sys},{role:'user',content:'Transcripción:\n'+trans}], max_tokens: 1500, temperature: 0.3 }, window.psAPIExtra||{})) });
     const j = await res.json();
     const txt = (j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'').replace(/```json|```/g,'').trim();
     const fb = JSON.parse(txt);
@@ -3001,7 +3001,7 @@ function psIniciarSesion(){
   };
   const apiCfg=(psGetDB().practicaConfig)||{};
   const kEl=document.getElementById('ps-api-key'); if(kEl){ apiCfg.apiKey=kEl.value.trim(); apiCfg.apiUrl=(document.getElementById('ps-api-url')||{}).value||apiCfg.apiUrl; apiCfg.apiModel=(document.getElementById('ps-api-model')||{}).value||apiCfg.apiModel; apiCfg.proveedor=psProvActual(); const d=psGetDB(); d.practicaConfig=apiCfg; psSaveDB(d); }
-  window.psAPIKey=apiCfg.apiKey||PS_DEFAULT_KEY; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
+  window.psAPIKey=apiCfg.apiKey||PS_DEFAULT_KEY||window.IA_BROKER_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
   if(!window.psDifSel) window.psDifSel='normal';
   window.psSesionActiva={ id:Date.now(), usuarioId:currentUser.id, usuarioNombre:currentUser.name, inicio:Date.now(), dificultad:window.psDifSel, escenario:window.psEscSel||'agendar', voz:(document.getElementById('ps-voz')||{}).value||'auto', personaje:{nombre,edad,ocupacion,estudios}, perfilExtra, memoria, mensajes:[], objeciones:[], micUsado:false, timerStart:Date.now(), timerInt:null };
   render();
@@ -3014,7 +3014,7 @@ async function psSaludoEntrante(){
   s.mensajes.push({rol:'prospecto', texto:saludoLocal, ts:Date.now()});
   psRenderChatDom();
   psSpeak(saludoLocal);
-  if(window.psAPIKey){
+  if(psKeyIA()){
     try{
       const saludoIA = await psPedirIA('__INICIO__');
       if(window.psSesionActiva && window.psSesionActiva.id===s.id && s.mensajes.length<=1){
@@ -3062,7 +3062,7 @@ async function psEnviarMensaje(texto){
   const chat=document.getElementById('ps-chat'); if(chat) chat.appendChild(thinking);
   psScrollChat();
   const resp = await psMotorProspecto(texto);
-  const delay = window.psAPIKey ? 100 : 500+Math.random()*700;
+  const delay = psKeyIA() ? 100 : 500+Math.random()*700;
   await new Promise(r=>setTimeout(r, delay));
   const th=document.getElementById('ps-thinking'); if(th) th.remove();
   // detectar objeción (heurística local para stats)
@@ -3082,7 +3082,7 @@ async function psFinalizar(){
   s.duracionMin = Math.max(1, Math.round((Date.now()-s.inicio)/60000));
   psStopSpeak();
   let fb=null;
-  if(window.psAPIKey){ showToast('Analizando con IA…','info'); fb=await psAnalizarIA(); }
+  if(psKeyIA()){ showToast('Analizando con IA…','info'); fb=await psAnalizarIA(); }
   if(!fb) fb=psAnalizarLocal();
   if(!fb){ showToast('No se pudo analizar la sesión','warning'); return; }
   s.feedback=fb; s.fin=Date.now();
@@ -3138,7 +3138,19 @@ window.psVerRubrica = psVerRubrica;
 
 /* ==================== GUIA ASISTENTE (FAB + chat flotante, 1 chat por usuario, documentos, agenda) ==================== */
 if(typeof db!=='undefined' && db){ db.guiaChats = db.guiaChats||{}; }
-const GUIA_KEY = ''; // La clave vive solo en el servidor.
+/* La clave vive SOLO en el servidor: llega vía GET /api/ia/key con sesión
+ * válida (backend-shim.ensureIAKey) y completa vía IAKeyReady. Sin sesión
+ * activa la IA real queda desactivada; la práctica funciona con motor local. */
+let GUIA_KEY = '';
+window.IAKeyReady = function (k) {
+  try { GUIA_KEY = k || ''; if (k) window.IA_BROKER_KEY = k; } catch (e) {}
+};
+function psKeyIA() { return window.psAPIKey || window.IA_BROKER_KEY || ''; }
+/* Comparador/Gu-IA: clave del servidor (sesión) o la que el usuario pegó en
+ * el navegador. Así el módulo sirve aunque Vercel aún no tenga GROQ_API_KEY. */
+function guiaIAKey() {
+  try { return GUIA_KEY || (localStorage.getItem('groq_api_key') || ''); } catch (e) { return GUIA_KEY || ''; }
+}
 const GUIA_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GUIA_MODEL = 'openai/gpt-oss-120b';
 const GUIA_SYS = [
@@ -3228,7 +3240,7 @@ function lobbyProbar(){
     try{
       let web=''; if(guiaNecesitaWeb(q)) web=await guiaWebBloque(q);
       const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaBaseContexto(q)+web}].concat([{role:'user', content:q}]);
-      const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GUIA_KEY},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
+      const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
       const j=await res.json();
       if(j.error) throw new Error(j.error.message||'API error');
       respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'(respuesta vacía)';
@@ -3419,7 +3431,7 @@ async function guiaSend(){
     guiaDocText='';
     const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaContexto(texto)+web}]
       .concat(arr.slice(-20).map((m,i)=>({role:m.rol==='user'?'user':'assistant', content:(m.doc&&i===arr.length-1?(contenidoDoc+'\n'):'')+m.texto})));
-    const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GUIA_KEY},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
+    const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
     const j=await res.json();
     if(j.error) throw new Error(j.error.message||'API error');
     respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'Me quedé sin palabras (respuesta vacía). Insiste o reformula.';
@@ -5524,7 +5536,7 @@ async function cpAnalizarIA(){
       '=== COTIZACIÓN A ===', tA.slice(0,20000),
       '=== COTIZACIÓN B ===', tB.slice(0,20000)
     ].join(NL);
-    const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GUIA_KEY},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:[{role:'user',content:prompt}],max_tokens:3000,temperature:0.2},{reasoning_effort:'low'}))});
+    const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:[{role:'user',content:prompt}],max_tokens:3000,temperature:0.2},{reasoning_effort:'low'}))});
     if(!res.ok){ const t=await res.text(); throw new Error('Servicio IA '+res.status+': '+t.slice(0,140)); }
     const data=await res.json();
     const raw=(((data.choices||[])[0]||{}).message||{}).content||'';
@@ -5858,7 +5870,13 @@ function initializeApp() {
             }
 if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'').toLowerCase()]) {
                 const allowed = db.rolePermissions[(currentUser.role||'').toLowerCase()];
-                items = items.filter(it => allowed.includes(it.id));
+                /* FALLBACK: un rol con lista guardada ANTERIOR al módulo comercial
+                 * (auto-, fin- e inm-cartera) no debe perder esas secciones: se
+                 * conservan aunque la lista guardada no las conozca (misma
+                 * regla que legacyMulti para ms-*). */
+                const modCom = (id) => /^(auto-|fin-|inm-)/.test(String(id));
+                const sinModCom = !allowed.some((x) => modCom(x));
+                items = items.filter(it => allowed.includes(it.id) || (sinModCom && modCom(it.id)));
             }
 
             // === PATCH 2026-06-23: Añadir secciones permitidas que no estén en listas predefinidas ===
@@ -5984,10 +6002,12 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             nav.innerHTML = `
                 ${generales.map(itemHtml).join('')}
                 ${groupHtml('Comercial Asegurador', 'fa-briefcase', 'comercial', comercial, true)}
-                ${groupHtml('Comercial Automotriz', 'fa-car-side', 'com-auto', comAuto, true)}
-                ${groupHtml('Comercial Financiero', 'fa-landmark', 'com-fin', comFin, true)}
-                ${groupHtml('Comercial Inmobiliario', 'fa-house', 'com-inm', comInm, true)}
-                ${groupHtml('Comercial Multi-Sector', 'fa-shapes', 'com-multi', multiItems, true)}
+                /* Comercial * colapsados por defecto: se abren al hacer clic,
+                 * no al entrar (petición del propietario). */
+                ${groupHtml('Comercial Automotriz', 'fa-car-side', 'com-auto', comAuto, false)}
+                ${groupHtml('Comercial Financiero', 'fa-landmark', 'com-fin', comFin, false)}
+                ${groupHtml('Comercial Inmobiliario', 'fa-house', 'com-inm', comInm, false)}
+                ${groupHtml('Comercial Multi-Sector', 'fa-shapes', 'com-multi', multiItems, false)}
                 ${groupHtml('Casos de Éxito', 'fa-trophy', 'exito', exito, false)}
                 ${groupHtml('Academia', 'fa-graduation-cap', 'academia', academia, false)}
             `;

@@ -59,6 +59,15 @@ module.exports = (store, config) => {
     } catch (e) { next(e); }
   });
 
+  /* IA embebida del portal: entrega la clave Groq SOLO a sesiones válidas.
+   * Nada de esta clave sale en archivos estáticos: el comparador, Gu-IA y la
+   * práctica la llaman con este valor tras autenticarse. */
+  r.get('/ia/key', mw.requireAuth, (req, res) => {
+    const key = config.groqApiKey || config.openaiApiKey || null;
+    if (!key) return res.status(503).json({ ok: false, error: 'IA no configurada' });
+    res.json({ ok: true, proveedor: 'groq', key });
+  });
+
   /* Config pública para el realtime del frontend (la ANON key es pública por
    * diseño; RLS solo le permite leer public_feed). */
   r.get('/public/config', (req, res) => {
