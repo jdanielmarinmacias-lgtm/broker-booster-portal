@@ -3146,6 +3146,17 @@ window.IAKeyReady = function (k) {
   try { GUIA_KEY = k || ''; if (k) window.IA_BROKER_KEY = k; } catch (e) {}
 };
 function psKeyIA() { return window.psAPIKey || window.IA_BROKER_KEY || ''; }
+/* Bootstrap propio de la clave: no depende del shim (que el navegador puede
+ * tener cacheado). Si hay sesión válida pide la clave y la activa; sin sesión
+ * o sin backend queda en no-op (401 → silencio). */
+(async function () {
+  try {
+    const res = await fetch('/api/ia/key', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const j = await res.json();
+    if (j && j.ok && j.key && !window.IA_BROKER_KEY) window.IAKeyReady(j.key);
+  } catch (e) { /* sin backend/red: la IA pide clave a su manera */ }
+})();
 /* Comparador/Gu-IA: clave del servidor (sesión) o la que el usuario pegó en
  * el navegador. Así el módulo sirve aunque Vercel aún no tenga GROQ_API_KEY. */
 function guiaIAKey() {
