@@ -468,6 +468,18 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
             document.querySelector('#login-screen h2').textContent = 'Acceso Administrativo';
         }
 
+        // Botón "Regresar" del login (acceso administrativo y Campus): cierra el
+        // login y vuelve a la portada pública, sin dejar destino pendiente.
+        function exitLogin() {
+            try { sessionStorage.removeItem('login_destination'); } catch (e) {}
+            const ls = document.getElementById('login-screen');
+            if (ls) { ls.classList.add('hidden'); ls.classList.remove('flex'); }
+            const pp = document.getElementById('public-portal');
+            if (pp) pp.classList.remove('hidden');
+            const err = document.getElementById('login-error');
+            if (err) { err.textContent = ''; err.classList.add('hidden'); }
+        }
+
         function login(username, password) {
             const user = db.users.find(u => u.username === username && u.password === password);
             if (user) {
@@ -490,8 +502,15 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
                     }
                 } else {
                     if (isAdmin(user)) {
-                        alert('Los editores solo pueden acceder al panel de edición. Usa "Acceso administrativo".');
-                        return false;
+                        // Sin popup: el admin/editor que entra a Campus va directo a su panel.
+                        currentUser = user;
+                        sessionStorage.setItem('pepes_user', JSON.stringify(user));
+                        document.getElementById('login-screen').classList.add('hidden');
+                        document.getElementById('public-portal').classList.add('hidden');
+                        document.getElementById('main-app').classList.remove('hidden');
+                        initializeApp();
+                        setTimeout(() => navigateTo((user.role||'').toLowerCase()==='gm' ? 'dashboard' : 'editor'), 100);
+                        return true;
                     }
                     currentUser = user;
                     sessionStorage.setItem('pepes_user', JSON.stringify(user));
@@ -8206,13 +8225,46 @@ function renderMessages() {
             }
         }
 
+        /* ===== CHAT EN VIVO (sin recargar): polling ligero mientras el modal
+         * está abierto + refresco inmediato en evento realtime del feed.
+         * Re-renderiza SOLO el cuerpo de la conversación (#chat-messages):
+         * el input no se pierde mientras escribes. Sin backend, el tick solo
+         * aplica cambios si llegó algo del servidor (paridad local). ====== */
+        let chatLiveTimer = null;
+        let chatLiveUserId = null;
+        function stopChatLive() { if (chatLiveTimer) { clearInterval(chatLiveTimer); chatLiveTimer = null; } chatLiveUserId = null; }
+        function renderConversationBox(userId) {
+            const box = document.getElementById('chat-messages');
+            if (!box) return false;
+            const conv = db.messages.filter(m => (m.fromId === currentUser.id && m.toId === userId) || (m.fromId === userId && m.toId === currentUser.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
+            let hayLeidos = false;
+            conv.forEach(m => { if (m.toId === currentUser.id && !m.read) { m.read = true; hayLeidos = true; } });
+            if (hayLeidos) saveDB();
+            box.innerHTML = conv.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación</p>' : conv.map(m => `<div class="flex ${m.fromId === currentUser.id ? 'justify-end' : 'justify-start'}"><div class="max-w-[75%] ${m.fromId === currentUser.id ? 'bg-indigo-600 text-white' : 'bg-white border'} rounded-2xl px-4 py-2.5 shadow-sm"><p class="text-sm">${m.text}</p><p class="text-[10px] mt-1 ${m.fromId === currentUser.id ? 'text-indigo-200' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`).join('');
+            box.scrollTop = box.scrollHeight;
+            return true;
+        }
+        async function chatLiveTick() {
+            if (chatLiveUserId === null || !document.getElementById('chat-messages')) { stopChatLive(); return; }
+            try {
+                if (window.BackendSync && window.BackendSync.pullCollections) await window.BackendSync.pullCollections(['messages']);
+            } catch (e) { /* sin backend o sin red: se queda con lo local */ }
+            try { renderConversationBox(chatLiveUserId); } catch (e2) { /* render en otro estado */ }
+        }
+        function startChatLive(userId) {
+            stopChatLive();
+            chatLiveUserId = userId;
+            chatLiveTimer = setInterval(chatLiveTick, 2500);
+        }
+        window.chatLiveRefresh = function () { if (chatLiveUserId !== null) { try { renderConversationBox(chatLiveUserId); } catch (e) {} } };
         function openChat(userId) {
             const otherUser = db.users.find(u => String(u.id) === String(userId));
             if (!otherUser) { if (window.showToast) window.showToast('Contacto no disponible, reingresa para sincronizar', 'warning'); return; }
             const conversation = db.messages.filter(m => (m.fromId === currentUser.id && m.toId === userId) || (m.fromId === userId && m.toId === currentUser.id)).sort((a,b) => new Date(a.date) - new Date(b.date));
             conversation.forEach(m => { if (m.toId === currentUser.id) m.read = true; }); saveDB();
             showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar}" class="w-10 h-10 rounded-full"><div class="flex-1"><h3 class="font-semibold">${otherUser.name}</h3><p class="text-xs text-slate-500">${isTeacher(otherUser) ? 'Maestro' : 'Alumno'} · ${otherUser.email}</p></div><button onclick="openWhatsApp(${userId})" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button><button aria-label="Cerrar" onclick="closeModal()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3">${conversation.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación</p>' : conversation.map(m => `<div class="flex ${m.fromId === currentUser.id ? 'justify-end' : 'justify-start'}"><div class="max-w-[75%] ${m.fromId === currentUser.id ? 'bg-indigo-600 text-white' : 'bg-white border'} rounded-2xl px-4 py-2.5 shadow-sm"><p class="text-sm">${m.text}</p><p class="text-[10px] mt-1 ${m.fromId === currentUser.id ? 'text-indigo-200' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`).join('')}</div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2"><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
-            document.getElementById('chat-form').onsubmit = e => { e.preventDefault(); const text = document.getElementById('chat-input').value.trim(); if (!text) return; db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: userId, text: text, date: new Date().toISOString(), read: false }); saveDB(); document.getElementById('chat-input').value = ''; openChat(userId); setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; }, 100); };
+            startChatLive(userId);
+            document.getElementById('chat-form').onsubmit = e => { e.preventDefault(); const text = document.getElementById('chat-input').value.trim(); if (!text) return; db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: userId, text: text, date: new Date().toISOString(), read: false }); saveDB(); document.getElementById('chat-input').value = ''; renderConversationBox(userId); };
             setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
         }
         function openWhatsApp(userId) {

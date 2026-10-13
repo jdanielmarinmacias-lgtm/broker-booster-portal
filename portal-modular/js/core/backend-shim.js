@@ -49,42 +49,21 @@
 
   function guardCampus(user) {
     // Espejo de las reglas de destino del legacy:
-    // campus rechaza roles admin-ish; admin rechaza al resto.
+    // - admin rechaza al no-admin (con aviso).
+    // - SIN POPUP: un admin/editor que entra por Campus va directo a su panel.
     const dest = sessionStorage.getItem('login_destination') || 'campus';
     const adminish = window.RolesService
       ? window.RolesService.isAdmin(user)
       : ['admin', 'gm', 'desarrollador'].includes((user.role || '').toLowerCase());
-    if (dest === 'admin' && !adminish) { alert('Acceso denegado. Solo administradores y editores.'); return false; }
-    if (dest !== 'admin' && adminish) {
-      alert('Los editores solo pueden acceder al panel de edición. Usa "Acceso administrativo".');
-      return false;
-    }
-    return true;
+    if (dest === 'admin' && !adminish) { alert('Acceso denegado. Solo administradores y editores.'); return null; }
+    return dest === 'admin' ? 'admin' : (adminish ? 'admin' : 'campus');
   }
 
-  function askChangePassword(user, then) {
-    const show = window.showModal || ((html) => { document.body.insertAdjacentHTML('beforeend', `<div id="tmp-pw">${html}</div>`); });
-    const close = window.closeModal || (() => { const t = $('tmp-pw'); if (t) t.remove(); });
-    show(`<form id="pw-form" class="p-6 space-y-3 max-w-md w-full">
-      <h3 class="font-bold text-lg">Cambia tu contraseña</h3>
-      <p class="text-sm text-slate-500">Tu cuenta usa una clave temporal. Crea una definitiva (mínimo 8 caracteres).</p>
-      <input name="current" type="password" required placeholder="Clave temporal actual" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300">
-      <input name="next" type="password" required minlength="8" placeholder="Nueva contraseña" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300">
-      <div id="pw-err" class="hidden text-sm text-red-600"></div>
-      <button class="w-full bg-indigo-600 text-white py-2 rounded font-semibold">Guardar y entrar</button>
-    </form>`);
-    $('pw-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const f = new FormData(e.target);
-      try {
-        await window.Backend.changePassword(f.get('current'), f.get('next'));
-        close();
-        then();
-      } catch (err) {
-        const box = $('pw-err');
-        if (box) { box.textContent = err.message; box.classList.remove('hidden'); }
-      }
-    };
+  function askChangePassword() {
+    /* ELIMINADA: el modal obligatorio se auto-actualizaba (no dejaba escribir)
+     * y bloqueaba el ingreso de usuarios nuevos. El cambio de clave se hace
+     * después desde el menú/perfil con POST /api/auth/change-password. */
+    void arguments;
   }
 
   async function syncUsersMirror() {
@@ -122,13 +101,13 @@
       try {
         const r = await window.Backend.login(u, p);
         try { if (window.BackendSync) window.BackendSync.normUser(r.user); } catch (e) {}
-        if (!guardCampus(r.user)) return;
+        const finalDest = guardCampus(r.user);
+        if (!finalDest) return;
         await syncUsersMirror();
         // fase 2b: pull del servidor ANTES del primer render (datos de todos).
         try { if (window.BackendSync) await window.BackendSync.pull(); } catch (e) {}
-        const proceed = () => enterApp(r.user);
-        if (r.mustChangePassword) askChangePassword(r.user, proceed);
-        else proceed();
+        // Sin modal de cambio de clave (bloqueaba el ingreso): entra directo.
+        enterApp(r.user, finalDest);
       } catch (err) {
         loginError(err.message || 'Credenciales incorrectas');
       }

@@ -448,6 +448,11 @@
       if (!target) cols = cols.concat(LIVE_WORK.filter(function (c) { return cols.indexOf(c) === -1; }));
       pullNames(cols).then(function () {
         try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
+        // Chat abierto + mensaje nuevo → refresca la conversación al instante
+        // (además del polling de 2.5s que cubre el caso sin realtime).
+        if (kind === 'messages' || kind === 'groupMessages') {
+          try { if (typeof window.chatLiveRefresh === 'function') window.chatLiveRefresh(); } catch (e4) {}
+        }
         if (kind && KIND_TOAST[kind] && window.showToast) {
           try { window.showToast(KIND_TOAST[kind], 'info'); } catch (e3) {}
         }
@@ -459,6 +464,7 @@
     normUser: function (u) { return normIds(u) || u; },
     pull: pullAll,
     pullShowcase: function () { return pullNames(SHOWCASE); },
+    pullCollections: function (names) { return pullNames(names || []); },
     hookSave,
     get active() { return active; },
   };
