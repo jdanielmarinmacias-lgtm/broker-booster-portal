@@ -6002,8 +6002,6 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             nav.innerHTML = `
                 ${generales.map(itemHtml).join('')}
                 ${groupHtml('Comercial Asegurador', 'fa-briefcase', 'comercial', comercial, true)}
-                /* Comercial * colapsados por defecto: se abren al hacer clic,
-                 * no al entrar (petición del propietario). */
                 ${groupHtml('Comercial Automotriz', 'fa-car-side', 'com-auto', comAuto, false)}
                 ${groupHtml('Comercial Financiero', 'fa-landmark', 'com-fin', comFin, false)}
                 ${groupHtml('Comercial Inmobiliario', 'fa-house', 'com-inm', comInm, false)}
