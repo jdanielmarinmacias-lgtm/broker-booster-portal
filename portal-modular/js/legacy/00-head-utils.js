@@ -66,12 +66,27 @@ function exportarEquipoPDF(){
     }catch(e){ alert('PDF error: '+e.message); }
 }
 
+function exportarAuditoriaCSV(){
+    try{
+        const logs = (db.auditoria||[]).slice().reverse();
+        let csv = 'ID,Fecha,Usuario,Tipo,Detalle\n';
+        logs.forEach(l=>{
+            const det = JSON.stringify({ventaId:l.ventaId, clave:l.clave, antes:l.antes, despues:l.despues}).replace(/"/g,'""');
+            csv += `"${l.id||''}","${l.fecha||''}","${(l.usuarioNombre||'').replace(/"/g,'""')}","${(l.tipo||'').replace(/"/g,'""')}","${det}"\n`;
+        });
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href=url; a.download='auditoria_portal.csv'; a.click(); URL.revokeObjectURL(url);
+    }catch(e){ alert('Error exportando auditoría: '+e.message); }
+}
+
 function verAuditoriaVentas(){
     try{
         if (typeof db === 'undefined') { console.log('verAuditoriaVentas: db no disponible'); return; }
-    const logs=(db.auditoria||[]).filter(l=>l.tipo&&l.tipo.includes('venta')).slice(-50).reverse();
-    let html='<div class="p-6"><h3 class="font-bold text-lg mb-3">Auditoría</h3><div class="max-h-96 overflow-auto"><table class="w-full text-xs"><thead><tr class="bg-slate-100"><th class="p-2 text-left">Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>';
-    logs.forEach(l=>{ html+='<tr class="border-t"><td class="p-1">'+new Date(l.fecha).toLocaleString('es-MX')+'</td><td class="p-1">'+(l.usuarioNombre||'')+'</td><td class="p-1">'+l.tipo+'</td><td class="p-1">'+(l.antes?.contratante||'')+' $'+(l.antes?.prima||0)+'</td></tr>'; });
+        if (Array.isArray(db.auditoria) && db.auditoria.length > 500) db.auditoria = db.auditoria.slice(-500);
+    const logs=(db.auditoria||[]).slice(-100).reverse();
+    let html='<div class="p-6"><div class="flex items-center justify-between mb-3"><h3 class="font-bold text-lg">Auditoría (últimos '+logs.length+' de máx. 500)</h3><button onclick="exportarAuditoriaCSV()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold"><i class="fas fa-file-csv mr-1"></i>Exportar CSV</button></div><div class="max-h-96 overflow-auto"><table class="w-full text-xs"><thead><tr class="bg-slate-100"><th class="p-2 text-left">Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>';
+    logs.forEach(l=>{ html+='<tr class="border-t"><td class="p-1">'+new Date(l.fecha).toLocaleString('es-MX')+'</td><td class="p-1">'+(l.usuarioNombre||'')+'</td><td class="p-1">'+l.tipo+'</td><td class="p-1">'+(l.antes?.contratante||l.clave||'')+' '+(l.antes?.prima?'$'+l.antes.prima:'')+'</td></tr>'; });
     html+='</tbody></table></div><div class="text-right mt-3"><button aria-label="Cerrar" onclick="closeModal()" class="border px-3 py-1 rounded">Cerrar</button></div></div>';
     showModal(html);
     }catch(e){ console.log('verAuditoriaVentas error', e); alert('Error auditoría: '+e.message); }

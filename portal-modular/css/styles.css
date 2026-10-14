@@ -1,8 +1,50 @@
 /* portal-modular/css/styles.css — EXTRAÍDO de portal.html (Paso 1, por líneas) */
 
 /* ---------- bloque <style> líneas 100-157 ---------- */
-:root { --primary: #0a2540; --primary-dark: #081c30; --accent: #c9a86a; }
-        body { font-family: 'Inter', 'Poppins', sans-serif; background-color: #f6f7f9; letter-spacing: -0.01em; }
+:root { --primary: #0a2540; --primary-dark: #081c30; --accent: #c9a86a; --gold: #c9a86a; --gold-soft: rgba(201, 168, 106, 0.28); }
+        body {
+            font-family: 'Inter', 'Poppins', sans-serif;
+            background-color: #faf8f5;
+            background-image:
+                radial-gradient(ellipse at 12% 18%, rgba(201, 168, 106, 0.11) 0%, transparent 48%),
+                radial-gradient(ellipse at 88% 82%, rgba(201, 168, 106, 0.09) 0%, transparent 52%),
+                linear-gradient(125deg, transparent 38%, rgba(201, 168, 106, 0.06) 44%, rgba(148, 163, 184, 0.05) 45%, transparent 51%),
+                linear-gradient(295deg, transparent 58%, rgba(201, 168, 106, 0.05) 62%, transparent 66%);
+            background-attachment: fixed;
+            letter-spacing: -0.01em;
+        }
+        #main-content, #public-portal, #login-screen {
+            background-color: transparent !important;
+            background-image:
+                radial-gradient(circle at 80% 10%, rgba(201, 168, 106, 0.08), transparent 45%),
+                linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,248,244,0.92) 50%, rgba(245,241,234,0.88) 100%);
+        }
+        /* Detalles dorados y acabado mármol en contenedores y tarjetas */
+        #main-content .bg-white.rounded-2xl,
+        #main-content .bg-white.rounded-xl,
+        #public-portal .bg-white.rounded-2xl,
+        #public-portal .bg-white.rounded-3xl {
+            border-color: rgba(201, 168, 106, 0.30) !important;
+            box-shadow: 0 8px 26px -12px rgba(10, 37, 64, 0.09), 0 0 0 1px rgba(201, 168, 106, 0.12);
+        }
+        header.bg-white, header.bg-white\/95 {
+            border-bottom: 1px solid rgba(201, 168, 106, 0.35) !important;
+            background: linear-gradient(90deg, rgba(255,255,255,0.96) 0%, rgba(252,249,243,0.96) 100%) !important;
+        }
+        #sidebar {
+            background: linear-gradient(180deg, #ffffff 0%, #fcfaf6 100%) !important;
+            border-right: 1px solid rgba(201, 168, 106, 0.32) !important;
+        }
+        .nav-link.bg-indigo-50 {
+            background: linear-gradient(90deg, rgba(201, 168, 106, 0.16) 0%, rgba(240, 244, 248, 0.65) 100%) !important;
+            border-left: 3px solid var(--accent) !important;
+            color: var(--primary) !important;
+        }
+        .gold-pill {
+            background: linear-gradient(135deg, #dfbe7f 0%, #b89146 100%);
+            color: #0a2540;
+            font-weight: 700;
+        }
         .sidebar { transition: transform 0.3s ease-in-out; }
         .modal-backdrop { background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
         .flashcard { perspective: 1000px; cursor: pointer; }

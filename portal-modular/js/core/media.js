@@ -73,12 +73,49 @@
     return data.items[0];
   }
 
+  /* #3 Refuerzo: compresión inteligente de imágenes en cliente para evitar
+   * errores 413 en Vercel y acelerar cargas tanto en Storage como en base64. */
+  function comprimirImagen(file, maxW, quality) {
+    maxW = maxW || 1400;
+    quality = quality || 0.82;
+    return new Promise(function (resolve) {
+      if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || '')) {
+        const r = new FileReader();
+        r.onload = function () { resolve(r.result); };
+        r.onerror = function () { resolve(null); };
+        r.readAsDataURL(file);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+          let w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          try {
+            resolve(c.toDataURL('image/jpeg', quality));
+          } catch (err) {
+            resolve(e.target.result);
+          }
+        };
+        img.onerror = function () { resolve(e.target.result); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function subirMuchos(files, scope) {
-    const list = Array.from(files || []).slice(0, 8);
+    const list = Array.from(files || []).slice(0, 10);
     const out = [];
     for (const f of list) out.push(await subir(f, { scope }));
     return out;
   }
 
-  window.Media = { subir, subirMuchos };
+  window.Media = { subir, subirMuchos, comprimirImagen };
 })();

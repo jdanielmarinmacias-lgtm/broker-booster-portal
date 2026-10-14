@@ -37,28 +37,18 @@
       + '<p style="font-size:11px;color:#94a3b8;margin:0">' + esc(when) + '</p></div></article>';
   }
 
-  /* El strip pertenece SOLO a la portada pública. Antes se insertaba al
-   * inicio del <body> sin importar el estado: al recargar asomaba un instante
-   * sobre el login/aplicación (flash de contenido). Ahora: solo si la portada
-   * está visible, y se atiende al cambio de visibilidad con un observer. */
+  /* El strip visual "Novedades en vivo" se desactiva en la portada pública para no
+   * mostrar tarjetas basura ("Nuevo en posts", "Nuevo en messages", etc.).
+   * La suscripción realtime a public_feed SIGUE activa para disparar el evento
+   * CustomEvent('public-feed') con el que sync.js actualiza las colecciones en vivo. */
   function portalVisible() {
     var portal = document.getElementById('public-portal');
     return !!portal && !portal.classList.contains('hidden');
   }
   function ensureStrip() {
-    var list = document.getElementById(LIST_ID);
-    if (list) return portalVisible() ? list : null;
-    if (!portalVisible()) return null; // login/app: no crear nada (no flash)
-    var strip = document.createElement('section');
-    strip.id = STRIP_ID;
-    strip.innerHTML = '<div style="max-width:1100px;margin:0 auto;padding:18px 16px 0">'
-      + '<h2 style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 2px">Novedades en vivo</h2>'
-      + '<p style="font-size:12px;color:#64748b;margin:0 0 12px">Publicaciones e inmuebles, autos y avisos del equipo — se actualizan solas.</p>'
-      + '<div id="' + LIST_ID + '" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px"></div></div>';
-    var main = document.querySelector('main') || document.body;
-    if (main === document.body) document.body.insertBefore(strip, document.body.firstChild);
-    else main.insertBefore(strip, main.firstChild);
-    return strip.querySelector('#' + LIST_ID);
+    var old = document.getElementById(STRIP_ID);
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    return null;
   }
   /* Cuando la portada vuelve a mostrarse (logout, cierre de sesión), se
    * pinta el feed inicial; cuando se oculta, el strip desaparece con la
@@ -84,17 +74,7 @@
 
   function onItem(row) {
     try {
-      var list = ensureStrip();
-      if (!list) return; // portada oculta: sin DOM, sin toast (nada que mostrar)
-      var tmp = document.createElement('div');
-      tmp.innerHTML = card(row);
-      var node = tmp.firstChild;
-      node.style.outline = '2px solid #10b981';
-      list.insertBefore(node, list.firstChild);
-      setTimeout(function () { node.style.outline = ''; }, 4000);
-      while (list.children.length > 12) list.removeChild(list.lastChild);
-      toast(row);
-      bump(row);
+      ensureStrip();
       document.dispatchEvent(new CustomEvent('public-feed', { detail: row }));
     } catch (e) { /* portada en otro estado: ignorar */ }
   }

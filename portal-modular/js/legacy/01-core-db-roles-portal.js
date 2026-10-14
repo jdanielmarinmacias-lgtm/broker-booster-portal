@@ -334,6 +334,9 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
             Object.keys(db.rolePermissions||{}).forEach(function(r){ var perms=db.rolePermissions[r]; if(Array.isArray(perms)&&perms.indexOf('auto-cartera')>=0){ ['auto-unidades','auto-clientes','auto-equipo','auto-monitoreo','auto-metas','auto-simulador','auto-guion','auto-pauta','auto-practica'].forEach(function(s){ if(perms.indexOf(s)<0) perms.push(s); }); } });
             if (!Array.isArray(db.finCartera)) db.finCartera = []; // Cartera Financiera (Comercial Financiero)
             if (!Array.isArray(db.inmCartera)) db.inmCartera = []; // Cartera Inmobiliaria (Comercial Inmobiliario)
+            if (!db.inmPublica || typeof db.inmPublica !== 'object') db.inmPublica = { props: [] };
+            if (!Array.isArray(db.inmPublica.props)) db.inmPublica.props = [];
+            Object.keys(db.rolePermissions||{}).forEach(function(r){ var perms=db.rolePermissions[r]; if(Array.isArray(perms)&&perms.indexOf('inm-cartera')>=0){ ['inm-unidades','inm-cartera'].forEach(function(s){ if(perms.indexOf(s)<0) perms.push(s); }); } });
             if (!db.rolePermissions) db.rolePermissions = {
                 admin: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','mi-equipo','convenciones','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
                 gm: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','control-accesos','mi-equipo','convenciones','mis-clientes','siniestros','ai-lobby','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
@@ -411,7 +414,10 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
                 Object.keys(db.rolePermissions).forEach(r => {
                     const perms = db.rolePermissions[r];
                     if(Array.isArray(perms) && perms.includes('mis-clientes') && !perms.includes('auto-cartera')){
-                        perms.push('auto-cartera','fin-cartera','inm-cartera');
+                        perms.push('auto-cartera','fin-cartera','inm-cartera','inm-unidades');
+                    }
+                    if(Array.isArray(perms) && perms.includes('inm-cartera') && !perms.includes('inm-unidades')){
+                        perms.push('inm-unidades');
                     }
                 });
             }
@@ -610,33 +616,54 @@ function renderCaminosCards(){
 }
 function auPublicas(){
     const d = auD();
-    return d.unidades.filter(u=>(!u.estado||u.estado==='Disponible'));
+    return d.unidades.filter(u=>(!u.estado||u.estado==='Disponible'||u.estado==='Reservada'));
 }
 function vitScroll(){ setTimeout(function(){ var el=document.getElementById('autos'); if(el) el.scrollIntoView({behavior:'auto'}); },0); }
 function irAUtos(){ pubSetView("autos"); }
 function auVerAuto(id){
-    const u = auPublicas().find(x=>x.id===id);
+    const d = auD();
+    const u = d.unidades.find(x=>String(x.id)===String(id));
     if(!u){ irAUtos(); return; }
-    window._auVerId = id;
-    try{ history.replaceState(null,'', '#auto-'+id); }catch(e){}
+    window._auVerId = u.id;
+    window._auPagIdx = 0;
+    try{ history.replaceState(null,'', '#auto-'+u.id); }catch(e){}
     const p = document.getElementById('public-portal');
     const fotos = (u.fotos||[]);
+    const est = u.estado||'Disponible';
     const desc = u.precioLista && u.precioLista>u.precio ? Math.round((1-u.precio/u.precioLista)*100) : 0;
     const fila = (lb, v)=> v ? `<div class="flex justify-between py-2 border-b border-slate-100 text-sm"><span class="text-slate-400">${lb}</span><b class="text-slate-700">${psEscape(String(v))}</b></div>` : '';
     const mini = (ico, v)=> v ? `<div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"><i class="fas ${ico} text-emerald-600"></i><span class="text-xs font-semibold text-slate-700">${psEscape(String(v))}</span></div>` : '';
-    p.innerHTML = `
+    const tieneSesion = !!sessionStorage.getItem('pepes_user');
+    p.innerHTML = `<div class="bg-slate-50 min-h-screen text-slate-800">
         <header class="sticky top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
             <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
                 <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" onclick="irAUtos()" alt="Inicio">
-                <button onclick="irAUtos()" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más autos</button>
+                <div class="flex items-center gap-2">
+                    ${tieneSesion?`<button onclick="window._forceApp=true; try{history.replaceState(null,'',location.pathname);}catch(e){} checkSession();" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"><i class="fas fa-gauge-high mr-1"></i>Volver al portal</button>`:''}
+                    <button onclick="irAUtos()" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más autos</button>
+                </div>
             </div>
         </header>
         <div class="max-w-6xl mx-auto px-4 py-8">
-            <button onclick="irAUtos()" class="text-sm text-slate-500 hover:text-emerald-700 mb-4"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                <button onclick="irAUtos()" class="text-sm text-slate-500 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
+                <div class="flex items-center gap-2">
+                    <button onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
+                    <button onclick="auWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
+                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir / PDF</button>
+                </div>
+            </div>
             <div class="grid lg:grid-cols-5 gap-8">
                 <div class="lg:col-span-3">
-                    ${fotos[0]?`<img id="au-pag-principal" src="${fotos[0]}" class="w-full h-80 object-cover rounded-2xl border bg-slate-50">`:`<div class="w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-5xl"></i></div>`}
-                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="var m=document.getElementById('au-pag-principal'); m.src=this.src; document.querySelectorAll('.au-pag-thumb').forEach(t=>t.classList.remove('ring-2','ring-emerald-500')); this.classList.add('ring-2','ring-emerald-500');" class="au-pag-thumb w-28 h-20 object-cover rounded-xl border cursor-pointer ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
+                    <div class="relative rounded-2xl overflow-hidden border bg-slate-50">
+                        ${fotos[0]?`<img id="au-pag-principal" src="${fotos[0]}" class="w-full h-80 sm:h-96 object-cover">`:`<div class="w-full h-80 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-5xl"></i></div>`}
+                        ${fotos.length>1?`
+                            <button type="button" onclick="auPagGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left"></i></button>
+                            <button type="button" onclick="auPagGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right"></i></button>
+                            <span id="au-pag-counter" class="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/65 text-white text-xs font-semibold">1 / ${fotos.length}</span>
+                        `:''}
+                    </div>
+                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" data-idx="${i}" onclick="auPagGalGo(${i})" class="au-pag-thumb w-24 h-16 object-cover rounded-xl border cursor-pointer shrink-0 ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
                         ${mini('fa-road', u.km?Number(u.km).toLocaleString('es-MX')+' km':'')}
                         ${mini('fa-gears', u.transmision)}
@@ -645,14 +672,16 @@ function auVerAuto(id){
                     </div>
                 </div>
                 <div class="lg:col-span-2">
-                    <div class="flex gap-1.5 mb-2">${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}</div>
+                    <div class="flex flex-wrap gap-1.5 mb-2">${auEstadoBadge(est)}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}</div>
                     <p class="text-sm text-slate-400 uppercase font-semibold">${psEscape(u.marca||'')} · ${psEscape(String(u.anio||''))}</p>
                     <h1 class="text-3xl font-black text-slate-900 leading-tight">${psEscape(u.modelo||'')}</h1>
                     <div class="flex items-baseline gap-3 mt-2">
                         <p class="text-4xl font-black text-emerald-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
                         ${desc>0?`<p class="text-lg text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}
                     </div>
+                    ${est==='Reservada' && u.reservaHasta ? `<div class="mt-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900"><i class="fas fa-clock mr-1"></i>Unidad apartada (reserva vigente hasta <b>${psEscape(u.reservaHasta)}</b>). Déjanos tus datos por si se libera.</div>` : ''}
                     <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-4">
+                        ${fila('Estatus', est)}
                         ${fila('Color', u.color)}
                         ${fila('Motor', u.motor)}
                         ${fila('Puertas', u.puertas)}
@@ -661,7 +690,7 @@ function auVerAuto(id){
                         ${fila('Entidad', u.entidad)}
                     </div>
                     ${u.descripcion?`<div class="bg-white border border-slate-200 rounded-2xl p-4 mt-3"><p class="text-xs uppercase font-bold text-slate-400 mb-1">Equipamiento</p><p class="text-sm text-slate-700">${psEscape(u.descripcion)}</p></div>`:''}
-                    <button onclick="auMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>Me interesa este auto</button>
+                    ${est!=='Vendida'?`<button onclick="auMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa este auto'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Unidad vendida</div>`}
                     <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor de la agencia ${psEscape(u.sucursal||'')} te contacta hoy.</p>
                 </div>
             </div>
@@ -678,7 +707,7 @@ function auVerAuto(id){
         </div>
         <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8">
             <div class="max-w-6xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Agencia Automotriz</div>
-        </footer>`;
+        </footer></div>`;
 }
 function auVitrinaFicha(id){
     const u = auPublicas().find(x=>x.id===id); if(!u) return;
@@ -765,7 +794,13 @@ function inmPubD(){
     if(!Array.isArray(db.inmPublica.props)) db.inmPublica.props = [];
     return db.inmPublica;
 }
-function inmPubLista(){ return inmPubD().props.filter(function(p){ return !p.vendida; }); }
+function inmEstadoProp(p){
+    if(!p) return 'Disponible';
+    if(p.estado) return p.estado;
+    if(p.vendida) return 'Vendida';
+    return 'Disponible';
+}
+function inmPubLista(){ return inmPubD().props.filter(function(p){ const e=inmEstadoProp(p); return e==='Disponible' || e==='Reservada'; }); }
 function inmPBadge(t){
     if(t==='Renta') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700">Renta</span>';
     if(t==='Preventa') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700">Preventa</span>';
@@ -815,7 +850,7 @@ function pubAutosPagina(){
         return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition group">
             <div class="relative cursor-pointer" onclick="auVerAuto(${u.id})">
                 ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-52 object-cover group-hover:scale-[1.03] transition">`:`<div class="w-full h-52 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
-                <div class="absolute top-2 left-2 flex gap-1">${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}</div>
+                <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(u.estado||'Disponible')}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}</div>
                 ${fotos.length>1?`<span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px]"><i class="fas fa-camera mr-1"></i>${fotos.length}</span>`:''}
             </div>
             <div class="p-4">
@@ -865,12 +900,20 @@ function pubAutosPagina(){
 }
 function pubPropsPagina(){
     const lista = inmPubLista();
+    const fQ = String(window.inmVitQ||'').toLowerCase().trim();
+    const fTipo = window.inmVitTipo||'';
+    let l = lista.slice();
+    if(fQ) l = l.filter(function(p){ return [p.titulo,p.colonia,p.ciudad,p.desc,p.inmuebleTipo].some(function(x){ return String(x||'').toLowerCase().includes(fQ); }); });
+    if(fTipo) l = l.filter(function(p){ return (p.tipo||'Venta')===fTipo; });
+    l.sort(function(a,b){ return (b.destacada?1:0)-(a.destacada?1:0) || (b.id||0)-(a.id||0); });
     const card = function(p){
         const fotos = (p.fotos||[]);
+        const est = inmEstadoProp(p);
         return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition group">
             <div class="relative cursor-pointer" onclick="inmVerProp(${p.id})">
                 ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-52 object-cover group-hover:scale-[1.03] transition">`:`<div class="w-full h-52 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-4xl"></i></div>`}
-                <div class="absolute top-2 left-2 flex gap-1">${inmPBadge(p.tipo||'Venta')}</div>
+                <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}${p.inmuebleTipo?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900/75 text-white">${psEscape(p.inmuebleTipo)}</span>`:''}</div>
+                ${fotos.length>1?`<span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px]"><i class="fas fa-camera mr-1"></i>${fotos.length}</span>`:''}
             </div>
             <div class="p-4">
                 <p class="text-xs text-slate-400 uppercase font-semibold">${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</p>
@@ -903,61 +946,93 @@ function pubPropsPagina(){
                     <h1 class="text-4xl font-black text-slate-900">Propiedades</h1>
                     <p class="text-slate-600 mt-2 max-w-2xl">Casas y departamentos en venta, renta y preventa. Asesoría completa: crédito, escrituración y acompañamiento hasta la firma.</p>
                 </div>
-                <div class="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl px-4 py-2"><b class="text-slate-900">${lista.length}</b> propiedad(es) publicadas</div>
+                <div class="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl px-4 py-2"><b class="text-slate-900">${l.length}</b> propiedad(es) publicadas</div>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-6">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input value="${psEscape(window.inmVitQ||'')}" oninput="window.inmVitQ=this.value;renderPublicPortal()" placeholder="Buscar por título, colonia o ciudad..." class="w-64 pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+                </div>
+                <select onchange="window.inmVitTipo=this.value;renderPublicPortal()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las operaciones</option><option ${fTipo==='Venta'?'selected':''}>Venta</option><option ${fTipo==='Renta'?'selected':''}>Renta</option><option ${fTipo==='Preventa'?'selected':''}>Preventa</option></select>
+                ${(fQ||fTipo)?`<button onclick="window.inmVitQ='';window.inmVitTipo='';renderPublicPortal()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
             </div>
             <div id="inm-cat-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                ${lista.map(function(p){ return card(p); }).join('') || '<p class="text-slate-400 col-span-full text-center bg-white border border-slate-200 rounded-2xl p-10">Por el momento no hay propiedades publicadas. Vuelve pronto.</p>'}
+                ${l.map(function(p){ return card(p); }).join('') || '<p class="text-slate-400 col-span-full text-center bg-white border border-slate-200 rounded-2xl p-10">Por el momento no hay propiedades publicadas. Vuelve pronto.</p>'}
             </div>
         </div>
         <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-7xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Propiedades · <a href="#" onclick="pubSetView('autos'); return false;" class="hover:text-white">Ver autos en venta</a></div></footer>
     </div>`;
 }
 function inmVerProp(id){
-    const u = inmPubLista().find(function(x){ return x.id===id; });
+    const u = inmPubD().props.find(function(x){ return String(x.id)===String(id); });
     if(!u){ pubSetView('props'); return; }
-    window._inmVerId = id;
-    try{ history.replaceState(null,'','#prop-'+id); }catch(e){}
+    window._inmVerId = u.id;
+    window._inmPagIdx = 0;
+    try{ history.replaceState(null,'','#prop-'+u.id); }catch(e){}
     const p = document.getElementById('public-portal');
     const fotos = (u.fotos||[]);
+    const est = inmEstadoProp(u);
+    const tieneSesion = !!sessionStorage.getItem('pepes_user');
     const fila = function(lb, v){ return v ? `<div class="flex justify-between py-2 border-b border-slate-100 text-sm"><span class="text-slate-400">${lb}</span><b class="text-slate-700">${psEscape(String(v))}</b></div>` : ''; };
     const mini = function(ico, v){ return v ? `<div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"><i class="fas ${ico} text-emerald-600"></i><span class="text-xs font-semibold text-slate-700">${psEscape(String(v))}</span></div>` : ''; };
-    p.innerHTML = `
+    p.innerHTML = `<div class="bg-slate-50 min-h-screen text-slate-800">
         <header class="sticky top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
             <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
                 <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" onclick="pubSetView('')" alt="Inicio">
-                <button onclick="pubSetView('props')" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más propiedades</button>
+                <div class="flex items-center gap-2">
+                    ${tieneSesion?`<button onclick="window._forceApp=true; try{history.replaceState(null,'',location.pathname);}catch(e){} checkSession();" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"><i class="fas fa-gauge-high mr-1"></i>Volver al portal</button>`:''}
+                    <button onclick="pubSetView('props')" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más propiedades</button>
+                </div>
             </div>
         </header>
         <div class="max-w-6xl mx-auto px-4 py-8">
-            <button onclick="pubSetView('props')" class="text-sm text-slate-500 hover:text-emerald-700 mb-4"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                <button onclick="pubSetView('props')" class="text-sm text-slate-500 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
+                <div class="flex items-center gap-2">
+                    <button onclick="inmCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
+                    <button onclick="inmWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
+                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir / PDF</button>
+                </div>
+            </div>
             <div class="grid lg:grid-cols-5 gap-8">
                 <div class="lg:col-span-3">
-                    ${fotos[0]?`<img id="inm-pag-principal" src="${fotos[0]}" class="w-full h-80 object-cover rounded-2xl border bg-slate-50">`:`<div class="w-full h-80 bg-slate-100 rounded-2xl flex items-center justify-center"><i class="fas fa-house text-slate-300 text-5xl"></i></div>`}
-                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map(function(f,i){ return `<img src="${f}" onclick="var m=document.getElementById('inm-pag-principal'); m.src=this.src;" class="w-28 h-20 object-cover rounded-xl border cursor-pointer ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`; }).join('')}</div>`:''}
+                    <div class="relative rounded-2xl overflow-hidden border bg-slate-50">
+                        ${fotos[0]?`<img id="inm-pag-principal" src="${fotos[0]}" class="w-full h-80 sm:h-96 object-cover">`:`<div class="w-full h-80 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-5xl"></i></div>`}
+                        ${fotos.length>1?`
+                            <button type="button" onclick="inmPagGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left"></i></button>
+                            <button type="button" onclick="inmPagGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right"></i></button>
+                            <span id="inm-pag-counter" class="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/65 text-white text-xs font-semibold">1 / ${fotos.length}</span>
+                        `:''}
+                    </div>
+                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map(function(f,i){ return `<img src="${f}" onclick="inmPagGalGo(${i})" class="inm-pag-thumb w-24 h-16 object-cover rounded-xl border cursor-pointer shrink-0 ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`; }).join('')}</div>`:''}
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
                         ${mini('fa-bed', u.recs?u.recs+' recámaras':'')}
                         ${mini('fa-bath', u.banios?u.banios+' baños':'')}
                         ${mini('fa-ruler-combined', u.m2?u.m2+' m²':'')}
-                        ${mini('fa-tag', u.tipo)}
+                        ${mini('fa-tag', u.tipo||'Venta')}
                     </div>
                 </div>
                 <div class="lg:col-span-2">
-                    ${inmPBadge(u.tipo||'Venta')}
-                    <p class="text-sm text-slate-400 uppercase font-semibold mt-2">${psEscape(u.colonia||'')} · ${psEscape(u.ciudad||'')}</p>
+                    <div class="flex flex-wrap gap-1.5 mb-2">${auEstadoBadge(est)}${inmPBadge(u.tipo||'Venta')}${u.inmuebleTipo?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">${psEscape(u.inmuebleTipo)}</span>`:''}</div>
+                    <p class="text-sm text-slate-400 uppercase font-semibold mt-1">${psEscape(u.colonia||'')} · ${psEscape(u.ciudad||'')}</p>
                     <h1 class="text-3xl font-black text-slate-900 leading-tight">${psEscape(u.titulo||'Propiedad')}</h1>
                     <div class="flex items-baseline gap-3 mt-2">
                         <p class="text-4xl font-black text-emerald-700">${u.precio?'$'+Number(u.precio).toLocaleString('es-MX'):'Precio a consultar'}</p>
                         ${u.tipo==='Renta'&&u.precio?'<span class="text-slate-400 text-sm">/mes</span>':''}
                     </div>
+                    ${est==='Reservada' && u.reservaHasta ? `<div class="mt-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900"><i class="fas fa-clock mr-1"></i>Propiedad apartada (reserva vigente hasta <b>${psEscape(u.reservaHasta)}</b>). Déjanos tus datos por si se libera.</div>` : ''}
                     <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-4">
+                        ${fila('Estatus', est)}
                         ${fila('Ubicación', (u.colonia?u.colonia+', ':'')+(u.ciudad||''))}
                         ${fila('Operación', u.tipo||'Venta')}
+                        ${fila('Tipo de inmueble', u.inmuebleTipo)}
                         ${fila('Recámaras', u.recs)}
                         ${fila('Baños', u.banios)}
+                        ${fila('Estacionamientos', u.estacionamientos)}
                         ${fila('Superficie', u.m2?u.m2+' m²':'')}
                     </div>
                     ${u.desc?`<div class="bg-white border border-slate-200 rounded-2xl p-4 mt-3"><p class="text-xs uppercase font-bold text-slate-400 mb-1">Descripción</p><p class="text-sm text-slate-700">${psEscape(u.desc)}</p></div>`:''}
-                    <button onclick="inmMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>Me interesa esta propiedad</button>
+                    ${est!=='Vendida'?`<button onclick="inmMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa esta propiedad'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Propiedad cerrada</div>`}
                     <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor te contacta hoy.</p>
                 </div>
             </div>
@@ -972,7 +1047,7 @@ function inmVerProp(id){
                 </div>
             </div>
         </div>
-        <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-6xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Propiedades</div></footer>`;
+        <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-6xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Propiedades</div></footer></div>`;
 }
 function inmMeInteresa(id){
     const u = inmPubLista().find(function(x){ return x.id===id; }); if(!u) return;
@@ -1132,7 +1207,7 @@ function renderPublicPortal() {
                                 </div>
                             </nav>
                             <div class="flex items-center gap-3">
-                                <button onclick="showCampusLogin()" class="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition">Campus</button>
+                                <button onclick="showCampusLogin()" class="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg">Campus</button>
                                 <button onclick="openSolicitudModal('aplicar')" class="px-5 py-2.5 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
                                 <button onclick="showAdminLogin()" class="hidden lg:inline-flex px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg">Acceso administrativo</button>
                             </div>
@@ -1797,9 +1872,9 @@ function auOrigenBadge(o){
     return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Mexicano</span>';
 }
 function auEstadoBadge(est){
-    if(est==='Vendida') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white">Vendida</span>';
-    if(est==='Reservada') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-amber-900">Reservada</span>';
-    return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">Disponible</span>';
+    if(est==='Vendida') return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-white"></span>Vendida</span>';
+    if(est==='Reservada') return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-amber-950 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-amber-900"></span>Reservada</span>';
+    return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span>';
 }
 function auD(){
     if(!db.autoHub || typeof db.autoHub!=='object') db.autoHub = { unidades:[], clientes:[], metas:[], ventas:[], guion:null, publicidad:[], practica:[] };
@@ -1809,6 +1884,14 @@ function auD(){
     return d;
 }
         function checkSession() {
+            const h0 = String(location.hash||'');
+            if ((h0.indexOf('#auto-')===0 || h0.indexOf('#prop-')===0) && !window._forceApp) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+                document.getElementById('public-portal').classList.remove('hidden');
+                renderPublicPortal();
+                return;
+            }
             const user = sessionStorage.getItem('pepes_user');
             if (user) {
                 currentUser = JSON.parse(user);
@@ -3560,7 +3643,8 @@ function renderCentroMensajes(){
         <p class="text-slate-500 text-sm mt-1">Plantillas por categoría con variables {nombre} y {asesor}. Copia el texto y úsalo donde quieras.</p>
       </div>
       <div class="flex gap-2">
-        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase())?`<button onclick="cmVerAuditoria()" class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50"><i class="fas fa-clipboard-list mr-1"></i> Auditoría</button>
+        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase())?`<button onclick="cmAbrirBroadcast()" class="px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700"><i class="fas fa-bullhorn mr-1"></i> Difusión al equipo</button>
+        <button onclick="cmVerAuditoria()" class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50"><i class="fas fa-clipboard-list mr-1"></i> Auditoría</button>
         <button onclick="guiaEditarMensajes()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar plantillas</button>`:''}
       </div>
     </div>
@@ -3602,8 +3686,89 @@ function renderCentroMensajes(){
 }
 function cmVerAuditoria(){
   const logs=(db.settings && db.settings.auditoriaContenido)||[];
-  showModal(`<div class="p-6 max-w-2xl w-full"><div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold"><i class="fas fa-clipboard-list text-emerald-600 mr-2"></i>Auditoría de modificaciones</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+  showModal(`<div class="p-6 max-w-2xl w-full"><div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold"><i class="fas fa-clipboard-list text-emerald-600 mr-2"></i>Auditoría de modificaciones</h3><div class="flex items-center gap-2"><button onclick="exportarAuditoriaCSV()" class="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100"><i class="fas fa-file-csv mr-1"></i>Exportar CSV</button><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div></div>
     <div class="max-h-[60vh] overflow-y-auto">${logs.map(l=>`<div class="border-b border-slate-100 py-2.5"><div class="flex justify-between text-xs text-slate-500"><span class="font-semibold text-slate-700">${psEscape(l.seccion)}</span><span>${new Date(l.fecha).toLocaleString('es-MX')}</span></div><p class="text-sm text-slate-800">${psEscape(l.accion)}${l.detalle?` — <span class="text-slate-500">${psEscape(l.detalle)}</span>`:''}</p><p class="text-xs text-slate-400">por ${psEscape(l.usuario)}</p></div>`).join('') || '<p class="text-sm text-slate-400 text-center py-8">Sin modificaciones registradas todavía</p>'}</div></div>`);
+}
+function exportarAuditoriaCSV(){
+  const logs = ((db.auditoria||[]).concat((db.settings && db.settings.auditoriaContenido)||[])).slice(0, 500);
+  const rows = [['Fecha','Usuario','Tipo/Sección','Acción/Detalle']];
+  logs.forEach(l => {
+    rows.push([
+      l.fecha || '',
+      l.usuarioNombre || l.usuario || '',
+      l.tipo || l.seccion || '',
+      (l.accion ? l.accion + (l.detalle ? ' - ' + l.detalle : '') : JSON.stringify(l))
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => '"' + String(v||'').replace(/"/g, '""') + '"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'auditoria_portal_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  if(window.showToast) showToast('Auditoría exportada en CSV', 'success');
+}
+function cmAbrirBroadcast(){
+  showModal(`<div class="p-6 max-w-lg w-full">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-bullhorn text-amber-600"></i> Difusión / Anuncio al equipo</h3>
+      <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+    </div>
+    <p class="text-sm text-slate-500 mb-4">Envía un comunicado directo al buzón de Mensajes de todos los usuarios o de un rol específico.</p>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold text-slate-600 uppercase">Destinatarios</label>
+        <select id="cm-bc-rol" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+          <option value="todos">Todo el equipo (todos los usuarios activos)</option>
+          <option value="alumno">Solo Asesores / Alumnos</option>
+          <option value="maestro">Solo Maestros / Capacitadores</option>
+          <option value="agencia">Solo Agencias / Promotorías</option>
+          <option value="admin">Solo Administradores</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-600 uppercase">Mensaje de difusión</label>
+        <textarea id="cm-bc-texto" rows="4" placeholder="Escribe el anuncio oficial para el equipo..." class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"></textarea>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-sm">Cancelar</button>
+      <button onclick="cmEnviarBroadcast()" class="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-semibold hover:bg-amber-700"><i class="fas fa-paper-plane mr-1"></i> Enviar a todos</button>
+    </div>
+  </div>`);
+}
+function cmEnviarBroadcast(){
+  const rol = (document.getElementById('cm-bc-rol')?.value || 'todos').toLowerCase();
+  const texto = (document.getElementById('cm-bc-texto')?.value || '').trim();
+  if(!texto){ showToast('Escribe el mensaje a difundir','warning'); return; }
+  if(!Array.isArray(db.messages)) db.messages = [];
+  const targets = (db.users || []).filter(u => {
+    if (!u || String(u.id) === String(currentUser.id)) return false;
+    const r = (u.role || '').toLowerCase();
+    if (r === 'prospecto') return false;
+    if (rol === 'todos') return true;
+    if (rol === 'alumno') return isStudent(u);
+    if (rol === 'maestro') return isTeacher(u);
+    if (rol === 'admin') return isAdmin(u);
+    return r === rol;
+  });
+  const now = new Date().toISOString();
+  targets.forEach((u, idx) => {
+    db.messages.push({
+      id: Date.now() + idx,
+      fromId: currentUser.id,
+      toId: u.id,
+      text: '📢 [ANUNCIO OFICIAL] ' + texto,
+      date: now,
+      read: false,
+      broadcast: true
+    });
+  });
+  cmRegistrarAuditoria('Centro de Mensajes', 'Difusión masiva (' + rol + ')', texto.slice(0, 80));
+  saveDB();
+  closeModal();
+  showToast('Anuncio enviado a ' + targets.length + ' usuarios', 'success');
+  render();
 }
 function cmCompartirCierre(){
   showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-2">Compartir un cierre</h3><p class="text-sm text-slate-500 mb-4">Tu cierre ayudará a toda la comunidad. Se publicará con tu nombre.</p>
@@ -3694,15 +3859,44 @@ function guionDefaults(){
 function renderGuionLlamadas(){
   const puede=guionPuedeEditar();
   const guion=(db.settings && Array.isArray(db.settings.guionLlamadas) && db.settings.guionLlamadas.length) ? db.settings.guionLlamadas : guionDefaults();
+  const modo = window.guionModo || 'lista';
+  const pasoIdx = Math.min(guion.length - 1, Math.max(0, window.guionPasoIdx || 0));
+  const notas = window.guionNotasLive || {};
   return `<div class="max-w-4xl mx-auto p-6">
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
       <div>
         <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-phone-volume text-emerald-600"></i> Guion de Llamadas</h2>
-        <p class="text-slate-500 text-sm mt-1">La estructura que usan los asesores top: fases con tiempos y frases exactas.</p>
+        <p class="text-slate-500 text-sm mt-1">La estructura que usan los asesores top: fases con tiempos, frases exactas y modo en vivo.</p>
       </div>
-      ${puede?`<button onclick="guionEditar()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar guion</button>`:''}
+      <div class="flex items-center gap-2">
+        <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden">
+          <button onclick="window.guionModo='lista';render()" class="px-3 py-1.5 text-xs font-semibold ${modo==='lista'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-list mr-1"></i>Completo</button>
+          <button onclick="window.guionModo='interactivo';window.guionPasoIdx=0;render()" class="px-3 py-1.5 text-xs font-semibold ${modo==='interactivo'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-headset mr-1"></i>Modo Llamada en Vivo</button>
+        </div>
+        ${puede?`<button onclick="guionEditar()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar guion</button>`:''}
+      </div>
     </div>
-    <div class="space-y-3">
+    ${modo === 'interactivo' ? (() => {
+      const actual = guion[pasoIdx] || guion[0];
+      return `<div class="bg-white rounded-2xl border-2 border-amber-400 p-6 shadow-md">
+        <div class="flex items-center justify-between mb-4">
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Paso ${pasoIdx + 1} de ${guion.length} · ${psEscape(actual.fase)}</span>
+          <div class="flex gap-1">${guion.map((_, i) => `<button onclick="window.guionPasoIdx=${i};render()" class="w-7 h-2 rounded-full ${i===pasoIdx?'bg-amber-600':'bg-slate-200'}"></button>`).join('')}</div>
+        </div>
+        <ul class="space-y-3 mb-5">
+          ${(actual.puntos||[]).map(p => `<li class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-sm flex items-start gap-2.5"><i class="fas fa-comment-dots text-amber-600 mt-1"></i><span>${psEscape(p)}</span></li>`).join('')}
+        </ul>
+        <div class="mb-4">
+          <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Notas de esta fase con el prospecto</label>
+          <textarea oninput="window.guionNotasLive=window.guionNotasLive||{};window.guionNotasLive[${pasoIdx}]=this.value" rows="2" placeholder="Anota respuestas clave del cliente en esta etapa..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">${psEscape(notas[pasoIdx]||'')}</textarea>
+        </div>
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+          <button ${pasoIdx===0?'disabled':''} onclick="window.guionPasoIdx=Math.max(0,${pasoIdx-1});render()" class="px-4 py-2 rounded-xl border border-slate-300 text-sm font-semibold disabled:opacity-40"><i class="fas fa-arrow-left mr-1"></i> Anterior</button>
+          <button onclick="copiarNotasGuionLive()" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold"><i class="fas fa-copy mr-1"></i> Copiar resumen de llamada</button>
+          <button ${pasoIdx>=guion.length-1?'disabled':''} onclick="window.guionPasoIdx=Math.min(${guion.length-1},${pasoIdx+1});render()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40">Siguiente <i class="fas fa-arrow-right ml-1"></i></button>
+        </div>
+      </div>`;
+    })() : `<div class="space-y-3">
       ${guion.map(g=>`
       <div class="bg-white rounded-2xl border border-slate-200 p-5">
         <div class="flex items-center gap-2 mb-3">
@@ -3710,11 +3904,17 @@ function renderGuionLlamadas(){
         </div>
         <ul class="space-y-2">${(g.puntos||[]).map(p=>`<li class="text-sm text-slate-700 flex items-start gap-2"><i class="fas fa-check text-emerald-500 mt-1 text-xs"></i><span>${psEscape(p)}</span></li>`).join('')}</ul>
       </div>`).join('')}
-    </div>
+    </div>`}
     <div class="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-600">
       <strong>Tip:</strong> Practica este guion con el prospecto IA antes de llamar a un cliente real.
     </div>
   </div>`;
+}
+function copiarNotasGuionLive(){
+  const notas = window.guionNotasLive || {};
+  const guion=(db.settings && Array.isArray(db.settings.guionLlamadas) && db.settings.guionLlamadas.length) ? db.settings.guionLlamadas : guionDefaults();
+  const txt = guion.map((g,i) => `${g.fase}: ${notas[i]||'Sin notas'}`).join('\n');
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>showToast('Notas de llamada copiadas','success'));
 }
 function guionEditar(){
   if(!guionPuedeEditar()){ showToast('No tienes permiso para editar el guion','warning'); return; }
@@ -4268,13 +4468,55 @@ function borrarPublicidad(id){
                     ${kpiCard('fa-paper-plane', k.prom?k.prom.toFixed(1)+'h':'—', 'Respuesta promedio', 'bg-violet-500')}
                 </div>
                 <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden mr-2">
+                        <button onclick="window.cotVista='lista';render()" class="px-3 py-1.5 text-xs font-semibold ${(window.cotVista||'lista')==='lista'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-list mr-1"></i>Lista</button>
+                        <button onclick="window.cotVista='kanban';render()" class="px-3 py-1.5 text-xs font-semibold ${window.cotVista==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban</button>
+                    </div>
                     ${filtros.map(x=>`<button onclick="cotSetFiltro('${x}')" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${f===x?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}">${x==='todas'?'Todas':(COT_ESTADO_LABEL[x]||x)}${x!=='todas'?' ('+lista.filter(s=>s.estado===x).length+')':''}</button>`).join('')}
                     <div class="ml-auto relative"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input id="cot-busca" value="${escapeHTML(q)}" oninput="cotSetBusca(this.value)" placeholder="Buscar folio, cliente, ramo…" class="pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl w-56 focus:outline-none focus:ring-2 focus:ring-emerald-500"></div>
                 </div>
-                <div class="space-y-3">
+                ${window.cotVista === 'kanban' ? (() => {
+                    const cols = [
+                        { id: 'solicitud', lbl: 'Solicitadas', cls: 'border-blue-300 bg-blue-50/40' },
+                        { id: 'revision', lbl: 'En Revisión / Cotizando', cls: 'border-amber-300 bg-amber-50/40' },
+                        { id: 'aclaracion', lbl: 'Aclaración', cls: 'border-orange-300 bg-orange-50/40' },
+                        { id: 'cotizada', lbl: 'Cotizadas', cls: 'border-indigo-300 bg-indigo-50/40' },
+                        { id: 'emitida', lbl: 'Emitidas', cls: 'border-emerald-300 bg-emerald-50/40' }
+                    ];
+                    return `<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        ${cols.map(col => {
+                            const itemsCol = filtradas.filter(s => s.estado === col.id);
+                            return `<div class="rounded-2xl border ${col.cls} p-3 flex flex-col min-h-[280px]">
+                                <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/80">
+                                    <span class="text-xs font-bold uppercase text-slate-700">${col.lbl}</span>
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-white border border-slate-200 text-slate-700">${itemsCol.length}</span>
+                                </div>
+                                <div class="space-y-2.5 flex-1">
+                                    ${itemsCol.map(s => {
+                                        const sla = cotSlaInfo(s);
+                                        const semCls = sla.nivel === 'over' ? 'bg-red-500' : sla.nivel === 'warn' ? 'bg-amber-500' : 'bg-emerald-500';
+                                        return `<div class="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition cursor-pointer" onclick="cotAbrir('${s.id}')">
+                                            <div class="flex items-center justify-between gap-1 mb-1">
+                                                <span class="font-bold text-xs text-slate-900">${s.id}</span>
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${semCls}" title="Semáforo SLA"><i class="fas fa-clock"></i> ${sla.etiqueta}</span>
+                                            </div>
+                                            <p class="text-xs font-semibold text-slate-800 truncate">${escapeHTML(s.cliente.nombre)}</p>
+                                            <p class="text-[11px] text-slate-500 truncate">${escapeHTML(s.ramoNombre)} · ${escapeHTML(s.compania)}</p>
+                                            ${cotEsProcesador() ? `<div class="mt-2 pt-2 border-t border-slate-100 flex justify-end gap-1" onclick="event.stopPropagation()">
+                                                ${col.id !== 'revision' ? `<button onclick="cotCambiarEstadoKanban('${s.id}','revision')" class="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-amber-100 rounded font-semibold">Cotizar</button>` : ''}
+                                                ${col.id !== 'cotizada' ? `<button onclick="cotCambiarEstadoKanban('${s.id}','cotizada')" class="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-indigo-100 rounded font-semibold">Cotizada</button>` : ''}
+                                                ${col.id !== 'emitida' ? `<button onclick="cotCambiarEstadoKanban('${s.id}','emitida')" class="px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded font-semibold">Emitir</button>` : ''}
+                                            </div>` : ''}
+                                        </div>`;
+                                    }).join('') || '<p class="text-xs text-slate-400 text-center py-6">Sin trámites</p>'}
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+                })() : `<div class="space-y-3">
                     ${filtradas.length ? filtradas.map(s=>cotFila(s)).join('') : '<div class="bg-white rounded-2xl border border-slate-200 p-10 text-center"><i class="fas fa-inbox text-4xl text-slate-300 mb-3"></i><p class="text-slate-500">No hay solicitudes aquí. Crea una con el botón «Nueva solicitud».</p></div>'}
-                </div>
+                </div>`}
             </div>`;
         }
         function cotFila(s){
@@ -4305,6 +4547,33 @@ function borrarPublicidad(id){
             </div>`;
         }
         function cotSetFiltro(f){ window.cotFiltro=f; render(); }
+        function cotCambiarEstadoKanban(id, nuevoEstado){
+            const s = cotDB().find(x => x.id === id);
+            if(!s) return;
+            s.estado = nuevoEstado;
+            s.estadoDesde = new Date().toISOString();
+            saveDB();
+            showToast('Folio ' + id + ' movido a ' + (COT_ESTADO_LABEL[nuevoEstado] || nuevoEstado), 'success');
+            render();
+        }
+        async function cotAdjuntarDocRequisito(id, chkKey, inputEl){
+            const file = inputEl && inputEl.files && inputEl.files[0];
+            if(!file) return;
+            const s = cotDB().find(x => x.id === id);
+            if(!s) return;
+            try {
+                const dataURL = window.Media && window.Media.subirOUrl ? await window.Media.subirOUrl(file, 'cotizaciones') : '';
+                if(!Array.isArray(s.docs)) s.docs = [];
+                s.docs.push({ nombre: '[' + chkKey + '] ' + file.name, tipo: file.type || 'application/octet-stream', dataURL, reqKey: chkKey, fecha: new Date().toISOString() });
+                const item = (s.checklist || []).find(c => c.k === chkKey);
+                if(item) { item.ok = true; item.docUrl = dataURL; item.docName = file.name; }
+                saveDB();
+                showToast('Documento cargado y requisito marcado como cumplido', 'success');
+                cotAbrir(id, 'resumen');
+            } catch(e) {
+                showToast('Error al adjuntar documento', 'error');
+            }
+        }
         function cotSetBusca(v){ window.cotBusca=v; const box=document.getElementById('cot-busca'); if(box){ box.focus(); } cotRenderSolo(); }
         function cotRenderSolo(){ const c=document.getElementById('main-content'); if(c && window.lastPage==='cotizaciones') c.innerHTML=renderCotizaciones(); const b=document.getElementById('cot-busca'); if(b){ b.focus(); const v=b.value; b.value=''; b.value=v; } }
         /* ---------- Analítica (procesadores) ---------- */
@@ -5149,7 +5418,16 @@ function borrarPublicidad(id){
                 const mio = String(m.de.id)===String(currentUser.id);
                 return '<div class="flex '+(mio?'justify-end':'justify-start')+' mb-2"><div class="'+(mio?'bg-emerald-600 text-white':'bg-slate-100 text-slate-700')+' rounded-2xl px-3 py-2 max-w-[75%]"><p class="text-xs font-bold mb-0.5">'+escapeHTML(m.de.nombre)+(m.de.rol?' · '+m.de.rol.replace('_',' '):'')+'</p><p class="text-sm whitespace-pre-wrap">'+escapeHTML(m.texto)+'</p><p class="text-[10px] '+(mio?'text-emerald-200':'text-slate-400')+' mt-1 text-right">'+new Date(m.fecha).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+'</p></div></div>';
             }).join('') || '<p class="text-center text-slate-400 text-sm py-6">Sin mensajes todavía.</p>';
-            const checklistHtml = (s.checklist||[]).map(c=>'<label class="flex items-center gap-2 text-sm '+(c.ok?'text-slate-500 line-through':'text-slate-700 font-medium')+'"><i class="fas '+(c.ok?'fa-circle-check text-emerald-500':'fa-circle text-slate-300')+'"></i>'+escapeHTML(c.t)+'</label>').join('');
+            const checklistHtml = (s.checklist||[]).map(c=>`<div class="flex items-center justify-between gap-2 py-1 border-b border-slate-100 last:border-0">
+                <label class="flex items-center gap-2 text-sm ${c.ok?'text-slate-500 line-through':'text-slate-700 font-medium'}">
+                    <i class="fas ${c.ok?'fa-circle-check text-emerald-500':'fa-circle text-slate-300'}"></i>${escapeHTML(c.t)}
+                    ${c.docUrl ? `<a href="${c.docUrl}" target="_blank" download="${escapeHTML(c.docName||'requisito')}" class="text-[11px] text-amber-700 underline ml-1"><i class="fas fa-paperclip"></i> ${escapeHTML(c.docName||'Ver doc')}</a>` : ''}
+                </label>
+                <label class="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold cursor-pointer shrink-0">
+                    <i class="fas fa-upload mr-1"></i>Subir doc
+                    <input type="file" class="hidden" onchange="cotAdjuntarDocRequisito('${s.id}','${c.k}',this)">
+                </label>
+            </div>`).join('');
             const docsHtml = (s.docs||[]).map((d,i)=>'<a href="'+d.dataURL+'" download="'+escapeHTML(d.nombre)+'" class="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"><i class="fas '+(/pdf/.test(d.tipo)?'fa-file-pdf text-red-500':'fa-file-image text-blue-500')+'"></i>'+escapeHTML(d.nombre)+'</a>').join('') || '<p class="text-xs text-slate-400">Sin documentos adjuntos.</p>';
             const detHtml = Object.entries(s.detalles||{}).map(([k,v])=>'<div><p class="text-[10px] uppercase font-semibold text-slate-400">'+escapeHTML(k)+'</p><p class="text-sm text-slate-700">'+escapeHTML(String(v))+'</p></div>').join('');
             let acciones = '';
@@ -5814,7 +6092,7 @@ function initializeApp() {
 
             function renderNav() {
             const nav = document.getElementById('nav-menu');
-            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
+            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
             const adminItems = [
                 { id: 'users', label: 'Usuarios', icon: 'fa-users' },
                 { id: 'monitoreo', label: 'Monitoreo Agencias', icon: 'fa-chart-line' },
@@ -5901,6 +6179,9 @@ function initializeApp() {
                 else if (isTeacher(currentUser)) items.push(...maestroItems);
                 else if ((currentUser.role||'').toLowerCase() === 'editor') items = [...editorItems];
                 else items.push(...alumnoItems);
+                // Deduplicar por id manteniendo el primer orden (Dashboard -> Mensajes arriba)
+                const seenNavIds = {};
+                items = items.filter(it => { if (seenNavIds[it.id]) return false; seenNavIds[it.id] = true; return true; });
             }
 
             
@@ -5979,7 +6260,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     {id:'auto-pauta', label:'Publicidad Autos', icon:'fa-bullhorn'},
                     {id:'auto-practica', label:'Práctica de Venta', icon:'fa-chalkboard-user'},
                     {id:'fin-cartera', label:'Cartera Financiera', icon:'fa-landmark'},
-                    {id:'inm-cartera', label:'Cartera Inmobiliaria', icon:'fa-house'}
+                    {id:'inm-unidades', label:'Inventario de Propiedades', icon:'fa-building'},
+                    {id:'inm-cartera', label:'Clientes y Expedientes', icon:'fa-house'}
                 ];
                 allowed.forEach(id => {
                     if (!items.find(it => it.id === id)) {
@@ -5990,15 +6272,17 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             }
 
             const liveCount = isStudent(currentUser) ? (db.notifications || []).filter(n => n.userId === currentUser.id && n.type === 'live-class' && !n.read).length : 0;
+            const unreadMsgCount = currentUser ? (db.messages || []).filter(m => String(m.toId) === String(currentUser.id) && !m.read).length : 0;
 
             // === NUEVA AGRUPACIÓN DE MENÚ ===
-            const generalesIds = ['dashboard','carrusel-circulares','mi-agenda','live-classes','control-accesos','editor','oferta-valor','solicitudes','personalizar','users','centro-mensajes','ai-lobby'];
+            const generalesIds = ['dashboard','messages','carrusel-circulares','mi-agenda','live-classes','control-accesos','editor','oferta-valor','solicitudes','personalizar','users','centro-mensajes','ai-lobby'];
             const comercialIds = ['monitoreo','mi-equipo','mis-clientes','mis-metas','mis-logros','convenciones','mi-experiencia','simulador','practica-sesiones','guion-llamadas','publicidad','cotizaciones','comparador-productos','siniestros'];
             const exitoIds = ['casos-exito'];
             const itemHtml = (item) => `
                 <a href="#" onclick="navigateTo('${item.id}')" data-page="${item.id}" class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition ml-2">
                     <i class="fas ${item.icon} w-5 text-center text-slate-500"></i>
                     <span class="flex-1 text-sm">${item.label}</span>${item.id==='mis-clientes' && ['admin','gm','agencia','desarrollador'].includes((currentUser.role||'').toLowerCase()) && getUnreadNotifications()>0 ? `<span class="ml-auto bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">${getUnreadNotifications()}</span>` : ''}
+                    ${item.id==='messages' && unreadMsgCount > 0 ? `<span id="badge-messages" class="ml-auto bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">${unreadMsgCount}</span>` : ''}
                     ${item.id==='solicitudes'?`<span id="badge-solicitudes" class="hidden ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>`:''}
                     ${item.id==='cotizaciones'?`<span id="badge-cotizaciones" class="hidden ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>`:''}
                     ${item.id==='siniestros'?`<span id="badge-tramites" class="hidden ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>`:''}
@@ -6010,7 +6294,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const comercial = items.filter(i => comercialIds.includes(i.id));
             const autoIds = ['auto-unidades','auto-clientes','auto-equipo','auto-monitoreo','auto-metas','auto-simulador','auto-guion','auto-pauta','auto-practica'];
             const finIds = ['fin-cartera'];
-            const inmIds = ['inm-cartera'];
+            const inmIds = ['inm-unidades','inm-cartera'];
             const comAuto = items.filter(i => autoIds.includes(i.id));
             const comFin = items.filter(i => finIds.includes(i.id));
             const comInm = items.filter(i => inmIds.includes(i.id));
@@ -6105,7 +6389,9 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 case 'auto-pauta': content.innerHTML = auPagina('pauta'); break;
                 case 'auto-practica': content.innerHTML = auPagina('practica'); break;
                 case 'fin-cartera': content.innerHTML = vcRender('fin-cartera'); break;
-                case 'inm-cartera': content.innerHTML = vcRender('inm-cartera'); break;
+                case 'inm-unidades': window.inmTabId='unidades'; content.innerHTML = renderInmAgencia('unidades'); break;
+                case 'inm-cartera': content.innerHTML = renderInmAgencia(window.inmTabId||'unidades'); break;
+                case 'inm-cartera-clientes': window.inmTabId='clientes'; content.innerHTML = renderInmAgencia('clientes'); break;
                 default:
                     if (MULTI_SECTOR_SECCIONES.some(x=>x.id===page)) { content.innerHTML = renderMultiSector(page); break; }
                 case 'mi-equipo': content.innerHTML = renderMiEquipo(); setTimeout(function(){ if(typeof renderRanking==='function') renderRanking(); }, 150); break;
@@ -6437,6 +6723,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const filtroPlan = window.filtroRankPlan ? parseInt(window.filtroRankPlan) : null;
             const filtroGen = window.filtroRankGen ? parseInt(window.filtroRankGen) : null;
             const filtroGrupo = window.filtroRankGrupo ? parseInt(window.filtroRankGrupo) : null;
+            const filtroPeriodo = window.filtroRankPeriodo || 'todo';
+            const filtroRamo = window.filtroRankRamo || 'todos';
             
             // Determinar alcance
             let alumnosIds = [];
@@ -6458,27 +6746,75 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const plan = db.planes.find(p=>p.id===filtroPlan);
                 titulo = plan ? plan.nombre : 'Formación';
             } else {
-                // por defecto: generación del usuario o primera
+                // por defecto: generación del usuario o todos los alumnos
                 const enrollment = db.enrollments.find(e=>e.userId===currentUser.id);
-                const genId = enrollment ? enrollment.generationId : (db.generations[0]?.id || 1);
-                alumnosIds = db.enrollments.filter(e=>e.generationId===genId).map(e=>e.userId);
-                const gen = db.generations.find(g=>g.id===genId);
-                titulo = gen?.name || 'Generación';
+                if (enrollment) {
+                    const genId = enrollment.generationId;
+                    alumnosIds = db.enrollments.filter(e=>e.generationId===genId).map(e=>e.userId);
+                    const gen = db.generations.find(g=>g.id===genId);
+                    titulo = gen?.name || 'Generación';
+                } else {
+                    alumnosIds = db.users.filter(u=>isStudent(u)).map(u=>u.id);
+                }
             }
+
+            // Cálculo por período y ramo
+            const nowMs = Date.now();
+            const cutoffMs = filtroPeriodo === 'semana' ? nowMs - 7*86400000
+                           : filtroPeriodo === 'mes' ? nowMs - 30*86400000
+                           : filtroPeriodo === 'trimestre' ? nowMs - 90*86400000
+                           : filtroPeriodo === 'anio' ? nowMs - 365*86400000 : 0;
+
+            const calcScore = (u) => {
+                let score = filtroPeriodo === 'todo' ? (u.xp || 0) : 0;
+                if (filtroPeriodo !== 'todo') {
+                    (db.progress || []).forEach(p => {
+                        if (String(p.userId) === String(u.id) && p.date && new Date(p.date).getTime() >= cutoffMs) {
+                            score += (p.xpAwardedView ? 50 : 0) + (p.xpAwardedQuiz ? 100 : 0);
+                        }
+                    });
+                }
+                // Puntos comerciales por ramo
+                const cots = (typeof cotDB === 'function' ? cotDB() : (db.cotizaciones || [])).filter(c => {
+                    const matchUser = c.creadoPor && String(c.creadoPor.id) === String(u.id);
+                    const matchTime = !cutoffMs || (c.creado && new Date(c.creado).getTime() >= cutoffMs);
+                    const matchRamo = filtroRamo === 'todos' || (filtroRamo === 'seguros' && !c.sector) || (c.ramo || '').toLowerCase().includes(filtroRamo);
+                    return matchUser && matchTime && matchRamo;
+                });
+                const emitidas = cots.filter(c => (c.estado || '').toLowerCase() === 'emitida').length;
+                if (filtroRamo !== 'todos') {
+                    return emitidas * 300 + cots.length * 50 + score;
+                }
+                return score + emitidas * 150;
+            };
             
-            const alumnos = db.users.filter(u=>alumnosIds.includes(u.id) && isStudent(u)).sort((a,b)=>(b.xp||0)-(a.xp||0));
+            const alumnos = db.users.filter(u=>alumnosIds.includes(u.id) && isStudent(u)).map(u => ({ ...u, _rankScore: calcScore(u) })).sort((a,b)=>b._rankScore - a._rankScore);
             const myPos = alumnos.findIndex(u=>u.id===currentUser.id) + 1;
             
             const gensFiltradas = filtroPlan ? db.generations.filter(g=>g.planId===filtroPlan) : db.generations;
             const gruposFiltrados = filtroGen ? db.groups.filter(gr=>gr.generationId===filtroGen) : (filtroPlan ? db.groups.filter(gr=>gensFiltradas.map(g=>g.id).includes(gr.generationId)) : db.groups);
             
             return `<div class="mb-6">
-                <div class="flex flex-col  lg:items-end justify-between gap-4">
+                <div class="flex flex-col lg:items-end justify-between gap-4">
                     <div>
-                        <h2 class="text-2xl font-bold mb-1">Ranking</h2>
-                        <p class="text-slate-500">${titulo} • Tu posición: #${myPos || '-'}</p>
+                        <h2 class="text-2xl font-bold mb-1">Ranking Ejecutivo y Académico</h2>
+                        <p class="text-slate-500">${titulo} • Período: <strong class="text-amber-700 uppercase">${filtroPeriodo}</strong> • Tu posición: #${myPos || '-'}</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
+                        <select onchange="window.filtroRankPeriodo=this.value; navigateTo('leaderboard')" class="px-3 py-2 border border-amber-300 rounded-lg text-sm bg-amber-50/60 text-slate-900 font-semibold">
+                            <option value="todo" ${filtroPeriodo==='todo'?'selected':''}>Todo el historial</option>
+                            <option value="semana" ${filtroPeriodo==='semana'?'selected':''}>Esta Semana</option>
+                            <option value="mes" ${filtroPeriodo==='mes'?'selected':''}>Este Mes</option>
+                            <option value="trimestre" ${filtroPeriodo==='trimestre'?'selected':''}>Trimestre</option>
+                            <option value="anio" ${filtroPeriodo==='anio'?'selected':''}>Año en curso</option>
+                        </select>
+                        <select onchange="window.filtroRankRamo=this.value; navigateTo('leaderboard')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                            <option value="todos" ${filtroRamo==='todos'?'selected':''}>Todos los ramos</option>
+                            <option value="vida" ${filtroRamo==='vida'?'selected':''}>Vida / Ahorro</option>
+                            <option value="gmm" ${filtroRamo==='gmm'?'selected':''}>Gastos Médicos</option>
+                            <option value="autos" ${filtroRamo==='autos'?'selected':''}>Automotriz / Autos</option>
+                            <option value="inmobiliario" ${filtroRamo==='inmobiliario'?'selected':''}>Inmobiliario</option>
+                        </select>
                         <select onchange="window.filtroRankPlan=this.value; window.filtroRankGen=''; window.filtroRankGrupo=''; navigateTo('leaderboard')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="">Todas las formaciones</option>
                             ${db.planes.map(p=>`<option value="${p.id}" ${filtroPlan===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}
@@ -6495,8 +6831,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 </div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div class="p-4 border-b bg-slate-50"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-trophy text-amber-500"></i> Tabla de Posiciones</h3></div>
-                <div class="divide-y">${alumnos.map((u,i)=>{ const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`; const isMe = u.id===currentUser.id; return `<div class="p-4 flex items-center gap-4 ${isMe?'bg-indigo-50':''}"><div class="w-8 text-center font-medium">${medal}</div><img src="${u.avatar}" class="w-10 h-10 rounded-full"><div class="flex-1"><div class="font-medium">${u.name} ${isMe?'<span class="text-xs text-indigo-600">(Tú)</span>':''}</div><div class="text-xs text-slate-500">Nivel ${Math.floor((u.xp||0)/300)+1}</div></div><div class="text-right"><div class="font-semibold text-indigo-600">${u.xp||0} XP</div><div class="text-[11px] text-slate-500">Experiencia</div></div></div>`}).join('') || '<p class="p-6 text-center text-slate-500">No hay alumnos en este filtro</p>'}</div>
+                <div class="p-4 border-b bg-slate-50 flex items-center justify-between"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-trophy text-amber-500"></i> Tabla de Posiciones</h3><span class="text-xs text-slate-500">${alumnos.length} participantes</span></div>
+                <div class="divide-y">${alumnos.map((u,i)=>{ const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`; const isMe = u.id===currentUser.id; return `<div class="p-4 flex items-center gap-4 ${isMe?'bg-amber-50/50':''}"><div class="w-8 text-center font-medium">${medal}</div><img src="${u.avatar}" class="w-10 h-10 rounded-full"><div class="flex-1"><div class="font-medium">${u.name} ${isMe?'<span class="text-xs text-amber-700 font-bold">(Tú)</span>':''}</div><div class="text-xs text-slate-500">Nivel ${Math.floor((u.xp||0)/300)+1}</div></div><div class="text-right"><div class="font-semibold text-amber-700">${u._rankScore||0} pts</div><div class="text-[11px] text-slate-500">Puntaje (${u.xp||0} XP base)</div></div></div>`}).join('') || '<p class="p-6 text-center text-slate-500">No hay alumnos en este filtro</p>'}</div>
             </div>`;
         }
 
@@ -6589,9 +6925,9 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     if(!cc.circulares) return '';
                     const canSee = db.rolePermissions[(currentUser.role||'').toLowerCase()]?.includes('carrusel-circulares');
                     if(!canSee) return '';
-                    const isInvited = (it) => !it.participantes?.length || it.participantes.includes(currentUser.id) || canEditCarrusel();
+                    const isInvited = (it) => !it || !it.participantes?.length || it.participantes.includes(currentUser.id) || canEditCarrusel();
                     return `<div class="mb-6 grid md:grid-cols-2 gap-4">
-                        ${[cc.circulares, cc.carrusel].map((it,idx) => {
+                        ${[cc.circulares, cc.carrusel].filter(Boolean).map((it,idx) => {
                             const color = idx===0 ? '#0a2540' : '#c9a86a';
                             const invited = isInvited(it);
                             return `<div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition group">
@@ -6655,6 +6991,51 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 ${isStudent(currentUser) ? (() => { const enr = db.enrollments.find(e=>e.userId===currentUser.id); const gen = enr ? db.generations.find(g=>g.id===enr.generationId) : null; const plan = gen ? db.planes.find(p=>p.id===gen.planId) : null; return plan ? `<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><div class="flex items-center justify-between"><div><p class="text-slate-500 text-sm">Mi Formación</p><p class="text-lg font-bold text-indigo-700">${plan.nombre}</p><p class="text-xs text-slate-500">${plan.tipo} • ${gen.name}</p></div><div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center"><i class="fas fa-graduation-cap"></i></div></div></div>` : ''; })() : ''}
                 ${isTeacher(currentUser) ? (() => { const myGroups = db.groups.filter(g=>g.tutorId===currentUser.id); const plans = [...new Set(myGroups.map(g=>{ const gen=db.generations.find(ge=>ge.id===g.generationId); return gen?.planId; }).filter(Boolean))].map(id=>db.planes.find(p=>p.id===id)).filter(Boolean); return plans.length ? `<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 md:col-span-2"><div class="flex items-center justify-between"><div><p class="text-slate-500 text-sm">Formaciones que impartes</p><div class="flex flex-wrap gap-2 mt-2">${plans.map(p=>`<span class='px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium'><i class='fas fa-graduation-cap mr-1'></i>${p.nombre}</span>`).join('')}</div></div></div></div>` : ''; })() : ''}
                 </div>
+
+                ${(() => {
+                    // #4 KPIs Ejecutivos de Conversión Solicitud -> Cotización -> Venta + Exportación CSV
+                    const sols = (db.solicitudes || []).length;
+                    const cotsAll = typeof cotDB === 'function' ? cotDB() : (db.cotizaciones || []);
+                    const cotsCount = cotsAll.length;
+                    const emitidasCount = cotsAll.filter(c => ['emitida','pagada','cerrada'].includes((c.estado||'').toLowerCase())).length;
+                    const clientesAll = (db.clientes || []).length;
+                    const tasaSolCot = sols > 0 ? Math.min(100, Math.round((cotsCount / sols) * 100)) : (cotsCount > 0 ? 100 : 0);
+                    const tasaCotVenta = cotsCount > 0 ? Math.round((emitidasCount / cotsCount) * 100) : 0;
+                    return `<div class="mt-6 bg-white p-5 rounded-2xl border border-amber-200/80 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 class="font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-chart-line text-amber-600"></i> Embudo Ejecutivo y Conversión Comercial</h3>
+                                <p class="text-xs text-slate-500">Métricas consolidadas en tiempo real: Prospectos → Cotizaciones → Emisiones</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="exportDashboardKPIsCSV()" class="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50/70 text-amber-900 text-xs font-semibold hover:bg-amber-100 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar KPIs CSV</button>
+                                <button onclick="navigateTo('messages')" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-comments"></i> Ir a Mensajes</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <p class="text-xs text-slate-500">Solicitudes / Prospectos</p>
+                                <p class="text-2xl font-bold text-slate-900">${sols + clientesAll}</p>
+                                <p class="text-[11px] text-slate-400">${sols} web · ${clientesAll} cartera</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <p class="text-xs text-slate-500">Cotizaciones Activas</p>
+                                <p class="text-2xl font-bold text-slate-900">${cotsCount}</p>
+                                <p class="text-[11px] text-amber-700 font-medium">Conversión: ${tasaSolCot}%</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <p class="text-xs text-slate-500">Pólizas / Ventas Emitidas</p>
+                                <p class="text-2xl font-bold text-emerald-700">${emitidasCount}</p>
+                                <p class="text-[11px] text-emerald-600 font-medium">Cierre: ${tasaCotVenta}%</p>
+                            </div>
+                            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <p class="text-xs text-slate-500">Mensajes sin leer</p>
+                                <p class="text-2xl font-bold text-amber-700">${(db.messages||[]).filter(m=>String(m.toId)===String(currentUser.id)&&!m.read).length}</p>
+                                <p class="text-[11px] text-slate-400">Comunicación interna</p>
+                            </div>
+                        </div>
+                    </div>`;
+                })()}
                 
                 ${isStudent(currentUser) ? `
                                 <!-- Tarjeta SRS -->
@@ -7443,6 +7824,28 @@ function renderGlossary() {
         }
 
 
+        function exportDashboardKPIsCSV() {
+            const sols = (db.solicitudes || []).length;
+            const cotsAll = typeof cotDB === 'function' ? cotDB() : (db.cotizaciones || []);
+            const emitidas = cotsAll.filter(c => ['emitida','pagada','cerrada'].includes((c.estado||'').toLowerCase())).length;
+            const rows = [
+                ['Métrica', 'Valor', 'Fecha Corte'],
+                ['Usuarios Activos', (db.users||[]).length, new Date().toISOString()],
+                ['Solicitudes Web', sols, new Date().toISOString()],
+                ['Clientes en Cartera', (db.clientes||[]).length, new Date().toISOString()],
+                ['Cotizaciones Totales', cotsAll.length, new Date().toISOString()],
+                ['Pólizas / Ventas Emitidas', emitidas, new Date().toISOString()],
+                ['Lecciones Totales', (db.lessons||[]).length, new Date().toISOString()]
+            ];
+            const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'kpis_ejecutivos_' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+            if (window.showToast) showToast('KPIs exportados en CSV', 'success');
+        }
+
         function renderReports() {
     const alumnos = db.users.filter(u => isStudent(u));
     const maestros = db.users.filter(u => isTeacher(u));
@@ -7470,13 +7873,38 @@ function renderGlossary() {
     });
     return `<div class="bg-white p-6 rounded-xl shadow-sm">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-chart-pie text-indigo-600"></i> Reportes de Progreso</h3>
+            <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-chart-pie text-indigo-600"></i> Reportes de Progreso y Embudo Comercial</h3>
             <div class="flex items-center gap-3">
                 <div class="text-sm text-slate-500">${alumnos.length} alumnos · ${db.lessons.length} lecciones</div>
                 <!-- FASE 1 - PDF REAL -->
                 <button onclick="exportReportsPDF()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
             </div>
         </div>
+        ${(() => {
+            // #6 Gráfica visual de Embudo Comercial + SLA en Reportes
+            const sols = (db.solicitudes || []).length + (db.clientes || []).length;
+            const cots = typeof cotDB === 'function' ? cotDB() : (db.cotizaciones || []);
+            const enProceso = cots.filter(c => ['nueva','cotizando','enviada'].includes((c.estado||'').toLowerCase())).length;
+            const emitidas = cots.filter(c => ['emitida','pagada','cerrada'].includes((c.estado||'').toLowerCase())).length;
+            const maxVal = Math.max(1, sols, cots.length, enProceso, emitidas);
+            return `<div class="mb-6 p-4 rounded-xl border border-amber-200/80 bg-slate-50/70">
+                <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fas fa-filter text-amber-600"></i> Embudo de Conversión Comercial y SLA</h4>
+                <div class="space-y-2.5">
+                    ${[
+                        ['1. Prospectos y Solicitudes', sols, 'bg-slate-700'],
+                        ['2. Cotizaciones Solicitadas', cots.length, 'bg-amber-600'],
+                        ['3. En Cotización / Propuesta Enviada', enProceso, 'bg-indigo-600'],
+                        ['4. Pólizas / Ventas Emitidas', emitidas, 'bg-emerald-600']
+                    ].map(([lbl, val, cls]) => {
+                        const pct = Math.max(8, Math.round((val / maxVal) * 100));
+                        return `<div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1"><span>${lbl}</span><span>${val}</span></div>
+                            <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden"><div class="h-full ${cls} rounded-full transition-all" style="width:${pct}%"></div></div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        })()}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div class="relative">
                 <select id="filter-alumno" onchange="filterReports()" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
@@ -7545,7 +7973,7 @@ function filterReports(){
             // El contenedor adopta el mismo ancho máximo que declara el contenido (sin franjas vacías)
             const capMatch = isLarge ? html.match(/max-w-(?:[1-7]xl|\[95vw\])/) : null;
             const maxWidth = capMatch ? ('w-full ' + capMatch[0]) : (isLarge ? '' : 'w-full max-w-lg');
-            document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onclick="closeModal(event)"><div class="bg-white rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()">${html}</div></div>`; }
+            document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onclick="closeModal(event)"><div class="bg-white text-slate-800 rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()">${html}</div></div>`; }
         function closeModal(e) { if(!e || e.target.classList.contains('modal-backdrop')){ document.getElementById('modal-container').innerHTML=''; window.cotModalId=null; } }
 
         function openUserModal(id=null) {
@@ -7946,11 +8374,12 @@ const file=e.target.avatarFile.files[0]; const save=(avatar)=>{ if(avatar) data.
                                             <span><i class="fas fa-percentage mr-1"></i>Aprobar: ${exam.passPercent}% · Exentar: ${exam.exemptPercent}%</span>
                                         </div>
                                         ${lastAttempt ? `<div class="mt-3 pt-3 border-t border-slate-100">
-                                            <div class="flex items-center gap-3">
+                                            <div class="flex items-center flex-wrap gap-3">
                                                 <span class="text-xs text-slate-500">Último intento:</span>
                                                 <span class="text-xs px-2 py-1 rounded-full ${lastAttempt.result==='EXENTADO'?'bg-purple-100 text-purple-700':lastAttempt.result==='APROBADO'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${lastAttempt.result} (${lastAttempt.score}%)</span>
                                                 <span class="text-xs text-slate-400">${new Date(lastAttempt.date).toLocaleDateString('es-MX')}</span>
                                                 ${lastAttempt.xpAwarded > 0 ? `<span class="text-xs text-amber-600 font-medium">+${lastAttempt.xpAwarded} XP</span>` : ''}
+                                                ${(lastAttempt.result==='APROBADO' || lastAttempt.result==='EXENTADO') ? `<button onclick="descargarCertificadoExamen(${exam.id}, ${lastAttempt.score})" class="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-1"><i class="fas fa-award text-amber-600"></i> Descargar Certificado PDF</button>` : ''}
                                             </div>
                                         </div>` : ''}
                                     </div>
@@ -8228,62 +8657,125 @@ function renderMessages() {
             if (!db.messages) db.messages = [];
             if (!db.glossaryCategories) db.glossaryCategories = [{ id: 1, name: 'General' }];
             if (!db.glossaryConcepts) db.glossaryConcepts = [];
-            let contacts = [];
-            let title = 'Mensajes';
+            // Permitir comunicación abierta entre miembros del portal (excepto prospectos aislados)
+            let contacts = (db.users || []).filter(u => u && String(u.id) !== String(currentUser.id) && (u.role || '').toLowerCase() !== 'prospecto');
+            let title = 'Centro de Comunicación y Mensajes';
             let headerIcon = 'fa-comments';
-            
-            if (isStudent(currentUser)) {
-                // Maestros asignados
-                const myTeachers = db.users.filter(u => isTeacher(u) && (u.students || []).includes(currentUser.id));
-                const myCategories = db.categories.filter(c => c.assignedTo.includes(currentUser.id));
-                myCategories.forEach(cat => { 
-                    db.users.filter(u => isTeacher(u)).forEach(m => { 
-                        if (!myTeachers.find(t => t.id === m.id)) myTeachers.push(m); 
-                    }); 
-                });
-                // NUEVO: agregar admins
-                const admins = db.users.filter(u => isAdmin(u));
-                contacts = [...myTeachers, ...admins];
-                title = 'Contactar Maestros y Admins';
-            } else if (isTeacher(currentUser)) {
-                const myStudents = db.users.filter(u => isStudent(u) && (currentUser.students || []).includes(u.id));
-                // NUEVO: agregar admins
-                const admins = db.users.filter(u => isAdmin(u));
-                contacts = [...myStudents, ...admins];
-                title = 'Mensajes';
-            } else if (isAdmin(currentUser)) {
-                // NUEVO: admin ve alumnos y maestros
-                const alumnos = db.users.filter(u => isStudent(u));
-                const maestros = db.users.filter(u => isTeacher(u));
-                contacts = [...alumnos, ...maestros];
-                title = 'Mensajes (Admin)';
-            }
 
-            // Eliminar duplicados y al propio usuario
-            contacts = contacts.filter((c, idx, arr) => c.id !== currentUser.id && arr.findIndex(x => x.id === c.id) === idx);
+            // Filtro de búsqueda y rol
+            const q = (window.msgSearchQuery || '').trim().toLowerCase();
+            const roleFilter = window.msgRoleFilter || 'todos';
+            if (q) {
+                contacts = contacts.filter(c => ((c.name || '') + ' ' + (c.email || '') + ' ' + (c.role || '')).toLowerCase().includes(q));
+            }
+            if (roleFilter !== 'todos') {
+                contacts = contacts.filter(c => {
+                    if (roleFilter === 'no-leidos') {
+                        return db.messages.some(m => String(m.fromId) === String(c.id) && String(m.toId) === String(currentUser.id) && !m.read);
+                    }
+                    if (roleFilter === 'admin') return isAdmin(c);
+                    if (roleFilter === 'maestro') return isTeacher(c);
+                    if (roleFilter === 'alumno') return isStudent(c);
+                    return (c.role || '').toLowerCase() === roleFilter;
+                });
+            }
 
             // Construir mapa de últimas conversaciones
             const conversations = {}; 
             db.messages.forEach(m => { 
-                if (m.toId === currentUser.id || m.fromId === currentUser.id) { 
-                    const otherId = m.fromId === currentUser.id ? m.toId : m.fromId; 
+                if (String(m.toId) === String(currentUser.id) || String(m.fromId) === String(currentUser.id)) { 
+                    const otherId = String(m.fromId) === String(currentUser.id) ? m.toId : m.fromId; 
                     if (!conversations[otherId] || new Date(m.date) > new Date(conversations[otherId].date)) 
                         conversations[otherId] = m; 
                 } 
             });
 
-            // Ordenar por actividad reciente
+            // Ordenar por no leídos primero y luego actividad reciente
             contacts.sort((a,b) => {
+                const ua = db.messages.filter(m => String(m.fromId) === String(a.id) && String(m.toId) === String(currentUser.id) && !m.read).length;
+                const ub = db.messages.filter(m => String(m.fromId) === String(b.id) && String(m.toId) === String(currentUser.id) && !m.read).length;
+                if (ub !== ua) return ub - ua;
                 const da = conversations[a.id] ? new Date(conversations[a.id].date) : 0;
                 const dbd = conversations[b.id] ? new Date(conversations[b.id].date) : 0;
                 return dbd - da;
             });
 
-            if (isStudent(currentUser)) {
-                return `<div class="bg-white p-6 rounded-xl shadow-sm"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas ${headerIcon} text-indigo-600"></i> ${title}</h3><div class="text-sm text-slate-500">${contacts.length} contactos disponibles</div></div>${contacts.length === 0 ? '<p class="text-center py-12 text-slate-500">No tienes contactos asignados</p>' : `<div class="grid gap-4 md:grid-cols-2">${contacts.map(contact => { const conversation = db.messages.filter(m => (m.fromId === currentUser.id && m.toId === contact.id) || (m.fromId === contact.id && m.toId === currentUser.id)).sort((a,b) => new Date(b.date) - new Date(a.date)); const lastMsg = conversation[0]; const unread = conversation.filter(m => m.toId === currentUser.id && !m.read).length; const roleBadge = isAdmin(contact) ? '<span class="ml-2 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] rounded">ADMIN</span>' : isTeacher(contact) ? '<span class="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded">MAESTRO</span>' : ''; return `<div class="border border-slate-200 rounded-xl p-5 hover:shadow-md transition"><div class="flex items-start gap-4"><img src="${contact.avatar}" class="w-14 h-14 rounded-full object-cover"><div class="flex-1"><div class="flex items-start justify-between mb-2"><div><h4 class="font-semibold flex items-center">${contact.name}${roleBadge}</h4><p class="text-xs text-slate-500">${contact.email}</p></div>${unread > 0 ? `<span class="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">${unread}</span>` : ''}</div>${lastMsg ? `<p class="text-sm text-slate-600 mb-3">${lastMsg.fromId === currentUser.id ? 'Tú: ' : ''}${lastMsg.text}</p><p class="text-xs text-slate-400">${new Date(lastMsg.date).toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</p>` : '<p class="text-sm text-slate-400 mb-3">Sin mensajes aún</p>'}<div class="flex gap-2 mt-4"><button onclick="openChat(${contact.id})" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-comment-dots mr-1.5"></i>Chat interno</button>${contact.phone ? `<button onclick="openWhatsApp(${contact.id})" class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700" title="WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}</div></div></div></div>`; }).join('')}</div>`}<div class="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-lg"><p class="text-sm text-amber-800"><i class="fas fa-info-circle mr-2"></i><strong>Tip:</strong> Usa el chat interno para dudas académicas. WhatsApp es para urgencias.</p></div></div>`;
-            } else {
-                return `<div class="bg-white p-6 rounded-xl shadow-sm"><div class="flex justify-between items-center mb-6"><h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas ${headerIcon} text-indigo-600"></i> ${title}</h3><div class="text-sm text-slate-500">${contacts.length} contactos</div></div><div class="grid gap-3">${contacts.map(contact => { const lastMsg = conversations[contact.id]; const unread = db.messages.filter(m => m.fromId === contact.id && m.toId === currentUser.id && !m.read).length; const totalMsgs = db.messages.filter(m => (m.fromId === contact.id && m.toId === currentUser.id) || (m.fromId === currentUser.id && m.toId === contact.id)).length; const roleBadge = isAdmin(contact) ? 'ADMIN' : isTeacher(contact) ? 'MAESTRO' : 'ALUMNO'; const badgeColor = isAdmin(contact) ? 'purple' : isTeacher(contact) ? 'blue' : 'emerald'; return `<div class="border border-slate-200 rounded-xl p-4 hover:bg-slate-50 cursor-pointer transition" onclick="openChat(${contact.id})"><div class="flex items-center gap-3"><div class="relative"><img src="${contact.avatar}" class="w-12 h-12 rounded-full object-cover">${unread > 0 ? `<span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">${unread}</span>` : ''}</div><div class="flex-1 min-w-0"><div class="flex justify-between items-start"><h4 class="font-medium truncate flex items-center gap-2">${contact.name}<span class="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[10px] rounded uppercase">${roleBadge}</span></h4>${lastMsg ? `<span class="text-xs text-slate-400 ml-2 whitespace-nowrap">${new Date(lastMsg.date).toLocaleDateString('es-MX', {day:'2-digit', month:'short'})}</span>` : ''}</div><p class="text-sm text-slate-600 truncate">${lastMsg ? (lastMsg.fromId === currentUser.id ? 'Tú: ' : '') + lastMsg.text : 'Sin mensajes'}</p></div><div class="flex items-center gap-3"><span class="text-xs text-slate-400">${totalMsgs} msgs</span><i class="fas fa-chevron-right text-slate-300"></i></div></div></div>`; }).join('') || '<p class="text-center py-12 text-slate-500">No hay contactos</p>'}</div></div>`;
-            }
+            const totalUnread = db.messages.filter(m => String(m.toId) === String(currentUser.id) && !m.read).length;
+            const isOnline = (u) => u && u.lastActive && (Date.now() - Number(u.lastActive) < 15 * 60 * 1000);
+
+            return `<div class="bg-white p-6 rounded-2xl shadow-sm border border-amber-200/60">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-5">
+                    <div>
+                        <h3 class="text-xl font-bold flex items-center gap-2 text-slate-900">
+                            <i class="fas ${headerIcon} text-amber-600"></i> ${title}
+                            ${totalUnread > 0 ? `<span class="px-2.5 py-0.5 bg-red-600 text-white text-xs rounded-full font-bold">${totalUnread} sin leer</span>` : `<span class="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 text-xs rounded-full font-medium">Al día</span>`}
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Comunicación directa en tiempo real con todo el equipo, asesores, capacitadores y administración</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase()) ? `<button onclick="cmAbrirBroadcast()" class="px-3.5 py-2 rounded-xl bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 flex items-center gap-1.5"><i class="fas fa-bullhorn"></i> Anuncio al equipo</button>` : ''}
+                        <button onclick="navigateTo('centro-mensajes')" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-copy text-amber-600"></i> Plantillas de Mensajes</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 mb-5 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+                    <div class="relative flex-1 min-w-[220px]">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" value="${psEscape(window.msgSearchQuery || '')}" oninput="window.msgSearchQuery=this.value;render()" placeholder="Buscar usuario por nombre, correo o rol..." class="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 text-sm bg-white text-slate-900">
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${[
+                            ['todos','Todos'],
+                            ['no-leidos','No leídos ('+totalUnread+')'],
+                            ['admin','Admins'],
+                            ['maestro','Capacitadores'],
+                            ['alumno','Asesores']
+                        ].map(([id,lbl]) => `<button onclick="window.msgRoleFilter='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${roleFilter===id ? 'bg-slate-900 text-amber-300 border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}">${lbl}</button>`).join('')}
+                    </div>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2">
+                    ${contacts.map(contact => {
+                        const lastMsg = conversations[contact.id];
+                        const unread = db.messages.filter(m => String(m.fromId) === String(contact.id) && String(m.toId) === String(currentUser.id) && !m.read).length;
+                        const totalMsgs = db.messages.filter(m => (String(m.fromId) === String(contact.id) && String(m.toId) === String(currentUser.id)) || (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(contact.id))).length;
+                        const roleBadge = isAdmin(contact) ? 'ADMIN' : isTeacher(contact) ? 'MAESTRO' : (contact.role || 'ASESOR').toUpperCase();
+                        const online = isOnline(contact);
+                        const seenTick = lastMsg && String(lastMsg.fromId) === String(currentUser.id)
+                            ? (lastMsg.read ? '<i class="fas fa-check-double text-sky-500 mr-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-400 mr-1" title="Enviado"></i>')
+                            : '';
+                        return `<div class="border ${unread > 0 ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200 bg-white'} rounded-xl p-4 hover:shadow-md cursor-pointer transition" onclick="openChat('${contact.id}')">
+                            <div class="flex items-center gap-3">
+                                <div class="relative shrink-0">
+                                    <img src="${contact.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(contact.name||'U')}" class="w-12 h-12 rounded-full object-cover border border-amber-200">
+                                    <span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}" title="${online ? 'En línea recientemente' : 'Desconectado'}"></span>
+                                    ${unread > 0 ? `<span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center">${unread}</span>` : ''}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-start gap-2">
+                                        <h4 class="font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                                            ${psEscape(contact.name)}
+                                            <span class="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] rounded font-semibold uppercase">${roleBadge}</span>
+                                        </h4>
+                                        ${lastMsg ? `<span class="text-[11px] text-slate-400 whitespace-nowrap">${new Date(lastMsg.date).toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</span>` : ''}
+                                    </div>
+                                    <p class="text-xs text-slate-500 truncate mb-1">${psEscape(contact.email || '')}</p>
+                                    <p class="text-sm ${unread > 0 ? 'font-semibold text-slate-900' : 'text-slate-600'} truncate">
+                                        ${lastMsg ? `${seenTick}${String(lastMsg.fromId) === String(currentUser.id) ? 'Tú: ' : ''}${psEscape(lastMsg.text)}` : '<span class="text-slate-400 italic">Iniciar conversación...</span>'}
+                                    </p>
+                                </div>
+                                <div class="flex flex-col items-end gap-1.5 shrink-0">
+                                    <span class="text-[11px] text-slate-400">${totalMsgs} msgs</span>
+                                    <div class="flex gap-1">
+                                        ${contact.phone ? `<button onclick="event.stopPropagation();openWhatsApp('${contact.id}')" class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}
+                                        <span class="p-1.5 text-amber-700"><i class="fas fa-chevron-right text-xs"></i></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('') || '<p class="text-center py-12 text-slate-500 col-span-2">No se encontraron contactos con ese filtro</p>'}
+                </div>
+            </div>`;
         }
 
         /* ===== CHAT EN VIVO (sin recargar): polling ligero mientras el modal
@@ -8297,11 +8789,17 @@ function renderMessages() {
         function renderConversationBox(userId) {
             const box = document.getElementById('chat-messages');
             if (!box) return false;
-            const conv = db.messages.filter(m => (m.fromId === currentUser.id && m.toId === userId) || (m.fromId === userId && m.toId === currentUser.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
+            const conv = db.messages.filter(m => (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(userId)) || (String(m.fromId) === String(userId) && String(m.toId) === String(currentUser.id))).sort((a, b) => new Date(a.date) - new Date(b.date));
             let hayLeidos = false;
-            conv.forEach(m => { if (m.toId === currentUser.id && !m.read) { m.read = true; hayLeidos = true; } });
-            if (hayLeidos) saveDB();
-            box.innerHTML = conv.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación</p>' : conv.map(m => `<div class="flex ${m.fromId === currentUser.id ? 'justify-end' : 'justify-start'}"><div class="max-w-[75%] ${m.fromId === currentUser.id ? 'bg-indigo-600 text-white' : 'bg-white border'} rounded-2xl px-4 py-2.5 shadow-sm"><p class="text-sm">${m.text}</p><p class="text-[10px] mt-1 ${m.fromId === currentUser.id ? 'text-indigo-200' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`).join('');
+            const nowIso = new Date().toISOString();
+            conv.forEach(m => { if (String(m.toId) === String(currentUser.id) && !m.read) { m.read = true; m.readAt = nowIso; hayLeidos = true; } });
+            if (hayLeidos) { saveDB(); try { renderNav(); } catch(e){} }
+            box.innerHTML = conv.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación con un mensaje o adjunto</p>' : conv.map(m => {
+                const mine = String(m.fromId) === String(currentUser.id);
+                const seenIcon = mine ? (m.read ? '<i class="fas fa-check-double text-amber-300 ml-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-300 ml-1" title="Enviado"></i>') : '';
+                const attachmentHtml = m.attachmentUrl ? `<div class="mt-2 pt-2 border-t ${mine?'border-amber-400/30':'border-slate-200'}"><a href="${m.attachmentUrl}" target="_blank" download="${psEscape(m.attachmentName||'adjunto')}" class="inline-flex items-center gap-1.5 text-xs underline font-semibold"><i class="fas fa-paperclip"></i> ${psEscape(m.attachmentName||'Ver archivo adjunto')}</a></div>` : '';
+                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm"><p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p>${attachmentHtml}<p class="text-[10px] mt-1 flex items-center justify-end gap-1 ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}${seenIcon}</p></div></div>`;
+            }).join('');
             box.scrollTop = box.scrollHeight;
             return true;
         }
@@ -8321,12 +8819,46 @@ function renderMessages() {
         function openChat(userId) {
             const otherUser = db.users.find(u => String(u.id) === String(userId));
             if (!otherUser) { if (window.showToast) window.showToast('Contacto no disponible, reingresa para sincronizar', 'warning'); return; }
-            const conversation = db.messages.filter(m => (m.fromId === currentUser.id && m.toId === userId) || (m.fromId === userId && m.toId === currentUser.id)).sort((a,b) => new Date(a.date) - new Date(b.date));
-            conversation.forEach(m => { if (m.toId === currentUser.id) m.read = true; }); saveDB();
-            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar}" class="w-10 h-10 rounded-full"><div class="flex-1"><h3 class="font-semibold">${otherUser.name}</h3><p class="text-xs text-slate-500">${isTeacher(otherUser) ? 'Maestro' : 'Alumno'} · ${otherUser.email}</p></div><button onclick="openWhatsApp(${userId})" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button><button aria-label="Cerrar" onclick="closeModal()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3">${conversation.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación</p>' : conversation.map(m => `<div class="flex ${m.fromId === currentUser.id ? 'justify-end' : 'justify-start'}"><div class="max-w-[75%] ${m.fromId === currentUser.id ? 'bg-indigo-600 text-white' : 'bg-white border'} rounded-2xl px-4 py-2.5 shadow-sm"><p class="text-sm">${m.text}</p><p class="text-[10px] mt-1 ${m.fromId === currentUser.id ? 'text-indigo-200' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`).join('')}</div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2"><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            const conversation = db.messages.filter(m => (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(userId)) || (String(m.fromId) === String(userId) && String(m.toId) === String(currentUser.id))).sort((a,b) => new Date(a.date) - new Date(b.date));
+            const nowIso = new Date().toISOString();
+            conversation.forEach(m => { if (String(m.toId) === String(currentUser.id)) { m.read = true; m.readAt = m.readAt || nowIso; } }); saveDB();
+            try { renderNav(); } catch(e){}
+            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            renderConversationBox(userId);
             startChatLive(userId);
-            document.getElementById('chat-form').onsubmit = e => { e.preventDefault(); const text = document.getElementById('chat-input').value.trim(); if (!text) return; db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: userId, text: text, date: new Date().toISOString(), read: false }); saveDB(); document.getElementById('chat-input').value = ''; renderConversationBox(userId); };
+            document.getElementById('chat-form').onsubmit = e => { e.preventDefault(); const text = document.getElementById('chat-input').value.trim(); if (!text) return; db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: otherUser.id, text: text, date: new Date().toISOString(), read: false }); saveDB(); document.getElementById('chat-input').value = ''; renderConversationBox(userId); };
             setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
+        }
+        async function enviarAdjuntoChat(userId, inputEl) {
+            const file = inputEl && inputEl.files && inputEl.files[0];
+            if (!file) return;
+            const otherUser = db.users.find(u => String(u.id) === String(userId));
+            if (!otherUser) return;
+            try {
+                let url = '';
+                if (window.Media && window.Media.subirOUrl) {
+                    url = await window.Media.subirOUrl(file, 'messages');
+                }
+                if (url) {
+                    db.messages.push({
+                        id: Date.now(),
+                        fromId: currentUser.id,
+                        toId: otherUser.id,
+                        text: '📎 Archivo adjunto: ' + file.name,
+                        attachmentUrl: url,
+                        attachmentName: file.name,
+                        date: new Date().toISOString(),
+                        read: false
+                    });
+                    saveDB();
+                    renderConversationBox(userId);
+                    if (window.showToast) showToast('Archivo enviado', 'success');
+                }
+            } catch (e) {
+                if (window.showToast) showToast('No se pudo adjuntar el archivo', 'error');
+            } finally {
+                inputEl.value = '';
+            }
         }
         function openWhatsApp(userId) {
             const teacher = db.users.find(u => u.id === userId);
@@ -8892,6 +9424,7 @@ END:VCALENDAR`;
                     {id:'fin-cartera', label:'Cartera Financiera'}
                 ]},
                 { titulo: 'Comercial Inmobiliario', icon: 'fa-house-circle-check', secciones: [
+                    {id:'inm-unidades', label:'Inventario de Propiedades'},
                     {id:'inm-cartera', label:'Cartera Inmobiliaria'}
                 ]},
                 { titulo: 'Comercial Multi-Sector', icon: 'fa-shapes', secciones: MULTI_SECTOR_SECCIONES.map(x=>({id:x.id, label:x.label})) },
@@ -9086,14 +9619,67 @@ END:VCALENDAR`;
         }
 
 
+        function descargarCertificadoExamen(examId, score) {
+            const exam = (db.exams || []).find(e => e.id === examId) || { title: 'Certificación Académica' };
+            const inst = (db.settings && db.settings.institutionName) || 'Broker Booster';
+            try {
+                if (window.jspdf && window.jspdf.jsPDF) {
+                    const doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+                    doc.setFillColor(250, 248, 243);
+                    doc.rect(0, 0, 297, 210, 'F');
+                    doc.setDrawColor(201, 168, 106);
+                    doc.setLineWidth(3);
+                    doc.rect(12, 12, 273, 186);
+                    doc.setFontSize(14);
+                    doc.setTextColor(140, 110, 50);
+                    doc.text(inst.toUpperCase(), 148.5, 42, { align: 'center' });
+                    doc.setFontSize(28);
+                    doc.setTextColor(15, 23, 42);
+                    doc.text('CERTIFICADO DE APROBACIÓN', 148.5, 65, { align: 'center' });
+                    doc.setFontSize(13);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text('Se otorga el presente reconocimiento a:', 148.5, 85, { align: 'center' });
+                    doc.setFontSize(24);
+                    doc.setTextColor(180, 130, 50);
+                    doc.text(String(currentUser.name || 'Asesor'), 148.5, 105, { align: 'center' });
+                    doc.setFontSize(14);
+                    doc.setTextColor(51, 65, 85);
+                    doc.text('Por haber acreditado satisfactoriamente la evaluación:', 148.5, 125, { align: 'center' });
+                    doc.setFontSize(18);
+                    doc.setTextColor(15, 23, 42);
+                    doc.text(String(exam.title), 148.5, 140, { align: 'center' });
+                    doc.setFontSize(12);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(`Calificación obtenida: ${score}%   ·   Fecha: ${new Date().toLocaleDateString('es-MX')}`, 148.5, 162, { align: 'center' });
+                    doc.save('Certificado_' + String(exam.title).replace(/\s+/g, '_') + '.pdf');
+                    if (window.showToast) showToast('Certificado descargado en PDF', 'success');
+                    return;
+                }
+            } catch (e) {}
+            window.print();
+        }
+
         // --- BIBLIOTECA ---
         function renderBiblioteca() {
             const canUpload = ['admin','gm','desarrollador','maestro','capacitador','agencia'].includes(currentUser.role);
             const materials = db.library.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+            const pendingLessons = (db.lessons || []).filter(l => !(db.progress || []).some(p => String(p.userId) === String(currentUser.id) && String(p.lessonId) === String(l.id) && p.completed)).slice(0, 3);
             return `<div class="flex items-center justify-between mb-6">
                 <div><h2 class="text-2xl font-bold">Biblioteca</h2><p class="text-slate-500 text-sm">Material de apoyo por categorías y lecciones</p></div>
                 ${canUpload?`<button onclick="openLibraryModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Subir Material</button>`:''}
             </div>
+            ${pendingLessons.length ? `<div class="mb-5 p-4 rounded-2xl border border-amber-200 bg-amber-50/60">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-xs font-bold uppercase text-amber-900 flex items-center gap-1.5"><i class="fas fa-sparkles text-amber-600"></i> Recomendado para ti (Lecciones pendientes por completar)</h4>
+                    <button onclick="navigateTo('lessons')" class="text-xs font-semibold text-amber-800 hover:underline">Ir a Lecciones →</button>
+                </div>
+                <div class="grid sm:grid-cols-3 gap-2.5">
+                    ${pendingLessons.map(l => `<div onclick="navigateTo('lessons')" class="p-2.5 rounded-xl bg-white border border-amber-200/80 cursor-pointer hover:shadow-sm transition">
+                        <p class="text-xs font-bold text-slate-800 truncate">${psEscape(l.title)}</p>
+                        <p class="text-[11px] text-slate-500 truncate">Continuar aprendizaje</p>
+                    </div>`).join('')}
+                </div>
+            </div>` : ''}
             <div class="mb-5 flex flex-wrap gap-3 items-center">
                 <select id="lib-filter-cat" onchange="renderBibliotecaFilter()" class="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><option value="">Todas las categorías</option>${db.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
                 <select id="lib-filter-lesson" onchange="renderBibliotecaFilter()" class="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><option value="">Todas las lecciones</option></select>

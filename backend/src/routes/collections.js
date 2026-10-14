@@ -47,13 +47,33 @@ module.exports = (store, config) => {
       await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
       const data = store.get();
       const settings = data.settings || {};
+      const rawAutos = Array.isArray(data.autoHub)
+        ? data.autoHub
+        : (data.autoHub && Array.isArray(data.autoHub.unidades) ? data.autoHub.unidades : []);
+      const rawProps = Array.isArray(data.inmPublica)
+        ? data.inmPublica
+        : (data.inmPublica && Array.isArray(data.inmPublica.props) ? data.inmPublica.props : []);
+      const autosPublicos = rawAutos.filter((u) => u && (!u.estado || u.estado === 'Disponible' || u.estado === 'Reservada'));
+      const propsPublicas = rawProps.filter((p) => p && !p.vendida && p.estado !== 'Vendida');
       res.json({
         ok: true,
         portal: {
           institutionName: settings.institutionName || 'Broker Booster',
           logo: settings.logo || null,
-          autosDisponibles: (data.autoHub || []).length,
-          propiedadesPublicadas: (data.inmPublica || []).length,
+          autosDisponibles: autosPublicos.length,
+          propiedadesPublicadas: propsPublicas.length,
+          autos: autosPublicos,
+          propiedades: propsPublicas,
+          hero: settings.hero || null,
+          caminos: settings.caminos || null,
+          comisiones: settings.comisiones || null,
+          historias: settings.historias || null,
+          aseguradoras: settings.aseguradoras || null,
+          servicios: settings.servicios || null,
+          blog: settings.blog || null,
+          privacidad: settings.privacidad || null,
+          ctaFinal: settings.ctaFinal || null,
+          empresa: settings.empresa || null,
         },
       });
     } catch (e) { next(e); }
@@ -191,6 +211,9 @@ module.exports = (store, config) => {
         root[collection][id] = req.body.value === null ? null : req.body.value;
         db.audit(store.get(), `edicion_${collection}`, req.user, { clave: id });
         await store.persistCollections([collection, 'auditoria']);
+        if (FEED_COLLECTIONS.has(collection)) {
+          store.pushFeed({ kind: collection, title: `Actualización en ${collection}` }).catch(() => {});
+        }
         return res.json({ ok: true, value: root[collection][id] });
       }
       const col = db.collection(store.get(), collection);

@@ -1962,20 +1962,35 @@ function auInventarioHtml(){
         const est = u.estado||'Disponible';
         const fotos = (u.fotos||[]);
         const desc = u.precioLista && u.precioLista>u.precio ? Math.round((1-u.precio/u.precioLista)*100) : 0;
-        const file = (i)=>`<div class="w-full h-28 object-cover rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">${fotos[i]?`<img src="${fotos[i]}" class="w-full h-28 object-cover hover:scale-105 transition cursor-pointer" onclick="auFicha(${u.id})">`:'<i class="fas fa-car text-slate-300 text-xl"></i>'}</div>`;
-        return `<div class="bg-white border rounded-2xl overflow-hidden ${est==='Vendida'?'opacity-75 border-emerald-300':(est==='Reservada'?'border-amber-300':'border-slate-200')} hover:shadow-lg transition">
-            <div class="relative">
-                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer hover:scale-[1.02] transition" onclick="auFicha(${u.id})">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
+        const cliRes = u.clienteId ? d.clientes.find(c=>String(c.id)===String(u.clienteId)) : null;
+        return `<div class="bg-white border rounded-2xl overflow-hidden ${est==='Vendida'?'opacity-80 border-emerald-400':(est==='Reservada'?'border-amber-300 ring-1 ring-amber-200':'border-slate-200')} hover:shadow-lg transition flex flex-col">
+            <div class="relative group">
+                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer group-hover:scale-[1.02] transition" onclick="auFicha(${u.id})">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center cursor-pointer" onclick="auFicha(${u.id})"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(est)}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}${u.destacada?'<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white">Destacada</span>':''}</div>
-                ${fotos.length>1?`<span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px]"><i class="fas fa-camera mr-1"></i>${fotos.length}</span>`:''}
+                ${fotos.length>0?`<span onclick="auFicha(${u.id})" class="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[10px] font-semibold cursor-pointer"><i class="fas fa-images mr-1"></i>${fotos.length} foto${fotos.length===1?'':'s'}</span>`:''}
             </div>
-            <div class="p-4">
-                <p class="text-xs text-slate-400 uppercase font-semibold">${psEscape(u.marca||'')} ${u.anio?'· '+psEscape(String(u.anio)):''}</p>
-                <h4 class="font-bold text-slate-900 leading-tight">${psEscape(u.modelo||'')}</h4>
+            ${fotos.length>1?`<div class="flex gap-1.5 px-4 pt-2.5 overflow-x-auto">${fotos.slice(0,5).map((f,idx)=>`<img src="${f}" onclick="auFicha(${u.id},${idx})" class="w-12 h-9 object-cover rounded-md border border-slate-200 cursor-pointer hover:ring-2 hover:ring-indigo-500 shrink-0 transition" title="Foto ${idx+1}">`).join('')}${fotos.length>5?`<button onclick="auFicha(${u.id},5)" class="w-12 h-9 rounded-md border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600 shrink-0 hover:bg-slate-200">+${fotos.length-5}</button>`:''}</div>`:''}
+            <div class="p-4 flex-1 flex flex-col">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="text-xs text-slate-400 uppercase font-semibold">${psEscape(u.marca||'')} ${u.anio?'· '+psEscape(String(u.anio)):''}</p>
+                        <h4 class="font-bold text-slate-900 leading-tight">${psEscape(u.modelo||'')}</h4>
+                    </div>
+                    <select onchange="auCambioRapidoEstado(${u.id}, this.value)" title="Cambiar estatus de disponibilidad" class="text-[11px] font-semibold rounded-lg border px-2 py-1 cursor-pointer ${est==='Vendida'?'bg-emerald-50 border-emerald-300 text-emerald-800':(est==='Reservada'?'bg-amber-50 border-amber-300 text-amber-900':'bg-slate-50 border-slate-200 text-slate-700')}">
+                        <option value="Disponible" ${est==='Disponible'?'selected':''}>🟢 Disponible</option>
+                        <option value="Reservada" ${est==='Reservada'?'selected':''}>🟡 Reservada</option>
+                        <option value="Vendida" ${est==='Vendida'?'selected':''}>✅ Vendida</option>
+                    </select>
+                </div>
                 <div class="flex items-baseline gap-2 mt-1">
                     <p class="text-xl font-black text-indigo-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
                     ${desc>0?`<p class="text-xs text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}
                 </div>
+                ${est==='Reservada' && (u.anticipo || u.reservaHasta || cliRes) ? `<div class="mt-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-0.5">
+                    ${cliRes?`<div><i class="fas fa-user mr-1"></i><b>Apartado por:</b> ${psEscape(cliRes.nombre)}</div>`:''}
+                    ${u.anticipo?`<div><i class="fas fa-coins mr-1"></i><b>Anticipo:</b> $${Number(u.anticipo).toLocaleString('es-MX')}</div>`:''}
+                    ${u.reservaHasta?`<div><i class="fas fa-calendar-day mr-1"></i><b>Vence:</b> ${psEscape(u.reservaHasta)}</div>`:''}
+                </div>` : ''}
                 <div class="grid grid-cols-2 gap-1.5 mt-3">
                     ${fichaCampo('fa-road','Kilómetros', u.km?Number(u.km).toLocaleString('es-MX')+' km':'')}
                     ${fichaCampo('fa-gears','Transmisión', u.transmision)}
@@ -1985,11 +2000,12 @@ function auInventarioHtml(){
                     ${fichaCampo('fa-warehouse','Agencia', u.sucursal)}
                 </div>
                 ${u.descripcion?`<p class="text-xs text-slate-500 mt-2 line-clamp-2">${psEscape(u.descripcion)}</p>`:''}
-                <div class="flex flex-wrap gap-1.5 mt-3">
-                    <button onclick="auFicha(${u.id})" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ver ficha</button>
-                    ${est!=='Vendida'?`<button onclick="auReservar(${u.id})" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Reservar"><i class="fas fa-hand"></i></button>`:''}
-                    ${est!=='Vendida'?`<button onclick="auVender(${u.id})" class="text-xs px-2.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" title="Vender"><i class="fas fa-handshake"></i></button>`:''}
-                    <button onclick="auAltaUnidad(${u.id})" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar"><i class="fas fa-pen"></i></button>
+                <div class="flex flex-wrap gap-1.5 mt-auto pt-3">
+                    <button onclick="auFicha(${u.id})" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ficha</button>
+                    <button onclick="auCompartirFichaModal(${u.id})" class="text-xs px-2.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-medium" title="Compartir ficha con cliente"><i class="fas fa-share-nodes mr-1"></i>Compartir</button>
+                    ${est!=='Vendida'?`<button onclick="auReservar(${u.id})" class="text-xs px-2.5 py-2 border ${est==='Reservada'?'bg-amber-100 border-amber-300 text-amber-900':'hover:bg-slate-50'} rounded-lg" title="${est==='Reservada'?'Gestionar o liberar reserva':'Apartar / Reservar'}"><i class="fas fa-hand"></i></button>`:''}
+                    ${est!=='Vendida'?`<button onclick="auVender(${u.id})" class="text-xs px-2.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" title="Registrar venta"><i class="fas fa-handshake"></i></button>`:''}
+                    <button onclick="auAltaUnidad(${u.id})" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar unidad y galería"><i class="fas fa-pen"></i></button>
                     <button onclick="auBorrarUnidad(${u.id})" class="text-xs px-2.5 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar (GM/admin)"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
@@ -2026,30 +2042,190 @@ function auInventarioHtml(){
         <p class="text-xs text-slate-400 mt-4"><i class="fas fa-circle-info mr-1"></i>Las unidades disponibles se publican automáticamente en el escaparate público de la portada. Toca la foto o "Ver ficha" para la galería completa.</p>
     </div>`;
 }
-// ===== Ficha detallada (galeria grande + especificaciones) =====
-function auFicha(id){
+// ===== Ficha detallada (galeria grande + especificaciones + compartir) =====
+function auUrlFichaPublica(id){
+    const base = window.location.origin + window.location.pathname;
+    return base + '#auto-' + id;
+}
+function auTextoCompartir(u){
+    if(!u) return '';
+    const precio = '$' + Number(u.precio||0).toLocaleString('es-MX');
+    const partes = [
+        '🚗 *' + [u.marca, u.modelo, u.anio].filter(Boolean).join(' ') + '*',
+        '💰 Precio: *' + precio + '*' + (u.precioLista && u.precioLista>u.precio ? ' (Lista: $'+Number(u.precioLista).toLocaleString('es-MX')+')' : ''),
+        '📌 Estatus: ' + (u.estado||'Disponible'),
+        u.km ? '🛣️ Kilometraje: ' + Number(u.km).toLocaleString('es-MX') + ' km' : '',
+        u.transmision ? '⚙️ Transmisión: ' + u.transmision : '',
+        u.combustible ? '⛽ Combustible: ' + u.combustible : '',
+        (u.sucursal || u.entidad) ? '📍 Ubicación: ' + [u.sucursal, u.entidad].filter(Boolean).join(', ') : '',
+        u.descripcion ? '✨ Equipamiento: ' + u.descripcion : '',
+        '🔗 Ver ficha y galería: ' + auUrlFichaPublica(u.id)
+    ].filter(Boolean);
+    return partes.join('\n');
+}
+function auCopiarLinkFicha(id){
+    const url = auUrlFichaPublica(id);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(()=>{ if(window.showToast) showToast('Enlace de la ficha copiado al portapapeles','success'); }).catch(()=>auFallbackCopy(url));
+    } else auFallbackCopy(url);
+}
+function auCopiarResumenFicha(id){
+    const d = auD();
+    const u = d.unidades.find(x=>String(x.id)===String(id)); if(!u) return;
+    const txt = auTextoCompartir(u);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(()=>{ if(window.showToast) showToast('Ficha completa copiada para pegar','success'); }).catch(()=>auFallbackCopy(txt));
+    } else auFallbackCopy(txt);
+}
+function auFallbackCopy(txt){
+    try{
+        const ta = document.createElement('textarea');
+        ta.value = txt; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        if(window.showToast) showToast('Copiado al portapapeles','success');
+    }catch(e){}
+}
+function auWhatsAppFicha(id){
+    const d = auD();
+    const u = d.unidades.find(x=>String(x.id)===String(id)); if(!u) return;
+    const msg = auTextoCompartir(u);
+    window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+function auAbrirVistaPublica(id){
+    closeModal();
+    window._forceApp = false;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('main-app').classList.add('hidden');
+    document.getElementById('public-portal').classList.remove('hidden');
+    auVerAuto(id);
+    window.scrollTo(0,0);
+}
+function auCompartirFichaModal(id){
+    const d = auD();
+    const u = d.unidades.find(x=>String(x.id)===String(id)); if(!u) return;
+    const url = auUrlFichaPublica(u.id);
+    const resumen = auTextoCompartir(u);
+    const fotos = (u.fotos||[]);
+    showModal(`<div class="p-6">
+        <div class="flex items-start justify-between gap-3 mb-4">
+            <div>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase">Ficha compartible</span>
+                <h3 class="text-xl font-bold text-slate-900 mt-1">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
+                <p class="text-xs text-slate-500">Comparte esta unidad con tu cliente por WhatsApp, enlace directo o vista pública imprimible.</p>
+            </div>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+        </div>
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
+            ${fotos[0]?`<img src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-car text-slate-400"></i></div>`}
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">${auEstadoBadge(u.estado||'Disponible')}<span class="text-xs font-bold text-indigo-700">$${Number(u.precio||0).toLocaleString('es-MX')}</span></div>
+                <p class="text-xs text-slate-500 truncate mt-0.5">${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}</p>
+            </div>
+        </div>
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs font-semibold text-slate-600 block mb-1">Enlace directo a la ficha pública</label>
+                <div class="flex gap-2">
+                    <input readonly value="${psEscape(url)}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 text-slate-700 font-mono">
+                    <button type="button" onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fas fa-copy mr-1"></i>Copiar link</button>
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600 block mb-1">Mensaje con ficha técnica lista para enviar</label>
+                <textarea readonly rows="6" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 text-slate-700">${psEscape(resumen)}</textarea>
+            </div>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-2 mt-5">
+            <button type="button" onclick="auWhatsAppFicha(${u.id})" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i>Enviar por WhatsApp</button>
+            <button type="button" onclick="auCopiarResumenFicha(${u.id})" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-clipboard-check"></i>Copiar texto completo</button>
+            <button type="button" onclick="auAbrirVistaPublica(${u.id})" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-up-right-from-square"></i>Abrir ficha pública</button>
+        </div>
+    </div>`);
+}
+function auFichaGalGo(idx){
+    const fotos = window._auFichaFotos || [];
+    if(!fotos.length) return;
+    const n = fotos.length;
+    window._auFichaIdx = ((idx % n) + n) % n;
+    const main = document.getElementById('au-ficha-principal');
+    if(main) main.src = fotos[window._auFichaIdx];
+    const cnt = document.getElementById('au-ficha-counter');
+    if(cnt) cnt.textContent = (window._auFichaIdx + 1) + ' / ' + n;
+    document.querySelectorAll('.au-ficha-thumb').forEach((el, i)=>{
+        el.classList.toggle('ring-2', i === window._auFichaIdx);
+        el.classList.toggle('ring-indigo-600', i === window._auFichaIdx);
+    });
+}
+function auFichaGalStep(delta){
+    auFichaGalGo((window._auFichaIdx || 0) + delta);
+}
+function auPagGalGo(idx){
+    const d = auD();
+    const u = d.unidades.find(x=>String(x.id)===String(window._auVerId));
+    const fotos = (u && u.fotos) || [];
+    if(!fotos.length) return;
+    const n = fotos.length;
+    window._auPagIdx = ((idx % n) + n) % n;
+    const main = document.getElementById('au-pag-principal');
+    if(main) main.src = fotos[window._auPagIdx];
+    const cnt = document.getElementById('au-pag-counter');
+    if(cnt) cnt.textContent = (window._auPagIdx + 1) + ' / ' + n;
+    document.querySelectorAll('.au-pag-thumb').forEach((el, i)=>{
+        el.classList.toggle('ring-2', i === window._auPagIdx);
+        el.classList.toggle('ring-emerald-500', i === window._auPagIdx);
+    });
+}
+function auPagGalStep(delta){
+    auPagGalGo((window._auPagIdx || 0) + delta);
+}
+function auFicha(id, startIdx){
     const d = auD();
     const u = d.unidades.find(x=>x.id===id); if(!u) return;
     const fotos = (u.fotos||[]);
+    window._auFichaFotos = fotos;
+    window._auFichaIdx = (typeof startIdx==='number' && startIdx>=0 && startIdx<fotos.length) ? startIdx : 0;
+    const est = u.estado||'Disponible';
+    const cliRes = u.clienteId ? d.clientes.find(c=>String(c.id)===String(u.clienteId)) : null;
     const desc = u.precioLista && u.precioLista>u.precio ? Math.round((1-u.precio/u.precioLista)*100) : 0;
     const filaSpec = (lb, v)=> v ? `<div class="flex justify-between py-1.5 border-b border-slate-100 text-sm"><span class="text-slate-400">${lb}</span><b class="text-slate-700">${psEscape(String(v))}</b></div>` : '';
     showModal(`<div class="p-6">
         <div class="flex items-start justify-between gap-3 mb-3">
             <div>
-                <div class="flex flex-wrap items-center gap-1.5 mb-1">${auEstadoBadge(u.estado||'Disponible')}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}% vs lista</span>`:''}</div>
+                <div class="flex flex-wrap items-center gap-1.5 mb-1">${auEstadoBadge(est)}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}% vs lista</span>`:''}</div>
                 <h3 class="text-2xl font-bold text-slate-900">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
                 <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}</p>
             </div>
             <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
-        ${fotos[0]?`<img id="au-ficha-principal" src="${fotos[0]}" class="w-full h-72 object-cover rounded-xl border bg-slate-50">`:''}
-        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="document.getElementById('au-ficha-principal').src=this.src" class="w-24 h-16 object-cover rounded-lg border cursor-pointer ${i===0?'ring-2 ring-indigo-500':''} hover:ring-2 hover:ring-indigo-400 transition">`).join('')}</div>`:''}
-        <div class="flex items-baseline gap-3 mt-4">
-            <p class="text-3xl font-black text-indigo-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
-            ${desc>0?`<p class="text-lg text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}
+        ${fotos[0]?`<div class="relative rounded-xl overflow-hidden border bg-slate-50">
+            <img id="au-ficha-principal" src="${fotos[window._auFichaIdx]}" class="w-full h-80 object-cover">
+            ${fotos.length>1?`
+                <button type="button" onclick="auFichaGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left text-xs"></i></button>
+                <button type="button" onclick="auFichaGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right text-xs"></i></button>
+                <span id="au-ficha-counter" class="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-black/65 text-white text-xs font-semibold">${window._auFichaIdx+1} / ${fotos.length}</span>
+            `:''}
+        </div>`:''}
+        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="auFichaGalGo(${i})" class="au-ficha-thumb w-24 h-16 object-cover rounded-lg border cursor-pointer shrink-0 ${i===window._auFichaIdx?'ring-2 ring-indigo-600':''} hover:ring-2 hover:ring-indigo-400 transition">`).join('')}</div>`:''}
+        <div class="flex items-baseline justify-between flex-wrap gap-3 mt-4">
+            <div class="flex items-baseline gap-3">
+                <p class="text-3xl font-black text-indigo-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
+                ${desc>0?`<p class="text-lg text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}
+            </div>
+            <div class="flex items-center gap-1.5">
+                <button type="button" onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar link</button>
+                <button type="button" onclick="auWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+                <button type="button" onclick="auAbrirVistaPublica(${u.id})" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold"><i class="fas fa-up-right-from-square mr-1"></i>Vista cliente</button>
+            </div>
         </div>
+        ${est==='Reservada' && (u.anticipo || u.reservaHasta || cliRes || u.reservaNotas) ? `<div class="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-wrap gap-x-5 gap-y-1">
+            ${cliRes?`<span><i class="fas fa-user mr-1"></i><b>Cliente:</b> ${psEscape(cliRes.nombre)}</span>`:''}
+            ${u.anticipo?`<span><i class="fas fa-coins mr-1"></i><b>Anticipo:</b> $${Number(u.anticipo).toLocaleString('es-MX')}</span>`:''}
+            ${u.reservaHasta?`<span><i class="fas fa-calendar-day mr-1"></i><b>Vence:</b> ${psEscape(u.reservaHasta)}</span>`:''}
+            ${u.reservaNotas?`<span class="w-full text-amber-800"><i class="fas fa-comment-dots mr-1"></i>${psEscape(u.reservaNotas)}</span>`:''}
+        </div>` : ''}
         <div class="grid md:grid-cols-2 gap-x-8 mt-3">
             <div>
+                ${filaSpec('Estatus', est)}
                 ${filaSpec('Kilometraje', u.km?Number(u.km).toLocaleString('es-MX')+' km':'')}
                 ${filaSpec('Transmisión', u.transmision)}
                 ${filaSpec('Combustible', u.combustible)}
@@ -2061,23 +2237,83 @@ function auFicha(id){
                 ${filaSpec('Pasajeros', u.pasajeros?u.pasajeros+' personas':'')}
                 ${filaSpec('Origen', u.origen||'Mexicano')}
                 ${filaSpec('VIN', u.vin)}
+                ${filaSpec('Agente responsable', u.agenteNombre)}
             </div>
         </div>
         ${u.descripcion?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mt-3"><b>Equipamiento:</b> ${psEscape(u.descripcion)}</div>`:''}
         <div class="flex justify-end gap-2 mt-4 flex-wrap">
-            ${(u.estado||'Disponible')!=='Vendida'?`<button onclick="closeModal();auReservar(${u.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>Reservar</button>`:''}
-            ${(u.estado||'Disponible')!=='Vendida'?`<button onclick="closeModal();auVender(${u.id})" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"><i class="fas fa-handshake mr-1"></i>Vender</button>`:''}
+            <button onclick="closeModal();auCompartirFichaModal(${u.id})" class="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"><i class="fas fa-share-nodes mr-1"></i>Compartir ficha</button>
+            ${est!=='Vendida'?`<button onclick="closeModal();auReservar(${u.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>${est==='Reservada'?'Gestionar reserva':'Reservar'}</button>`:''}
+            ${est!=='Vendida'?`<button onclick="closeModal();auVender(${u.id})" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"><i class="fas fa-handshake mr-1"></i>Vender</button>`:''}
             <button onclick="closeModal();auAltaUnidad(${u.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-pen mr-1"></i>Editar</button>
         </div>
     </div>`);
 }
+function auRenderDraftFotos(){
+    const wrap = document.getElementById('au-draft-fotos-wrap');
+    if(!wrap) return;
+    const arr = window._auDraftFotos || [];
+    if(!arr.length){
+        wrap.innerHTML = `<div class="border border-dashed border-slate-300 rounded-xl p-4 text-center text-xs text-slate-400">Sin fotos cargadas todavía. Sube hasta 10 fotos o agrega una URL de imagen.</div>`;
+        return;
+    }
+    wrap.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">${arr.map((src, i)=>`
+        <div class="relative group rounded-xl overflow-hidden border ${i===0?'border-indigo-500 ring-2 ring-indigo-500/30':'border-slate-200'} bg-slate-50">
+            <img src="${src}" class="w-full h-24 object-cover">
+            ${i===0?`<span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold shadow">Portada</span>`:`<button type="button" onclick="auDraftSetPortada(${i})" class="
+            absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/65 hover:bg-indigo-600 text-white text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">Hacer portada</button>`}
+            <button type="button" onclick="auDraftQuitarFoto(${i})" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[10px] flex items-center justify-center shadow" title="Quitar foto"><i class="fas fa-trash"></i></button>
+        </div>`).join('')}</div>`;
+}
+function auDraftSetPortada(idx){
+    const arr = window._auDraftFotos || [];
+    if(idx<=0 || idx>=arr.length) return;
+    const item = arr.splice(idx, 1)[0];
+    arr.unshift(item);
+    auRenderDraftFotos();
+}
+function auDraftQuitarFoto(idx){
+    const arr = window._auDraftFotos || [];
+    if(idx<0 || idx>=arr.length) return;
+    arr.splice(idx, 1);
+    auRenderDraftFotos();
+}
+function auDraftAgregarUrl(){
+    const inp = document.getElementById('au-foto-url');
+    if(!inp) return;
+    const url = inp.value.trim();
+    if(!url) return;
+    window._auDraftFotos = window._auDraftFotos || [];
+    if(window._auDraftFotos.length >= 10){ showToast('Máximo 10 fotos por unidad','warning'); return; }
+    window._auDraftFotos.push(url);
+    inp.value = '';
+    auRenderDraftFotos();
+}
+function auDraftSubirArchivos(inputEl){
+    const files = (inputEl && inputEl.files) ? [...inputEl.files] : [];
+    if(!files.length) return;
+    window._auDraftFotos = window._auDraftFotos || [];
+    const disp = Math.max(0, 10 - window._auDraftFotos.length);
+    if(disp <= 0){ showToast('Ya tienes el máximo de 10 fotos','warning'); inputEl.value=''; return; }
+    const primeros = files.slice(0, disp);
+    const anexar = (nuevas)=>{
+        (nuevas||[]).filter(Boolean).forEach(u=>{ if(window._auDraftFotos.length<10) window._auDraftFotos.push(u); });
+        inputEl.value = '';
+        auRenderDraftFotos();
+    };
+    if (window.Media && window.Backend && window.Backend.available) {
+        if (window.showToast) window.showToast('Subiendo fotos…','info');
+        window.Media.subirMuchos(primeros, 'autoHub').then(items=>anexar(items.map(x=>x.url))).catch(()=>auFotosLocal(primeros, anexar));
+    } else auFotosLocal(primeros, anexar);
+}
 function auAltaUnidad(id){
     const d = auD();
     const u = id ? d.unidades.find(x=>x.id===id) : null;
+    window._auDraftFotos = u && Array.isArray(u.fotos) ? u.fotos.slice() : [];
     const opt = (arr, sel)=>arr.map(v=>`<option ${v===(sel||'')?'selected':''}>${v}</option>`).join('');
     showModal(`<form id="au-unidad-form" class="p-6">
         <h3 class="text-xl font-bold mb-1">${u?'Editar unidad':'Cargar unidad al inventario'}</h3>
-        <p class="text-xs text-slate-500 mb-4">Ficha completa estilo portal de venta: mientras m\u00e1s datos, mejor posicionada en el escaparate p\u00fablico.</p>
+        <p class="text-xs text-slate-500 mb-4">Ficha completa estilo portal de venta: administra la galería de fotos, elige portada y define su disponibilidad.</p>
         <div class="grid md:grid-cols-3 gap-3">
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Marca *</label><input id="au-marca" required value="${psEscape(u&&u.marca||'')}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Modelo *</label><input id="au-modelo" required value="${psEscape(u&&u.modelo||'')}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
@@ -2095,10 +2331,23 @@ function auAltaUnidad(id){
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">VIN / N\u00fam. de serie</label><input id="au-vin" value="${psEscape(u&&u.vin||'')}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Puertas</label><select id="au-puertas" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['2','4','5'], u&&String(u.puertas||''))}</select></div>
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Pasajeros</label><select id="au-pasajeros" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['2','4','5','7','8'], u&&String(u.pasajeros||''))}</select></div>
-            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Estado</label><select id="au-estado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['Disponible','Reservada','Vendida'], u&&u.estado)}</select></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Estado de disponibilidad</label><select id="au-estado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['Disponible','Reservada','Vendida'], u&&u.estado)}</select></div>
             <div class="md:col-span-2"><label class="text-sm font-medium text-slate-700 mb-1 block">Descripci\u00f3n / equipamiento</label><input id="au-desc" value="${psEscape(u&&u.descripcion||'')}" placeholder="Ej. C\u00e1mara reversa, bluetooth, aire acondicionado, rines de aleaci\u00f3n" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Destacar en portada</label><select id="au-destacada" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option ${(u&&u.destacada)?'selected':''}>S\u00ed</option><option ${(!u||!u.destacada)?'selected':''}>No</option></select></div>
-            <div class="md:col-span-3"><label class="text-sm font-medium text-slate-700 mb-1 block">Fotos de la unidad (hasta 8, la primera es la portada)</label><input id="au-fotos" type="file" accept="image/*" multiple class="w-full text-sm border border-slate-300 rounded-lg p-2 bg-white text-slate-900"></div>
+            <div class="md:col-span-3 border-t border-slate-200 pt-3 mt-1">
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <label class="text-sm font-semibold text-slate-800"><i class="fas fa-images mr-1 text-indigo-600"></i>Galer\u00eda de fotos de la unidad (hasta 10, elige cu\u00e1l es portada)</label>
+                    <span class="text-[11px] text-slate-400">Puedes subir varias tandas o pegar URLs</span>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-2 mb-3">
+                    <input id="au-fotos" type="file" accept="image/*" multiple onchange="auDraftSubirArchivos(this)" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-900">
+                    <div class="flex gap-1.5">
+                        <input id="au-foto-url" type="url" placeholder="O pega URL de imagen (https://...)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-900">
+                        <button type="button" onclick="auDraftAgregarUrl()" class="px-3 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Agregar URL</button>
+                    </div>
+                </div>
+                <div id="au-draft-fotos-wrap"></div>
+            </div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
@@ -2106,55 +2355,102 @@ function auAltaUnidad(id){
         </div>
     </form>`);
     setTimeout(()=>{
+        auRenderDraftFotos();
         const form = document.getElementById('au-unidad-form');
         if(form) form.onsubmit = (e)=>{ e.preventDefault(); auGuardarUnidad(id); };
     },0);
 }
 /* Paso 4: lectura base64 local (fallback cuando no hay backend/sube falla). */
 function auFotosLocal(primeros, guardar){
+    if(window.Media && typeof window.Media.comprimirImagen==='function'){
+        Promise.all(primeros.map(f=>window.Media.comprimirImagen(f))).then(arr=>guardar(arr.filter(Boolean)));
+        return;
+    }
     let pend = primeros.length; const arr = [];
     primeros.forEach(f=>{ const r=new FileReader(); r.onload=()=>{ arr.push(r.result); pend--; if(pend===0) guardar(arr); }; r.onerror=()=>{ pend--; if(pend===0) guardar(arr); }; r.readAsDataURL(f); });
 }
 function auFileLocal(f, guardar){
+    if(window.Media && typeof window.Media.comprimirImagen==='function'){
+        window.Media.comprimirImagen(f).then(guardar);
+        return;
+    }
     const r=new FileReader(); r.onload=()=>guardar(r.result); r.onerror=()=>guardar(null); r.readAsDataURL(f);
 }
 function auGuardarUnidad(id){
     const d = auD();
     const lee = (k)=>{ const el=document.getElementById(k); return el?el.value.trim():''; };
-    const files = (document.getElementById('au-fotos')||{files:[]}).files;
-    const guardar = (fotosArr)=>{
-        const datos = { marca:lee('au-marca'), modelo:lee('au-modelo'), anio:parseInt(lee('au-anio'))||'', precio:parseFloat(lee('au-precio'))||0, precioLista:parseFloat(lee('au-precio-lista'))||0, origen:lee('au-origen'), entidad:lee('au-entidad'), sucursal:lee('au-sucursal'), km:parseInt(lee('au-km'))||'', color:lee('au-color'), transmision:lee('au-trans'), combustible:lee('au-comb'), motor:lee('au-motor'), vin:lee('au-vin'), placas:lee('au-placas'), puertas:lee('au-puertas'), pasajeros:lee('au-pasajeros'), estado:lee('au-estado')||'Disponible', descripcion:lee('au-desc'), destacada:lee('au-destacada')==='S\u00ed' };
-        if(!datos.marca||!datos.modelo){ showToast('Marca y modelo son obligatorios','warning'); return; }
-        if(id){
-            const u = d.unidades.find(x=>x.id===id); if(!u) return;
-            Object.assign(u, datos);
-            if(fotosArr && fotosArr.length) u.fotos = fotosArr.slice(0,8);
-        } else {
-            d.unidades.unshift(Object.assign({ id:Date.now(), fechaAlta:new Date().toISOString(), fotos:(fotosArr||[]).slice(0,8), clienteId:null, agenteId:currentUser.id, agenteNombre:currentUser.name }, datos));
-        }
-        cmLog('Agencia Automotriz', id?'Edit\u00f3 unidad':'Carg\u00f3 unidad', datos.marca+' '+datos.modelo+' ('+datos.origen+', '+datos.sucursal+')');
-        saveDB(); closeModal(); showToast('Unidad guardada','success'); render();
-    };
-    if(files && files.length){
-        const primeros = [...files].slice(0,8);
-        // Paso 4: servidor primero (URLs compartidas en vivo), base64 si falla.
-        if (window.Media && window.Backend && window.Backend.available) {
-            if (window.showToast) window.showToast('Subiendo fotos…','info');
-            window.Media.subirMuchos(primeros, 'autoHub').then(items=>guardar(items.map(x=>x.url))).catch(()=>auFotosLocal(primeros, guardar));
-        } else auFotosLocal(primeros, guardar);
-    } else guardar(null);
+    const fotosFinales = (window._auDraftFotos || []).slice(0, 10);
+    const datos = { marca:lee('au-marca'), modelo:lee('au-modelo'), anio:parseInt(lee('au-anio'))||'', precio:parseFloat(lee('au-precio'))||0, precioLista:parseFloat(lee('au-precio-lista'))||0, origen:lee('au-origen'), entidad:lee('au-entidad'), sucursal:lee('au-sucursal'), km:parseInt(lee('au-km'))||'', color:lee('au-color'), transmision:lee('au-trans'), combustible:lee('au-comb'), motor:lee('au-motor'), vin:lee('au-vin'), placas:lee('au-placas'), puertas:lee('au-puertas'), pasajeros:lee('au-pasajeros'), estado:lee('au-estado')||'Disponible', descripcion:lee('au-desc'), destacada:lee('au-destacada')==='S\u00ed', fotos:fotosFinales };
+    if(!datos.marca||!datos.modelo){ showToast('Marca y modelo son obligatorios','warning'); return; }
+    if(id){
+        const u = d.unidades.find(x=>x.id===id); if(!u) return;
+        Object.assign(u, datos);
+    } else {
+        d.unidades.unshift(Object.assign({ id:Date.now(), fechaAlta:new Date().toISOString(), clienteId:null, agenteId:currentUser.id, agenteNombre:currentUser.name }, datos));
+    }
+    cmLog('Agencia Automotriz', id?'Edit\u00f3 unidad':'Carg\u00f3 unidad', datos.marca+' '+datos.modelo+' ('+datos.origen+', '+datos.sucursal+')');
+    saveDB(); closeModal(); showToast('Unidad guardada','success'); render();
+}
+function auCambioRapidoEstado(id, nuevoEst){
+    const d = auD();
+    const u = d.unidades.find(x=>x.id===id); if(!u) return;
+    if(nuevoEst==='Reservada' && (u.estado||'Disponible')!=='Reservada'){
+        auReservar(id);
+        return;
+    }
+    if(nuevoEst==='Vendida' && (u.estado||'Disponible')!=='Vendida'){
+        auVender(id);
+        return;
+    }
+    u.estado = nuevoEst || 'Disponible';
+    if(u.estado === 'Disponible'){
+        u.clienteId = null; u.anticipo = 0; u.reservaHasta = ''; u.reservaNotas = '';
+    }
+    cmLog('Agencia Automotriz','Cambi\u00f3 estatus a '+u.estado, u.marca+' '+u.modelo);
+    saveDB(); showToast('Estatus actualizado: '+u.estado,'success'); render();
 }
 function auReservar(id){
     const d = auD(); const u = d.unidades.find(x=>x.id===id); if(!u) return;
-    if((u.estado||'Disponible')==='Reservada'){ u.estado='Disponible'; u.clienteId=null; cmLog('Agencia Automotriz','Liber\u00f3 unidad', u.marca+' '+u.modelo); saveDB(); showToast('Inventario actualizado','success'); render(); return; }
-    const opts = d.clientes.map(c=>`<option value="${c.id}">${psEscape(c.nombre)}</option>`).join('');
-    showModal(`<div class="p-6"><h3 class="text-lg font-bold mb-2">Reservar ${psEscape(u.marca+' '+u.modelo)}</h3><p class="text-xs text-slate-500 mb-3">Opcional: vincula al cliente que deja la se\u00f1al.</p><select id="au-res-cli" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">Sin cliente vinculado</option>${opts}</select><div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border rounded-lg">Cancelar</button><button onclick="auConfirmaReserva(${u.id})" class="px-5 py-2 bg-amber-500 text-white rounded-lg font-semibold">Reservar</button></div></div>`);
+    const opts = d.clientes.map(c=>`<option value="${c.id}" ${String(u.clienteId||'')===String(c.id)?'selected':''}>${psEscape(c.nombre)}</option>`).join('');
+    const defHasta = u.reservaHasta || new Date(Date.now() + 3*86400000).toISOString().slice(0,10);
+    const defEntrega = u.fechaEntrega || new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
+    showModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-1">Apartar / Reservar \u2014 ${psEscape(u.marca+' '+u.modelo)}</h3>
+        <p class="text-xs text-slate-500 mb-4">Registra los datos del apartado para bloquear la unidad en piso, vigencia y fecha compromiso de entrega.</p>
+        <div class="space-y-3">
+            <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Cliente que aparta</label><select id="au-res-cli" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">Sin cliente vinculado</option>${opts}</select></div>
+            <div class="grid grid-cols-3 gap-3">
+                <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Monto de anticipo ($)</label><input id="au-res-anticipo" type="number" step="100" value="${psEscape(String(u.anticipo||5000))}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Vigencia del apartado</label><input id="au-res-hasta" type="date" value="${psEscape(defHasta)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Fecha compromiso de entrega</label><input id="au-res-entrega" type="date" value="${psEscape(defEntrega)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            </div>
+            <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Notas o condiciones del apartado</label><input id="au-res-notas" value="${psEscape(u.reservaNotas||'')}" placeholder="Ej. Pendiente autorizaci\u00f3n de cr\u00e9dito / entrega el s\u00e1bado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+        </div>
+        <div class="flex items-center justify-between gap-2 mt-5">
+            ${(u.estado||'Disponible')==='Reservada'?`<button type="button" onclick="auLiberarReserva(${u.id})" class="px-4 py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs font-semibold"><i class="fas fa-unlock mr-1"></i>Liberar a Disponible</button>`:'<span></span>'}
+            <div class="flex gap-2">
+                <button type="button" onclick="closeModal();render()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="button" onclick="auConfirmaReserva(${u.id})" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold"><i class="fas fa-hand mr-1"></i>Guardar apartado</button>
+            </div>
+        </div>
+    </div>`);
+}
+function auLiberarReserva(id){
+    const d = auD(); const u = d.unidades.find(x=>x.id===id); if(!u) return;
+    u.estado='Disponible'; u.clienteId=null; u.anticipo=0; u.reservaHasta=''; u.fechaEntrega=''; u.reservaNotas='';
+    cmLog('Agencia Automotriz','Liber\u00f3 unidad', u.marca+' '+u.modelo);
+    saveDB(); closeModal(); showToast('Unidad liberada como Disponible','success'); render();
 }
 function auConfirmaReserva(id){
     const d = auD(); const u = d.unidades.find(x=>x.id===id); if(!u) return;
-    u.estado='Reservada'; u.clienteId=(document.getElementById('au-res-cli')||{}).value||null;
-    cmLog('Agencia Automotriz','Reserv\u00f3 unidad', u.marca+' '+u.modelo);
-    saveDB(); closeModal(); showToast('Unidad reservada','success'); render();
+    u.estado='Reservada';
+    u.clienteId=(document.getElementById('au-res-cli')||{}).value||null;
+    u.anticipo=parseFloat((document.getElementById('au-res-anticipo')||{}).value)||0;
+    u.reservaHasta=((document.getElementById('au-res-hasta')||{}).value||'').trim();
+    u.fechaEntrega=((document.getElementById('au-res-entrega')||{}).value||'').trim();
+    u.reservaNotas=((document.getElementById('au-res-notas')||{}).value||'').trim();
+    cmLog('Agencia Automotriz','Reserv\u00f3 unidad', u.marca+' '+u.modelo+(u.anticipo?' (anticipo $'+u.anticipo+')':''));
+    saveDB(); closeModal(); showToast('Unidad apartada con fecha de entrega','success'); render();
 }
 function auVender(id){
     const d = auD(); const u = d.unidades.find(x=>x.id===id); if(!u) return;
@@ -2489,7 +2785,50 @@ function auSimHtml(){
             <div id="au-sim-res" class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm"></div>
             <p class="text-xs text-slate-500 mt-3">Ingreso por unidad = precio × comisión% + (precio × financiado% × comisión banco%) + bono por unidad. Se muestra cuántas unidades necesitas vender al mes y tu ingreso estimado con bonos.</p>
         </div>
+
+        <div class="bg-white rounded-2xl border border-amber-200/80 p-6">
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                <div>
+                    <h3 class="font-semibold text-lg flex items-center gap-2"><i class="fas fa-car text-emerald-600"></i> Simulador de Financiamiento para el Cliente (#13)</h3>
+                    <p class="text-xs text-slate-500">Cotiza al instante enganche, plazo y mensualidad/quincena para compartir por WhatsApp con tu prospecto.</p>
+                </div>
+                <button type="button" onclick="auSimClienteWhatsApp()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"><i class="fab fa-whatsapp"></i> Compartir corrida por WhatsApp</button>
+            </div>
+            <div class="grid md:grid-cols-4 gap-4 mb-4">
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Valor del Auto ($)</label><input id="au-cli-sim-precio" type="number" value="285000" oninput="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Enganche (%)</label><input id="au-cli-sim-eng" type="number" value="20" min="10" max="80" oninput="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Plazo (meses)</label><select id="au-cli-sim-plazo" onchange="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="12">12 meses</option><option value="24">24 meses</option><option value="36">36 meses</option><option value="48" selected>48 meses</option><option value="60">60 meses</option></select></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Tasa anual estimada (%)</label><input id="au-cli-sim-tasa" type="number" step="0.1" value="14.9" oninput="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            </div>
+            <div id="au-cli-sim-out" class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm"></div>
+        </div>
     </div>`;
+}
+function auSimClienteCalc(){
+    const precio = parseFloat((document.getElementById('au-cli-sim-precio')||{}).value)||285000;
+    const engPct = parseFloat((document.getElementById('au-cli-sim-eng')||{}).value)||20;
+    const plazo = parseInt((document.getElementById('au-cli-sim-plazo')||{}).value,10)||48;
+    const tasaAnual = parseFloat((document.getElementById('au-cli-sim-tasa')||{}).value)||14.9;
+    const enganche = precio * (engPct / 100);
+    const financiar = Math.max(0, precio - enganche);
+    const r = (tasaAnual / 100) / 12;
+    const mensual = r > 0 ? (financiar * r) / (1 - Math.pow(1 + r, -plazo)) : (financiar / plazo);
+    const quincenal = mensual / 2;
+    const out = document.getElementById('au-cli-sim-out');
+    if(out){
+        out.innerHTML = `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div><p class="text-xs text-slate-500">Enganche (${engPct}%)</p><p class="text-lg font-bold text-slate-900">$${Math.round(enganche).toLocaleString('es-MX')}</p></div>
+            <div><p class="text-xs text-slate-500">Monto a financiar</p><p class="text-lg font-bold text-slate-900">$${Math.round(financiar).toLocaleString('es-MX')}</p></div>
+            <div><p class="text-xs text-slate-500">Mensualidad (${plazo} m)</p><p class="text-xl font-black text-emerald-700">$${Math.round(mensual).toLocaleString('es-MX')}</p></div>
+            <div><p class="text-xs text-slate-500">Pago Quincenal aprox.</p><p class="text-xl font-black text-amber-700">$${Math.round(quincenal).toLocaleString('es-MX')}</p></div>
+        </div>`;
+    }
+    return { precio, engPct, enganche, financiar, plazo, tasaAnual, mensual, quincenal };
+}
+function auSimClienteWhatsApp(){
+    const c = auSimClienteCalc();
+    const txt = `🚗 *Cotización Estimada de Financiamiento*\n• Precio unidad: $${Math.round(c.precio).toLocaleString('es-MX')}\n• Enganche (${c.engPct}%): $${Math.round(c.enganche).toLocaleString('es-MX')}\n• Plazo: ${c.plazo} meses\n• Mensualidad aprox.: *$${Math.round(c.mensual).toLocaleString('es-MX')}*\n• Quincena aprox.: *$${Math.round(c.quincenal).toLocaleString('es-MX')}*\n¿Agendamos tu prueba de manejo hoy?`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 }
 function auSimCalc(){
     const meta = parseFloat((document.getElementById('au-sim-meta')||{}).value)||0;
@@ -2512,6 +2851,7 @@ function auSimCalc(){
 function auSimBind(){
     ['au-sim-meta','au-sim-precio','au-sim-com','au-sim-banco','au-sim-eng','au-sim-fin','au-sim-bono1','au-sim-bono2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', auSimCalc); });
     auSimCalc();
+    auSimClienteCalc();
 }
 function auSimGuardar(){
     if(!sinPuedeTodo()){ showToast('Solo GM/desarrollador/admin puede editar el simulador','warning'); return; }
@@ -2967,6 +3307,540 @@ function vcBorrarRegistro(id, rid){
     cmLog(vcCfg(id).nombre, 'Eliminar registro', r?r.cliente:'');
     saveDB(); closeModal(); showToast('Registro eliminado','success'); render();
 }
+
+/* ==================== AGENCIA INMOBILIARIA (Inventario de Propiedades + Clientes) ==================== */
+function inmD(){
+    if(!db.inmPublica || typeof db.inmPublica!=='object') db.inmPublica = { props: [] };
+    if(!Array.isArray(db.inmPublica.props)) db.inmPublica.props = [];
+    return db.inmPublica;
+}
+function inmSetTab(t){
+    window.inmTabId = t;
+    render();
+}
+function renderInmAgencia(forcedTab){
+    const tab = forcedTab || window.inmTabId || 'unidades';
+    window.inmTabId = tab;
+    const d = inmD();
+    const props = d.props || [];
+    const disp = props.filter(p=>inmEstadoProp(p)==='Disponible').length;
+    const resv = props.filter(p=>inmEstadoProp(p)==='Reservada').length;
+    const vend = props.filter(p=>inmEstadoProp(p)==='Vendida').length;
+    const valorDisp = props.filter(p=>inmEstadoProp(p)==='Disponible').reduce((s,p)=>s+(Number(p.precio)||0),0);
+    return `<div class="max-w-7xl mx-auto space-y-6">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-900"><i class="fas fa-house-chimney text-emerald-600 mr-2"></i>Comercial Inmobiliario</h2>
+                <p class="text-slate-500 text-sm mt-1">Carga propiedades al inventario con galería de fotos, administra disponibilidad y compártelas directo en el portal público.</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="inmAltaProp()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Cargar propiedad</button>
+                <button onclick="vcAltaModal('inm-cartera')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-user-plus mr-1"></i> Nuevo expediente cliente</button>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5"><p class="text-xs uppercase font-semibold text-slate-400">Disponibles</p><p class="text-3xl font-bold text-slate-900 mt-1">${disp}</p><p class="text-xs text-slate-400 mt-1">Publicadas en el escaparate</p></div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5"><p class="text-xs uppercase font-semibold text-slate-400">Reservadas</p><p class="text-3xl font-bold text-amber-600 mt-1">${resv}</p><p class="text-xs text-slate-400 mt-1">Con apartado en curso</p></div>
+            <div class="bg-emerald-50 rounded-2xl border border-emerald-200 p-5"><p class="text-xs uppercase font-semibold text-emerald-600">Cerradas / Vendidas</p><p class="text-3xl font-bold text-emerald-700 mt-1">${vend}</p><p class="text-xs text-emerald-600/80 mt-1">Operaciones concluidas</p></div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5"><p class="text-xs uppercase font-semibold text-slate-400">Valor en escaparate</p><p class="text-2xl font-bold text-slate-900 mt-1">$${Math.round(valorDisp).toLocaleString('es-MX')}</p><p class="text-xs text-slate-400 mt-1">Suma de disponibles</p></div>
+        </div>
+        <div class="flex gap-2 border-b border-slate-200 pb-2">
+            <button onclick="inmSetTab('unidades')" class="px-4 py-2 rounded-lg text-sm font-semibold ${tab==='unidades'?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas fa-building mr-1.5"></i>Inventario de Propiedades (${props.length})</button>
+            <button onclick="inmSetTab('clientes')" class="px-4 py-2 rounded-lg text-sm font-semibold ${tab==='clientes'?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas fa-folder-open mr-1.5"></i>Expedientes y Cartera (${vcCartera('inm-cartera').filter(vcVisible).length})</button>
+        </div>
+        <div>${tab==='clientes' ? vcRender('inm-cartera') : inmInventarioHtml()}</div>
+    </div>`;
+}
+function inmInventarioHtml(){
+    const d = inmD();
+    const fQ = String(window.inmInvQ||'').toLowerCase().trim();
+    const fEst = window.inmInvEst||'';
+    const fOp = window.inmInvOp||'';
+    const fInm = window.inmInvTipo||'';
+    const fRec = parseInt(window.inmInvRec||'0',10)||0;
+    const fMaxP = parseFloat(window.inmInvMaxP||'0')||0;
+    let lista = (d.props||[]).slice();
+    if(fQ) lista = lista.filter(p=>[p.titulo,p.colonia,p.ciudad,p.desc,p.inmuebleTipo].some(x=>String(x||'').toLowerCase().includes(fQ)));
+    if(fEst) lista = lista.filter(p=>inmEstadoProp(p)===fEst);
+    if(fOp) lista = lista.filter(p=>(p.tipo||'Venta')===fOp);
+    if(fInm) lista = lista.filter(p=>(p.inmuebleTipo||'Casa')===fInm);
+    if(fRec) lista = lista.filter(p=>(parseInt(p.recs,10)||0)>=fRec);
+    if(fMaxP) lista = lista.filter(p=>(Number(p.precio)||0)<=fMaxP);
+    lista.sort((a,b)=>(b.destacada?1:0)-(a.destacada?1:0) || (b.id||0)-(a.id||0));
+    const fichaCampo = (ico, lb, v)=> v ? `<div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1"><i class="fas ${ico} text-slate-400 text-[10px] w-4"></i><div><p class="text-[9px] uppercase text-slate-400 leading-none">${lb}</p><p class="text-xs font-semibold text-slate-700">${psEscape(String(v))}</p></div></div>` : '';
+    const card = (p)=>{
+        const est = inmEstadoProp(p);
+        const fotos = (p.fotos||[]);
+        return `<div class="bg-white border rounded-2xl overflow-hidden ${est==='Vendida'?'opacity-80 border-emerald-400':(est==='Reservada'?'border-amber-300 ring-1 ring-amber-200':'border-slate-200')} hover:shadow-lg transition flex flex-col">
+            <div class="relative group">
+                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer group-hover:scale-[1.02] transition" onclick="inmFicha(${p.id})">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center cursor-pointer" onclick="inmFicha(${p.id})"><i class="fas fa-house text-slate-300 text-4xl"></i></div>`}
+                <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}${p.destacada?'<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white">Destacada</span>':''}</div>
+                ${fotos.length>0?`<span onclick="inmFicha(${p.id})" class="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[10px] font-semibold cursor-pointer"><i class="fas fa-images mr-1"></i>${fotos.length} foto${fotos.length===1?'':'s'}</span>`:''}
+            </div>
+            ${fotos.length>1?`<div class="flex gap-1.5 px-4 pt-2.5 overflow-x-auto">${fotos.slice(0,5).map((f,idx)=>`<img src="${f}" onclick="inmFicha(${p.id},${idx})" class="w-12 h-9 object-cover rounded-md border border-slate-200 cursor-pointer hover:ring-2 hover:ring-emerald-500 shrink-0 transition" title="Foto ${idx+1}">`).join('')}${fotos.length>5?`<button onclick="inmFicha(${p.id},5)" class="w-12 h-9 rounded-md border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600 shrink-0 hover:bg-slate-200">+${fotos.length-5}</button>`:''}</div>`:''}
+            <div class="p-4 flex-1 flex flex-col">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="text-xs text-slate-400 uppercase font-semibold truncate">${psEscape(p.colonia||'')} ${p.ciudad?'· '+psEscape(p.ciudad):''}</p>
+                        <h4 class="font-bold text-slate-900 leading-tight truncate">${psEscape(p.titulo||'Propiedad')}</h4>
+                    </div>
+                    <select onchange="inmCambioRapidoEstado(${p.id}, this.value)" title="Cambiar estatus de disponibilidad" class="text-[11px] font-semibold rounded-lg border px-2 py-1 cursor-pointer ${est==='Vendida'?'bg-emerald-50 border-emerald-300 text-emerald-800':(est==='Reservada'?'bg-amber-50 border-amber-300 text-amber-900':'bg-slate-50 border-slate-200 text-slate-700')}">
+                        <option value="Disponible" ${est==='Disponible'?'selected':''}>🟢 Disponible</option>
+                        <option value="Reservada" ${est==='Reservada'?'selected':''}>🟡 Reservada</option>
+                        <option value="Vendida" ${est==='Vendida'?'selected':''}>✅ Vendida</option>
+                    </select>
+                </div>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-xl font-black text-emerald-700">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'A consultar'}</p>
+                    ${p.tipo==='Renta'&&p.precio?'<span class="text-xs text-slate-400">/mes</span>':''}
+                </div>
+                ${est==='Reservada' && (p.anticipo || p.reservaHasta || p.clienteNombre) ? `<div class="mt-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-0.5">
+                    ${p.clienteNombre?`<div><i class="fas fa-user mr-1"></i><b>Apartada por:</b> ${psEscape(p.clienteNombre)}</div>`:''}
+                    ${p.anticipo?`<div><i class="fas fa-coins mr-1"></i><b>Anticipo:</b> $${Number(p.anticipo).toLocaleString('es-MX')}</div>`:''}
+                    ${p.reservaHasta?`<div><i class="fas fa-calendar-day mr-1"></i><b>Vence:</b> ${psEscape(p.reservaHasta)}</div>`:''}
+                </div>` : ''}
+                <div class="grid grid-cols-2 gap-1.5 mt-3">
+                    ${fichaCampo('fa-building','Inmueble', p.inmuebleTipo||'Casa')}
+                    ${fichaCampo('fa-ruler-combined','Superficie', p.m2?p.m2+' m²':'')}
+                    ${fichaCampo('fa-bed','Recámaras', p.recs?p.recs+' rec':'')}
+                    ${fichaCampo('fa-bath','Baños', p.banios?p.banios+' baños':'')}
+                </div>
+                ${p.desc?`<p class="text-xs text-slate-500 mt-2 line-clamp-2">${psEscape(p.desc)}</p>`:''}
+                <div class="flex flex-wrap gap-1.5 mt-auto pt-3">
+                    <button onclick="inmFicha(${p.id})" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ficha</button>
+                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.colonia,p.ciudad,p.titulo].filter(Boolean).join(', '))}" target="_blank" class="text-xs px-2.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 font-medium" title="Ver ubicación en Google Maps"><i class="fas fa-map-location-dot"></i></a>
+                    <button onclick="inmCompartirFichaModal(${p.id})" class="text-xs px-2.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-medium" title="Compartir ficha"><i class="fas fa-share-nodes mr-1"></i>Compartir</button>
+                    ${est!=='Vendida'?`<button onclick="inmReservar(${p.id})" class="text-xs px-2.5 py-2 border ${est==='Reservada'?'bg-amber-100 border-amber-300 text-amber-900':'hover:bg-slate-50'} rounded-lg" title="Apartar / Reservar"><i class="fas fa-hand"></i></button>`:''}
+                    <button onclick="inmAltaProp(${p.id})" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar propiedad y galería"><i class="fas fa-pen"></i></button>
+                    <button onclick="inmBorrarProp(${p.id})" class="text-xs px-2.5 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        </div>`;
+    };
+    return `<div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+            <h3 class="font-semibold text-lg">Propiedades en inventario (${lista.length})</h3>
+            <div class="flex flex-wrap gap-2">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input value="${psEscape(window.inmInvQ||'')}" oninput="window.inmInvQ=this.value;render()" placeholder="Título, colonia, ciudad..." class="w-52 pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                </div>
+                <select onchange="window.inmInvEst=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <option value="">Todos los estados</option>
+                    ${['Disponible','Reservada','Vendida'].map(o=>`<option ${fEst===o?'selected':''}>${o}</option>`).join('')}
+                </select>
+                <select onchange="window.inmInvOp=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <option value="">Operación</option>
+                    ${['Venta','Renta','Preventa'].map(o=>`<option ${fOp===o?'selected':''}>${o}</option>`).join('')}
+                </select>
+                <select onchange="window.inmInvTipo=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <option value="">Tipo de inmueble</option>
+                    ${['Casa','Departamento','Terreno','Local / Oficina','Bodega / Nave'].map(o=>`<option ${fInm===o?'selected':''}>${o}</option>`).join('')}
+                </select>
+                <select onchange="window.inmInvRec=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <option value="">Recámaras (todas)</option>
+                    ${[1,2,3,4].map(n=>`<option value="${n}" ${fRec===n?'selected':''}>${n}+ recámaras</option>`).join('')}
+                </select>
+                <input type="number" value="${window.inmInvMaxP||''}" oninput="window.inmInvMaxP=this.value;render()" placeholder="Precio máx $" class="w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <button onclick="window.inmInvQ='';window.inmInvEst='';window.inmInvOp='';window.inmInvTipo='';window.inmInvRec='';window.inmInvMaxP='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
+            </div>
+        </div>
+        <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            ${lista.map(card).join('') || '<p class="text-sm text-slate-400 col-span-full py-8 text-center">Sin propiedades cargadas. Usa el botón "Cargar propiedad" para publicar la primera en el portal.</p>'}
+        </div>
+        <p class="text-xs text-slate-400 mt-4"><i class="fas fa-circle-info mr-1"></i>Las propiedades Disponibles y Reservadas se muestran automáticamente en la sección "Propiedades" del portal público.</p>
+    </div>`;
+}
+function inmUrlFichaPublica(id){
+    const base = window.location.origin + window.location.pathname;
+    return base + '#prop-' + id;
+}
+function inmTextoCompartir(p){
+    if(!p) return '';
+    const est = inmEstadoProp(p);
+    const precio = p.precio ? '$' + Number(p.precio).toLocaleString('es-MX') + (p.tipo==='Renta'?' /mes':'') : 'Precio a consultar';
+    const partes = [
+        '🏠 *' + (p.titulo || 'Propiedad') + '*',
+        '💼 Operación: *' + (p.tipo||'Venta') + '* (' + (p.inmuebleTipo||'Casa') + ')',
+        '💰 Precio: *' + precio + '*',
+        '📌 Estatus: ' + est,
+        (p.colonia || p.ciudad) ? '📍 Ubicación: ' + [p.colonia, p.ciudad].filter(Boolean).join(', ') : '',
+        p.m2 ? '📐 Superficie: ' + p.m2 + ' m²' : '',
+        (p.recs || p.banios) ? '🛏️ Distribución: ' + [p.recs?p.recs+' recámaras':'', p.banios?p.banios+' baños':''].filter(Boolean).join(' · ') : '',
+        p.desc ? '✨ Descripción: ' + p.desc : '',
+        '🔗 Ver ficha y galería: ' + inmUrlFichaPublica(p.id)
+    ].filter(Boolean);
+    return partes.join('\n');
+}
+function inmCopiarLinkFicha(id){
+    const url = inmUrlFichaPublica(id);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(()=>{ if(window.showToast) showToast('Enlace de la propiedad copiado','success'); }).catch(()=>auFallbackCopy(url));
+    } else auFallbackCopy(url);
+}
+function inmCopiarResumenFicha(id){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    const txt = inmTextoCompartir(p);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(()=>{ if(window.showToast) showToast('Ficha de propiedad copiada','success'); }).catch(()=>auFallbackCopy(txt));
+    } else auFallbackCopy(txt);
+}
+function inmWhatsAppFicha(id){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    window.open('https://wa.me/?text=' + encodeURIComponent(inmTextoCompartir(p)), '_blank');
+}
+function inmAbrirVistaPublica(id){
+    closeModal();
+    window._forceApp = false;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('main-app').classList.add('hidden');
+    document.getElementById('public-portal').classList.remove('hidden');
+    inmVerProp(id);
+    window.scrollTo(0,0);
+}
+function inmCompartirFichaModal(id){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    const url = inmUrlFichaPublica(p.id);
+    const resumen = inmTextoCompartir(p);
+    const fotos = (p.fotos||[]);
+    const est = inmEstadoProp(p);
+    showModal(`<div class="p-6">
+        <div class="flex items-start justify-between gap-3 mb-4">
+            <div>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase">Ficha inmobiliaria compartible</span>
+                <h3 class="text-xl font-bold text-slate-900 mt-1">${psEscape(p.titulo||'Propiedad')}</h3>
+                <p class="text-xs text-slate-500">Comparte esta propiedad con tu cliente por WhatsApp, enlace directo o vista pública imprimible.</p>
+            </div>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+        </div>
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
+            ${fotos[0]?`<img src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-house text-slate-400"></i></div>`}
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}<span class="text-xs font-bold text-emerald-700">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'A consultar'}</span></div>
+                <p class="text-xs text-slate-500 truncate mt-0.5">${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</p>
+            </div>
+        </div>
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs font-semibold text-slate-600 block mb-1">Enlace directo a la ficha pública</label>
+                <div class="flex gap-2">
+                    <input readonly value="${psEscape(url)}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 text-slate-700 font-mono">
+                    <button type="button" onclick="inmCopiarLinkFicha(${p.id})" class="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fas fa-copy mr-1"></i>Copiar link</button>
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600 block mb-1">Mensaje con ficha técnica lista para enviar</label>
+                <textarea readonly rows="6" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 text-slate-700">${psEscape(resumen)}</textarea>
+            </div>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-2 mt-5">
+            <button type="button" onclick="inmWhatsAppFicha(${p.id})" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i>Enviar por WhatsApp</button>
+            <button type="button" onclick="inmCopiarResumenFicha(${p.id})" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-clipboard-check"></i>Copiar texto completo</button>
+            <button type="button" onclick="inmAbrirVistaPublica(${p.id})" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-up-right-from-square"></i>Abrir ficha pública</button>
+        </div>
+    </div>`);
+}
+function inmFichaGalGo(idx){
+    const fotos = window._inmFichaFotos || [];
+    if(!fotos.length) return;
+    const n = fotos.length;
+    window._inmFichaIdx = ((idx % n) + n) % n;
+    const main = document.getElementById('inm-ficha-principal');
+    if(main) main.src = fotos[window._inmFichaIdx];
+    const cnt = document.getElementById('inm-ficha-counter');
+    if(cnt) cnt.textContent = (window._inmFichaIdx + 1) + ' / ' + n;
+    document.querySelectorAll('.inm-ficha-thumb').forEach((el, i)=>{
+        el.classList.toggle('ring-2', i === window._inmFichaIdx);
+        el.classList.toggle('ring-emerald-600', i === window._inmFichaIdx);
+    });
+}
+function inmFichaGalStep(delta){
+    inmFichaGalGo((window._inmFichaIdx || 0) + delta);
+}
+function inmPagGalGo(idx){
+    const u = inmD().props.find(x=>String(x.id)===String(window._inmVerId));
+    const fotos = (u && u.fotos) || [];
+    if(!fotos.length) return;
+    const n = fotos.length;
+    window._inmPagIdx = ((idx % n) + n) % n;
+    const main = document.getElementById('inm-pag-principal');
+    if(main) main.src = fotos[window._inmPagIdx];
+    const cnt = document.getElementById('inm-pag-counter');
+    if(cnt) cnt.textContent = (window._inmPagIdx + 1) + ' / ' + n;
+    document.querySelectorAll('.inm-pag-thumb').forEach((el, i)=>{
+        el.classList.toggle('ring-2', i === window._inmPagIdx);
+        el.classList.toggle('ring-emerald-500', i === window._inmPagIdx);
+    });
+}
+function inmPagGalStep(delta){
+    inmPagGalGo((window._inmPagIdx || 0) + delta);
+}
+function inmFicha(id, startIdx){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    const fotos = (p.fotos||[]);
+    window._inmFichaFotos = fotos;
+    window._inmFichaIdx = (typeof startIdx==='number' && startIdx>=0 && startIdx<fotos.length) ? startIdx : 0;
+    const est = inmEstadoProp(p);
+    const filaSpec = (lb, v)=> v ? `<div class="flex justify-between py-1.5 border-b border-slate-100 text-sm"><span class="text-slate-400">${lb}</span><b class="text-slate-700">${psEscape(String(v))}</b></div>` : '';
+    showModal(`<div class="p-6">
+        <div class="flex items-start justify-between gap-3 mb-3">
+            <div>
+                <div class="flex flex-wrap items-center gap-1.5 mb-1">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}${p.inmuebleTipo?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">${psEscape(p.inmuebleTipo)}</span>`:''}</div>
+                <h3 class="text-2xl font-bold text-slate-900">${psEscape(p.titulo||'Propiedad')}</h3>
+                <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</p>
+            </div>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+        </div>
+        ${fotos[0]?`<div class="relative rounded-xl overflow-hidden border bg-slate-50">
+            <img id="inm-ficha-principal" src="${fotos[window._inmFichaIdx]}" class="w-full h-80 object-cover">
+            ${fotos.length>1?`
+                <button type="button" onclick="inmFichaGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left text-xs"></i></button>
+                <button type="button" onclick="inmFichaGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right text-xs"></i></button>
+                <span id="inm-ficha-counter" class="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-black/65 text-white text-xs font-semibold">${window._inmFichaIdx+1} / ${fotos.length}</span>
+            `:''}
+        </div>`:''}
+        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="inmFichaGalGo(${i})" class="inm-ficha-thumb w-24 h-16 object-cover rounded-lg border cursor-pointer shrink-0 ${i===window._inmFichaIdx?'ring-2 ring-emerald-600':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
+        <div class="flex items-baseline justify-between flex-wrap gap-3 mt-4">
+            <div class="flex items-baseline gap-2">
+                <p class="text-3xl font-black text-emerald-700">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'Precio a consultar'}</p>
+                ${p.tipo==='Renta'&&p.precio?'<span class="text-sm text-slate-400">/mes</span>':''}
+            </div>
+            <div class="flex items-center gap-1.5">
+                <button type="button" onclick="inmCopiarLinkFicha(${p.id})" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar link</button>
+                <button type="button" onclick="inmWhatsAppFicha(${p.id})" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+                <button type="button" onclick="inmAbrirVistaPublica(${p.id})" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold"><i class="fas fa-up-right-from-square mr-1"></i>Vista cliente</button>
+            </div>
+        </div>
+        ${est==='Reservada' && (p.anticipo || p.reservaHasta || p.clienteNombre || p.reservaNotas) ? `<div class="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-wrap gap-x-5 gap-y-1">
+            ${p.clienteNombre?`<span><i class="fas fa-user mr-1"></i><b>Cliente:</b> ${psEscape(p.clienteNombre)}</span>`:''}
+            ${p.anticipo?`<span><i class="fas fa-coins mr-1"></i><b>Anticipo:</b> $${Number(p.anticipo).toLocaleString('es-MX')}</span>`:''}
+            ${p.reservaHasta?`<span><i class="fas fa-calendar-day mr-1"></i><b>Vence:</b> ${psEscape(p.reservaHasta)}</span>`:''}
+            ${p.reservaNotas?`<span class="w-full text-amber-800"><i class="fas fa-comment-dots mr-1"></i>${psEscape(p.reservaNotas)}</span>`:''}
+        </div>` : ''}
+        <div class="grid md:grid-cols-2 gap-x-8 mt-3">
+            <div>
+                ${filaSpec('Estatus', est)}
+                ${filaSpec('Operación', p.tipo||'Venta')}
+                ${filaSpec('Tipo de inmueble', p.inmuebleTipo||'Casa')}
+                ${filaSpec('Superficie', p.m2?p.m2+' m²':'')}
+                ${filaSpec('Recámaras', p.recs)}
+            </div>
+            <div>
+                ${filaSpec('Baños', p.banios)}
+                ${filaSpec('Estacionamientos', p.estacionamientos)}
+                ${filaSpec('Colonia / Zona', p.colonia)}
+                ${filaSpec('Ciudad', p.ciudad)}
+                ${filaSpec('Asesor', p.agenteNombre)}
+            </div>
+        </div>
+        ${p.desc?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mt-3"><b>Descripción:</b> ${psEscape(p.desc)}</div>`:''}
+        <div class="flex justify-end gap-2 mt-4 flex-wrap">
+            <button onclick="closeModal();inmCompartirFichaModal(${p.id})" class="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"><i class="fas fa-share-nodes mr-1"></i>Compartir ficha</button>
+            ${est!=='Vendida'?`<button onclick="closeModal();inmReservar(${p.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>${est==='Reservada'?'Gestionar reserva':'Reservar'}</button>`:''}
+            <button onclick="closeModal();inmAltaProp(${p.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-pen mr-1"></i>Editar</button>
+        </div>
+    </div>`);
+}
+function inmRenderDraftFotos(){
+    const wrap = document.getElementById('inm-draft-fotos-wrap');
+    if(!wrap) return;
+    const arr = window._inmDraftFotos || [];
+    if(!arr.length){
+        wrap.innerHTML = `<div class="border border-dashed border-slate-300 rounded-xl p-4 text-center text-xs text-slate-400">Sin fotos cargadas todavía. Sube hasta 10 fotos o agrega una URL de imagen.</div>`;
+        return;
+    }
+    wrap.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">${arr.map((src, i)=>`
+        <div class="relative group rounded-xl overflow-hidden border ${i===0?'border-emerald-500 ring-2 ring-emerald-500/30':'border-slate-200'} bg-slate-50">
+            <img src="${src}" class="w-full h-24 object-cover">
+            ${i===0?`<span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold shadow">Portada</span>`:`<button type="button" onclick="inmDraftSetPortada(${i})" class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/65 hover:bg-emerald-600 text-white text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">Hacer portada</button>`}
+            <button type="button" onclick="inmDraftQuitarFoto(${i})" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[10px] flex items-center justify-center shadow" title="Quitar foto"><i class="fas fa-trash"></i></button>
+        </div>`).join('')}</div>`;
+}
+function inmDraftSetPortada(idx){
+    const arr = window._inmDraftFotos || [];
+    if(idx<=0 || idx>=arr.length) return;
+    const item = arr.splice(idx, 1)[0];
+    arr.unshift(item);
+    inmRenderDraftFotos();
+}
+function inmDraftQuitarFoto(idx){
+    const arr = window._inmDraftFotos || [];
+    if(idx<0 || idx>=arr.length) return;
+    arr.splice(idx, 1);
+    inmRenderDraftFotos();
+}
+function inmDraftAgregarUrl(){
+    const inp = document.getElementById('inm-foto-url');
+    if(!inp) return;
+    const url = inp.value.trim();
+    if(!url) return;
+    window._inmDraftFotos = window._inmDraftFotos || [];
+    if(window._inmDraftFotos.length >= 10){ showToast('Máximo 10 fotos por propiedad','warning'); return; }
+    window._inmDraftFotos.push(url);
+    inp.value = '';
+    inmRenderDraftFotos();
+}
+function inmDraftSubirArchivos(inputEl){
+    const files = (inputEl && inputEl.files) ? [...inputEl.files] : [];
+    if(!files.length) return;
+    window._inmDraftFotos = window._inmDraftFotos || [];
+    const disp = Math.max(0, 10 - window._inmDraftFotos.length);
+    if(disp <= 0){ showToast('Ya tienes el máximo de 10 fotos','warning'); inputEl.value=''; return; }
+    const primeros = files.slice(0, disp);
+    const anexar = (nuevas)=>{
+        (nuevas||[]).filter(Boolean).forEach(u=>{ if(window._inmDraftFotos.length<10) window._inmDraftFotos.push(u); });
+        inputEl.value = '';
+        inmRenderDraftFotos();
+    };
+    if (window.Media && window.Backend && window.Backend.available) {
+        if (window.showToast) window.showToast('Subiendo fotos…','info');
+        window.Media.subirMuchos(primeros, 'inmPublica').then(items=>anexar(items.map(x=>x.url))).catch(()=>auFotosLocal(primeros, anexar));
+    } else auFotosLocal(primeros, anexar);
+}
+function inmAltaProp(id){
+    const d = inmD();
+    const p = id ? d.props.find(x=>String(x.id)===String(id)) : null;
+    window._inmDraftFotos = p && Array.isArray(p.fotos) ? p.fotos.slice() : [];
+    const est = p ? inmEstadoProp(p) : 'Disponible';
+    const opt = (arr, sel)=>arr.map(v=>`<option ${v===(sel||'')?'selected':''}>${v}</option>`).join('');
+    showModal(`<form id="inm-prop-form" class="p-6">
+        <h3 class="text-xl font-bold mb-1">${p?'Editar propiedad':'Cargar propiedad al inventario'}</h3>
+        <p class="text-xs text-slate-500 mb-4">Al guardar, la propiedad aparece tanto en Comercial Inmobiliario como en la sección Propiedades del portal público.</p>
+        <div class="grid md:grid-cols-3 gap-3">
+            <div class="md:col-span-2"><label class="text-sm font-medium text-slate-700 mb-1 block">Título de la propiedad *</label><input id="inm-titulo" required value="${psEscape(p&&p.titulo||'')}" placeholder="Ej. Residencia contemporánea en Valle Poniente" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Operación *</label><select id="inm-tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['Venta','Renta','Preventa'], p&&p.tipo||'Venta')}</select></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Tipo de inmueble</label><select id="inm-inm-tipo" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['Casa','Departamento','Terreno','Local / Oficina','Bodega / Nave'], p&&p.inmuebleTipo||'Casa')}</select></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Precio ($ MXN)</label><input id="inm-precio" type="number" step="0.01" value="${psEscape(String(p&&p.precio||''))}" placeholder="0 = Precio a consultar" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Estatus de disponibilidad</label><select id="inm-estado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${opt(['Disponible','Reservada','Vendida'], est)}</select></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Colonia / Zona *</label><input id="inm-colonia" required value="${psEscape(p&&p.colonia||'')}" placeholder="Ej. Del Valle" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Ciudad *</label><input id="inm-ciudad" required value="${psEscape(p&&p.ciudad||'San Pedro Garza García')}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Superficie (m²)</label><input id="inm-m2" type="number" value="${psEscape(String(p&&p.m2||''))}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Recámaras</label><input id="inm-recs" type="number" value="${psEscape(String(p&&p.recs||''))}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Baños</label><input id="inm-banios" type="number" step="0.5" value="${psEscape(String(p&&p.banios||''))}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Estacionamientos</label><input id="inm-estac" type="number" value="${psEscape(String(p&&p.estacionamientos||''))}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div class="md:col-span-2"><label class="text-sm font-medium text-slate-700 mb-1 block">Descripción y amenidades</label><input id="inm-desc" value="${psEscape(p&&p.desc||'')}" placeholder="Ej. Jardín amplio, terraza con asador, seguridad 24/7, cocina equipada" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div><label class="text-sm font-medium text-slate-700 mb-1 block">Destacar en portada</label><select id="inm-destacada" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option ${(p&&p.destacada)?'selected':''}>Sí</option><option ${(!p||!p.destacada)?'selected':''}>No</option></select></div>
+            <div class="md:col-span-3 border-t border-slate-200 pt-3 mt-1">
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <label class="text-sm font-semibold text-slate-800"><i class="fas fa-images mr-1 text-emerald-600"></i>Galería de fotos de la propiedad (hasta 10, elige cuál es portada)</label>
+                    <span class="text-[11px] text-slate-400">Puedes subir archivos o pegar URLs</span>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-2 mb-3">
+                    <input id="inm-fotos" type="file" accept="image/*" multiple onchange="inmDraftSubirArchivos(this)" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-900">
+                    <div class="flex gap-1.5">
+                        <input id="inm-foto-url" type="url" placeholder="O pega URL de imagen (https://...)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-900">
+                        <button type="button" onclick="inmDraftAgregarUrl()" class="px-3 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Agregar URL</button>
+                    </div>
+                </div>
+                <div id="inm-draft-fotos-wrap"></div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"><i class="fas fa-save mr-1"></i> Guardar propiedad</button>
+        </div>
+    </form>`);
+    setTimeout(()=>{
+        inmRenderDraftFotos();
+        const form = document.getElementById('inm-prop-form');
+        if(form) form.onsubmit = (e)=>{ e.preventDefault(); inmGuardarProp(id); };
+    },0);
+}
+function inmGuardarProp(id){
+    const d = inmD();
+    const lee = (k)=>{ const el=document.getElementById(k); return el?el.value.trim():''; };
+    const fotosFinales = (window._inmDraftFotos || []).slice(0, 10);
+    const est = lee('inm-estado') || 'Disponible';
+    const datos = {
+        titulo: lee('inm-titulo'),
+        tipo: lee('inm-tipo') || 'Venta',
+        inmuebleTipo: lee('inm-inm-tipo') || 'Casa',
+        precio: parseFloat(lee('inm-precio')) || 0,
+        estado: est,
+        vendida: est === 'Vendida',
+        colonia: lee('inm-colonia'),
+        ciudad: lee('inm-ciudad') || 'San Pedro Garza García',
+        m2: parseFloat(lee('inm-m2')) || 0,
+        recs: parseInt(lee('inm-recs')) || 0,
+        banios: parseFloat(lee('inm-banios')) || 0,
+        estacionamientos: parseInt(lee('inm-estac')) || 0,
+        desc: lee('inm-desc'),
+        destacada: lee('inm-destacada') === 'Sí',
+        fotos: fotosFinales
+    };
+    if(!datos.titulo){ showToast('El título de la propiedad es obligatorio','warning'); return; }
+    if(id){
+        const p = d.props.find(x=>String(x.id)===String(id)); if(!p) return;
+        Object.assign(p, datos);
+    } else {
+        d.props.unshift(Object.assign({ id: Date.now(), fechaAlta: new Date().toISOString(), agenteId: currentUser?currentUser.id:null, agenteNombre: currentUser?currentUser.name:'' }, datos));
+    }
+    cmLog('Comercial Inmobiliario', id?'Editó propiedad':'Cargó propiedad', datos.titulo+' ('+datos.colonia+')');
+    saveDB(); closeModal(); showToast('Propiedad guardada y publicada','success'); render();
+}
+function inmCambioRapidoEstado(id, nuevoEst){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    if(nuevoEst==='Reservada' && inmEstadoProp(p)!=='Reservada'){
+        inmReservar(id);
+        return;
+    }
+    p.estado = nuevoEst || 'Disponible';
+    p.vendida = p.estado === 'Vendida';
+    if(p.estado === 'Disponible'){
+        p.clienteNombre = ''; p.anticipo = 0; p.reservaHasta = ''; p.reservaNotas = '';
+    }
+    cmLog('Comercial Inmobiliario', 'Cambió estatus a '+p.estado, p.titulo);
+    saveDB(); showToast('Estatus actualizado: '+p.estado,'success'); render();
+}
+function inmReservar(id){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    const defHasta = p.reservaHasta || new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
+    showModal(`<div class="p-6">
+        <h3 class="text-lg font-bold mb-1">Apartar / Reservar — ${psEscape(p.titulo||'Propiedad')}</h3>
+        <p class="text-xs text-slate-500 mb-4">Registra los datos del apartado para mostrar su vigencia en inventario y escaparate.</p>
+        <div class="space-y-3">
+            <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Cliente que aparta</label><input id="inm-res-cli" value="${psEscape(p.clienteNombre||'')}" placeholder="Nombre del comprador o interesado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Monto de apartado ($)</label><input id="inm-res-anticipo" type="number" step="1000" value="${psEscape(String(p.anticipo||20000))}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Vigencia del apartado</label><input id="inm-res-hasta" type="date" value="${psEscape(defHasta)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+            </div>
+            <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Notas o condiciones</label><input id="inm-res-notas" value="${psEscape(p.reservaNotas||'')}" placeholder="Ej. En trámite de avalúo hipotecario" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+        </div>
+        <div class="flex items-center justify-between gap-2 mt-5">
+            ${inmEstadoProp(p)==='Reservada'?`<button type="button" onclick="inmLiberarReserva(${p.id})" class="px-4 py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs font-semibold"><i class="fas fa-unlock mr-1"></i>Liberar a Disponible</button>`:'<span></span>'}
+            <div class="flex gap-2">
+                <button type="button" onclick="closeModal();render()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="button" onclick="inmConfirmaReserva(${p.id})" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold"><i class="fas fa-hand mr-1"></i>Guardar apartado</button>
+            </div>
+        </div>
+    </div>`);
+}
+function inmLiberarReserva(id){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    p.estado='Disponible'; p.vendida=false; p.clienteNombre=''; p.anticipo=0; p.reservaHasta=''; p.reservaNotas='';
+    cmLog('Comercial Inmobiliario','Liberó propiedad', p.titulo);
+    saveDB(); closeModal(); showToast('Propiedad liberada como Disponible','success'); render();
+}
+function inmConfirmaReserva(id){
+    const p = inmD().props.find(x=>String(x.id)===String(id)); if(!p) return;
+    p.estado='Reservada'; p.vendida=false;
+    p.clienteNombre=((document.getElementById('inm-res-cli')||{}).value||'').trim();
+    p.anticipo=parseFloat((document.getElementById('inm-res-anticipo')||{}).value)||0;
+    p.reservaHasta=((document.getElementById('inm-res-hasta')||{}).value||'').trim();
+    p.reservaNotas=((document.getElementById('inm-res-notas')||{}).value||'').trim();
+    cmLog('Comercial Inmobiliario','Reservó propiedad', p.titulo);
+    saveDB(); closeModal(); showToast('Propiedad apartada','success'); render();
+}
+function inmBorrarProp(id){
+    const rol = (currentUser && currentUser.role || '').toLowerCase();
+    if(rol!=='gm' && rol!=='admin'){ showToast('Solo GM/admin puede eliminar propiedades','warning'); return; }
+    if(!confirm('¿Eliminar esta propiedad del inventario?')) return;
+    const d = inmD();
+    const p = d.props.find(x=>String(x.id)===String(id));
+    d.props = d.props.filter(x=>String(x.id)!==String(id));
+    cmLog('Comercial Inmobiliario','Eliminó propiedad', p?p.titulo:'');
+    saveDB(); showToast('Propiedad eliminada','success'); render();
+}
 function openColoresGraficas(){
     if((currentUser.role||'').toLowerCase()!=='gm'){ showToast('Solo el rol GM puede editar los colores de las gráficas','warning'); return; }
     const ramos=['VIDA','GMM','DAÑOS','AUTOS','INVERSIÓN','INVERSIÓN ELITE'];
@@ -3152,9 +4026,32 @@ function renderMisClientes(){
             </div>
         </div>
         ${formHtml}
+        ${(() => {
+            const ahora = Date.now();
+            const sinSeguimiento = clientes.filter(c => {
+                const ult = new Date(c.ultimaActividad || c.fecha || 0).getTime();
+                return ult > 0 && (ahora - ult) > 7 * 86400000 && (c.etapaKanban || 'Emitido') !== 'Emitido';
+            });
+            return sinSeguimiento.length ? `<div class="p-4 rounded-2xl border border-amber-300 bg-amber-50/80 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0"><i class="fas fa-user-clock"></i></div>
+                    <div>
+                        <p class="text-xs font-bold uppercase text-amber-900">Alerta de seguimiento (#24)</p>
+                        <p class="text-sm text-amber-800">Tienes <b>${sinSeguimiento.length}</b> prospecto(s)/cliente(s) en proceso con más de 7 días sin actividad.</p>
+                    </div>
+                </div>
+                <button onclick="window.vistaMisClientes='kanban';render()" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold">Ver en Kanban</button>
+            </div>` : '';
+        })()}
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
-            <div class="flex flex-col  lg:items-end justify-between gap-4 mb-4">
-                <h3 class="font-semibold text-lg">Listado de Clientes (${clientes.length})</h3>
+            <div class="flex flex-col lg:items-end justify-between gap-4 mb-4">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h3 class="font-semibold text-lg">Listado de Clientes (${clientes.length})</h3>
+                    <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden">
+                        <button onclick="window.vistaMisClientes='tabla';render()" class="px-3 py-1.5 text-xs font-semibold ${(window.vistaMisClientes||'tabla')==='tabla'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-table mr-1"></i>Tabla</button>
+                        <button onclick="window.vistaMisClientes='kanban';render()" class="px-3 py-1.5 text-xs font-semibold ${window.vistaMisClientes==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban CRM (#23)</button>
+                    </div>
+                </div>
                 <div class="flex flex-wrap gap-2">
                     <div class="relative">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -3187,7 +4084,38 @@ function renderMisClientes(){
                     <button onclick="window.filtroClienteCompania='';window.filtroClienteRamo='';window.filtroClienteAgente='';window.filtroClienteQ='';window.filtroClienteMes='';window.filtroClienteTrim='';window.filtroClienteAgencia='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
                 </div>
             </div>
-            <div class="overflow-x-auto">
+            ${window.vistaMisClientes === 'kanban' ? (() => {
+                const etapas = ['Prospecto', 'Contactado', 'Propuesta', 'Emitido'];
+                return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    ${etapas.map(et => {
+                        const colItems = clientes.filter(c => (c.etapaKanban || 'Emitido') === et);
+                        return `<div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 min-h-[260px] flex flex-col">
+                            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200">
+                                <span class="text-xs font-bold uppercase text-slate-700">${et}</span>
+                                <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-white border border-slate-200">${colItems.length}</span>
+                            </div>
+                            <div class="space-y-2.5 flex-1">
+                                ${colItems.map(c => {
+                                    const diasInactivo = Math.floor((Date.now() - new Date(c.ultimaActividad || c.fecha || Date.now()).getTime()) / 86400000);
+                                    return `<div class="bg-white rounded-xl border ${diasInactivo > 7 && et !== 'Emitido' ? 'border-amber-400' : 'border-slate-200'} p-3 shadow-sm">
+                                        <div class="flex items-center justify-between gap-1 mb-1">
+                                            <span class="font-bold text-xs text-slate-900 truncate">${escapeHTML(c.nombre)}</span>
+                                            ${diasInactivo > 7 && et !== 'Emitido' ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Días sin actividad"><i class="fas fa-clock mr-0.5"></i>${diasInactivo}d</span>` : ''}
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 truncate">${escapeHTML(c.compania || '')} · ${escapeHTML(c.ramo || '')} · $${Number(c.primaTotal||0).toLocaleString('es-MX')}</p>
+                                        <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
+                                            <select onchange="cambiarEtapaKanbanCliente(${c.id}, this.value)" class="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 bg-slate-50 text-slate-700">
+                                                ${etapas.map(opt => `<option value="${opt}" ${(c.etapaKanban||'Emitido')===opt?'selected':''}>${opt}</option>`).join('')}
+                                            </select>
+                                            <button onclick="openCobranza(${c.id})" class="text-xs text-amber-600 hover:text-amber-800 px-1.5" title="Seguimiento / Cobranza"><i class="fab fa-whatsapp"></i></button>
+                                        </div>
+                                    </div>`;
+                                }).join('') || '<p class="text-xs text-slate-400 text-center py-6">Sin registros</p>'}
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+            })() : `<div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-left text-slate-600">
                         <tr>
@@ -3226,9 +4154,19 @@ function renderMisClientes(){
                         }).join('') || `<tr><td colspan="12" class="p-8 text-center text-slate-500">No hay clientes registrados</td></tr>`}
                     </tbody>
                 </table>
-            </div>
+            </div>`}
         </div>
     </div>`;
+}
+
+function cambiarEtapaKanbanCliente(id, etapa){
+    const c = (db.clientes || []).find(x => String(x.id) === String(id));
+    if(!c) return;
+    c.etapaKanban = etapa;
+    c.ultimaActividad = new Date().toISOString();
+    saveDB();
+    if(window.showToast) showToast('Cliente movido a ' + etapa, 'success');
+    render();
 }
 
 function actualizarAportacionCliente(){

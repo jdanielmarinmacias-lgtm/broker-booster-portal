@@ -6,12 +6,9 @@
   
   const teoStyle = document.createElement('style');
   teoStyle.id = 'teo-v4-style';
-  teoStyle.textContent = `:root { color-scheme: dark; }
-  body { font-family: 'Outfit', system-ui, -apple-system, Segoe UI, Roboto; background: #070a0f; }
-  .scrollbar::-webkit-scrollbar { width: 6px; height: 6px }
-  .scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px }
-  .glass { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-  #teo-wrapper { background:#070a0f; color:#e4e4e7; min-height:calc(100vh - 120px); }
+  teoStyle.textContent = `
+  #teo-wrapper { font-family: 'Outfit', system-ui, -apple-system, Segoe UI, Roboto; background:#070a0f; color:#e4e4e7; min-height:calc(100vh - 120px); color-scheme: dark; }
+  #teo-wrapper .glass { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
   #teo-wrapper .scrollbar::-webkit-scrollbar { width:6px;height:6px }
   #teo-wrapper .scrollbar::-webkit-scrollbar-thumb { background:#27272a;border-radius:3px }
   `;

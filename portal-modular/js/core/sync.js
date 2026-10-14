@@ -204,6 +204,7 @@
       if (SKIP[n] || n === 'users') return;
       if (Array.isArray(db[n]) || isPlain(db[n])) pre[n] = clone(db[n]);
     });
+    const prevShadow = shadow ? clone(shadow) : null;
     const names = (idx.collections || []).filter(function (n) { return !SKIP[n]; });
     pulled = {}; usersPulled = false;
     await pullNames(names);
@@ -214,13 +215,22 @@
       if (Array.isArray(db[n])) {
         const have = {};
         db[n].forEach(function (x) { have[String(x.id)] = true; });
+        const wasOnServer = {};
+        if (prevShadow && Array.isArray(prevShadow[n])) {
+          prevShadow[n].forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
+        }
         pre[n].forEach(function (x) {
-          if (x && x.id !== undefined && !have[String(x.id)]) { db[n].push(x); merged++; }
+          // #2 Refuerzo (lápidas/tombstones): si el registro ya existía en la sombra previa
+          // del servidor y ahora el servidor no lo trae, fue borrado en otro equipo → no resucitarlo.
+          if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]) {
+            db[n].push(x); merged++;
+          }
         });
       } else if (isPlain(db[n])) {
         let added = false;
+        const prevObj = (prevShadow && isPlain(prevShadow[n])) ? prevShadow[n] : null;
         Object.keys(pre[n]).forEach(function (k) {
-          if (!(k in db[n])) { db[n][k] = pre[n][k]; added = true; }
+          if (!(k in db[n]) && !(prevObj && (k in prevObj))) { db[n][k] = pre[n][k]; added = true; }
         });
         if (added) merged++;
       }
@@ -424,10 +434,46 @@
     } catch (e) { /* legacy aún no cargó */ }
   }
 
+  async function pullPublicShowcase() {
+    try {
+      const r = await get('/api/public/portal');
+      if (!r || !r.portal) return false;
+      const db = legDb();
+      if (!db) return false;
+      const p = r.portal;
+      if (Array.isArray(p.autos)) {
+        if (!isPlain(db.autoHub)) db.autoHub = { unidades: [], clientes: [], metas: [], ventas: [], guion: null, publicidad: [], practica: [] };
+        if (!Array.isArray(db.autoHub.unidades)) db.autoHub.unidades = [];
+        replaceArray(db.autoHub.unidades, normIds(p.autos));
+      }
+      if (Array.isArray(p.propiedades)) {
+        if (!isPlain(db.inmPublica)) db.inmPublica = { props: [] };
+        if (!Array.isArray(db.inmPublica.props)) db.inmPublica.props = [];
+        replaceArray(db.inmPublica.props, normIds(p.propiedades));
+      }
+      if (db.settings && isPlain(db.settings)) {
+        ['hero', 'caminos', 'comisiones', 'historias', 'aseguradoras', 'servicios', 'blog', 'privacidad', 'ctaFinal', 'empresa'].forEach(function (k) {
+          if (p[k]) db.settings[k] = p[k];
+        });
+      }
+      return true;
+    } catch (e) { return false; }
+  }
+
   async function boot() {
     try { if (!(window.Backend && await window.Backend.detect())) return; }
     catch (e) { return; }
     hookSave();
+    // Siempre hidratar escaparate público (autos + propiedades) para que la portada
+    // los muestre desde el primer segundo, con o sin sesión iniciada.
+    try {
+      if (await pullPublicShowcase()) {
+        const pp = document.getElementById('public-portal');
+        if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+          window.renderPublicPortal();
+        }
+      }
+    } catch (e) {}
     // Sesión restaurada (incógnito con cookie, otro navegador ya logueado…).
     try {
       const me = await window.Backend.me();
@@ -440,14 +486,28 @@
     // Novedades de otros usuarios → re-pull escaparate + trabajo + re-render.
     // Ej: agente carga solicitud → el cotizador la ve en ese momento + toast.
     document.addEventListener('public-feed', function (e) {
-      if (!active) return;
       var kind = e && e.detail && e.detail.kind;
+      if (!active) {
+        if (kind === 'autoHub' || kind === 'inmPublica' || kind === 'settings') {
+          pullPublicShowcase().then(function (ok) {
+            const pp = document.getElementById('public-portal');
+            if (ok && pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+              try { window.renderPublicPortal(); } catch (e0) {}
+            }
+          });
+        }
+        return;
+      }
       var cols = SHOWCASE.slice();
       var target = kind && KIND_TO_COL[kind];
       if (target && cols.indexOf(target) === -1 && LIVE_WORK.indexOf(target) !== -1) cols.push(target);
       if (!target) cols = cols.concat(LIVE_WORK.filter(function (c) { return cols.indexOf(c) === -1; }));
       pullNames(cols).then(function () {
         try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
+        const pp = document.getElementById('public-portal');
+        if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+          try { window.renderPublicPortal(); } catch (e5) {}
+        }
         // Chat abierto + mensaje nuevo → refresca la conversación al instante
         // (además del polling de 2.5s que cubre el caso sin realtime).
         if (kind === 'messages' || kind === 'groupMessages') {
@@ -463,6 +523,7 @@
   window.BackendSync = {
     normUser: function (u) { return normIds(u) || u; },
     pull: pullAll,
+    pullPublicShowcase,
     pullShowcase: function () { return pullNames(SHOWCASE); },
     pullCollections: function (names) { return pullNames(names || []); },
     hookSave,
