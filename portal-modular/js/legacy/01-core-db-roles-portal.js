@@ -320,10 +320,23 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
                 let nid = Math.max(0,...db.users.map(u=>Number(u.id)||0))+1;
                 db.users.push({ id: nid, username: 'gmvillegas', role: 'gm', name: 'GM Villegas', email: 'gmvillegas@portal.com', avatar: 'https://i.pravatar.cc/40?u=gmvillegas', xp: 0, students: [], phone: '521000000000' });
             }
-            // Migración: renombrar títulos antiguos (Circulares→Capacitación Semanal, Carrusel→Reunión Semanal)
+            // Migración: renombrar títulos antiguos (Circulares→Capacitación Semanal, Carrusel→Reunión Semanal) y asegurar ambos objetos
+            if (!db.carruselCirculares || typeof db.carruselCirculares !== 'object') db.carruselCirculares = {};
+            if (!db.carruselCirculares.circulares || typeof db.carruselCirculares.circulares !== 'object') {
+                db.carruselCirculares.circulares = { titulo: 'Capacitación Semanal', dia: 'Martes', horario: '19:00', tema: 'Estrategias de Cierre', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200', zoom: 'https://zoom.us/j/123456789', participantes: [] };
+            }
+            if (!db.carruselCirculares.carrusel || typeof db.carruselCirculares.carrusel !== 'object') {
+                db.carruselCirculares.carrusel = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
+            }
             if (db.carruselCirculares) {
                 if (db.carruselCirculares.circulares && (!db.carruselCirculares.circulares.titulo || /circular/i.test(db.carruselCirculares.circulares.titulo))) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
+                if (!db.carruselCirculares.circulares.dia) db.carruselCirculares.circulares.dia = 'Martes';
+                if (!db.carruselCirculares.circulares.horario) db.carruselCirculares.circulares.horario = '19:00';
+                if (!db.carruselCirculares.circulares.imagen) db.carruselCirculares.circulares.imagen = 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200';
                 if (db.carruselCirculares.carrusel && (!db.carruselCirculares.carrusel.titulo || /carrusel/i.test(db.carruselCirculares.carrusel.titulo))) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
+                if (!db.carruselCirculares.carrusel.dia) db.carruselCirculares.carrusel.dia = 'Miércoles';
+                if (!db.carruselCirculares.carrusel.horario) db.carruselCirculares.carrusel.horario = '19:00';
+                if (!db.carruselCirculares.carrusel.imagen) db.carruselCirculares.carrusel.imagen = 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200';
             }
             if (!db.posts) db.posts = [];
             if (!db.groupMessages) db.groupMessages = [];
@@ -619,6 +632,61 @@ function auPublicas(){
     return d.unidades.filter(u=>(!u.estado||u.estado==='Disponible'||u.estado==='Reservada'));
 }
 function vitScroll(){ setTimeout(function(){ var el=document.getElementById('autos'); if(el) el.scrollIntoView({behavior:'auto'}); },0); }
+function pubToggleCompare(tipo, id){
+    const key = tipo === 'auto' ? '_pubCompAutos' : '_pubCompProps';
+    window[key] = window[key] || [];
+    const idx = window[key].indexOf(id);
+    if(idx >= 0) window[key].splice(idx, 1);
+    else {
+        if(window[key].length >= 3){ if(window.showToast) showToast('Puedes comparar hasta 3 elementos a la vez', 'warning'); return; }
+        window[key].push(id);
+    }
+    renderPublicPortal();
+}
+function pubAbrirComparador(tipo){
+    if(tipo === 'auto'){
+        const ids = window._pubCompAutos || [];
+        const items = auPublicas().filter(u => ids.includes(u.id));
+        if(!items.length) return;
+        showModal(`<div class="p-6 max-w-4xl w-full">
+            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Unidades Automotrices (#10)</h3><button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
+            <div class="grid grid-cols-${Math.min(3, items.length)} gap-4">
+                ${items.map(u => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
+                    ${(u.fotos||[])[0]?`<img src="${u.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
+                    <h4 class="font-bold text-slate-900">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h4>
+                    <p class="text-xl font-black text-emerald-700 my-1">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
+                    <div class="text-xs text-slate-600 space-y-1 mt-2 border-t pt-2">
+                        <div><b>Km:</b> ${u.km?Number(u.km).toLocaleString('es-MX')+' km':'—'}</div>
+                        <div><b>Transmisión:</b> ${psEscape(u.transmision||'—')}</div>
+                        <div><b>Motor / Comb.:</b> ${psEscape(u.motor||'—')} · ${psEscape(u.combustible||'—')}</div>
+                        <div><b>Origen:</b> ${psEscape(u.origen||'Mexicano')}</div>
+                        <div><b>Agencia:</b> ${psEscape(u.sucursal||'—')}</div>
+                    </div>
+                </div>`).join('')}
+            </div>
+        </div>`);
+    } else {
+        const ids = window._pubCompProps || [];
+        const items = inmPubLista().filter(p => ids.includes(p.id));
+        if(!items.length) return;
+        showModal(`<div class="p-6 max-w-4xl w-full">
+            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Propiedades (#10)</h3><button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
+            <div class="grid grid-cols-${Math.min(3, items.length)} gap-4">
+                ${items.map(p => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
+                    ${(p.fotos||[])[0]?`<img src="${p.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
+                    <h4 class="font-bold text-slate-900">${psEscape(p.titulo||'Propiedad')}</h4>
+                    <p class="text-xl font-black text-emerald-700 my-1">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'A consultar'}</p>
+                    <div class="text-xs text-slate-600 space-y-1 mt-2 border-t pt-2">
+                        <div><b>Operación:</b> ${psEscape(p.tipo||'Venta')} (${psEscape(p.inmuebleTipo||'Casa')})</div>
+                        <div><b>Ubicación:</b> ${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</div>
+                        <div><b>Superficie:</b> ${p.m2?p.m2+' m²':'—'}</div>
+                        <div><b>Recámaras / Baños:</b> ${p.recs||'—'} rec · ${p.banios||'—'} baños</div>
+                    </div>
+                </div>`).join('')}
+            </div>
+        </div>`);
+    }
+}
 function irAUtos(){ pubSetView("autos"); }
 function auVerAuto(id){
     const d = auD();
@@ -858,7 +926,10 @@ function pubAutosPagina(){
                 <h4 class="font-bold text-slate-900">${psEscape(u.modelo||'')}</h4>
                 <div class="flex items-baseline gap-2"><p class="text-xl font-black text-emerald-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>${desc>0?`<p class="text-xs text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}</div>
                 <p class="text-xs text-slate-500 mt-1"><i class="fas fa-location-dot mr-1"></i>${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}${u.km?' · '+Number(u.km).toLocaleString('es-MX')+' km':''}</p>
-                <button onclick="auVerAuto(${u.id})" class="w-full mt-3 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="auVerAuto(${u.id})" class="flex-1 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition text-sm"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
+                    <button onclick="pubToggleCompare('auto', ${u.id})" class="px-3 py-2.5 rounded-xl border ${(window._pubCompAutos||[]).includes(u.id)?'bg-amber-500 text-white border-amber-500':'border-slate-300 text-slate-600 hover:bg-slate-50'} text-xs font-semibold" title="Comparar unidad (#10)"><i class="fas fa-scale-balanced"></i></button>
+                </div>
             </div>
         </div>`;
     };
@@ -890,6 +961,7 @@ function pubAutosPagina(){
                 <select onchange="window.vitMarca=this.value;renderPublicPortal();vitScroll()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las marcas</option>${marcas.map(function(m){ return '<option '+(fMarca===m?'selected':'')+'>'+psEscape(m)+'</option>'; }).join('')}</select>
                 <select onchange="window.vitOrig=this.value;renderPublicPortal();vitScroll()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Origen</option><option ${fOrig==='Mexicano'?'selected':''}>Mexicano</option><option ${fOrig==='Americano'?'selected':''}>Americano</option><option ${fOrig==='Legalizado'?'selected':''}>Legalizado</option></select>
                 ${(fQ||fMarca||fOrig)?`<button onclick="window.vitQ='';window.vitMarca='';window.vitOrig='';renderPublicPortal();vitScroll()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
+                ${(window._pubCompAutos||[]).length ? `<button onclick="pubAbrirComparador('auto')" class="px-4 py-2.5 bg-slate-900 text-amber-300 rounded-xl text-sm font-bold shadow"><i class="fas fa-scale-balanced mr-1.5"></i>Comparar (${window._pubCompAutos.length})</button>` : ''}
             </div>
             <div id="au-cat-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 ${l.map(function(u){ return card(u); }).join('') || '<p class="text-slate-400 col-span-full text-center bg-white border border-slate-200 rounded-2xl p-10">Por el momento no hay autos publicados. Vuelve pronto.</p>'}
@@ -924,7 +996,10 @@ function pubPropsPagina(){
                     ${p.banios?`<span><i class="fas fa-bath mr-1"></i>${p.banios} baños</span>`:''}
                     ${p.m2?`<span><i class="fas fa-ruler-combined mr-1"></i>${p.m2} m²</span>`:''}
                 </div>
-                <button onclick="inmVerProp(${p.id})" class="w-full mt-3 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="inmVerProp(${p.id})" class="flex-1 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition text-sm"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
+                    <button onclick="pubToggleCompare('prop', ${p.id})" class="px-3 py-2.5 rounded-xl border ${(window._pubCompProps||[]).includes(p.id)?'bg-amber-500 text-white border-amber-500':'border-slate-300 text-slate-600 hover:bg-slate-50'} text-xs font-semibold" title="Comparar propiedad (#10)"><i class="fas fa-scale-balanced"></i></button>
+                </div>
             </div>
         </div>`;
     };
@@ -955,6 +1030,7 @@ function pubPropsPagina(){
                 </div>
                 <select onchange="window.inmVitTipo=this.value;renderPublicPortal()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las operaciones</option><option ${fTipo==='Venta'?'selected':''}>Venta</option><option ${fTipo==='Renta'?'selected':''}>Renta</option><option ${fTipo==='Preventa'?'selected':''}>Preventa</option></select>
                 ${(fQ||fTipo)?`<button onclick="window.inmVitQ='';window.inmVitTipo='';renderPublicPortal()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
+                ${(window._pubCompProps||[]).length ? `<button onclick="pubAbrirComparador('prop')" class="px-4 py-2.5 bg-slate-900 text-amber-300 rounded-xl text-sm font-bold shadow"><i class="fas fa-scale-balanced mr-1.5"></i>Comparar (${window._pubCompProps.length})</button>` : ''}
             </div>
             <div id="inm-cat-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 ${l.map(function(p){ return card(p); }).join('') || '<p class="text-slate-400 col-span-full text-center bg-white border border-slate-200 rounded-2xl p-10">Por el momento no hay propiedades publicadas. Vuelve pronto.</p>'}
@@ -4698,6 +4774,42 @@ function borrarPublicidad(id){
                 </div>
             </div>`);
         }
+        async function cotAutoFillDesdeDoc(inputEl){
+            const file = inputEl && inputEl.files && inputEl.files[0];
+            if(!file) return;
+            try {
+                if(window.showToast) showToast('Escaneando documento para auto-llenado...', 'info');
+                let texto = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+                if(/pdf/i.test(file.type||'') || /\.pdf$/i.test(file.name||'')){
+                    if(window.pdfjsLib){
+                        const buf = await file.arrayBuffer();
+                        const pdf = await window.pdfjsLib.getDocument({data:buf}).promise;
+                        let acc = '';
+                        for(let i=1; i<=Math.min(pdf.numPages, 3); i++){
+                            const pg = await pdf.getPage(i);
+                            const tc = await pg.getTextContent();
+                            acc += tc.items.map(it=>it.str).join(' ') + ' ';
+                        }
+                        if(acc.trim()) texto = acc;
+                    }
+                }
+                const mNom = texto.match(/(?:nombre|asegurado|contratante)[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ ]{5,50})/i);
+                const mEdad = texto.match(/(?:edad)[:\s]*(\d{2})\b/i);
+                const mTel = texto.match(/\b(\d{10})\b/);
+                const mCp = texto.match(/(?:c\.?p\.?|postal)[:\s]*(\d{5})\b/i);
+                const inpNom = document.getElementById('cot-nombre');
+                const inpEdad = document.getElementById('cot-edad');
+                const inpTel = document.getElementById('cot-tel');
+                if(inpNom && !inpNom.value) inpNom.value = (mNom && mNom[1] ? mNom[1].trim() : file.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '));
+                if(inpEdad && mEdad && mEdad[1]) inpEdad.value = mEdad[1];
+                if(inpTel && mTel && mTel[1]) inpTel.value = mTel[1];
+                const inpCp = document.getElementById('cot-f-cp');
+                if(inpCp && mCp && mCp[1]) inpCp.value = mCp[1];
+                if(window.showToast) showToast('Datos detectados y pre-llenados en el formulario', 'success');
+            } catch(e) {
+                if(window.showToast) showToast('Se cargó el nombre base del archivo', 'info');
+            }
+        }
         /* ---------- Crear solicitud ---------- */
         function cotModalNueva(){
             if(!(cotEsSolicitante()||cotEsProcesador())) return;
@@ -4710,6 +4822,16 @@ function borrarPublicidad(id){
                     <button onclick="closeModal()" class="justify-self-end text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
                 </div>
                 <div class="p-5 sm:p-7 lg:p-8 space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+                        <div>
+                            <p class="text-xs font-bold text-amber-900"><i class="fas fa-id-card mr-1.5 text-amber-600"></i>Lector Inteligente OCR de INE / Carátula (#8)</p>
+                            <p class="text-[11px] text-slate-600">Sube una carátula en PDF, imagen o archivo de identificación para pre-llenar nombre, edad y datos automáticamente.</p>
+                        </div>
+                        <label class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold cursor-pointer hover:bg-slate-800 shrink-0">
+                            <i class="fas fa-wand-magic-sparkles mr-1"></i>Escanear INE / Carátula
+                            <input type="file" accept=".pdf,image/*,.txt" class="hidden" onchange="cotAutoFillDesdeDoc(this)">
+                        </label>
+                    </div>
                     <p class="text-[10px] font-bold uppercase text-slate-400 tracking-wider"><i class="fas fa-user-pen mr-1"></i> Datos del cliente</p>
                     <div class="grid sm:grid-cols-3 gap-4">
                         <div><label class="text-xs font-semibold text-slate-500 uppercase">Nombre del cliente / asegurado *</label>
@@ -6462,11 +6584,21 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             navigateTo(page);
         }
 
+        function ensureCarruselDefaults(){
+            if (!db.carruselCirculares || typeof db.carruselCirculares !== 'object') db.carruselCirculares = {};
+            const defCirc = { titulo: 'Capacitación Semanal', dia: 'Martes', horario: '19:00', tema: 'Estrategias de Cierre', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200', zoom: 'https://zoom.us/j/123456789', participantes: [] };
+            const defCarr = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
+            db.carruselCirculares.circulares = Object.assign({}, defCirc, db.carruselCirculares.circulares || {});
+            db.carruselCirculares.carrusel = Object.assign({}, defCarr, db.carruselCirculares.carrusel || {});
+            if (/circular/i.test(db.carruselCirculares.circulares.titulo || '')) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
+            if (/carrusel/i.test(db.carruselCirculares.carrusel.titulo || '')) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
+            return db.carruselCirculares;
+        }
         function canEditCarrusel(){ return hasRole(currentUser, ['admin','gm','desarrollador','editor']); }
         function renderCarruselCirculares(){
-            const data = db.carruselCirculares || {};
-            const circ = data.circulares || {};
-            const carr = data.carrusel || {};
+            const data = ensureCarruselDefaults();
+            const circ = data.circulares;
+            const carr = data.carrusel;
             const canEdit = canEditCarrusel();
             const isInvited = (item) => {
                 if(canEdit) return true;
@@ -6921,7 +7053,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 })()}
 
                 ${(() => {
-                    const cc = db.carruselCirculares || {};
+                    const cc = typeof ensureCarruselDefaults === 'function' ? ensureCarruselDefaults() : (db.carruselCirculares || {});
                     if(!cc.circulares) return '';
                     const canSee = db.rolePermissions[(currentUser.role||'').toLowerCase()]?.includes('carrusel-circulares');
                     if(!canSee) return '';
@@ -8734,6 +8866,34 @@ function renderMessages() {
                     </div>
                 </div>
 
+                <!-- FASE 2 (#1): Canales Grupales por Área y Ramo -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5"><i class="fas fa-hashtag text-amber-600"></i> Canales Grupales del Equipo (#1)</h4>
+                        <span class="text-[11px] text-slate-400">Salas abiertas por ramo y especialidad</span>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        ${[
+                            { id: 'canal:general', nombre: '#General-Promotoría', desc: 'Avisos, cierres y dudas generales', icon: 'fa-users' },
+                            { id: 'canal:seguros', nombre: '#Seguros-Vida-GMM', desc: 'Cotizaciones, aseguradoras y coberturas', icon: 'fa-shield-heart' },
+                            { id: 'canal:automotriz', nombre: '#Comercial-Automotriz', desc: 'Unidades, apartados y financieras', icon: 'fa-car-side' },
+                            { id: 'canal:inmobiliario', nombre: '#Bienes-Raíces', desc: 'Propiedades, preventas y créditos', icon: 'fa-building' }
+                        ].map(ch => {
+                            const chMsgs = (db.messages || []).filter(m => String(m.toId) === ch.id);
+                            const lastCh = chMsgs[chMsgs.length - 1];
+                            return `<div onclick="openChannelChat('${ch.id}', '${ch.nombre}')" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-center justify-between gap-2 mb-1">
+                                        <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5"><i class="fas ${ch.icon} text-amber-600"></i> ${ch.nombre}</span>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-800 font-semibold">${chMsgs.length}</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 line-clamp-1">${lastCh ? psEscape((lastCh.fromName || 'Equipo') + ': ' + lastCh.text) : ch.desc}</p>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+
                 <div class="grid gap-3 md:grid-cols-2">
                     ${contacts.map(contact => {
                         const lastMsg = conversations[contact.id];
@@ -8823,11 +8983,57 @@ function renderMessages() {
             const nowIso = new Date().toISOString();
             conversation.forEach(m => { if (String(m.toId) === String(currentUser.id)) { m.read = true; m.readAt = m.readAt || nowIso; } }); saveDB();
             try { renderNav(); } catch(e){}
-            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderConversationBox(userId);
             startChatLive(userId);
             document.getElementById('chat-form').onsubmit = e => { e.preventDefault(); const text = document.getElementById('chat-input').value.trim(); if (!text) return; db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: otherUser.id, text: text, date: new Date().toISOString(), read: false }); saveDB(); document.getElementById('chat-input').value = ''; renderConversationBox(userId); };
             setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
+        }
+
+        // FASE 2 (#1): Chat de Canal Grupal
+        function openChannelChat(channelId, channelName) {
+            stopChatLive();
+            const renderChBox = () => {
+                const box = document.getElementById('chat-messages');
+                if (!box) return;
+                const msgs = (db.messages || []).filter(m => String(m.toId) === String(channelId)).sort((a,b) => new Date(a.date) - new Date(b.date));
+                box.innerHTML = msgs.length === 0 ? `<p class="text-center text-slate-400 py-8">Sé el primero en escribir en ${psEscape(channelName)}</p>` : msgs.map(m => {
+                    const mine = String(m.fromId) === String(currentUser.id);
+                    const sender = m.fromName || ((db.users||[]).find(u=>String(u.id)===String(m.fromId))?.name) || 'Miembro';
+                    return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p><p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
+                }).join('');
+                box.scrollTop = box.scrollHeight;
+            };
+            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold"><i class="fas fa-hashtag"></i></div><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(channelName)}</h3><p class="text-xs text-slate-500">Canal grupal abierto para todo el equipo · Usa @nombre para mencionar</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span>IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)}..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            renderChBox();
+            document.getElementById('chat-form').onsubmit = e => {
+                e.preventDefault();
+                const text = document.getElementById('chat-input').value.trim();
+                if (!text) return;
+                db.messages.push({ id: Date.now(), fromId: currentUser.id, fromName: currentUser.name, toId: channelId, text, date: new Date().toISOString(), read: true });
+                saveDB();
+                document.getElementById('chat-input').value = '';
+                renderChBox();
+            };
+        }
+
+        // FASE 2 (#7): Copiloto IA en el Chat y Centro de Mensajes
+        function sugerirRespuestaIAChat(targetId) {
+            const box = document.getElementById('chat-ai-suggestions');
+            const inp = document.getElementById('chat-input');
+            if (!box) return;
+            const borrador = (inp && inp.value.trim()) || '';
+            const sugerencias = [
+                borrador ? `✨ Versión Ejecutiva: "${borrador}. ¿Le parece bien si lo revisamos hoy en una llamada breve de 10 minutos a las 5:00 pm o prefiere mañana a las 11:00 am?"` : `🤝 Seguimiento ejecutivo: "Hola, quería darle seguimiento puntual a nuestra propuesta y confirmar si tienes alguna duda con las coberturas antes de emitir."`,
+                `💡 Manejo de objeción ('Lo voy a pensar'): "Entiendo totalmente. Para ayudarte a tomar la mejor decisión con calma, ¿qué punto en específico te gustaría que ajustemos en suma asegurada o aportación?"`,
+                `📅 Cierre con doble alternativa: "Ya quedó todo listo en mesa de control. ¿Agendamos la firma hoy jueves a las 6:00 pm o te acomoda mejor mañana viernes a las 10:00 am?"`
+            ];
+            box.classList.remove('hidden');
+            box.innerHTML = `<div class="flex items-center justify-between"><span class="text-[11px] font-bold uppercase text-amber-900"><i class="fas fa-wand-magic-sparkles mr-1"></i>Copiloto IA — Haz clic para usar una respuesta:</span><button type="button" onclick="document.getElementById('chat-ai-suggestions').classList.add('hidden')" class="text-xs text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div>` +
+                sugerencias.map(s => {
+                    const clean = s.replace(/^[^"]*"|"$/g, '');
+                    return `<div onclick="document.getElementById('chat-input').value=this.dataset.txt;document.getElementById('chat-ai-suggestions').classList.add('hidden');document.getElementById('chat-input').focus();" data-txt="${psEscape(clean)}" class="p-2 rounded-lg bg-white border border-amber-200 hover:border-amber-500 text-xs text-slate-700 cursor-pointer transition">${psEscape(s)}</div>`;
+                }).join('');
         }
         async function enviarAdjuntoChat(userId, inputEl) {
             const file = inputEl && inputEl.files && inputEl.files[0];

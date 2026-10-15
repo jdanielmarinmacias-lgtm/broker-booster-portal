@@ -650,6 +650,26 @@ function renderAnalysis(){
         ${s.userMsgs.slice(-5).map(m=>`<div><span class="text-cyan-400">Tú:</span> ${m.slice(0,90)}</div>`).join('')}
       </div>
     </div>
+
+    ${(() => {
+      // FASE 2 (#9): Evaluación con Rúbrica IA en 4 Dimensiones
+      const apScore = Math.min(25, Math.max(10, s.intervenciones >= 2 ? 22 : 14));
+      const detScore = Math.min(25, Math.max(8, s.preguntasAbiertas * 8));
+      const objScore = Math.min(25, Math.max(10, s.objDetectadas > 0 ? 23 : 15));
+      const cieScore = Math.min(25, Math.max(8, s.numeros >= 2 ? 22 : 12));
+      return `<div class="bg-zinc-950 border border-amber-500/40 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-bold uppercase text-amber-400">Rúbrica Ejecutiva de Evaluación IA (#9)</h3>
+          <span class="text-xs font-bold text-emerald-400">Total: ${apScore+detScore+objScore+cieScore}/100</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div class="p-2 rounded bg-zinc-900 border border-zinc-800"><div class="text-zinc-400 text-[10px]">1. Apertura</div><div class="font-bold text-white">${apScore}/25</div></div>
+          <div class="p-2 rounded bg-zinc-900 border border-zinc-800"><div class="text-zinc-400 text-[10px]">2. Necesidades</div><div class="font-bold text-white">${detScore}/25</div></div>
+          <div class="p-2 rounded bg-zinc-900 border border-zinc-800"><div class="text-zinc-400 text-[10px]">3. Objeciones</div><div class="font-bold text-white">${objScore}/25</div></div>
+          <div class="p-2 rounded bg-zinc-900 border border-zinc-800"><div class="text-zinc-400 text-[10px]">4. Cierre / Datos</div><div class="font-bold text-white">${cieScore}/25</div></div>
+        </div>
+      </div>`;
+    })()}
     
     <div>
       <h3 class="text-sm font-semibold mb-3 text-zinc-300">Evolución (últimas ${hist.length} sesiones)</h3>

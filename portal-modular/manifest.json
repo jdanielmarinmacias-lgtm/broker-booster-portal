@@ -1,0 +1,21 @@
+{
+  "name": "Broker Booster — Plataforma Ejecutiva",
+  "short_name": "Broker Booster",
+  "description": "Plataforma integral de desarrollo comercial, academia, seguros, automotriz e inmobiliario.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf8f5",
+  "theme_color": "#0a2540",
+  "icons": [
+    {
+      "src": "https://ui-avatars.com/api/?name=BB&background=0a2540&color=c9a86a&size=192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ui-avatars.com/api/?name=BB&background=0a2540&color=c9a86a&size=512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

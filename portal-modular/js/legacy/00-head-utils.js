@@ -92,4 +92,178 @@ function verAuditoriaVentas(){
     }catch(e){ console.log('verAuditoriaVentas error', e); alert('Error auditoría: '+e.message); }
 }
 
+// === FASE 2 (#3): PWA Service Worker + Notificaciones Nativas del Navegador ===
+(function initPWAAndNotifications(){
+    try {
+        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+            window.addEventListener('load', function(){
+                navigator.serviceWorker.register('/sw.js').catch(function(){});
+            });
+        }
+    } catch (e) {}
+})();
+
+window.activarNotificacionesPush = async function(){
+    if (!('Notification' in window)) {
+        if (window.showToast) showToast('Tu navegador no soporta notificaciones nativas', 'warning');
+        return;
+    }
+    if (Notification.permission === 'granted') {
+        new Notification('Broker Booster — Notificaciones activas', {
+            body: 'Recibirás avisos inmediatos de mensajes nuevos, cotizaciones y solicitudes.',
+            icon: 'https://ui-avatars.com/api/?name=BB&background=0a2540&color=c9a86a&size=192'
+        });
+        if (window.showToast) showToast('Notificaciones activas en este dispositivo', 'success');
+        return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+        new Notification('¡Notificaciones activadas!', {
+            body: 'Te avisaremos cuando lleguen mensajes o actualizaciones de tus trámites.',
+            icon: 'https://ui-avatars.com/api/?name=BB&background=0a2540&color=c9a86a&size=192'
+        });
+        if (window.showToast) showToast('Notificaciones del navegador activadas', 'success');
+    } else {
+        if (window.showToast) showToast('Permiso de notificaciones denegado en el navegador', 'warning');
+    }
+};
+
+window.emitirNotificacionNativa = function(titulo, cuerpo){
+    try {
+        if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+            new Notification(titulo || 'Broker Booster', {
+                body: cuerpo || 'Tienes una nueva actualización en el portal.',
+                icon: 'https://ui-avatars.com/api/?name=BB&background=0a2540&color=c9a86a&size=192'
+            });
+        }
+    } catch (e) {}
+};
+
+// === FASE 2 (#14): BUSCADOR UNIVERSAL INSTANTÁNEO (Ctrl + K) ===
+window.openGlobalSearch = function(){
+    if (typeof db === 'undefined' || !currentUser) return;
+    showModal(`<div class="p-5 max-w-2xl w-full">
+        <div class="flex items-center gap-3 pb-3 border-b border-amber-200">
+            <i class="fas fa-search text-amber-600 text-lg"></i>
+            <input id="global-search-input" type="text" oninput="renderGlobalSearchResults(this.value)" placeholder="Busca clientes, pólizas, folios de cotización, autos, propiedades, lecciones o usuarios..." class="flex-1 text-sm bg-transparent outline-none text-slate-900 font-medium" autofocus>
+            <button onclick="closeModal()" class="px-2 py-1 text-xs rounded bg-slate-100 text-slate-500 hover:bg-slate-200">ESC</button>
+        </div>
+        <div id="global-search-results" class="mt-3 max-h-[60vh] overflow-y-auto space-y-2"></div>
+    </div>`);
+    setTimeout(function(){
+        const inp = document.getElementById('global-search-input');
+        if (inp) { inp.focus(); renderGlobalSearchResults(''); }
+    }, 50);
+};
+
+window.renderGlobalSearchResults = function(rawQ){
+    const box = document.getElementById('global-search-results');
+    if (!box || typeof db === 'undefined') return;
+    const q = String(rawQ || '').trim().toLowerCase();
+    const hits = [];
+    const match = function(txt){ return !q || String(txt || '').toLowerCase().includes(q); };
+
+    // 1. Clientes
+    (db.clientes || []).forEach(function(c){
+        if (match(c.nombre + ' ' + c.poliza + ' ' + c.compania + ' ' + c.ramo)) {
+            hits.push({
+                cat: 'Cliente / Póliza',
+                icon: 'fa-address-book text-indigo-600',
+                title: (c.nombre || 'Cliente') + (c.poliza ? ' · Póliza ' + c.poliza : ''),
+                sub: (c.compania || '') + ' · ' + (c.ramo || '') + ' · $' + Number(c.primaTotal || 0).toLocaleString('es-MX'),
+                action: "closeModal(); window.filtroClienteQ='" + String(c.nombre || '').replace(/'/g, '') + "'; navigateTo('mis-clientes');"
+            });
+        }
+    });
+    // 2. Cotizaciones
+    (db.cotizaciones || []).forEach(function(s){
+        const nom = (s.cliente && s.cliente.nombre) || '';
+        if (match(s.id + ' ' + nom + ' ' + s.ramoNombre + ' ' + s.compania)) {
+            hits.push({
+                cat: 'Cotización',
+                icon: 'fa-file-signature text-emerald-600',
+                title: s.id + ' — ' + nom,
+                sub: (s.ramoNombre || '') + ' · ' + (s.compania || '') + ' · Estado: ' + (s.estado || ''),
+                action: "closeModal(); navigateTo('cotizaciones'); setTimeout(function(){ if(window.cotAbrir) cotAbrir('" + s.id + "'); }, 120);"
+            });
+        }
+    });
+    // 3. Autos
+    ((db.autoHub && db.autoHub.unidades) || []).forEach(function(u){
+        if (match((u.marca || '') + ' ' + (u.modelo || '') + ' ' + (u.anio || '') + ' ' + (u.sucursal || ''))) {
+            hits.push({
+                cat: 'Inventario Automotriz',
+                icon: 'fa-car-side text-amber-600',
+                title: (u.marca || '') + ' ' + (u.modelo || '') + ' ' + (u.anio || ''),
+                sub: '$' + Number(u.precio || 0).toLocaleString('es-MX') + ' · ' + (u.estado || 'Disponible'),
+                action: "closeModal(); navigateTo('auto-unidades');"
+            });
+        }
+    });
+    // 4. Propiedades
+    ((db.inmPublica && db.inmPublica.props) || []).forEach(function(p){
+        if (match((p.titulo || '') + ' ' + (p.colonia || '') + ' ' + (p.ciudad || ''))) {
+            hits.push({
+                cat: 'Propiedad Inmobiliaria',
+                icon: 'fa-building text-teal-600',
+                title: p.titulo || 'Propiedad',
+                sub: (p.colonia || '') + ', ' + (p.ciudad || '') + ' · $' + Number(p.precio || 0).toLocaleString('es-MX'),
+                action: "closeModal(); navigateTo('inm-unidades');"
+            });
+        }
+    });
+    // 5. Usuarios / Mensajes
+    (db.users || []).forEach(function(u){
+        if (u.id !== currentUser.id && match((u.name || '') + ' ' + (u.email || '') + ' ' + (u.role || ''))) {
+            hits.push({
+                cat: 'Mensaje Directo',
+                icon: 'fa-comments text-amber-700',
+                title: u.name || u.username,
+                sub: (u.role || '').toUpperCase() + ' · ' + (u.email || ''),
+                action: "closeModal(); navigateTo('messages'); setTimeout(function(){ if(window.openChat) openChat('" + u.id + "'); }, 120);"
+            });
+        }
+    });
+    // 6. Lecciones
+    (db.lessons || []).forEach(function(l){
+        if (match(l.title + ' ' + (l.description || ''))) {
+            hits.push({
+                cat: 'Lección Academia',
+                icon: 'fa-book-open text-purple-600',
+                title: l.title,
+                sub: 'Ir a lección académica',
+                action: "closeModal(); navigateTo('lessons');"
+            });
+        }
+    });
+
+    const top = hits.slice(0, 18);
+    if (!top.length) {
+        box.innerHTML = '<p class="text-center text-sm text-slate-400 py-8">Sin resultados para "' + (rawQ || '') + '"</p>';
+        return;
+    }
+    box.innerHTML = top.map(function(h){
+        return `<div onclick="${h.action}" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-amber-400 hover:bg-amber-50/40 cursor-pointer transition">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0"><i class="fas ${h.icon}"></i></div>
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-slate-900 truncate">${h.title}</p>
+                    <p class="text-xs text-slate-500 truncate">${h.sub}</p>
+                </div>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0 uppercase">${h.cat}</span>
+        </div>`;
+    }).join('');
+};
+
+document.addEventListener('keydown', function(e){
+    if ((e.ctrlKey || e.metaKey) && e.key && e.key.toLowerCase() === 'k') {
+        if (typeof currentUser !== 'undefined' && currentUser) {
+            e.preventDefault();
+            window.openGlobalSearch();
+        }
+    }
+});
+
+
 

@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 
 
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUmlubyBQb3J0YWwgUHJlbWl1bSIsInNob3J0X25hbWUiOiJSaW5vIiwic3RhcnRfdXJsIjoiLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmOGZhZmMiLCJ0aGVtZV9jb2xvciI6IiMwYTI1NDAiLCJpY29ucyI6W3sic3JjIjoiaHR0cHM6Ly9pLnByYXZhdGFyLmNjLzE5MiIsInNpemVzIjoiMTkyeDE5MiIsInR5cGUiOiJpbWFnZS9wbmcifV19">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a2540">
 <meta name="description" content="Portal de Desarrollo Comercial — Academia con clases en vivo por roles.">
 
@@ -85,13 +85,25 @@
 
             <!-- Main Content -->
             <div class="flex-1 flex flex-col min-h-screen lg:min-w-0">
-                <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-20">
-                    <button id="menu-toggle" class="text-slate-600 hover:text-slate-900 p-2 -ml-2 rounded-lg hover:bg-slate-100"><i class="fas fa-bars text-xl"></i></button>
-                    <h2 id="page-title" class="text-xl font-semibold text-slate-800">Dashboard</h2>
-                    <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
-                        <i class="fas fa-bell text-lg"></i>
-                        <span id="badge-solicitudes-header" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white">0</span>
-                    </button>
+                <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-3 sticky top-0 z-20">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <button id="menu-toggle" class="text-slate-600 hover:text-slate-900 p-2 -ml-2 rounded-lg hover:bg-slate-100"><i class="fas fa-bars text-xl"></i></button>
+                        <h2 id="page-title" class="text-xl font-semibold text-slate-800 truncate">Dashboard</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-global-search" onclick="if(window.openGlobalSearch) openGlobalSearch()" class="px-3 py-1.5 rounded-xl border border-amber-300/80 bg-amber-50/50 hover:bg-amber-100/70 text-slate-700 text-xs font-semibold flex items-center gap-2 transition shadow-sm" title="Buscador universal (Ctrl+K)">
+                            <i class="fas fa-search text-amber-600"></i>
+                            <span class="hidden sm:inline">Buscar cliente, póliza, auto...</span>
+                            <kbd class="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded text-slate-500">Ctrl+K</kbd>
+                        </button>
+                        <button id="btn-push-notif" onclick="if(window.activarNotificacionesPush) activarNotificacionesPush()" class="p-2 rounded-xl border border-slate-200 hover:border-amber-300 text-slate-500 hover:text-amber-700 transition" title="Activar notificaciones del navegador (PWA)">
+                            <i class="fas fa-bell-concierge text-sm"></i>
+                        </button>
+                        <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
+                            <i class="fas fa-bell text-lg"></i>
+                            <span id="badge-solicitudes-header" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white">0</span>
+                        </button>
+                    </div>
                 </header>
                 <main id="main-content" class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50"></main>
                 <!-- Barra Noticias - con botón cerrar visible -->

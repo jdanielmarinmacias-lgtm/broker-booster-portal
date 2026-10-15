@@ -4018,9 +4018,11 @@ function renderMisClientes(){
                 <h2 class="text-2xl font-bold text-slate-900">Mis Clientes</h2>
                 <p class="text-slate-500 text-sm mt-1">${puedeVerTodos ? 'Vista completa de todos los agentes' : 'Tus clientes registrados'}</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 ${(currentUser.role||'').toLowerCase()==='gm' ? `<button onclick="openGestionarCompanias()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-building mr-1"></i> Compañías</button>` : ''}
-                <button onclick="openCobranzaPeriodo()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium"><i class="fas fa-bell mr-1"></i> Cobranza</button>
+                <button onclick="openRenovacionesMotor()" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded-lg text-sm font-medium border border-amber-400/50"><i class="fas fa-rotate mr-1"></i> Renovaciones (60/30/15d)</button>
+                <button onclick="openCobranzaPeriodo()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium"><i class="fas fa-calendar-check mr-1"></i> Cobranza y Conciliación</button>
+                <button onclick="openEstadoCuentaComisiones()" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-sm font-semibold"><i class="fas fa-coins mr-1"></i> Estado de Cuenta Comisiones</button>
                 <button onclick="exportarClientesCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-file-csv mr-1"></i> Exportar CSV</button>
                 <button onclick="verAuditoriaClientes()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"><i class="fas fa-history mr-1"></i> Auditoría</button>
             </div>
@@ -4149,7 +4151,7 @@ function renderMisClientes(){
                                 <td class="p-3 text-xs text-slate-500">${new Date(c.fecha).toLocaleDateString('es-MX')}</td>
                                 <td class="p-3 text-xs ${c.fechaEmision?'text-slate-600':'text-slate-300'}">${c.fechaEmision?new Date(c.fechaEmision).toLocaleDateString('es-MX'):'—'}</td>
                                 <td class="p-3">${c.evidencia ? `<button onclick="verEvidenciaCliente(${c.id})" class="text-indigo-600 hover:text-indigo-800 text-xs"><i class="fas fa-eye mr-1"></i>Ver</button>` : '<span class="text-slate-400 text-xs">-</span>'}</td>
-                                <td class="p-3">${puedeEditar ? `<div class="flex gap-2"><button onclick="openCobranza(${c.id})" class="text-amber-500 hover:text-amber-700" title="Cobranza / recordatorio de pago"><i class="fas fa-hand-holding-dollar"></i></button><button onclick="sinDesdeCliente(${c.id})" class="text-orange-500 hover:text-orange-700" title="Siniestro / Cancelación"><i class="fas fa-file-shield"></i></button><button onclick="editarCliente(${c.id})" class="text-slate-500 hover:text-indigo-600" title="Modificar"><i class="fas fa-pen"></i></button><button onclick="borrarCliente(${c.id})" class="text-slate-500 hover:text-red-600" title="Borrar"><i class="fas fa-trash"></i></button></div>` : ''}</td>
+                                <td class="p-3">${puedeEditar ? `<div class="flex gap-2"><button onclick="openExpediente360(${c.id})" class="text-teal-600 hover:text-teal-800" title="Expediente 360° y Venta Cruzada (#6)"><i class="fas fa-id-card-clip"></i></button><button onclick="openCobranza(${c.id})" class="text-amber-500 hover:text-amber-700" title="Cobranza / recordatorio de pago"><i class="fas fa-hand-holding-dollar"></i></button><button onclick="sinDesdeCliente(${c.id})" class="text-orange-500 hover:text-orange-700" title="Siniestro / Cancelación"><i class="fas fa-file-shield"></i></button><button onclick="editarCliente(${c.id})" class="text-slate-500 hover:text-indigo-600" title="Modificar"><i class="fas fa-pen"></i></button><button onclick="borrarCliente(${c.id})" class="text-slate-500 hover:text-red-600" title="Borrar"><i class="fas fa-trash"></i></button></div>` : ''}</td>
                             </tr>`;
                         }).join('') || `<tr><td colspan="12" class="p-8 text-center text-slate-500">No hay clientes registrados</td></tr>`}
                     </tbody>
@@ -4316,9 +4318,153 @@ function cbzEnviar(id){
 function cbzMarcarPagado(id){
     const c=(db.clientes||[]).find(x=>x.id===id); if(!c) return;
     c.fechaCobranza=new Date().toISOString();
+    c.recibosConciliados = (c.recibosConciliados || 0) + 1;
     const prox=cbzProximoVencimiento(c);
-    cbzRegistrarLog('cobranza_pago',c,'Pago registrado'+(prox?'; siguiente vencimiento: '+prox.toLocaleDateString('es-MX'):''));
-    saveDB(); if(window.showToast) showToast('Pago registrado','success'); closeModal(); render();
+    cbzRegistrarLog('cobranza_pago',c,'Pago conciliado'+(prox?'; siguiente vencimiento: '+prox.toLocaleDateString('es-MX'):''));
+    saveDB(); if(window.showToast) showToast('Pago conciliado y comisión devengada actualizada','success'); closeModal(); render();
+}
+
+// === FASE 2 (#4): MOTOR DE RENOVACIONES A 60 / 30 / 15 DÍAS ===
+function openRenovacionesMotor(){
+    const puedeVerTodos=['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
+    const base=puedeVerTodos?[...(db.clientes||[])]:[...(db.clientes||[])].filter(c=>String(c.agenteId)===String(currentUser.id));
+    const hoy=new Date(); hoy.setHours(0,0,0,0);
+    const items=base.map(c=>{
+        const fin=cbzVigenciaFin(c);
+        const dias=fin?Math.round((fin.getTime()-hoy.getTime())/86400000):999;
+        return { c, fin, dias };
+    }).filter(x=>x.dias<=90).sort((a,b)=>a.dias-b.dias);
+    const b15=items.filter(x=>x.dias<=15).length;
+    const b30=items.filter(x=>x.dias>15 && x.dias<=30).length;
+    const b60=items.filter(x=>x.dias>30 && x.dias<=60).length;
+    showModal(`<div class="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-rotate text-amber-600"></i> Motor de Renovaciones Anuales (60 / 30 / 15 días)</h3>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2.5 mb-4 text-center text-xs">
+            <div class="p-3 rounded-xl bg-red-50 border border-red-200"><div class="text-2xl font-black text-red-600">${b15}</div>Urgentes (≤15 días)</div>
+            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><div class="text-2xl font-black text-amber-600">${b30}</div>Próximas (16–30 días)</div>
+            <div class="p-3 rounded-xl bg-blue-50 border border-blue-200"><div class="text-2xl font-black text-blue-600">${b60}</div>Preventivas (31–60 días)</div>
+        </div>
+        <div class="space-y-2 max-h-[50vh] overflow-y-auto">
+            ${items.map(({c,fin,dias})=>{
+                const badge = dias<0 ? `<span class="px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">Vencida hace ${Math.abs(dias)}d</span>`
+                            : dias<=15 ? `<span class="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">Renueva en ${dias}d</span>`
+                            : dias<=30 ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">Renueva en ${dias}d</span>`
+                            : `<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">Renueva en ${dias}d</span>`;
+                const msgRenov = encodeURIComponent(`Hola ${c.nombre}, te saluda ${currentUser.name}. Tu póliza ${c.poliza||''} (${c.compania||''}) cumple su aniversario el ${fin?fin.toLocaleDateString('es-MX'):'próximo mes'}. Ya preparé tu propuesta de renovación para mantener tu antigüedad y beneficios. ¿La revisamos hoy?`);
+                return `<div class="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">${badge}<span class="font-bold text-sm text-slate-900 truncate">${escapeHTML(c.nombre)}</span></div>
+                        <p class="text-xs text-slate-500 mt-0.5">Póliza ${escapeHTML(c.poliza||'—')} · ${escapeHTML(c.compania||'')} · ${escapeHTML(c.ramo||'')} · Prima $${Number(c.primaTotal||0).toLocaleString('es-MX')} · Aniversario: ${fin?fin.toLocaleDateString('es-MX'):'—'}</p>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${c.whatsapp?`<a href="https://wa.me/${cbzNormalizaTel(c.whatsapp)}?text=${msgRenov}" target="_blank" class="px-2.5 py-1.5 rounded-lg bg-[#25D366] text-white text-xs font-bold" title="WhatsApp Renovación"><i class="fab fa-whatsapp"></i></a>`:''}
+                        <button onclick="closeModal();navigateTo('cotizaciones');setTimeout(function(){if(window.cotModalNueva)cotModalNueva();},150)" class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold">Recotizar</button>
+                    </div>
+                </div>`;
+            }).join('') || '<p class="text-center text-slate-400 py-8 text-sm">No hay pólizas próximas a renovar en los siguientes 90 días.</p>'}
+        </div>
+    </div>`);
+}
+
+// === FASE 2 (#6): EXPEDIENTE ÚNICO 360° Y VENTA CRUZADA (CROSS-SELLING) ===
+function openExpediente360(clienteId){
+    const c=(db.clientes||[]).find(x=>String(x.id)===String(clienteId)); if(!c) return;
+    const nomNorm=String(c.nombre||'').toLowerCase().trim();
+    const telNorm=cbzNormalizaTel(c.whatsapp||'').slice(-10);
+    const polizas=(db.clientes||[]).filter(x=>String(x.nombre||'').toLowerCase().trim()===nomNorm || (telNorm && cbzNormalizaTel(x.whatsapp||'').endsWith(telNorm)));
+    const cots=((typeof cotDB==='function'?cotDB():db.cotizaciones)||[]).filter(s=>String(s.cliente?.nombre||'').toLowerCase().trim()===nomNorm);
+    const autos=((db.autoHub&&db.autoHub.clientes)||[]).filter(a=>String(a.nombre||'').toLowerCase().trim()===nomNorm || (telNorm && String(a.tel||'').replace(/\D/g,'').endsWith(telNorm)));
+    const inm=(db.inmCartera||[]).filter(i=>String(i.cliente||'').toLowerCase().trim()===nomNorm);
+
+    const tieneVida=polizas.some(p=>/vida|inversi/i.test(p.ramo||''));
+    const tieneGMM=polizas.some(p=>/gmm|m[eé]dico/i.test(p.ramo||''));
+    const tieneAuto=polizas.some(p=>/auto/i.test(p.ramo||'')) || autos.length>0;
+    const tieneInm=inm.length>0;
+    const oportunidades=[];
+    if(!tieneVida) oportunidades.push('Plan de Vida / Ahorro para el Retiro');
+    if(!tieneGMM) oportunidades.push('Gastos Médicos Mayores (Protección Familiar)');
+    if(!tieneAuto) oportunidades.push('Póliza de Seguro de Auto / Cambio de Unidad en Agencia');
+    if(!tieneInm) oportunidades.push('Inversión Patrimonial Inmobiliaria');
+
+    showModal(`<div class="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">Vista Ejecutiva 360° (#6)</span>
+                <h3 class="text-xl font-bold text-slate-900 mt-1">${escapeHTML(c.nombre)}</h3>
+                <p class="text-xs text-slate-500">WhatsApp: ${escapeHTML(c.whatsapp||'—')} · Asesor: ${escapeHTML(c.agenteNombre||'—')}</p>
+            </div>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Pólizas Activas</p><p class="text-xl font-bold text-slate-900">${polizas.length}</p></div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Prima Anual Acum.</p><p class="text-lg font-bold text-emerald-700">$${polizas.reduce((s,x)=>s+Number(x.primaTotal||0),0).toLocaleString('es-MX')}</p></div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Cotizaciones</p><p class="text-xl font-bold text-indigo-700">${cots.length}</p></div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Autos / Inmuebles</p><p class="text-xl font-bold text-amber-700">${autos.length + inm.length}</p></div>
+        </div>
+        <div class="mb-4 p-4 rounded-xl bg-amber-50/70 border border-amber-200">
+            <h4 class="text-xs font-bold uppercase text-amber-900 mb-2"><i class="fas fa-lightbulb text-amber-600 mr-1"></i>Oportunidades de Venta Cruzada (Cross-Selling)</h4>
+            ${oportunidades.length ? `<ul class="space-y-1 text-xs text-slate-700">${oportunidades.map(o=>`<li><i class="fas fa-arrow-trend-up text-emerald-600 mr-1.5"></i>${o}</li>`).join('')}</ul>` : '<p class="text-xs text-emerald-700 font-semibold">¡Cliente blindado en las 4 líneas de negocio!</p>'}
+        </div>
+        <div class="space-y-2">
+            <h4 class="text-xs font-bold uppercase text-slate-500">Productos contratados y expedientes</h4>
+            ${polizas.map(p=>`<div class="p-2.5 rounded-lg border border-slate-200 bg-white flex justify-between text-xs"><span><b>${escapeHTML(p.ramo||'Seguro')}</b> · ${escapeHTML(p.compania||'')} · Póliza ${escapeHTML(p.poliza||'')}</span><span class="font-bold text-emerald-700">$${Number(p.primaTotal||0).toLocaleString('es-MX')}</span></div>`).join('')}
+        </div>
+    </div>`);
+}
+
+// === FASE 2 (#13 y #5): ESTADO DE CUENTA DE COMISIONES, BONOS Y CONCILIACIÓN ===
+function openEstadoCuentaComisiones(){
+    const puedeVerTodos=['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
+    const lista=puedeVerTodos?[...(db.clientes||[])]:[...(db.clientes||[])].filter(c=>String(c.agenteId)===String(currentUser.id));
+    const tasaRamo=(ramo)=>{
+        const r=String(ramo||'').toUpperCase();
+        if(r.includes('VIDA')||r.includes('INVERSI')) return 0.30;
+        if(r.includes('GMM')) return 0.18;
+        if(r.includes('AUTO')) return 0.12;
+        return 0.15;
+    };
+    let primaTotalCartera=0, comisionProyectada=0, comisionDevengada=0;
+    const filas=lista.map(c=>{
+        const prima=Number(c.primaNeta||c.primaTotal||0);
+        const pct=tasaRamo(c.ramo);
+        const comAnual=prima*pct;
+        const pagado=Boolean(c.fechaCobranza) || (c.recibosConciliados||0)>0;
+        primaTotalCartera+=prima;
+        comisionProyectada+=comAnual;
+        if(pagado) comisionDevengada+=comAnual;
+        return `<tr class="border-t text-xs">
+            <td class="p-2 font-semibold">${escapeHTML(c.nombre)}</td>
+            <td class="p-2">${escapeHTML(c.ramo||'General')} (${Math.round(pct*100)}%)</td>
+            <td class="p-2">$${prima.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+            <td class="p-2 font-bold text-amber-800">$${comAnual.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+            <td class="p-2">${pagado?'<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Conciliado</span>':'<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">Por conciliar</span>'}</td>
+        </tr>`;
+    }).join('');
+    const bonoMeta = lista.length >= 10 ? 5000 : (lista.length >= 5 ? 2000 : 0);
+    showModal(`<div class="p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-coins text-amber-600"></i> Estado de Cuenta de Comisiones y Conciliación (#13 y #5)</h3>
+                <p class="text-xs text-slate-500">Cálculo automático sobre prima neta/total según tabulador por ramo y recibos conciliados.</p>
+            </div>
+            <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Prima en Cartera</p><p class="text-lg font-bold text-slate-900">$${Math.round(primaTotalCartera).toLocaleString('es-MX')}</p></div>
+            <div class="p-3 rounded-xl bg-amber-50 border border-amber-200"><p class="text-[11px] text-amber-900">Comisión Proyectada</p><p class="text-lg font-bold text-amber-800">$${Math.round(comisionProyectada).toLocaleString('es-MX')}</p></div>
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200"><p class="text-[11px] text-emerald-900">Comisión Conciliada</p><p class="text-lg font-bold text-emerald-700">$${Math.round(comisionDevengada).toLocaleString('es-MX')}</p></div>
+            <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200"><p class="text-[11px] text-indigo-900">Bono de Productividad</p><p class="text-lg font-bold text-indigo-700">$${bonoMeta.toLocaleString('es-MX')}</p></div>
+        </div>
+        <div class="overflow-x-auto max-h-[45vh] border border-slate-200 rounded-xl">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-[11px] uppercase text-slate-500"><tr><th class="p-2">Cliente</th><th class="p-2">Ramo (% Com.)</th><th class="p-2">Prima Base</th><th class="p-2">Comisión</th><th class="p-2">Estatus Recibo</th></tr></thead>
+                <tbody>${filas || '<tr><td colspan="5" class="p-6 text-center text-xs text-slate-400">Sin pólizas registradas</td></tr>'}</tbody>
+            </table>
+        </div>
+    </div>`);
 }
 function openCobranzaPeriodo(){
     const puedeVerTodos=['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
