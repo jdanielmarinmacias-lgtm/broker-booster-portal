@@ -16,11 +16,11 @@
 
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body class="text-slate-800">
     <div id="public-portal"></div>
@@ -98,6 +98,10 @@
                         </button>
                         <button id="btn-push-notif" onclick="if(window.activarNotificacionesPush) activarNotificacionesPush()" class="p-2 rounded-xl border border-slate-200 hover:border-amber-300 text-slate-500 hover:text-amber-700 transition" title="Activar notificaciones del navegador (PWA)">
                             <i class="fas fa-bell-concierge text-sm"></i>
+                        </button>
+                        <button id="btn-theme-toggle" onclick="if(window.toggleExecutiveTheme) toggleExecutiveTheme()" class="px-2.5 py-1.5 rounded-xl border border-amber-300/80 bg-slate-900 text-amber-300 hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Alternar Modo Oscuro Ejecutivo (Obsidiana y Oro)">
+                            <i id="icon-theme-toggle" class="fas fa-moon text-amber-400"></i>
+                            <span id="label-theme-toggle" class="hidden md:inline">Obsidiana</span>
                         </button>
                         <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
                             <i class="fas fa-bell text-lg"></i>

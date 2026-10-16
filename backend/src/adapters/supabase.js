@@ -68,6 +68,36 @@ function createSupabaseAdapter({ url, serviceKey }) {
     return out;
   }
 
+  /* Carga quirúrgica de solo las colecciones solicitadas (evita descargar toda
+   * la tabla documents y app_users en cada POST/PUT/DELETE de una colección). */
+  async function loadCollections(names) {
+    const wanted = (names || []).filter((n) => n && n !== 'users');
+    const out = {};
+    if (!wanted.length) return out;
+    let from = 0;
+    const PAGE = 1000;
+    const objects = {};
+    for (;;) {
+      const { data, error } = await sb.from('documents')
+        .select('collection,doc_id,data')
+        .in('collection', wanted)
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error('Supabase loadCollections: ' + error.message);
+      for (const row of data) {
+        if (row.doc_id === '__object__') {
+          objects[row.collection] = row.data || {};
+        } else {
+          out[row.collection] = out[row.collection] || [];
+          out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+        }
+      }
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    for (const [c, v] of Object.entries(objects)) out[c] = v;
+    return out;
+  }
+
   async function saveDocuments(obj) {
     // Fallback total (seed/boot). Las rutas usan saveCollections (quirúrgico).
     const names = Object.keys(obj || {}).filter(
@@ -139,7 +169,9 @@ function createSupabaseAdapter({ url, serviceKey }) {
     kind: 'supabase',
     cacheTtlMs: 10 * 1000, // caché cálida 10s; sesiones/usuarios auth siempre en directo
     loadDocuments,
+    loadCollections,
     saveDocuments,
+    saveCollections,
     async getUserByUsername(username) {
       const { data, error } = await sb.from('app_users').select('*')
         .ilike('username', String(username)).limit(1).maybeSingle();

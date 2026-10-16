@@ -39,7 +39,15 @@ function createStore(adapter) {
      * puede estar dentro del TTL pero vieja respecto a otra instancia.
      * Mutar sin esto = reescribir (y borrar) lo ajeno. Un read extra por
      * escritura es barato frente a perder datos. */
-    async refreshForWrite() {
+    async refreshForWrite(collections) {
+      if (Array.isArray(collections) && collections.length && typeof adapter.loadCollections === 'function' && cacheAt > 0) {
+        const subset = await adapter.loadCollections(collections);
+        for (const col of collections) {
+          if (col === 'users') continue;
+          if (col in subset) cache[col] = subset[col];
+        }
+        return;
+      }
       cache = await adapter.loadDocuments();
       cacheAt = Date.now();
     },

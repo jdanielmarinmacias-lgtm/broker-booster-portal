@@ -44,7 +44,7 @@ const COLLECTION_RULES = {
   ventas:       { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
   metas:        { read: null, write: STAFF },
   solicitudes:  { read: null, write: ALL_ROLES },
-  cotizaciones: { read: null, write: [...STAFF, 'editor', 'capacitador'] },
+  cotizaciones: { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
   siniestros:   { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
   lessons:      { read: null, write: TEACHERS },
   exams:        { read: null, write: TEACHERS },

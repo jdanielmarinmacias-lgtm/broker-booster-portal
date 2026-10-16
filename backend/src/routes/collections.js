@@ -123,6 +123,33 @@ module.exports = (store, config) => {
     } catch (e) { next(e); }
   });
 
+  /* Endpoint Batch (/api/data/bundle): devuelve todas las colecciones legibles
+   * por el usuario en UNA sola petición HTTP (elimina la cascada de ~18 GETs
+   * al iniciar sesión o recargar). */
+  api.get('/bundle', async (req, res, next) => {
+    try {
+      await store.refreshIfStale();
+      const data = store.get();
+      const set = new Set(Object.keys(data).filter(
+        (k) => !FORBIDDEN.has(k) && (Array.isArray(data[k]) || isPlain(data[k]))
+      ));
+      for (const k of KNOWN_EMPTY) if (!FORBIDDEN.has(k)) set.add(k);
+      for (const k of KNOWN_OBJECTS) if (!FORBIDDEN.has(k)) set.add(k);
+      const bundle = {};
+      for (const col of set) {
+        if (!roles.canRead(req.user, col)) continue;
+        if (isPlain(data[col])) {
+          bundle[col] = { shape: 'object', value: data[col] };
+        } else if (!data[col] && KNOWN_OBJECTS.has(col)) {
+          bundle[col] = { shape: 'object', value: {} };
+        } else {
+          bundle[col] = { shape: 'array', items: Array.isArray(data[col]) ? data[col] : [] };
+        }
+      }
+      res.json({ ok: true, bundle });
+    } catch (e) { next(e); }
+  });
+
   api.get('/:collection', async (req, res, next) => {
     try {
       const { collection } = req.params;
@@ -155,7 +182,7 @@ module.exports = (store, config) => {
       // ORDEN CRÍTICO: refrescar ANTES de resolver la colección. Si se resuelve
       // antes, `col` apunta a la caché vieja y el push muta un objeto que el
       // persist ya no guarda (respuesta 201 pero dato perdido en producción).
-      await store.refreshForWrite();
+      await store.refreshForWrite([collection, 'auditoria']);
       const root = store.get();
       const body = req.body || {};
       // Objeto: merge por claves top-level (protege el objeto; jamás []).
@@ -200,7 +227,7 @@ module.exports = (store, config) => {
       const { collection, id } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      await store.refreshForWrite();
+      await store.refreshForWrite([collection, 'auditoria']);
       const root = store.get();
       // Objeto: :id es la CLAVE top-level a escribir/crear. { value }
       if (isPlain(root[collection]) || (!root[collection] && KNOWN_OBJECTS.has(collection))) {
@@ -231,7 +258,7 @@ module.exports = (store, config) => {
       const { collection, id } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      await store.refreshForWrite();
+      await store.refreshForWrite([collection, 'auditoria']);
       const data = store.get();
       // Objeto: borra la CLAVE top-level (diff del frontend baja borrados).
       if (isPlain(data[collection])) {

@@ -4020,7 +4020,8 @@ function renderMisClientes(){
             </div>
             <div class="flex flex-wrap gap-2">
                 ${(currentUser.role||'').toLowerCase()==='gm' ? `<button onclick="openGestionarCompanias()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-building mr-1"></i> Compañías</button>` : ''}
-                <button onclick="openRenovacionesMotor()" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded-lg text-sm font-medium border border-amber-400/50"><i class="fas fa-rotate mr-1"></i> Renovaciones (60/30/15d)</button>
+                <button onclick="if(window.openSimuladorPorRamo) openSimuladorPorRamo('vida-ind')" class="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium"><i class="fas fa-calculator mr-1"></i> Calculadoras por Ramo</button>
+                <button onclick="openRenovacionesMotor()" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded-lg text-sm font-medium border border-amber-400/50"><i class="fas fa-rotate mr-1"></i> Renovaciones y Edad Actuarial</button>
                 <button onclick="openCobranzaPeriodo()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium"><i class="fas fa-calendar-check mr-1"></i> Cobranza y Conciliación</button>
                 <button onclick="openEstadoCuentaComisiones()" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-sm font-semibold"><i class="fas fa-coins mr-1"></i> Estado de Cuenta Comisiones</button>
                 <button onclick="exportarClientesCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-file-csv mr-1"></i> Exportar CSV</button>
@@ -4353,10 +4354,12 @@ function openRenovacionesMotor(){
                             : dias<=15 ? `<span class="px-2 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">Renueva en ${dias}d</span>`
                             : dias<=30 ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">Renueva en ${dias}d</span>`
                             : `<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">Renueva en ${dias}d</span>`;
-                const msgRenov = encodeURIComponent(`Hola ${c.nombre}, te saluda ${currentUser.name}. Tu póliza ${c.poliza||''} (${c.compania||''}) cumple su aniversario el ${fin?fin.toLocaleDateString('es-MX'):'próximo mes'}. Ya preparé tu propuesta de renovación para mantener tu antigüedad y beneficios. ¿La revisamos hoy?`);
+                const esVidaGMM = /vida|gmm|m[eé]dico|inversi/i.test(c.ramo||'');
+                const badgeActuarial = esVidaGMM ? `<span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold" title="En Vida y GMM la tarifa sube al cambiar la edad actuarial"><i class="fas fa-cake-candles mr-1"></i>Cambio Edad Actuarial</span>` : '';
+                const msgRenov = encodeURIComponent(`Hola ${c.nombre}, te saluda ${currentUser.name}. Tu póliza ${c.poliza||''} (${c.compania||''}) cumple su aniversario el ${fin?fin.toLocaleDateString('es-MX'):'próximo mes'}. Ya preparé tu propuesta de renovación y blindaje de edad actuarial para mantener tu antigüedad y beneficios. ¿La revisamos hoy?`);
                 return `<div class="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2">
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">${badge}<span class="font-bold text-sm text-slate-900 truncate">${escapeHTML(c.nombre)}</span></div>
+                        <div class="flex items-center gap-2 flex-wrap">${badge}${badgeActuarial}<span class="font-bold text-sm text-slate-900 truncate">${escapeHTML(c.nombre)}</span></div>
                         <p class="text-xs text-slate-500 mt-0.5">Póliza ${escapeHTML(c.poliza||'—')} · ${escapeHTML(c.compania||'')} · ${escapeHTML(c.ramo||'')} · Prima $${Number(c.primaTotal||0).toLocaleString('es-MX')} · Aniversario: ${fin?fin.toLocaleDateString('es-MX'):'—'}</p>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">

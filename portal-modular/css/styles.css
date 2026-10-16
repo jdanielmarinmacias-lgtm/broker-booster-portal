@@ -284,3 +284,120 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
   .en-vivo-studio { font-family: 'Inter', system-ui, sans-serif; }
   @keyframes floatUp { 0% { transform: translateY(0) scale(0.8); opacity:1 } 100% { transform: translateY(-180px) scale(1.4); opacity:0 } }
+
+/* === MODO OSCURO EJECUTIVO: OBSIDIANA Y ORO === */
+body.theme-obsidian {
+    --primary: #c9a86a;
+    --primary-dark: #b89146;
+    --accent: #dfbe7f;
+    background-color: #070b14 !important;
+    background-image:
+        radial-gradient(ellipse at 14% 16%, rgba(201, 168, 106, 0.14) 0%, transparent 48%),
+        radial-gradient(ellipse at 86% 84%, rgba(201, 168, 106, 0.10) 0%, transparent 52%),
+        linear-gradient(135deg, #070b14 0%, #0d1424 52%, #090e1a 100%) !important;
+    color: #e2e8f0 !important;
+}
+body.theme-obsidian #main-content,
+body.theme-obsidian #login-screen {
+    background-color: transparent !important;
+    background-image:
+        radial-gradient(circle at 80% 10%, rgba(201, 168, 106, 0.10), transparent 45%),
+        linear-gradient(135deg, rgba(11, 17, 30, 0.94) 0%, rgba(15, 23, 42, 0.95) 55%, rgba(9, 14, 26, 0.96) 100%) !important;
+    color: #e2e8f0 !important;
+}
+body.theme-obsidian header.bg-white,
+body.theme-obsidian header.bg-white\/95 {
+    background: linear-gradient(90deg, rgba(11, 17, 30, 0.97) 0%, rgba(17, 25, 43, 0.97) 100%) !important;
+    border-bottom: 1px solid rgba(201, 168, 106, 0.42) !important;
+}
+body.theme-obsidian #sidebar {
+    background: linear-gradient(180deg, #0b111e 0%, #11192b 100%) !important;
+    border-right: 1px solid rgba(201, 168, 106, 0.35) !important;
+    color: #e2e8f0 !important;
+}
+body.theme-obsidian #sidebar .border-slate-200 {
+    border-color: rgba(201, 168, 106, 0.24) !important;
+}
+body.theme-obsidian #main-content .bg-white,
+body.theme-obsidian #login-screen .bg-white,
+body.theme-obsidian #modal-backdrop .bg-white,
+body.theme-obsidian .modal-backdrop .bg-white {
+    background-color: #11192b !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(201, 168, 106, 0.28) !important;
+    box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(201, 168, 106, 0.16) !important;
+}
+body.theme-obsidian #main-content .bg-slate-50,
+body.theme-obsidian #main-content .bg-slate-50\/70,
+body.theme-obsidian #main-content .bg-slate-50\/80,
+body.theme-obsidian #main-content .bg-slate-100,
+body.theme-obsidian .modal-backdrop .bg-slate-50,
+body.theme-obsidian .modal-backdrop .bg-slate-100 {
+    background-color: #162138 !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(201, 168, 106, 0.22) !important;
+}
+body.theme-obsidian .text-slate-900,
+body.theme-obsidian .text-slate-800,
+body.theme-obsidian #page-title,
+body.theme-obsidian #user-name {
+    color: #f8fafc !important;
+}
+body.theme-obsidian .text-slate-700,
+body.theme-obsidian .text-slate-600 {
+    color: #cbd5e1 !important;
+}
+body.theme-obsidian .text-slate-500,
+body.theme-obsidian .text-slate-400 {
+    color: #94a3b8 !important;
+}
+body.theme-obsidian .border-slate-200,
+body.theme-obsidian .border-slate-100,
+body.theme-obsidian .border-slate-300 {
+    border-color: rgba(201, 168, 106, 0.25) !important;
+}
+body.theme-obsidian .nav-link {
+    color: #cbd5e1 !important;
+}
+body.theme-obsidian .nav-link:hover {
+    background-color: rgba(201, 168, 106, 0.12) !important;
+    color: #f8fafc !important;
+}
+body.theme-obsidian .nav-link.bg-indigo-50 {
+    background: linear-gradient(90deg, rgba(201, 168, 106, 0.22) 0%, rgba(22, 33, 56, 0.85) 100%) !important;
+    border-left: 3px solid #dfbe7f !important;
+    color: #f8fafc !important;
+}
+body.theme-obsidian #main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+body.theme-obsidian #main-content select,
+body.theme-obsidian #main-content textarea,
+body.theme-obsidian .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+body.theme-obsidian .modal-backdrop select,
+body.theme-obsidian .modal-backdrop textarea {
+    background-color: #0b111e !important;
+    color: #f8fafc !important;
+    border-color: rgba(201, 168, 106, 0.35) !important;
+    color-scheme: dark;
+}
+body.theme-obsidian table thead,
+body.theme-obsidian table thead tr {
+    background-color: #162138 !important;
+    color: #dfbe7f !important;
+}
+body.theme-obsidian table tbody tr:hover {
+    background-color: rgba(201, 168, 106, 0.08) !important;
+}
+body.theme-obsidian #btn-global-search {
+    background-color: #162138 !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(201, 168, 106, 0.45) !important;
+}
+body.theme-obsidian #btn-theme-toggle {
+    background: linear-gradient(135deg, #dfbe7f 0%, #b89146 100%) !important;
+    color: #0a192f !important;
+    border-color: #dfbe7f !important;
+}
+body.theme-obsidian #btn-theme-toggle i {
+    color: #0a192f !important;
+}
+

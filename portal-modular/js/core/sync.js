@@ -126,6 +126,31 @@
     }
   }
 
+  async function pullBundle(fallbackNames) {
+    const db = legDb();
+    if (!db) return false;
+    try {
+      const r = await get('/api/data/bundle');
+      if (r && r.bundle && typeof r.bundle === 'object') {
+        Object.keys(r.bundle).forEach(function (n) {
+          if (SKIP[n]) return;
+          const v = r.bundle[n];
+          if (!v) return;
+          if (v.shape === 'array') {
+            if (!Array.isArray(db[n])) db[n] = [];
+            replaceArray(db[n], normIds(v.items));
+          } else if (v.shape === 'object') {
+            if (!isPlain(db[n])) db[n] = {};
+            Object.keys(db[n]).forEach(function (k) { delete db[n][k]; });
+            Object.assign(db[n], normIds(v.value));
+          }
+          pulled[n] = true;
+        });
+        return true;
+      }
+    } catch (e) { /* fallback individual */ }
+    return pullNames(fallbackNames || []);
+  }
   async function pullNames(names) {
     const db = legDb();
     if (!db) return false;
@@ -190,9 +215,6 @@
     try { await window.Backend.me(); }
     catch (e) { active = false; return false; } // sin sesión: no tocar nada
     active = true;
-    let idx;
-    try { idx = await get('/api/data'); }
-    catch (e) { return false; }
     const db = legDb();
     if (!db) return false;
     // Foto local previa SIEMPRE: lo que solo existe en este equipo se fusiona
@@ -205,9 +227,10 @@
       if (Array.isArray(db[n]) || isPlain(db[n])) pre[n] = clone(db[n]);
     });
     const prevShadow = shadow ? clone(shadow) : null;
-    const names = (idx.collections || []).filter(function (n) { return !SKIP[n]; });
     pulled = {}; usersPulled = false;
-    await pullNames(names);
+    try {
+      await pullBundle();
+    } catch (e) { return false; }
     await pullUsers(); // users: el servidor es la verdad (sin merge)
     snapshot(); // foto del servidor ANTES de fusionar lo local
     let merged = 0;
@@ -498,11 +521,14 @@
         }
         return;
       }
-      var cols = SHOWCASE.slice();
       var target = kind && KIND_TO_COL[kind];
-      if (target && cols.indexOf(target) === -1 && LIVE_WORK.indexOf(target) !== -1) cols.push(target);
-      if (!target) cols = cols.concat(LIVE_WORK.filter(function (c) { return cols.indexOf(c) === -1; }));
+      // Pull quirúrgico en Realtime: si sabemos qué colección cambió, solo
+      // descargamos esa colección en vez de volver a bajar las 5 de SHOWCASE.
+      var cols = target ? [target] : SHOWCASE.concat(LIVE_WORK.filter(function (c) { return SHOWCASE.indexOf(c) === -1; }));
       pullNames(cols).then(function () {
+        if (shadow && target && db && (Array.isArray(db[target]) || isPlain(db[target]))) {
+          shadow[target] = clone(db[target]);
+        }
         try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
         const pp = document.getElementById('public-portal');
         if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {

@@ -225,7 +225,22 @@ window.saveDB = function() {
             }
         }
 
-function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+let _saveDBTimer = null;
+let _saveDBPending = false;
+function _flushSaveDBSync() {
+    if (_saveDBTimer) { clearTimeout(_saveDBTimer); _saveDBTimer = null; }
+    _saveDBPending = false;
+    try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {}
+}
+function saveDB(immediate) {
+    if (immediate === true) { _flushSaveDBSync(); return; }
+    _saveDBPending = true;
+    if (_saveDBTimer) clearTimeout(_saveDBTimer);
+    _saveDBTimer = setTimeout(_flushSaveDBSync, 90);
+}
+window.flushSaveDB = _flushSaveDBSync;
+document.addEventListener('visibilitychange', function() { if (document.hidden && _saveDBPending) _flushSaveDBSync(); });
+window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushSaveDBSync(); });
         function checkStorageUsage() {
             try {
                 let total = 0;
@@ -718,7 +733,8 @@ function auVerAuto(id){
                 <div class="flex items-center gap-2">
                     <button onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
                     <button onclick="auWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
-                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir / PDF</button>
+                    <button onclick="auExportarFichaPDF(${u.id})" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold"><i class="fas fa-file-pdf mr-1"></i>Descargar Ficha PDF</button>
+                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir</button>
                 </div>
             </div>
             <div class="grid lg:grid-cols-5 gap-8">
@@ -758,6 +774,35 @@ function auVerAuto(id){
                         ${fila('Entidad', u.entidad)}
                     </div>
                     ${u.descripcion?`<div class="bg-white border border-slate-200 rounded-2xl p-4 mt-3"><p class="text-xs uppercase font-bold text-slate-400 mb-1">Equipamiento</p><p class="text-sm text-slate-700">${psEscape(u.descripcion)}</p></div>`:''}
+                    <!-- FASE 3: Cotizador de Crédito Automotriz + Seguro Integrado -->
+                    <div class="bg-white border border-amber-300/80 rounded-2xl p-4 mt-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase text-amber-900"><i class="fas fa-calculator text-amber-600 mr-1"></i>Cotizador de Crédito Automotriz + Seguro</span>
+                            <span class="text-[10px] font-semibold text-slate-400">Tasa ref. 13.9% anual</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2.5 text-xs">
+                            <div>
+                                <label class="text-[11px] font-semibold text-slate-500">Enganche (%)</label>
+                                <select id="au-fin-eng" onchange="auRecalcFin(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                    <option value="20">20% ($${Math.round(Number(u.precio||0)*0.20).toLocaleString('es-MX')})</option>
+                                    <option value="30" selected>30% ($${Math.round(Number(u.precio||0)*0.30).toLocaleString('es-MX')})</option>
+                                    <option value="40">40% ($${Math.round(Number(u.precio||0)*0.40).toLocaleString('es-MX')})</option>
+                                    <option value="50">50% ($${Math.round(Number(u.precio||0)*0.50).toLocaleString('es-MX')})</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-semibold text-slate-500">Plazo (Meses)</label>
+                                <select id="au-fin-plazo" onchange="auRecalcFin(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                    <option value="12">12 meses</option>
+                                    <option value="24">24 meses</option>
+                                    <option value="36">36 meses</option>
+                                    <option value="48" selected>48 meses</option>
+                                    <option value="60">60 meses</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="au-fin-res" class="mt-3 p-3 rounded-xl bg-slate-900 text-white grid grid-cols-2 gap-2 text-center"></div>
+                    </div>
                     ${est!=='Vendida'?`<button onclick="auMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa este auto'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Unidad vendida</div>`}
                     <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor de la agencia ${psEscape(u.sucursal||'')} te contacta hoy.</p>
                 </div>
@@ -776,7 +821,57 @@ function auVerAuto(id){
         <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8">
             <div class="max-w-6xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Agencia Automotriz</div>
         </footer></div>`;
+    setTimeout(function(){ if(window.auRecalcFin) auRecalcFin(Number(u.precio||0)); }, 20);
 }
+window.auRecalcFin = function(precio){
+    const engPct = Number(document.getElementById('au-fin-eng')?.value || 30) / 100;
+    const plazo = Number(document.getElementById('au-fin-plazo')?.value || 48);
+    const enganche = Math.round(precio * engPct);
+    const financiar = Math.max(0, precio - enganche);
+    const r = 0.139 / 12;
+    const pagoAuto = financiar > 0 ? Math.round((financiar * r) / (1 - Math.pow(1 + r, -plazo))) : 0;
+    const seguroMes = Math.round((precio * 0.032) / 12);
+    const totalMes = pagoAuto + seguroMes;
+    const box = document.getElementById('au-fin-res');
+    if(box) box.innerHTML = `<div><p class="text-[10px] text-slate-400">Mensualidad Auto + Seguro</p><p class="text-lg font-black text-amber-400">$${totalMes.toLocaleString('es-MX')}/mes</p><p class="text-[10px] text-slate-400">(Incluye ~$${seguroMes.toLocaleString('es-MX')} seguro amplio)</p></div><div><p class="text-[10px] text-slate-400">Monto a Financiar</p><p class="text-sm font-bold text-white">$${financiar.toLocaleString('es-MX')}</p><p class="text-[10px] text-emerald-400">Enganche: $${enganche.toLocaleString('es-MX')}</p></div>`;
+};
+window.auExportarFichaPDF = function(id){
+    const u = auD().unidades.find(x=>String(x.id)===String(id));
+    if(!u) return;
+    if(!window.jspdf){ if(window.showToast) showToast('Cargando motor PDF, intenta en un segundo','info'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFillColor(10, 37, 64);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(201, 168, 106);
+    doc.setFontSize(16);
+    doc.text((db.settings?.institutionName || 'Broker Booster') + ' — Ficha Técnica Automotriz', 14, 18);
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(18);
+    doc.text(`${u.marca||''} ${u.modelo||''} ${u.anio||''}`, 14, 42);
+    doc.setFontSize(14);
+    doc.setTextColor(4, 120, 87);
+    doc.text(`Precio: $${Number(u.precio||0).toLocaleString('es-MX')} MXN`, 14, 51);
+    doc.setTextColor(51, 65, 85);
+    doc.setFontSize(11);
+    const specs = [
+        ['Kilometraje', u.km ? Number(u.km).toLocaleString('es-MX') + ' km' : '—'],
+        ['Transmisión / Motor', (u.transmision||'—') + ' / ' + (u.motor||'—')],
+        ['Combustible', u.combustible||'—'],
+        ['Origen', u.origen||'Mexicano'],
+        ['Sucursal / Entidad', (u.sucursal||'—') + ' · ' + (u.entidad||'—')],
+        ['Enganche 30% sugerido', '$' + Math.round(Number(u.precio||0)*0.30).toLocaleString('es-MX') + ' MXN']
+    ];
+    let y = 64;
+    specs.forEach(([k,v])=>{ doc.text(`${k}: ${v}`, 14, y); y += 8; });
+    if(u.descripcion){
+        y += 4;
+        const lines = doc.splitTextToSize('Equipamiento: ' + u.descripcion, 180);
+        doc.text(lines, 14, y);
+    }
+    doc.save(`Ficha-Auto-${(u.marca||'Auto')}-${u.modelo||u.id}.pdf`);
+    if(window.showToast) showToast('Ficha PDF de la unidad descargada', 'success');
+};
 function auVitrinaFicha(id){
     const u = auPublicas().find(x=>x.id===id); if(!u) return;
     const fotos = (u.fotos||[]);
@@ -1067,7 +1162,8 @@ function inmVerProp(id){
                 <div class="flex items-center gap-2">
                     <button onclick="inmCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
                     <button onclick="inmWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
-                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir / PDF</button>
+                    <button onclick="inmExportarFichaPDF(${u.id})" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold"><i class="fas fa-file-pdf mr-1"></i>Descargar Ficha PDF</button>
+                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir</button>
                 </div>
             </div>
             <div class="grid lg:grid-cols-5 gap-8">
@@ -1108,6 +1204,31 @@ function inmVerProp(id){
                         ${fila('Superficie', u.m2?u.m2+' m²':'')}
                     </div>
                     ${u.desc?`<div class="bg-white border border-slate-200 rounded-2xl p-4 mt-3"><p class="text-xs uppercase font-bold text-slate-400 mb-1">Descripción</p><p class="text-sm text-slate-700">${psEscape(u.desc)}</p></div>`:''}
+                    <!-- FASE 3: Simulador Hipotecario, Gastos de Escrituración y Cap Rate -->
+                    ${u.precio && (u.tipo||'Venta')!=='Renta' ? `<div class="bg-white border border-amber-300/80 rounded-2xl p-4 mt-4 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold uppercase text-amber-900"><i class="fas fa-house-laptop text-amber-600 mr-1"></i>Simulador Hipotecario y ROI Patrimonial</span>
+                            <span class="text-[10px] font-semibold text-slate-400">Tasa ref. 10.6% anual</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2.5 text-xs">
+                            <div>
+                                <label class="text-[11px] font-semibold text-slate-500">Enganche (%)</label>
+                                <select id="inm-hip-eng" onchange="inmRecalcHip(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                    <option value="10">10% ($${Math.round(Number(u.precio||0)*0.10).toLocaleString('es-MX')})</option>
+                                    <option value="20" selected>20% ($${Math.round(Number(u.precio||0)*0.20).toLocaleString('es-MX')})</option>
+                                    <option value="30">30% ($${Math.round(Number(u.precio||0)*0.30).toLocaleString('es-MX')})</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-semibold text-slate-500">Plazo Hipoteca</label>
+                                <select id="inm-hip-plazo" onchange="inmRecalcHip(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                    <option value="15">15 años</option>
+                                    <option value="20" selected>20 años</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="inm-hip-res" class="mt-3 p-3 rounded-xl bg-slate-900 text-white grid grid-cols-2 gap-2 text-center"></div>
+                    </div>` : ''}
                     ${est!=='Vendida'?`<button onclick="inmMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa esta propiedad'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Propiedad cerrada</div>`}
                     <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor te contacta hoy.</p>
                 </div>
@@ -1124,7 +1245,59 @@ function inmVerProp(id){
             </div>
         </div>
         <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-6xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Propiedades</div></footer></div>`;
+    setTimeout(function(){ if(window.inmRecalcHip && u.precio) inmRecalcHip(Number(u.precio||0)); }, 20);
 }
+window.inmRecalcHip = function(precio){
+    const engPct = Number(document.getElementById('inm-hip-eng')?.value || 20) / 100;
+    const anios = Number(document.getElementById('inm-hip-plazo')?.value || 20);
+    const enganche = Math.round(precio * engPct);
+    const escrituracion = Math.round(precio * 0.055);
+    const credito = Math.max(0, precio - enganche);
+    const r = 0.106 / 12;
+    const n = anios * 12;
+    const mensualidad = credito > 0 ? Math.round((credito * r) / (1 - Math.pow(1 + r, -n))) : 0;
+    const rentaEst = Math.round(precio * 0.0058);
+    const capRate = ((rentaEst * 12) / (precio || 1) * 100).toFixed(1);
+    const box = document.getElementById('inm-hip-res');
+    if(box) box.innerHTML = `<div><p class="text-[10px] text-slate-400">Mensualidad Hipotecaria</p><p class="text-lg font-black text-amber-400">$${mensualidad.toLocaleString('es-MX')}/mes</p><p class="text-[10px] text-slate-400">Escrituración (~5.5%): $${escrituracion.toLocaleString('es-MX')}</p></div><div><p class="text-[10px] text-slate-400">Cap Rate / Renta Est.</p><p class="text-sm font-bold text-emerald-400">${capRate}% anual (~$${rentaEst.toLocaleString('es-MX')}/mes)</p><p class="text-[10px] text-slate-300">Ingreso mín.: $${Math.round(mensualidad*3).toLocaleString('es-MX')}</p></div>`;
+};
+window.inmExportarFichaPDF = function(id){
+    const u = inmPubD().props.find(function(x){ return String(x.id)===String(id); });
+    if(!u) return;
+    if(!window.jspdf){ if(window.showToast) showToast('Cargando motor PDF, intenta en un segundo','info'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFillColor(10, 37, 64);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(201, 168, 106);
+    doc.setFontSize(16);
+    doc.text((db.settings?.institutionName || 'Broker Booster') + ' — Ficha Técnica Inmobiliaria', 14, 18);
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(18);
+    doc.text(String(u.titulo||'Propiedad'), 14, 42);
+    doc.setFontSize(14);
+    doc.setTextColor(4, 120, 87);
+    doc.text(u.precio ? `Valor: $${Number(u.precio).toLocaleString('es-MX')} MXN (${u.tipo||'Venta'})` : 'Precio a consultar', 14, 51);
+    doc.setTextColor(51, 65, 85);
+    doc.setFontSize(11);
+    const specs = [
+        ['Ubicación', (u.colonia ? u.colonia + ', ' : '') + (u.ciudad||'—')],
+        ['Tipo de Inmueble', u.inmuebleTipo||'Casa'],
+        ['Superficie', u.m2 ? u.m2 + ' m²' : '—'],
+        ['Recámaras / Baños', (u.recs||'—') + ' recámaras · ' + (u.banios||'—') + ' baños'],
+        ['Estacionamientos', String(u.estacionamientos||'—')],
+        ['Gastos de Escrituración Est. (5.5%)', u.precio ? '$' + Math.round(Number(u.precio)*0.055).toLocaleString('es-MX') + ' MXN' : '—']
+    ];
+    let y = 64;
+    specs.forEach(([k,v])=>{ doc.text(`${k}: ${v}`, 14, y); y += 8; });
+    if(u.desc){
+        y += 4;
+        const lines = doc.splitTextToSize('Descripción: ' + u.desc, 180);
+        doc.text(lines, 14, y);
+    }
+    doc.save(`Ficha-Propiedad-${u.id}.pdf`);
+    if(window.showToast) showToast('Ficha PDF de la propiedad descargada', 'success');
+};
 function inmMeInteresa(id){
     const u = inmPubLista().find(function(x){ return x.id===id; }); if(!u) return;
     showModal(`<form id="inm-prospecto-form" class="p-6">
@@ -2007,7 +2180,32 @@ function auD(){
                 document.documentElement.style.setProperty('--primary-dark', s.primaryDark);
                 document.documentElement.style.setProperty('--accent', s.accent);
             }
+            applyExecutiveTheme(localStorage.getItem('bb_exec_theme') || (s.execTheme || 'marble'));
         }
+
+        function applyExecutiveTheme(mode){
+            const isObsidian = mode === 'obsidian';
+            document.body.classList.toggle('theme-obsidian', isObsidian);
+            const icon = document.getElementById('icon-theme-toggle');
+            const label = document.getElementById('label-theme-toggle');
+            if(icon){
+                icon.className = isObsidian ? 'fas fa-sun text-slate-900' : 'fas fa-moon text-amber-400';
+            }
+            if(label){
+                label.textContent = isObsidian ? 'Mármol Claro' : 'Obsidiana';
+            }
+        }
+
+        function toggleExecutiveTheme(){
+            const next = document.body.classList.contains('theme-obsidian') ? 'marble' : 'obsidian';
+            localStorage.setItem('bb_exec_theme', next);
+            applyExecutiveTheme(next);
+            if(typeof showToast === 'function'){
+                showToast(next === 'obsidian' ? 'Modo Oscuro Ejecutivo (Obsidiana y Oro) activado' : 'Modo Mármol y Dorado activado', 'info');
+            }
+        }
+        window.toggleExecutiveTheme = toggleExecutiveTheme;
+        window.applyExecutiveTheme = applyExecutiveTheme;
 
 function solicitudesSinVer(){
     try{
@@ -4482,7 +4680,7 @@ function borrarPublicidad(id){
             window.cotSnapPrev = cotSnap();
             setInterval(function(){
                 try{
-                    if(!currentUser) return;
+                    if(!currentUser || document.hidden) return;
                     updateBadgeCotizaciones();
                     const snap = cotSnap();
                     if(snap !== window.cotSnapPrev){
@@ -4531,7 +4729,8 @@ function borrarPublicidad(id){
                         <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2"><i class="fas fa-file-signature text-emerald-600"></i> Cotizaciones y Emisiones</h2>
                         <p class="text-slate-500 text-sm mt-1">${cotEsProcesador() ? 'Bandeja de procesamiento: toma solicitudes, cotiza, analiza y envía.' : 'Solicita cotizaciones y emisiones; sigue el avance y responde aclaraciones.'}</p>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="openSimuladorPorRamo()" class="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-sm font-bold hover:bg-amber-200"><i class="fas fa-calculator mr-1.5 text-amber-700"></i> Simuladores por Ramo</button>
                         ${cotEsProcesador() ? `<button onclick="cotTabAnalitica()" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200"><i class="fas fa-chart-bar mr-1"></i> Analítica</button>` : ''}
                         ${cotPuedeConfigurar() ? `<button onclick="cotConfigModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200"><i class="fas fa-sliders mr-1"></i> Configurar</button>` : ''}
                         <button onclick="cotModalNueva()" class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow"><i class="fas fa-plus mr-1"></i> Nueva solicitud</button>
@@ -4942,7 +5141,14 @@ function borrarPublicidad(id){
             const campos = COT_CAMPOS_EXTRA[ramo]||[];
             window.cotRamoActualCampos = campos;
             const pref = 'cot-f-';
-            document.getElementById('cot-campos-extra').innerHTML = campos.length ? `<div class="cot-fields grid gap-3">${campos.map(c=> c.tipo==='integrantes' ? cotIntegrantesHTML(pref) : cotCampoHTML(c,pref)).join('')}</div>` : '';
+            const btnCalc = `<div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-xs font-semibold text-slate-700"><i class="fas fa-wand-magic-sparkles text-amber-600 mr-1"></i>Herramienta especializada para <b>${r.nombre}</b>:</span>
+                <div class="flex gap-2">
+                    <button type="button" onclick="openSimuladorPorRamo('${ramo}')" class="px-3 py-1 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600"><i class="fas fa-calculator mr-1"></i>Abrir Calculadora de ${r.nombre}</button>
+                    ${r.colectivo ? `<label class="px-3 py-1 rounded-lg bg-emerald-700 text-white text-xs font-bold cursor-pointer hover:bg-emerald-800"><i class="fas fa-file-csv mr-1"></i>Importar Censo CSV<input type="file" accept=".csv,.txt" class="hidden" onchange="cotImportarCensoCSV(this, '${ramo}')"></label>` : ''}
+                </div>
+            </div>`;
+            document.getElementById('cot-campos-extra').innerHTML = btnCalc + (campos.length ? `<div class="cot-fields grid gap-3">${campos.map(c=> c.tipo==='integrantes' ? cotIntegrantesHTML(pref) : cotCampoHTML(c,pref)).join('')}</div>` : '');
             cotRefrescarCondicional();
             const items = COT_CHECK_BASE.concat(cotCheckExtra(ramo));
             window.cotNuevaChk = {};
@@ -4951,6 +5157,191 @@ function borrarPublicidad(id){
                 <div class="space-y-1.5">${items.map(c=>`<label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" data-cotchk="${c.k}" data-cott="${escapeHTML(c.t)}" onchange="window.cotNuevaChk['${c.k}']=this.checked" class="mt-0.5 accent-emerald-600"><span>${c.t}</span></label>`).join('')}</div>
                 <p class="text-[11px] text-slate-400 mt-2">Puedes enviar aunque falten requisitos, pero se marcarán como pendientes y pueden retrasar la cotización.</p></div>`;
         }
+
+        // === FASE 3: IMPORTADOR DE CENSO / PADRÓN CSV PARA COLECTIVOS Y FLOTILLAS ===
+        async function cotImportarCensoCSV(inputEl, ramo){
+            const file = inputEl && inputEl.files && inputEl.files[0];
+            if(!file) return;
+            try {
+                const text = await file.text();
+                const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+                if(lines.length < 2){ showToast('El archivo CSV debe incluir encabezado y al menos 1 fila', 'warning'); return; }
+                const rows = lines.slice(1).map(l=>l.split(',').map(c=>c.trim()));
+                const count = rows.length;
+                const edades = rows.map(r=>parseInt(r[1],10)).filter(n=>!isNaN(n) && n>0 && n<110);
+                const edadProm = edades.length ? Math.round(edades.reduce((a,b)=>a+b,0)/edades.length) : 35;
+                const inpInt = document.getElementById('cot-f-integrantes');
+                if(inpInt && inpInt.tagName==='INPUT') inpInt.value = String(count);
+                const inpNotas = document.getElementById('cot-notas');
+                const resumenCenso = `[Censo CSV importado: ${count} registros | Edad promedio: ${edadProm} años | Muestra: ${rows.slice(0,3).map(r=>r[0]).join(', ')}]`;
+                if(inpNotas) inpNotas.value = (inpNotas.value ? inpNotas.value + '\n' : '') + resumenCenso;
+                showToast(`Censo validado: ${count} integrantes/unidades (edad prom. ${edadProm} años)`, 'success');
+            } catch(e) {
+                showToast('Error leyendo CSV: ' + e.message, 'error');
+            }
+        }
+
+        // === FASE 3: SUITE DE SIMULADORES Y CALCULADORAS TÉCNICAS POR RAMO ===
+        window.openSimuladorPorRamo = function(ramoInicial){
+            const tab = ramoInicial || window._simRamoTab || 'vida-ind';
+            window._simRamoTab = tab;
+            const tabs = [
+                { id:'vida-ind', lbl:'Vida y Educación', icon:'fa-heart-pulse' },
+                { id:'gmm-ind',  lbl:'GMM Deducible/Coaseguro', icon:'fa-notes-medical' },
+                { id:'inv-cont', lbl:'PPR / Beneficio Fiscal SAT', icon:'fa-coins' },
+                { id:'danos',    lbl:'Daños / Reconstrucción m²', icon:'fa-house-crack' },
+                { id:'vida-col', lbl:'Colectivos / Censo CSV', icon:'fa-users' }
+            ];
+            let body = '';
+            if(tab === 'vida-ind'){
+                body = `<div class="space-y-4">
+                    <p class="text-xs text-slate-500">Calcula la <b>Suma Asegurada Ideal</b> para proteger el ingreso familiar, liquidar pasivos y garantizar el fondo universitario de los hijos.</p>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="text-xs font-bold text-slate-600">Gasto mensual familiar ($ MXN)</label><input id="sim-vida-gasto" type="number" value="35000" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Años de respaldo deseados</label><input id="sim-vida-anios" type="number" value="10" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Deudas / Hipoteca actual ($ MXN)</label><input id="sim-vida-deuda" type="number" value="800000" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Fondo Universitario por hijo ($ MXN)</label><input id="sim-vida-uni" type="number" value="900000" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                    </div>
+                    <div id="sim-vida-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
+                </div>`;
+            } else if(tab === 'gmm-ind'){
+                body = `<div class="space-y-4">
+                    <p class="text-xs text-slate-500">Muestra al cliente cuánto pagaría él y cuánto absorbe la aseguradora ante una hospitalización real según su <b>Deducible, Coaseguro y Tope de Coaseguro</b>.</p>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="text-xs font-bold text-slate-600">Monto del Siniestro Hospitalario ($)</label><input id="sim-gmm-siniestro" type="number" value="450000" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Deducible Contratado ($)</label><input id="sim-gmm-ded" type="number" value="30000" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Coaseguro (%)</label><input id="sim-gmm-coa" type="number" value="10" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Tope de Coaseguro ($)</label><input id="sim-gmm-tope" type="number" value="65000" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                    </div>
+                    <div id="sim-gmm-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
+                </div>`;
+            } else if(tab === 'inv-cont' || tab === 'inv-unica'){
+                body = `<div class="space-y-4">
+                    <p class="text-xs text-slate-500">Simulador de <b>Plan Personal de Retiro (Art. 151 LISR)</b> con cálculo de devolución anual del SAT e interés compuesto.</p>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div><label class="text-xs font-bold text-slate-600">Aportación Mensual ($ MXN)</label><input id="sim-ppr-mes" type="number" value="5000" oninput="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Plazo de Inversión (Años)</label><input id="sim-ppr-anios" type="number" value="15" oninput="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Tasa ISR del Cliente (%)</label><select id="sim-ppr-isr" onchange="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="30" selected>30% (Ingresos medios-altos)</option><option value="23">23% (Ingresos medios)</option><option value="35">35% (Tasa máxima)</option></select></div>
+                        <div><label class="text-xs font-bold text-slate-600">Rendimiento Anual Estimado (%)</label><select id="sim-ppr-tasa" onchange="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="8.5">8.5% (Conservador)</option><option value="10.5" selected>10.5% (Dinámico)</option><option value="12.5">12.5% (Inversionista)</option></select></div>
+                    </div>
+                    <div id="sim-ppr-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
+                </div>`;
+            } else if(tab === 'danos'){
+                body = `<div class="space-y-4">
+                    <p class="text-xs text-slate-500">Evita el <b>infraseguro</b> calculando el Valor Real de Reconstrucción por m² de construcción y contenidos.</p>
+                    <div class="grid sm:grid-cols-3 gap-3">
+                        <div><label class="text-xs font-bold text-slate-600">Superficie construida (m²)</label><input id="sim-dan-m2" type="number" value="180" oninput="calcSimDanos()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Nivel de Acabados</label><select id="sim-dan-tipo" onchange="calcSimDanos()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="14500">Interés Medio ($14,500/m²)</option><option value="21000" selected>Residencial ($21,000/m²)</option><option value="32000">Residencial Plus / Lujo ($32,000/m²)</option><option value="16000">Nave / Local PyME ($16,000/m²)</option></select></div>
+                        <div><label class="text-xs font-bold text-slate-600">% Contenidos / Mobiliario</label><input id="sim-dan-cont" type="number" value="30" oninput="calcSimDanos()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                    </div>
+                    <div id="sim-dan-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
+                </div>`;
+            } else {
+                body = `<div class="space-y-4">
+                    <p class="text-xs text-slate-500">Validador rápido de <b>Censos / Padrones Colectivos</b> (Vida, GMM o Flotilla de Autos). Pega tus filas separadas por coma (Nombre, Edad, Suma/Unidad).</p>
+                    <textarea id="sim-col-txt" rows="4" oninput="calcSimColectivo()" class="w-full p-3 border rounded-xl text-xs font-mono" placeholder="Juan Pérez, 34, 1000000\nMaría López, 29, 1000000\nCarlos Ruiz, 45, 1500000">Juan Pérez, 34, 1000000\nMaría López, 29, 1000000\nCarlos Ruiz, 45, 1500000\nAna Torres, 38, 1000000</textarea>
+                    <div id="sim-col-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
+                </div>`;
+            }
+            showModal(`<div class="max-w-3xl w-full bg-white rounded-2xl p-6 modal-scroll" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">Herramientas por Ramo</span>
+                        <h3 class="text-xl font-bold text-slate-900 mt-0.5"><i class="fas fa-calculator text-amber-600 mr-1.5"></i>Simuladores Técnicos y Financieros</h3>
+                    </div>
+                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mb-5 pb-3 border-b border-slate-200">
+                    ${tabs.map(t=>`<button type="button" onclick="openSimuladorPorRamo('${t.id}')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition ${tab===t.id?'bg-slate-900 text-amber-300 shadow':'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas ${t.icon} mr-1"></i>${t.lbl}</button>`).join('')}
+                </div>
+                ${body}
+            </div>`);
+            setTimeout(()=>{
+                if(tab==='vida-ind') window.calcSimVida();
+                else if(tab==='gmm-ind') window.calcSimGMM();
+                else if(tab==='inv-cont'||tab==='inv-unica') window.calcSimPPR();
+                else if(tab==='danos') window.calcSimDanos();
+                else window.calcSimColectivo();
+            }, 30);
+        };
+
+        window.calcSimVida = function(){
+            const gasto = Number(document.getElementById('sim-vida-gasto')?.value||0);
+            const anios = Number(document.getElementById('sim-vida-anios')?.value||10);
+            const deuda = Number(document.getElementById('sim-vida-deuda')?.value||0);
+            const uni = Number(document.getElementById('sim-vida-uni')?.value||0);
+            const sumaIdeal = (gasto * 12 * anios) + deuda + uni;
+            const primaEstMes = Math.round((sumaIdeal / 1000) * 0.42);
+            const box = document.getElementById('sim-vida-out');
+            if(box) box.innerHTML = `<div class="grid sm:grid-cols-3 gap-3 text-center">
+                <div><p class="text-[11px] text-slate-400">Respaldo Ingresos (${anios} años)</p><p class="text-lg font-bold text-white">$${(gasto*12*anios).toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Suma Asegurada Ideal</p><p class="text-2xl font-black text-amber-400">$${sumaIdeal.toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Aportación Mensual Est.</p><p class="text-lg font-bold text-emerald-400">~$${primaEstMes.toLocaleString('es-MX')}/mes</p></div>
+            </div>`;
+        };
+        window.calcSimGMM = function(){
+            const sin = Number(document.getElementById('sim-gmm-siniestro')?.value||0);
+            const ded = Number(document.getElementById('sim-gmm-ded')?.value||0);
+            const coaPct = Number(document.getElementById('sim-gmm-coa')?.value||0)/100;
+            const tope = Number(document.getElementById('sim-gmm-tope')?.value||0);
+            const remanente = Math.max(0, sin - ded);
+            const coaseguroReal = Math.min(tope || Infinity, Math.round(remanente * coaPct));
+            const pagaCliente = Math.min(sin, ded + coaseguroReal);
+            const pagaAseguradora = Math.max(0, sin - pagaCliente);
+            const pctAseg = sin > 0 ? Math.round((pagaAseguradora / sin) * 100) : 0;
+            const box = document.getElementById('sim-gmm-out');
+            if(box) box.innerHTML = `<div class="grid sm:grid-cols-3 gap-3 text-center">
+                <div><p class="text-[11px] text-slate-400">Paga el Cliente (Ded + Coas.)</p><p class="text-lg font-bold text-amber-300">$${pagaCliente.toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Absorbe la Aseguradora (${pctAseg}%)</p><p class="text-2xl font-black text-emerald-400">$${pagaAseguradora.toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Ahorro Patrimonial</p><p class="text-lg font-bold text-white">$${pagaAseguradora.toLocaleString('es-MX')}</p></div>
+            </div>`;
+        };
+        window.calcSimPPR = function(){
+            const mes = Number(document.getElementById('sim-ppr-mes')?.value||0);
+            const anios = Number(document.getElementById('sim-ppr-anios')?.value||15);
+            const isr = Number(document.getElementById('sim-ppr-isr')?.value||30)/100;
+            const tasa = Number(document.getElementById('sim-ppr-tasa')?.value||10.5)/100;
+            const anual = mes * 12;
+            const devAnualSAT = Math.round(anual * isr);
+            const rMes = tasa / 12;
+            const nMeses = anios * 12;
+            const capitalFinal = Math.round(mes * ((Math.pow(1 + rMes, nMeses) - 1) / rMes));
+            const totalAportado = anual * anios;
+            const box = document.getElementById('sim-ppr-out');
+            if(box) box.innerHTML = `<div class="grid sm:grid-cols-3 gap-3 text-center">
+                <div><p class="text-[11px] text-slate-400">Capital Aportado (${anios}a)</p><p class="text-lg font-bold text-white">$${totalAportado.toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Devolución SAT Est. (Art. 151)</p><p class="text-lg font-bold text-amber-400">$${devAnualSAT.toLocaleString('es-MX')}/año</p></div>
+                <div><p class="text-[11px] text-slate-400">Fondo Proyectado con Rendimientos</p><p class="text-2xl font-black text-emerald-400">$${capitalFinal.toLocaleString('es-MX')}</p></div>
+            </div>`;
+        };
+        window.calcSimDanos = function(){
+            const m2 = Number(document.getElementById('sim-dan-m2')?.value||0);
+            const costoM2 = Number(document.getElementById('sim-dan-tipo')?.value||21000);
+            const pctCont = Number(document.getElementById('sim-dan-cont')?.value||30)/100;
+            const valEdificio = m2 * costoM2;
+            const valContenidos = Math.round(valEdificio * pctCont);
+            const primaAnualEst = Math.round(((valEdificio + valContenidos) / 1000) * 1.35);
+            const box = document.getElementById('sim-dan-out');
+            if(box) box.innerHTML = `<div class="grid sm:grid-cols-3 gap-3 text-center">
+                <div><p class="text-[11px] text-slate-400">Suma Edificio (Reconstrucción)</p><p class="text-lg font-bold text-white">$${valEdificio.toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Suma Contenidos (${Math.round(pctCont*100)}%)</p><p class="text-lg font-bold text-amber-300">$${valContenidos.toLocaleString('es-MX')}</p></div>
+                <div><p class="text-[11px] text-slate-400">Prima Anual Hogar/PyME Est.</p><p class="text-2xl font-black text-emerald-400">~$${primaAnualEst.toLocaleString('es-MX')}/año</p></div>
+            </div>`;
+        };
+        window.calcSimColectivo = function(){
+            const raw = document.getElementById('sim-col-txt')?.value||'';
+            const rows = raw.split(/\r?\n/).map(l=>l.split(',').map(x=>x.trim())).filter(r=>r[0]);
+            const n = rows.length;
+            const edades = rows.map(r=>parseInt(r[1],10)).filter(x=>!isNaN(x));
+            const promEdad = edades.length ? Math.round(edades.reduce((a,b)=>a+b,0)/edades.length) : 0;
+            const sumaTotal = rows.reduce((a,r)=>a+(Number(String(r[2]||'0').replace(/[^\d.]/g,''))||0), 0);
+            const box = document.getElementById('sim-col-out');
+            if(box) box.innerHTML = `<div class="grid sm:grid-cols-3 gap-3 text-center">
+                <div><p class="text-[11px] text-slate-400">Integrantes / Unidades</p><p class="text-xl font-bold text-white">${n}</p></div>
+                <div><p class="text-[11px] text-slate-400">Edad Promedio Actuarial</p><p class="text-xl font-bold text-amber-400">${promEdad} años</p></div>
+                <div><p class="text-[11px] text-slate-400">Suma Asegurada / Valor Grupo</p><p class="text-xl font-black text-emerald-400">$${sumaTotal.toLocaleString('es-MX')}</p></div>
+            </div>`;
+        };
         function cotLeerDocs(cb){
             const inp = document.getElementById('cot-docs');
             const files = inp && inp.files ? [...inp.files] : [];
@@ -7705,6 +8096,7 @@ function renderMyProgress() {
                                             <button type="button" onclick="aplicarPresetMarca('formal')" class="px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-emerald-50 text-emerald-800 text-xs font-semibold hover:bg-emerald-100">⬛ Formal (blanco / verde / negro)</button>
                                             <button type="button" onclick="aplicarPresetMarca('ejecutivo')" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">◼ Ejecutivo azul</button>
                                             <button type="button" onclick="aplicarPresetMarca('premium')" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">✦ Premium dorado</button>
+                                            <button type="button" onclick="toggleExecutiveTheme()" class="px-3 py-1.5 rounded-lg border border-amber-400 bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800"><i class="fas fa-moon mr-1"></i>Alternar Obsidiana y Oro</button>
                                         </div>
                                         <p class="text-[11px] text-slate-500 mt-1">Presets de colores institucionales. Luego pulsa Guardar para aplicarlos.</p>
                                     </div>

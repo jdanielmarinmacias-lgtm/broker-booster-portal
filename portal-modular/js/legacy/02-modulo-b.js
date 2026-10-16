@@ -120,7 +120,7 @@
         // Vigilancia cada 20 s: detecta novedades (aunque las genere otra sesión) y avisa
         setInterval(function(){
             try{
-                if(!currentUser) return;
+                if(!currentUser || document.hidden) return;
                 const keys = newsItems().filter(i=>i.ts>0).slice(0,8).map(i=>(i.ts+'|'+i.sec+'|'+i.txt));
                 const prev = window._newsKeysPrev;
                 window._newsKeysPrev = keys;

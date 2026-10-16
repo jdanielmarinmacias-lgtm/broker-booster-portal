@@ -310,6 +310,17 @@ describe('promotoría+escuela: matriz y persist quirúrgico', () => {
     await api('DELETE', '/api/data/cotizaciones/991002');
     await api('DELETE', '/api/data/solicitudes/991001');
   });
+  it('GET /api/data/bundle devuelve todas las colecciones legibles en una sola respuesta', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('GET', '/api/data/bundle');
+    assert.equal(r.status, 200);
+    assert.equal(r.json.ok, true);
+    assert.ok(r.json.bundle && typeof r.json.bundle === 'object');
+    assert.equal(r.json.bundle.ventas.shape, 'array');
+    assert.equal(r.json.bundle.settings.shape, 'object');
+    assert.ok(!('users' in r.json.bundle) && !('sessions' in r.json.bundle));
+  });
   it('agente crea venta y mensaje (escuela/chat abiertos a todos)', async () => {
     // Alta de un agente temporal (el seed no trae agentes).
     jar.cookie = null;
