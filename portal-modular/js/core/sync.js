@@ -294,18 +294,30 @@
       try {
         if (!prev) {
           if (!u.password || u.passwordHash || u.password_hash) continue; // sin clave en claro: no se puede crear en servidor
-          const r = await send('POST', '/api/users', {
+          const createBody = Object.assign({}, stripUser(u), {
             id: u.id, username: u.username, password: u.password,
-            role: u.role, name: u.name, email: u.email, phone: u.phone, avatar: u.avatar,
           });
+          const r = await send('POST', '/api/users', createBody);
+          const canon = normIds(r.user);
           Object.keys(u).forEach(function (k) { delete u[k]; });
-          Object.assign(u, r.user); // récord canónico (sin hash) + mismo id
-        } else if (JSON.stringify(stripUser(u)) !== JSON.stringify(stripUser(prev))) {
+          Object.assign(u, canon); // récord canónico (sin hash) + mismo id numérico
+        } else if (
+          JSON.stringify(stripUser(u)) !== JSON.stringify(stripUser(prev))
+          || (typeof u.password === 'string' && u.password.trim() !== '')
+        ) {
           const body = stripUser(u);
-          delete body.id; delete body.username;
+          delete body.id;
+          // Si se desasignó agencia/equipo en local, enviar null explícito para que el servidor limpie la clave
+          ['agenciaId', 'agencia', 'parentId', 'assignedTo'].forEach(function (fk) {
+            if (prev[fk] !== undefined && u[fk] === undefined) body[fk] = null;
+          });
+          if (typeof u.password === 'string' && u.password.trim() !== '') {
+            body.password = u.password.trim();
+          }
           const r = await send('PUT', '/api/users/' + encodeURIComponent(u.id), body);
+          const canon = normIds(r.user);
           Object.keys(u).forEach(function (k) { delete u[k]; });
-          Object.assign(u, r.user, { password: undefined });
+          Object.assign(u, canon);
           delete u.password;
         }
       } catch (e) {

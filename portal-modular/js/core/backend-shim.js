@@ -95,7 +95,7 @@
         // eslint-disable-next-line no-undef
         db.users.length = 0;
         // eslint-disable-next-line no-undef
-        users.forEach((u) => db.users.push(u)); // sin hashes: el servidor nunca los envía
+        users.forEach((u) => db.users.push(window.BackendSync ? window.BackendSync.normUser(u) : u)); // sin hashes: el servidor nunca los envía
       }
     } catch (e) { /* sin permiso de listar: se sigue con el mirror local */ }
   }

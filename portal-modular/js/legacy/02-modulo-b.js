@@ -1093,14 +1093,33 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
 
         function renderSolicitudes() {
             const solicitudes = (db.solicitudes || []).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
-            const filtradas = solEstadoFiltro ? solicitudes.filter(s => estadoFromCiudad(s.ciudad) === solEstadoFiltro) : solicitudes;
+            const estF = window.solEstatusFiltro || 'all';
+            const qF = (window.solSearchQ || '').trim().toLowerCase();
+            const filtradas = solicitudes.filter(s => {
+                const okMapa = !solEstadoFiltro || estadoFromCiudad(s.ciudad) === solEstadoFiltro;
+                const okEst = estF === 'all' || (s.estado || 'nuevo') === estF;
+                const okQ = !qF || [s.nombre, s.ciudad, s.email, s.whatsapp, s.interes, s.tipo, s.referido].some(v => String(v || '').toLowerCase().includes(qF));
+                return okMapa && okEst && okQ;
+            });
             return `
                 <div>
                     <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-                        <h2 class="text-2xl font-semibold">Solicitudes de Información</h2>
-                        <div class="flex items-center gap-2">
-                            ${solEstadoFiltro ? `<button onclick="limpiarFiltroEstado()" class="text-xs font-semibold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 hover:bg-emerald-200"><i class="fas fa-filter mr-1"></i>${escapeHTML(solEstadoFiltro)} <i class="fas fa-times ml-1"></i></button>` : ''}
-                            <span class="text-sm text-slate-500">${filtradas.length} registro${filtradas.length === 1 ? '' : 's'}${solEstadoFiltro ? ` de ${solicitudes.length}` : ''}</span>
+                        <div>
+                            <h2 class="text-2xl font-semibold">Solicitudes de Información</h2>
+                            <p class="text-xs text-slate-500 mt-0.5">${filtradas.length} registro${filtradas.length === 1 ? '' : 's'} mostrado${filtradas.length === 1 ? '' : 's'} de ${solicitudes.length} en total</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input value="${escapeHTML(window.solSearchQ||'')}" oninput="window.solSearchQ=this.value;navigateTo('solicitudes')" placeholder="Buscar prospecto, ciudad, WhatsApp..." class="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 w-56">
+                            </div>
+                            <select onchange="window.solEstatusFiltro=this.value;navigateTo('solicitudes')" class="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-900">
+                                <option value="all" ${estF==='all'?'selected':''}>Todos los estados (${solicitudes.length})</option>
+                                <option value="nuevo" ${estF==='nuevo'?'selected':''}>Nuevos (${solicitudes.filter(s=>s.estado==='nuevo').length})</option>
+                                <option value="contactado" ${estF==='contactado'?'selected':''}>Contactados (${solicitudes.filter(s=>s.estado==='contactado').length})</option>
+                                <option value="convertido" ${estF==='convertido'?'selected':''}>Convertidos (${solicitudes.filter(s=>s.estado==='convertido').length})</option>
+                            </select>
+                            ${solEstadoFiltro ? `<button onclick="limpiarFiltroEstado()" class="text-xs font-semibold px-2.5 py-1.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 hover:bg-emerald-200"><i class="fas fa-filter mr-1"></i>${escapeHTML(solEstadoFiltro)} <i class="fas fa-times ml-1"></i></button>` : ''}
                         </div>
                     </div>
                     ${solicitudes.filter(s => s.estado === 'nuevo').length ? `
@@ -1108,7 +1127,7 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
                         <div class="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0"><i class="fas fa-user-clock text-white"></i></div>
                         <div class="flex-1">
                             <p class="font-semibold text-emerald-900 text-sm"><i class="fas fa-bell mr-1"></i> Tienes ${solicitudes.filter(s => s.estado === 'nuevo').length} prospecto(s) nuevo(s) sin contactar</p>
-                            <p class="text-xs text-emerald-700 mt-0.5">Recién llegados desde "Quiero aplicar". Contáctalos por WhatsApp y márcalos como contactados.</p>
+                            <p class="text-xs text-emerald-700 mt-0.5">Recién llegados desde "Quiero aplicar". Contáctalos por WhatsApp y márcalos como contactados o conviértelos en usuario.</p>
                         </div>
                     </div>` : ''}
                     ${renderMapaEstados(solicitudes)}
@@ -1118,7 +1137,7 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
                                 <thead class="bg-slate-50 border-b border-slate-200">
                                     <tr>
                                         <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Fecha</th>
-                                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Nombre</th>
+                                        <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Nombre / Ubicación</th>
                                         <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Contacto</th>
                                         <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Interés</th>
                                         <th class="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Referido</th>
@@ -1127,12 +1146,15 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
-                                    ${filtradas.length ? filtradas.map(s => `
+                                    ${filtradas.length ? filtradas.map(s => {
+                                        const estGeo = estadoFromCiudad(s.ciudad);
+                                        const uCreado = s.usuarioCreadoId ? (db.users||[]).find(u => String(u.id) === String(s.usuarioCreadoId)) : (db.users||[]).find(u => u.username && s.usuarioCreadoUsername && String(u.username).toLowerCase() === String(s.usuarioCreadoUsername).toLowerCase());
+                                        return `
                                         <tr class="hover:bg-slate-50">
                                             <td class="px-4 py-3 text-sm text-slate-600">${new Date(s.fecha).toLocaleDateString('es-MX')} <span class="text-xs">${new Date(s.fecha).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></td>
                                             <td class="px-4 py-3">
                                                 <div class="font-medium text-slate-900">${escapeHTML(s.nombre)}</div>
-                                                <div class="text-xs text-slate-500">${escapeHTML(s.ciudad || '-')}</div>
+                                                <div class="text-xs text-slate-500">${escapeHTML(s.ciudad || '-')}${estGeo ? ` <span class="text-emerald-700 font-medium">(${escapeHTML(estGeo)})</span>` : ''}</div>
                                             </td>
                                             <td class="px-4 py-3 text-sm">
                                                 <div>${escapeHTML(s.email || '-')}</div>
@@ -1148,17 +1170,18 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
                                             </td>
                                             <td class="px-4 py-3">
                                                 <span class="px-2 py-1 text-xs rounded-full font-medium ${s.estado==='nuevo'?'bg-blue-100 text-blue-700':s.estado==='contactado'?'bg-amber-100 text-amber-700':s.estado==='convertido'?'bg-emerald-100 text-emerald-700':'bg-green-100 text-green-700'}">${escapeHTML(s.estado)}</span>
+                                                ${uCreado ? `<div class="text-[11px] text-slate-500 mt-0.5 font-mono">@${escapeHTML(uCreado.username)}</div>` : ''}
                                             </td>
                                             <td class="px-4 py-3 text-right">
                                                 <div class="flex items-center justify-end gap-2">
                                                     <a href="https://wa.me/${(s.whatsapp||'').replace(/[^0-9]/g,'')}?text=Hola%20${encodeURIComponent(s.nombre)}%2C%20vimos%20tu%20solicitud%20de%20informaci%C3%B3n%20sobre%20${encodeURIComponent(s.plan||s.tipo)}.%20%C2%BFTe%20ayudo%3F" target="_blank" class="px-2 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
-                                                    <button onclick="marcarContactado(${s.id})" class="px-2 py-1.5 bg-amber-500 text-white rounded-lg text-xs hover:bg-amber-600" title="Marcar contactado"><i class="fas fa-check"></i></button>
-                                                    ${s.estado!=='convertido' ? `<button onclick="crearUsuarioDesdeSolicitud(${s.id})" class="px-2 py-1.5 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-700" title="Crear usuario"><i class="fas fa-user-plus"></i></button>` : `<span class="px-2 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs" title="Usuario ya creado"><i class="fas fa-user-check"></i></span>`}
+                                                    <button onclick="marcarContactado('${s.id}')" class="px-2 py-1.5 bg-amber-500 text-white rounded-lg text-xs hover:bg-amber-600" title="Marcar contactado"><i class="fas fa-check"></i></button>
+                                                    ${s.estado!=='convertido' ? `<button onclick="crearUsuarioDesdeSolicitud('${s.id}')" class="px-2 py-1.5 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-700" title="Crear usuario"><i class="fas fa-user-plus"></i></button>` : `<button onclick="navigateTo('users')" class="px-2 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs hover:bg-emerald-200" title="Ver en Usuarios"><i class="fas fa-user-check"></i></button>`}
                                                 </div>
                                             </td>
                                         </tr>
-                                        ${s.mensaje ? `<tr><td colspan="7" class="px-4 pb-3 -mt-2"><div class="text-xs text-slate-500 bg-slate-50 rounded p-2"><strong>Mensaje:</strong> ${escapeHTML(String(s.mensaje).replace(/\s*\|\s*Prima calculada: [^|]*/g, ''))}</div></td></tr>` : ''}
-                                    `).join('') : `<tr><td colspan="7" class="px-4 py-12 text-center text-slate-500">No hay solicitudes${solEstadoFiltro ? ' en ' + escapeHTML(solEstadoFiltro) : ''} aún</td></tr>`}
+                                        ${s.mensaje ? `<tr><td colspan="7" class="px-4 pb-3 -mt-2"><div class="text-xs text-slate-500 bg-slate-50 rounded p-2"><strong>Mensaje:</strong> ${escapeHTML(String(s.mensaje).replace(/\s*\|\s*Prima calculada: [^|]*/g, ''))}</div></td></tr>` : ''}`;
+                                    }).join('') : `<tr><td colspan="7" class="px-4 py-12 text-center text-slate-500">No hay solicitudes${solEstadoFiltro ? ' en ' + escapeHTML(solEstadoFiltro) : ''} aún</td></tr>`}
                                 </tbody>
                             </table>
                         </div>
@@ -1168,7 +1191,7 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
         }
 
         function marcarContactado(id) {
-            const s = db.solicitudes.find(x => x.id === id);
+            const s = (db.solicitudes || []).find(x => String(x.id) === String(id));
             if (s) {
                 s.estado = s.estado === 'contactado' ? 'nuevo' : 'contactado';
                 saveDB();
@@ -1178,34 +1201,65 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
 
         let solUsuarioActiva = null;
         function crearUsuarioDesdeSolicitud(id) {
-            const s = db.solicitudes.find(x => x.id === id);
+            const s = (db.solicitudes || []).find(x => String(x.id) === String(id));
             if (!s) return;
             solUsuarioActiva = s;
             const base = (s.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'').slice(0, 12) || 'prospecto';
             const taken = new Set((db.users || []).map(u => (u.username || '').toLowerCase()));
             let sugerido = base, n = 2;
             while (taken.has(sugerido)) { sugerido = base + n; n++; }
+            const estadoDetectado = estadoFromCiudad(s.ciudad) || '';
+            const agenciasList = (db.users || []).filter(u => u.role === 'agencia');
+            const estadosOpts = ESTADOS_MEX.map(e => `<option value="${escapeHTML(e.n)}" ${estadoDetectado===e.n?'selected':''}>${escapeHTML(e.n)}</option>`).join('');
+            const passSugerida = 'BB-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '26';
             const html = `
                 <div class="p-6">
-                    <div class="flex items-center gap-3 mb-1">
+                    <div class="flex items-center gap-3 mb-2">
                         <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center"><i class="fas fa-user-plus text-emerald-700"></i></div>
                         <div>
                             <h3 class="text-lg font-bold text-slate-900">Crear usuario para ${escapeHTML(s.nombre)}</h3>
-                            <p class="text-xs text-slate-500">Se creará con rol <span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-semibold">prospecto</span></p>
+                            <p class="text-xs text-slate-500">Se conservarán su WhatsApp (${escapeHTML(s.whatsapp || '—')}) y ubicación para el mapa de Usuarios.</p>
                         </div>
                     </div>
                     <form id="form-crear-usuario" onsubmit="confirmarCrearUsuario(event)" class="mt-4 space-y-3">
-                        <div>
-                            <label class="text-sm font-medium text-slate-700 mb-1 block">Usuario</label>
-                            <input required id="nuevo-usuario" class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none bg-white text-slate-900" value="${sugerido}" placeholder="usuario">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-semibold text-slate-700 mb-1 block">Usuario</label>
+                                <input required id="nuevo-usuario" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900" value="${escapeHTML(sugerido)}" placeholder="usuario">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-slate-700 mb-1 block">Contraseña inicial</label>
+                                <input required id="nuevo-password" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 font-mono" value="${escapeHTML(passSugerida)}" placeholder="contraseña">
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-sm font-medium text-slate-700 mb-1 block">Contraseña</label>
-                            <input required id="nuevo-password" class="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none bg-white text-slate-900" value="123" placeholder="contraseña">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-semibold text-slate-700 mb-1 block">Rol inicial</label>
+                                <select id="nuevo-rol-sol" onchange="const w=document.getElementById('sol-agencia-wrap');if(w)w.classList.toggle('hidden',!['agente_desarrollo','agente_agencia'].includes(this.value));" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+                                    <option value="prospecto" selected>Prospecto</option>
+                                    <option value="agente_desarrollo">Agente en Desarrollo</option>
+                                    <option value="agente_agencia">Agente de Agencia</option>
+                                    <option value="alumno">Alumno</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-slate-700 mb-1 block">Ubicación (Estado)</label>
+                                <select id="nuevo-ubicacion-sol" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+                                    <option value="">— Sin estado —</option>
+                                    ${estadosOpts}
+                                </select>
+                            </div>
                         </div>
-                        <div class="flex gap-2 pt-1">
-                            <button type="button" onclick="closeModal()" class="flex-1 py-2.5 border-2 border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50">Cancelar</button>
-                            <button type="submit" class="flex-1 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700"><i class="fas fa-user-plus mr-1"></i> Crear usuario</button>
+                        <div id="sol-agencia-wrap" class="hidden">
+                            <label class="text-xs font-semibold text-slate-700 mb-1 block">Agencia asignada (opcional)</label>
+                            <select id="nuevo-agencia-sol" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+                                <option value="">— Sin asignar —</option>
+                                ${agenciasList.map(a => `<option value="${a.id}">${escapeHTML(a.name || a.username)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="flex gap-2 pt-2">
+                            <button type="button" onclick="closeModal()" class="flex-1 py-2.5 border border-slate-300 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 text-sm">Cancelar</button>
+                            <button type="submit" class="flex-1 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 text-sm"><i class="fas fa-user-plus mr-1"></i> Crear y copiar acceso</button>
                         </div>
                     </form>
                 </div>
@@ -1219,27 +1273,50 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
             const s = solUsuarioActiva;
             const username = (document.getElementById('nuevo-usuario')?.value || '').trim();
             const password = (document.getElementById('nuevo-password')?.value || '').trim();
+            const role = (document.getElementById('nuevo-rol-sol')?.value || 'prospecto').trim();
+            const ubicacion = (document.getElementById('nuevo-ubicacion-sol')?.value || estadoFromCiudad(s?.ciudad) || '').trim();
+            const agenciaIdRaw = (document.getElementById('nuevo-agencia-sol')?.value || '').trim();
             if (!s || !username || !password) return;
             if ((db.users || []).some(u => (u.username || '').toLowerCase() === username.toLowerCase())) {
                 showToast('Ese usuario ya existe, elige otro', 'error');
                 return;
             }
-            db.users.push({
+            const nuevoUser = {
                 id: Date.now(),
                 username: username,
                 password: password,
-                role: 'prospecto',
+                role: role,
                 name: s.nombre,
                 email: s.email || '',
                 phone: s.whatsapp || '',
-                avatar: `https://i.pravatar.cc/40?u=${username}`,
+                ciudad: s.ciudad || '',
+                ubicacion: ubicacion,
+                avatar: `https://i.pravatar.cc/40?u=${encodeURIComponent(username)}`,
                 xp: 0,
                 students: []
-            });
+            };
+            if (['agente_desarrollo', 'agente_agencia'].includes(role) && agenciaIdRaw) {
+                const ag = (db.users || []).find(u => String(u.id) === String(agenciaIdRaw) && u.role === 'agencia');
+                if (ag) {
+                    nuevoUser.agenciaId = ag.id;
+                    nuevoUser.agencia = ag.id;
+                    nuevoUser.parentId = ag.id;
+                    nuevoUser.assignedTo = ag.id;
+                }
+            }
+            db.users.push(nuevoUser);
             s.estado = 'convertido';
+            s.usuarioCreadoId = nuevoUser.id;
+            s.usuarioCreadoUsername = nuevoUser.username;
             saveDB();
+            try {
+                const msgAcceso = `Hola ${s.nombre}, bienvenido a Broker Booster.\nPortal: ${window.location.origin}\nUsuario: ${username}\nContraseña: ${password}`;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(msgAcceso).catch(() => {});
+                }
+            } catch (err) {}
             closeModal();
-            showToast(`Usuario "${username}" creado con rol prospecto`, 'success');
+            showToast(`Usuario "${username}" (${role}) creado y acceso copiado al portapapeles`, 'success');
             navigateTo('solicitudes');
         }
 

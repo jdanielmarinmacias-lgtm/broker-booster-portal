@@ -7767,64 +7767,182 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
 
         function renderUsers() {
             if (!(isAdmin(currentUser))) return `<p>No tienes permiso.</p>`;
+            const allUsers = db.users || [];
+            const roleF = window.usersRoleFiltro || 'all';
+            const estadoF = window.usersEstadoFiltro || '';
+            const agF = window.usersAgenciaFiltro || '';
+            const qF = (window.usersSearchQ || '').trim().toLowerCase();
+            const agenciasList = allUsers.filter(u => u.role === 'agencia');
+            const filteredUsers = allUsers.filter(u => {
+                const okRol = roleF === 'all' || (u.role || '') === roleF;
+                const estU = estadoDeUsuario(u) || '';
+                const okEstado = !estadoF || estU === estadoF;
+                const okAg = !agF || (agF === '__none__' ? !u.agenciaId : String(u.agenciaId || '') === String(agF));
+                const okQ = !qF || [u.name, u.username, u.email, u.phone, estU, u.role].some(v => String(v || '').toLowerCase().includes(qF));
+                return okRol && okEstado && okAg && okQ;
+            });
+            const totalAgentes = allUsers.filter(u => ['agente','agente_agencia','agente_desarrollo'].includes((u.role||'').toLowerCase())).length;
+            const totalProspectos = allUsers.filter(u => (u.role||'').toLowerCase() === 'prospecto').length;
+            const totalConUbic = allUsers.filter(u => !!estadoDeUsuario(u)).length;
             return `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-                    <div class="p-4 sm:p-6 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <h3 class="font-semibold text-lg">Gestión de Usuarios</h3>
-                        <div class="flex items-center gap-3 w-full sm:w-auto">
-                            <div class="relative flex-1 sm:flex-none">
-                                <select id="user-role-filter" onchange="filterUsersByRole()" class="appearance-none pl-9 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white w-full sm:w-48 text-slate-900">
-                                    <option value="all">Todos los roles</option>
-<option value="prospecto">Prospecto</option>
-<option value="agente_desarrollo">Agente en Desarrollo</option>
-<option value="agente_agencia">Agente de Agencia</option>
-<option value="alumno">Alumno</option>
-<option value="agencia">Agencia</option>
-<option value="maestro">Maestro</option>
-<option value="capacitador">Capacitador</option>
-<option value="editor">Editor</option>
-<option value="desarrollador">Desarrollador</option>
-<option value="admin">Admin</option>
-<option value="gm">GM</option>
-                                </select>
-                                <i class="fas fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                            </div>
-                            <button onclick="openUserModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap"><i class="fas fa-plus mr-2"></i>Nuevo Usuario</button>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center"><i class="fas fa-users"></i></div>
+                            <div><div class="text-xs text-slate-500">Total Usuarios</div><div class="text-lg font-bold text-slate-900">${allUsers.length}</div></div>
+                        </div>
+                        <div class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center"><i class="fas fa-user-tie"></i></div>
+                            <div><div class="text-xs text-slate-500">Agentes Comerciales</div><div class="text-lg font-bold text-slate-900">${totalAgentes}</div></div>
+                        </div>
+                        <div class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center"><i class="fas fa-user-plus"></i></div>
+                            <div><div class="text-xs text-slate-500">Prospectos Activos</div><div class="text-lg font-bold text-slate-900">${totalProspectos}</div></div>
+                        </div>
+                        <div class="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center"><i class="fas fa-map-location-dot"></i></div>
+                            <div><div class="text-xs text-slate-500">Con Ubicación</div><div class="text-lg font-bold text-slate-900">${totalConUbic} <span class="text-xs font-normal text-slate-400">/ ${allUsers.length}</span></div></div>
                         </div>
                     </div>
-                    ${renderMapaUsuarios()}
-                    <div class="overflow-x-auto"><table class="w-full text-sm">
-                        <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="p-4 font-medium">Usuario</th><th class="p-4 font-medium">Email</th><th class="p-4 font-medium">Rol</th><th class="p-4 font-medium">Estado</th><th class="p-4 font-medium">Ubicación</th><th class="p-4 font-medium">Grupo / Agencia</th><th class="p-4 font-medium">Acciones</th></tr></thead>
-                        <tbody>${db.users.map(u => {
-                            const mentors = db.users.filter(m => ['maestro','capacitador','agencia','admin','gm','desarrollador'].includes(m.role) && (m.students||[]).includes(u.id));
-                            const esRolAgenteU = ['agente','agente_agencia','agente_desarrollo'].includes((u.role||'').toLowerCase());
-                            const agenciaDeU = esRolAgenteU ? db.users.find(m=>m.role==='agencia' && String(m.id)===String(u.agenciaId)) : null;
-                            const nAgentesAg = u.role==='agencia' ? db.users.filter(m=>['agente','agente_agencia','agente_desarrollo'].includes((m.role||'').toLowerCase()) && String(m.agenciaId)===String(u.id)).length : 0;
-                            const groupHtml = esRolAgenteU
-                                ? (agenciaDeU ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs"><i class="fas fa-building mr-0.5"></i>${agenciaDeU.name}</span>` : '<span class="text-slate-400 text-xs">Sin agencia — edítalo para asignarla</span>')
-                                : u.role==='agencia'
-                                ? `<span class="text-xs text-slate-600"><i class="fas fa-people-group mr-1 text-slate-400"></i>${nAgentesAg} agente${nAgentesAg===1?'':'s'} asignado${nAgentesAg===1?'':'s'}</span><button onclick="navigateTo('mi-equipo')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-2">Ver equipo</button>`
-                                : (isStudent(u) 
-                                ? (mentors.length ? mentors.map(m=>`<span class="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-full text-xs mr-1"><img src="${m.avatar}" class="w-4 h-4 rounded-full">${m.name}</span>`).join('') : '<span class="text-slate-400 text-xs">Sin asignar</span>')
-                                : `<div class="flex items-center gap-2"><span class="text-slate-600">${(u.students||[]).length} alumnos</span><button onclick="openAssignStudentsModal(${u.id})" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"><i class="fas fa-user-plus mr-1"></i>Asignar</button></div>`);
-                            const isOnline = u.lastActive && (Date.now() - u.lastActive < 300000);
-                            const puedeModificar = canModifyUser(currentUser, u);
-                            const accionesHtml = puedeModificar ? `<button onclick="openUserModal(${u.id})" class="text-slate-500 hover:text-indigo-600 mr-3"><i class="fas fa-edit"></i></button><button onclick="deleteUser(${u.id})" class="text-slate-500 hover:text-red-600"><i class="fas fa-trash"></i></button>` : `<span class="text-slate-300" title="Cuenta GM protegida: no modificable ni eliminable"><i class="fas fa-lock"></i></span>`;
-                            const estadoHtml = `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${isOnline?'bg-green-500 animate-pulse':'bg-slate-300'}"></span><span class="text-xs text-slate-500">${u.lastConnection?new Date(u.lastConnection).toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'Nunca'}</span></span>`;
-                            const ubicHtml = estadoDeUsuario(u) ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs"><i class="fas fa-map-marker-alt"></i>${estadoDeUsuario(u)}</span>` : '<span class="text-slate-300 text-xs">—</span>';
-                            return `
-                            <tr class="border-t user-row" data-role="${u.role}" data-estado="${estadoDeUsuario(u)||''}"><td class="p-4 flex items-center gap-3"><img src="${u.avatar}" class="w-8 h-8 rounded-full"><span class="font-medium">${u.name}</span></td><td class="p-4 text-slate-600">${u.email}</td><td class="p-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${isGM(u)?'bg-purple-100 text-purple-700':isAdmin(u)?'bg-red-100 text-red-700':isTeacher(u)?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}">${isGM(u)?'🛡️ '+u.role:u.role}</span></td><td class="p-4">${estadoHtml}</td><td class="p-4">${ubicHtml}</td><td class="p-4">${groupHtml}</td><td class="p-4">${accionesHtml}</td></tr>
-                        `}).join('')}</tbody>
-                    </table></div>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+                        <div class="p-4 sm:p-6 border-b flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
+                            <div>
+                                <h3 class="font-semibold text-lg">Gestión de Usuarios <span class="text-xs font-normal text-slate-500 ml-1">(${filteredUsers.length} mostrados)</span></h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Filtra por nombre, rol, agencia o estado en el mapa interactivo.</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                                <div class="relative flex-1 sm:flex-none">
+                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                    <input id="user-search-input" value="${escapeHTML(window.usersSearchQ||'')}" oninput="window.usersSearchQ=this.value;filterUsersByRole()" placeholder="Buscar nombre, usuario, correo..." class="pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 w-full sm:w-52">
+                                </div>
+                                <div class="relative">
+                                    <select id="user-role-filter" onchange="window.usersRoleFiltro=this.value;filterUsersByRole()" class="appearance-none pl-8 pr-7 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                                        <option value="all" ${roleF==='all'?'selected':''}>Todos los roles</option>
+                                        <option value="prospecto" ${roleF==='prospecto'?'selected':''}>Prospecto</option>
+                                        <option value="agente_desarrollo" ${roleF==='agente_desarrollo'?'selected':''}>Agente en Desarrollo</option>
+                                        <option value="agente_agencia" ${roleF==='agente_agencia'?'selected':''}>Agente de Agencia</option>
+                                        <option value="alumno" ${roleF==='alumno'?'selected':''}>Alumno</option>
+                                        <option value="agencia" ${roleF==='agencia'?'selected':''}>Agencia</option>
+                                        <option value="maestro" ${roleF==='maestro'?'selected':''}>Maestro</option>
+                                        <option value="capacitador" ${roleF==='capacitador'?'selected':''}>Capacitador</option>
+                                        <option value="editor" ${roleF==='editor'?'selected':''}>Editor</option>
+                                        <option value="desarrollador" ${roleF==='desarrollador'?'selected':''}>Desarrollador</option>
+                                        <option value="admin" ${roleF==='admin'?'selected':''}>Admin</option>
+                                        <option value="gm" ${roleF==='gm'?'selected':''}>GM</option>
+                                    </select>
+                                    <i class="fas fa-filter absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                </div>
+                                <select id="user-agencia-filter" onchange="window.usersAgenciaFiltro=this.value;filterUsersByRole()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                    <option value="" ${!agF?'selected':''}>Todas las agencias</option>
+                                    <option value="__none__" ${agF==='__none__'?'selected':''}>Sin agencia asignada</option>
+                                    ${agenciasList.map(a => `<option value="${a.id}" ${String(agF)===String(a.id)?'selected':''}>${escapeHTML(a.name||a.username)}</option>`).join('')}
+                                </select>
+                                ${(roleF!=='all' || estadoF || agF || qF) ? `<button onclick="window.usersRoleFiltro='all';window.usersEstadoFiltro=null;window.usersAgenciaFiltro='';window.usersSearchQ='';navigateTo('users')" class="px-2.5 py-2 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50" title="Limpiar filtros"><i class="fas fa-eraser"></i></button>` : ''}
+                                <button onclick="exportarUsuariosCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap" title="Exportar directorio en CSV"><i class="fas fa-file-csv mr-1"></i>CSV</button>
+                                <button onclick="openUserModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap"><i class="fas fa-plus mr-1.5"></i>Nuevo Usuario</button>
+                            </div>
+                        </div>
+                        ${renderMapaUsuarios()}
+                        <div class="overflow-x-auto"><table class="w-full text-sm">
+                            <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="p-4 font-medium">Usuario</th><th class="p-4 font-medium">Contacto</th><th class="p-4 font-medium">Rol</th><th class="p-4 font-medium">Estado</th><th class="p-4 font-medium">Ubicación</th><th class="p-4 font-medium">Grupo / Agencia</th><th class="p-4 font-medium text-right">Acciones</th></tr></thead>
+                            <tbody>${allUsers.map(u => {
+                                const mentors = allUsers.filter(m => ['maestro','capacitador','agencia','admin','gm','desarrollador'].includes(m.role) && (m.students||[]).map(String).includes(String(u.id)));
+                                const esRolAgenteU = ['agente','agente_agencia','agente_desarrollo'].includes((u.role||'').toLowerCase());
+                                const agenciaDeU = esRolAgenteU ? allUsers.find(m=>m.role==='agencia' && String(m.id)===String(u.agenciaId)) : null;
+                                const nAgentesAg = u.role==='agencia' ? allUsers.filter(m=>['agente','agente_agencia','agente_desarrollo'].includes((m.role||'').toLowerCase()) && String(m.agenciaId)===String(u.id)).length : 0;
+                                const groupHtml = esRolAgenteU
+                                    ? (agenciaDeU ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs"><i class="fas fa-building mr-0.5"></i>${escapeHTML(agenciaDeU.name)}</span>` : '<span class="text-slate-400 text-xs">Sin agencia — edítalo para asignarla</span>')
+                                    : u.role==='agencia'
+                                    ? `<span class="text-xs text-slate-600"><i class="fas fa-people-group mr-1 text-slate-400"></i>${nAgentesAg} agente${nAgentesAg===1?'':'s'} asignado${nAgentesAg===1?'':'s'}</span><button onclick="navigateTo('mi-equipo')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-2">Ver equipo</button>`
+                                    : (isStudent(u) 
+                                    ? (mentors.length ? mentors.map(m=>`<span class="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-full text-xs mr-1"><img src="${m.avatar}" class="w-4 h-4 rounded-full">${escapeHTML(m.name)}</span>`).join('') : '<span class="text-slate-400 text-xs">Sin asignar</span>')
+                                    : `<div class="flex items-center gap-2"><span class="text-slate-600">${(u.students||[]).length} alumnos</span><button onclick="openAssignStudentsModal(${u.id})" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"><i class="fas fa-user-plus mr-1"></i>Asignar</button></div>`);
+                                const isOnline = u.lastActive && (Date.now() - u.lastActive < 300000);
+                                const puedeModificar = canModifyUser(currentUser, u);
+                                const waClean = String(u.phone || '').replace(/[^0-9]/g, '');
+                                const waBtn = waClean && waClean !== '521000000000' ? `<a href="https://wa.me/${waClean}?text=${encodeURIComponent('Hola ' + (u.name || u.username) + ', tus datos de acceso al portal Broker Booster están listos. Usuario: ' + u.username)}" target="_blank" class="text-emerald-600 hover:text-emerald-700 mr-2.5" title="Enviar acceso por WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
+                                const copyBtn = `<button onclick="copiarCredencialesUsuario(${u.id})" class="text-slate-400 hover:text-amber-600 mr-2.5" title="Copiar datos de acceso"><i class="fas fa-key"></i></button>`;
+                                const accionesHtml = puedeModificar ? `${waBtn}${copyBtn}<button onclick="openUserModal(${u.id})" class="text-slate-500 hover:text-indigo-600 mr-2.5" title="Editar usuario"><i class="fas fa-edit"></i></button><button onclick="deleteUser(${u.id})" class="text-slate-500 hover:text-red-600" title="Eliminar usuario"><i class="fas fa-trash"></i></button>` : `<span class="text-slate-300" title="Cuenta GM protegida: no modificable ni eliminable"><i class="fas fa-lock"></i></span>`;
+                                const estadoHtml = `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${isOnline?'bg-green-500 animate-pulse':'bg-slate-300'}"></span><span class="text-xs text-slate-500">${u.lastConnection?new Date(u.lastConnection).toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'Nunca'}</span></span>`;
+                                const estU = estadoDeUsuario(u);
+                                const ubicHtml = estU ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs"><i class="fas fa-map-marker-alt"></i>${escapeHTML(estU)}</span>` : '<span class="text-slate-300 text-xs">—</span>';
+                                const visible = filteredUsers.some(fu => String(fu.id) === String(u.id));
+                                return `
+                                <tr class="border-t user-row" style="${visible?'':'display:none'}" data-role="${escapeHTML(u.role||'')}" data-estado="${escapeHTML(estU||'')}" data-agencia="${escapeHTML(String(u.agenciaId||''))}" data-search="${escapeHTML([u.name,u.username,u.email,u.phone,estU,u.role].join(' ').toLowerCase())}">
+                                    <td class="p-4 flex items-center gap-3">
+                                        <img src="${u.avatar}" class="w-8 h-8 rounded-full object-cover">
+                                        <div>
+                                            <div class="font-medium text-slate-900">${escapeHTML(u.name || u.username)}</div>
+                                            <div class="text-xs text-slate-400 font-mono">@${escapeHTML(u.username || '')}</div>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-slate-600">
+                                        <div class="text-xs">${escapeHTML(u.email || '—')}</div>
+                                        <div class="text-[11px] text-slate-400">${u.phone && u.phone !== '521000000000' ? escapeHTML(u.phone) : 'Sin WhatsApp'}</div>
+                                    </td>
+                                    <td class="p-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${isGM(u)?'bg-purple-100 text-purple-700':isAdmin(u)?'bg-red-100 text-red-700':isTeacher(u)?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}">${isGM(u)?'🛡️ '+u.role:u.role}</span></td>
+                                    <td class="p-4">${estadoHtml}</td>
+                                    <td class="p-4">${ubicHtml}</td>
+                                    <td class="p-4">${groupHtml}</td>
+                                    <td class="p-4 text-right whitespace-nowrap">${accionesHtml}</td>
+                                </tr>
+                            `}).join('')}</tbody>
+                        </table></div>
+                    </div>
                 </div>`;
         }
         function filterUsersByRole(){
-            const filter = document.getElementById('user-role-filter').value;
+            const roleSel = document.getElementById('user-role-filter');
+            const agSel = document.getElementById('user-agencia-filter');
+            const qInp = document.getElementById('user-search-input');
+            const filter = roleSel ? roleSel.value : (window.usersRoleFiltro || 'all');
+            const agF = agSel ? agSel.value : (window.usersAgenciaFiltro || '');
+            const q = (qInp ? qInp.value : (window.usersSearchQ || '')).trim().toLowerCase();
+            window.usersRoleFiltro = filter;
+            window.usersAgenciaFiltro = agF;
+            window.usersSearchQ = q;
             document.querySelectorAll('.user-row').forEach(row=>{
                 const okRol = (filter==='all' || row.dataset.role===filter);
                 const okEstado = !window.usersEstadoFiltro || row.dataset.estado===window.usersEstadoFiltro;
-                row.style.display = (okRol && okEstado) ? '' : 'none';
+                const okAg = !agF || (agF==='__none__' ? !row.dataset.agencia : String(row.dataset.agencia)===String(agF));
+                const okQ = !q || (row.dataset.search||'').includes(q);
+                row.style.display = (okRol && okEstado && okAg && okQ) ? '' : 'none';
             });
+        }
+        function copiarCredencialesUsuario(id){
+            const u = (db.users||[]).find(x => String(x.id) === String(id));
+            if(!u) return;
+            const url = window.location.origin;
+            const passHint = u.password ? `Contraseña: ${u.password}` : 'Contraseña: (la asignada por administración)';
+            const txt = `Acceso Portal Broker Booster\nNombre: ${u.name || u.username}\nUsuario: ${u.username}\n${passHint}\nRol: ${u.role}\nEnlace: ${url}`;
+            if(navigator.clipboard && navigator.clipboard.writeText){
+                navigator.clipboard.writeText(txt).then(() => showToast('Datos de acceso copiados al portapapeles', 'success')).catch(() => prompt('Copia los datos de acceso:', txt));
+            } else {
+                prompt('Copia los datos de acceso:', txt);
+            }
+        }
+        function exportarUsuariosCSV(){
+            const rows = [['ID','Nombre','Usuario','Rol','Email','WhatsApp','Ubicación','Agencia']];
+            (db.users||[]).forEach(u => {
+                const ag = (db.users||[]).find(a => String(a.id) === String(u.agenciaId));
+                rows.push([
+                    u.id,
+                    u.name || '',
+                    u.username || '',
+                    u.role || '',
+                    u.email || '',
+                    u.phone || '',
+                    estadoDeUsuario(u) || '',
+                    ag ? (ag.name || ag.username) : ''
+                ]);
+            });
+            const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `usuarios-broker-booster-${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            if(typeof showToast === 'function') showToast('Directorio de usuarios exportado en CSV', 'success');
         }
         /* ===== Ubicación por estado (usuarios) ===== */
         function estadoDeUsuario(u){
@@ -8501,9 +8619,43 @@ function filterReports(){
         function closeModal(e) { if(!e || e.target.classList.contains('modal-backdrop')){ document.getElementById('modal-container').innerHTML=''; window.cotModalId=null; } }
 
         function openUserModal(id=null) {
-            const user = id ? db.users.find(u=>u.id===id) : null;
+            const user = id !== null && id !== undefined ? db.users.find(u => String(u.id) === String(id)) : null;
             if(user && !canModifyUser(currentUser, user)){ alert('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
-            showModal(`<form id="user-form" class="p-6"><h3 class="text-xl font-bold mb-4">${user?'Editar':'Nuevo'} Usuario</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${user?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Usuario</label><input name="username" value="${user?.username||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Email</label><input type="email" name="email" value="${user?.email||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">WhatsApp <span class="text-red-500">*</span></label><input type="tel" name="phone" value="${user?.phone||''}" required placeholder="521123456789" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><p class="text-xs text-slate-500 mt-1">Formato: código país + número (ej. 521 para México)</p></div><div class="sm:col-span-2"><label class="text-sm font-medium">Ubicación (estado)</label><div class="flex items-center gap-3 mt-1 flex-wrap"><input type="hidden" id="user-ubicacion" value="${user?.ubicacion||''}"><button type="button" onclick="userUbicacionToggle()" class="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 bg-white"><i class="fas fa-map-marker-alt text-indigo-600"></i> Ubicación</button><span id="ub-seleccionado" class="text-sm text-slate-600">${user?.ubicacion?'<i class="fas fa-map-marker-alt mr-1 text-indigo-600"></i> '+escapeHTML(user.ubicacion):'<span class="text-slate-400">Sin ubicación — clic en "Ubicación" para elegirla en el mapa</span>'}</span></div><div id="ub-picker-wrap" class="hidden">${renderMapaPickerUbicacion()}</div></div><div><label class="text-sm">Contraseña</label><input type="password" name="password" value="${user?.password||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Rol</label><select name="role" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
+            const ubicActual = user ? (estadoDeUsuario(user) || user.ubicacion || '') : '';
+            const estadosOpts = (typeof ESTADOS_MEX !== 'undefined' ? ESTADOS_MEX : []).map(e => `<option value="${escapeHTML(e.n)}" ${ubicActual===e.n?'selected':''}>${escapeHTML(e.n)}</option>`).join('');
+            showModal(`<form id="user-form" class="p-6"><h3 class="text-xl font-bold mb-4">${user?'Editar':'Nuevo'} Usuario</h3><div class="space-y-4">
+                <div><label class="text-sm font-medium">Nombre completo</label><input name="name" value="${escapeHTML(user?.name||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="text-sm font-medium">Usuario</label><input name="username" value="${escapeHTML(user?.username||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                    <div><label class="text-sm font-medium">Email</label><input type="email" name="email" value="${escapeHTML(user?.email||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                </div>
+                <div><label class="text-sm font-medium">WhatsApp <span class="text-red-500">*</span></label><input type="tel" name="phone" value="${escapeHTML(user?.phone||'')}" required placeholder="521123456789" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><p class="text-xs text-slate-500 mt-1">Formato: código país + número (ej. 521 para México)</p></div>
+                <div class="sm:col-span-2">
+                    <label class="text-sm font-medium">Ubicación (estado)</label>
+                    <div class="flex items-center gap-2 mt-1 flex-wrap">
+                        <select id="user-ubicacion" name="ubicacion" onchange="userUbicacionSel(this.value)" class="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                            <option value="">— Selecciona un estado —</option>
+                            ${estadosOpts}
+                        </select>
+                        <button type="button" onclick="userUbicacionToggle()" class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 bg-white"><i class="fas fa-map-marked-alt text-indigo-600"></i> Elegir en mapa</button>
+                    </div>
+                    <div id="ub-seleccionado" class="text-xs text-slate-500 mt-1">${ubicActual?'<i class="fas fa-map-marker-alt mr-1 text-indigo-600"></i> Estado asignado: <b>'+escapeHTML(ubicActual)+'</b>':'<span class="text-slate-400">Sin ubicación asignada</span>'}</div>
+                    <div id="ub-picker-wrap" class="hidden">${renderMapaPickerUbicacion()}</div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm font-medium">${user ? 'Nueva contraseña <span class="text-xs font-normal text-slate-400">(opcional)</span>' : 'Contraseña inicial <span class="text-red-500">*</span>'}</label>
+                        <button type="button" onclick="generarPasswordModalUsuario()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800"><i class="fas fa-wand-magic-sparkles mr-1"></i>Generar clave</button>
+                    </div>
+                    <div class="relative mt-1">
+                        <input id="user-modal-pass" type="password" name="password" value="" ${user ? '' : 'required'} placeholder="${user ? 'Dejar en blanco para conservar su contraseña actual' : 'Escribe o genera una contraseña'}" class="w-full pl-3 pr-20 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
+                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button type="button" onclick="const inp=document.getElementById('user-modal-pass');if(inp){inp.type=inp.type==='password'?'text':'password';this.querySelector('i').className=inp.type==='password'?'fas fa-eye':'fas fa-eye-slash';}" class="p-1.5 text-slate-400 hover:text-slate-700" title="Mostrar/Ocultar contraseña"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                    ${user ? '<p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-shield-halved mr-1"></i>La contraseña actual está protegida en el servidor y NO se borrará si dejas este campo vacío.</p>' : ''}
+                </div>
+                <div><label class="text-sm font-medium">Rol</label><select name="role" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
 <option value="prospecto" ${user?.role==='prospecto'?'selected':''}>Prospecto</option>
 <option value="agente_desarrollo" ${user?.role==='agente_desarrollo'?'selected':''}>Agente en Desarrollo</option>
 <option value="agente_agencia" ${user?.role==='agente_agencia'?'selected':''}>Agente de Agencia</option>
@@ -8515,19 +8667,85 @@ function filterReports(){
 <option value="desarrollador" ${user?.role==='desarrollador'?'selected':''}>Desarrollador</option>
 <option value="admin" ${user?.role==='admin'?'selected':''}>Admin</option>
 ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='gm'?'selected':''}>GM</option>` : ''}
-</select>${!isGM(currentUser) ? '<p class="text-xs text-amber-600 mt-1">Solo un GM puede crear otro GM (requiere contraseña maestra)</p>' : ''}</div><div id="agencia-field" style="display:none;"><label class="text-sm font-medium">Agencia asignada <span class="text-red-500">*</span> <span class="text-slate-500 font-normal">(solo roles de agente)</span></label>
+</select>${!isGM(currentUser) ? '<p class="text-xs text-amber-600 mt-1">Solo un GM puede crear otro GM (requiere contraseña maestra)</p>' : ''}</div><div id="agencia-field" style="display:none;"><label class="text-sm font-medium">Agencia asignada <span class="text-slate-500 font-normal">(solo roles de agente)</span></label>
 <select name="agenciaId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></select>
-<p class="text-xs text-slate-500 mt-1">El agente aparecerá en "Mi Equipo" de esa agencia. Se llena automáticamente al elegir el rol.</p></div><div id="color-field" style="display:none;"><label class="text-sm font-medium">Color para calendario <span class="text-slate-500">(maestros/instructores)</span></label>
+<p class="text-xs text-slate-500 mt-1">El agente aparecerá en "Mi Equipo" de esa agencia.</p></div><div id="color-field" style="display:none;"><label class="text-sm font-medium">Color para calendario <span class="text-slate-500">(maestros/instructores)</span></label>
 <input type="color" name="calendarColor" value="${user?.calendarColor||'#0a2540'}" class="w-full mt-1 h-10 px-1 py-1 border rounded-lg cursor-pointer bg-white text-slate-900 border-slate-300">
-<p class="text-xs text-slate-500 mt-1">Este color se usará en el calendario de clases en vivo</p></div><div><label class="text-sm">Foto de perfil</label><input type="file" name="avatarFile" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><div class="mt-2 flex items-center gap-2">${user?.avatar?`<img src="${user.avatar}" class="w-10 h-10 rounded-full object-cover"><span class="text-xs text-slate-500">Actual</span>`: '<span class="text-xs text-slate-500">Se usará avatar automático si no subes</span>'}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
-            setTimeout(()=>{ const rs=document.querySelector('#user-form select[name=role]'); const af=document.getElementById('agencia-field'); const as=document.querySelector('#user-form select[name=agenciaId]'); if(as){ as.innerHTML='<option value="">Sin asignar</option>'+db.users.filter(u=>u.role==='agencia').map(a=>`<option value="${a.id}" ${user?.agenciaId==a.id?'selected':''}>${a.name}</option>`).join(''); } const tg=()=>{ if(af) af.style.display = rs && ['agente_agencia','agente_desarrollo','agente'].includes(rs.value) ? 'block':'none'; const cf=document.getElementById('color-field'); if(cf) cf.style.display = rs && ['maestro','capacitador','agencia','admin','gm'].includes(rs.value) ? 'block':'none'; }; if(rs){ rs.addEventListener('change',tg); tg(); } if(!isGM(currentUser)){ const gmOpt=document.querySelector('#user-form option[value=gm]'); if(gmOpt) gmOpt.remove(); } },0); document.getElementById('user-form').onsubmit = e => { e.preventDefault(); const fd=new FormData(e.target); const data=Object.fromEntries(fd); if(user && !canModifyUser(currentUser, user)){ alert('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; } if(data.role==='gm' && !isGM(currentUser)){ const pass = prompt('Crear GM requiere contraseña maestra:'); if(pass!=='GUIA-GM-2025'){ alert('Contraseña incorrecta. No se puede crear GM.'); return; } } const rolesAgenteU=['agente','agente_agencia','agente_desarrollo'];
-if(rolesAgenteU.includes(data.role)){
-  if(data.agenciaId){ const ag=db.users.find(x=>String(x.id)===String(data.agenciaId)&&x.role==='agencia'); if(ag){ data.agenciaId=ag.id; data.agencia=ag.id; data.parentId=ag.id; data.assignedTo=ag.id; } else { delete data.agenciaId; delete data.agencia; delete data.parentId; delete data.assignedTo; } }
-  else { delete data.agenciaId; delete data.agencia; delete data.parentId; delete data.assignedTo; }
-} else { delete data.agenciaId; delete data.agencia; delete data.parentId; delete data.assignedTo; }
-const file=e.target.avatarFile.files[0]; const save=(avatar)=>{ if(avatar) data.avatar=avatar; delete data.avatarFile; try{ const ub=document.getElementById('user-ubicacion'); if(ub){ data.ubicacion=ub.value||''; } }catch(err){} if(user){ Object.assign(user,data); if(rolesAgenteU.includes(data.role)){ if(!user.agenciaId){ delete user.agencia; delete user.parentId; delete user.assignedTo; } } else { delete user.agenciaId; delete user.agencia; delete user.parentId; delete user.assignedTo; } } else { data.id=Date.now(); if(!data.avatar) data.avatar=`https://i.pravatar.cc/40?u=${data.username}`; db.users.push(data); } saveDB(); closeModal(); render(); }; if(file){ const reader=new FileReader(); reader.onload=ev=>save(ev.target.result); reader.readAsDataURL(file); } else { save(user?.avatar); } };
+<p class="text-xs text-slate-500 mt-1">Este color se usará en el calendario de clases en vivo</p></div><div><label class="text-sm font-medium">Foto de perfil</label><input type="file" name="avatarFile" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><div class="mt-2 flex items-center gap-2">${user?.avatar?`<img src="${user.avatar}" class="w-10 h-10 rounded-full object-cover"><span class="text-xs text-slate-500">Actual</span>`: '<span class="text-xs text-slate-500">Se usará avatar automático si no subes</span>'}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold">Guardar</button></div></form>`);
+            setTimeout(()=>{ const rs=document.querySelector('#user-form select[name=role]'); const af=document.getElementById('agencia-field'); const as=document.querySelector('#user-form select[name=agenciaId]'); if(as){ as.innerHTML='<option value="">Sin asignar</option>'+db.users.filter(u=>u.role==='agencia').map(a=>`<option value="${a.id}" ${String(user?.agenciaId||'')===String(a.id)?'selected':''}>${escapeHTML(a.name)}</option>`).join(''); } const tg=()=>{ if(af) af.style.display = rs && ['agente_agencia','agente_desarrollo','agente'].includes(rs.value) ? 'block':'none'; const cf=document.getElementById('color-field'); if(cf) cf.style.display = rs && ['maestro','capacitador','agencia','admin','gm'].includes(rs.value) ? 'block':'none'; }; if(rs){ rs.addEventListener('change',tg); tg(); } if(!isGM(currentUser) && user?.role!=='gm'){ const gmOpt=document.querySelector('#user-form option[value=gm]'); if(gmOpt) gmOpt.remove(); } },0);
+            document.getElementById('user-form').onsubmit = e => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const data = Object.fromEntries(fd);
+                data.username = String(data.username || '').trim();
+                data.name = String(data.name || '').trim();
+                data.email = String(data.email || '').trim();
+                data.phone = String(data.phone || '').trim();
+                const rawPass = String(data.password || '').trim();
+                if (!data.username) { showToast('El nombre de usuario es obligatorio', 'error'); return; }
+                const dup = (db.users || []).some(u => String(u.id) !== String(user?.id || '') && String(u.username || '').toLowerCase() === data.username.toLowerCase());
+                if (dup) { showToast('Ese nombre de usuario ya está en uso, elige otro', 'error'); return; }
+                if (!user && !rawPass) { showToast('Ingresa una contraseña para el nuevo usuario', 'error'); return; }
+                if (user && !canModifyUser(currentUser, user)) { alert('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
+                if (data.role === 'gm' && !isGM(currentUser)) { const pass = prompt('Crear GM requiere contraseña maestra:'); if (pass !== 'GUIA-GM-2025') { alert('Contraseña incorrecta. No se puede crear GM.'); return; } }
+                const rolesAgenteU = ['agente', 'agente_agencia', 'agente_desarrollo'];
+                if (rolesAgenteU.includes(data.role)) {
+                    if (data.agenciaId) {
+                        const ag = db.users.find(x => String(x.id) === String(data.agenciaId) && x.role === 'agencia');
+                        if (ag) { data.agenciaId = ag.id; data.agencia = ag.id; data.parentId = ag.id; data.assignedTo = ag.id; }
+                        else { delete data.agenciaId; delete data.agencia; delete data.parentId; delete data.assignedTo; }
+                    } else { delete data.agenciaId; delete data.agencia; delete data.parentId; delete data.assignedTo; }
+                } else { delete data.agenciaId; delete data.agencia; delete data.parentId; delete data.assignedTo; }
+                const file = e.target.avatarFile.files[0];
+                const save = (avatar) => {
+                    if (avatar) data.avatar = avatar;
+                    delete data.avatarFile;
+                    try {
+                        const ub = document.getElementById('user-ubicacion');
+                        if (ub) data.ubicacion = ub.value || '';
+                    } catch (err) {}
+                    if (user) {
+                        // Si la contraseña viene en blanco al editar, NO sobrescribir ni vaciar la existente
+                        if (!rawPass) {
+                            delete data.password;
+                        } else {
+                            data.password = rawPass;
+                        }
+                        Object.assign(user, data);
+                        if (rolesAgenteU.includes(data.role)) {
+                            if (!data.agenciaId) { delete user.agenciaId; delete user.agencia; delete user.parentId; delete user.assignedTo; }
+                        } else {
+                            delete user.agenciaId; delete user.agencia; delete user.parentId; delete user.assignedTo;
+                        }
+                        showToast(`Usuario "${user.username}" actualizado correctamente`, 'success');
+                    } else {
+                        data.id = Date.now();
+                        data.password = rawPass;
+                        data.xp = 0;
+                        data.students = [];
+                        if (!data.avatar) data.avatar = `https://i.pravatar.cc/40?u=${encodeURIComponent(data.username)}`;
+                        db.users.push(data);
+                        showToast(`Usuario "${data.username}" creado correctamente`, 'success');
+                    }
+                    saveDB();
+                    closeModal();
+                    render();
+                };
+                if (file) { const reader = new FileReader(); reader.onload = ev => save(ev.target.result); reader.readAsDataURL(file); }
+                else { save(user?.avatar); }
+            };
         }
-        function deleteUser(id){ const target=db.users.find(u=>u.id===id); if(target && isGM(target)){ alert('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ alert('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>u.id!==id); saveDB(); navigateTo('users'); } }
+        function generarPasswordModalUsuario(){
+            const inp = document.getElementById('user-modal-pass');
+            if(!inp) return;
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+            let pass = 'BB-';
+            for(let i=0;i<6;i++) pass += chars.charAt(Math.floor(Math.random()*chars.length));
+            inp.value = pass;
+            inp.type = 'text';
+            if(typeof showToast === 'function') showToast('Contraseña generada: ' + pass, 'info');
+        }
+        function deleteUser(id){ const target=db.users.find(u=>String(u.id)===String(id)); if(target && isGM(target)){ alert('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ alert('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>String(u.id)!==String(id)); saveDB(); navigateTo('users'); } }
 
         function openCategoryModal(id=null){
             const cat = id ? db.categories.find(c=>c.id===id) : null;

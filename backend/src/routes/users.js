@@ -51,7 +51,10 @@ module.exports = (store) => {
     if (!canCreate(req.user, roleAlias((req.body || {}).role))) {
       return res.status(403).json({ ok: false, error: 'Sin permiso para crear ese rol' });
     }
-    const { username, role, name, email, phone, password, id } = req.body || {};
+    const {
+      username, role, name, email, phone, password, id, avatar,
+      ubicacion, ciudad, ubicacionCiudad, agenciaId, agencia, parentId, assignedTo, calendarColor,
+    } = req.body || {};
     if (!username) return res.status(400).json({ ok: false, error: 'username requerido' });
     const normRole = roleAlias(role);
     if (!roles.ROLES[normRole]) {
@@ -74,10 +77,13 @@ module.exports = (store) => {
       id: useId,
       username, role: normRole,
       name: name || username, email: email || '', phone: phone || '',
-      avatar: `https://i.pravatar.cc/40?u=${encodeURIComponent(username)}`,
+      avatar: avatar || `https://i.pravatar.cc/40?u=${encodeURIComponent(username)}`,
       xp: 0, students: [],
       mustChangePassword: true,
     };
+    for (const [k, v] of Object.entries({ ubicacion, ciudad, ubicacionCiudad, agenciaId, agencia, parentId, assignedTo, calendarColor })) {
+      if (v !== undefined) rec[k] = v;
+    }
     if (roles.isGM(rec) && !roles.isGM(req.user)) {
       return res.status(403).json({ ok: false, error: 'Solo un GM puede crear cuentas GM' });
     }
@@ -117,16 +123,38 @@ module.exports = (store) => {
         || String(target.id) === String(req.user.id) || createdByMe;
       if (!mine) return res.status(403).json({ ok: false, error: 'Solo puedes editar a tu equipo' });
     }
-    const { name, email, phone, role, avatar, agenciaId, agencia, parentId, assignedTo, xp, students } = req.body || {};
+    const {
+      username, password, name, email, phone, role, avatar,
+      ubicacion, ciudad, ubicacionCiudad, calendarColor,
+      agenciaId, agencia, parentId, assignedTo, xp, students,
+      lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy,
+    } = req.body || {};
     const antes = { ...target };
+    if (username !== undefined && String(username).trim() !== '' && String(username) !== String(target.username)) {
+      const nextU = String(username).trim();
+      if (users.some((x) => String(x.id) !== String(target.id) && String(x.username).toLowerCase() === nextU.toLowerCase())) {
+        return res.status(409).json({ ok: false, error: 'El username ya existe' });
+      }
+      target.username = nextU;
+    }
     if (name !== undefined) target.name = name;
     if (email !== undefined) target.email = email;
     if (phone !== undefined) target.phone = phone;
     if (avatar !== undefined) target.avatar = avatar;
-    // Asignaciones de equipo (agenciaId/parentId/assignedTo/agencia) + xp/students:
+    // Asignaciones de equipo + ubicación + color calendario + progreso:
     // el legacy las guarda en el mismo formulario de usuario.
-    for (const [k, v] of Object.entries({ agenciaId, agencia, parentId, assignedTo, xp, students })) {
-      if (v !== undefined) target[k] = v;
+    const extraFields = {
+      ubicacion, ciudad, ubicacionCiudad, calendarColor,
+      agenciaId, agencia, parentId, assignedTo, xp, students,
+      lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy,
+    };
+    for (const [k, v] of Object.entries(extraFields)) {
+      if (v === null) delete target[k];
+      else if (v !== undefined) target[k] = v;
+    }
+    if (password !== undefined && String(password).trim() !== '') {
+      target.passwordHash = passwords.hash(String(password).trim());
+      target.mustChangePassword = false;
     }
     if (role !== undefined) {
       const normRole = roleAlias(role);

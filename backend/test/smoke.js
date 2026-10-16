@@ -251,6 +251,60 @@ describe('auditoría: guardado de usuarios y equipo', () => {
     const del = await api('DELETE', `/api/users/${id}`);
     assert.equal(del.status, 200);
   });
+  it('POST y PUT /api/users persisten ubicacion, agenciaId, username y cambio opcional de password', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const created = await api('POST', '/api/users', {
+      username: 'userubic1',
+      password: 'ClaveInicial1*',
+      role: 'agente_agencia',
+      name: 'Usuario Ubicacion',
+      ubicacion: 'Nuevo León',
+      ciudad: 'Monterrey',
+      agenciaId: 77,
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.json.user.ubicacion, 'Nuevo León');
+    assert.equal(created.json.user.ciudad, 'Monterrey');
+    assert.equal(created.json.user.agenciaId, 77);
+    const uid = created.json.user.id;
+
+    // Editar ubicación sin enviar password conserva la contraseña original
+    const edit1 = await api('PUT', `/api/users/${uid}`, {
+      ubicacion: 'Jalisco',
+      agenciaId: null,
+    });
+    assert.equal(edit1.status, 200);
+    assert.equal(edit1.json.user.ubicacion, 'Jalisco');
+    assert.equal(edit1.json.user.agenciaId, undefined);
+
+    // Login con la contraseña original sigue funcionando tras editar sin password
+    jar.cookie = null;
+    const loginOrig = await api('POST', '/api/auth/login', { username: 'userubic1', password: 'ClaveInicial1*' }, false);
+    assert.equal(loginOrig.status, 200);
+
+    // Ahora admin rota la contraseña y username desde PUT /api/users/:id
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const edit2 = await api('PUT', `/api/users/${uid}`, {
+      username: 'userubic2',
+      password: 'ClaveRotada2*',
+    });
+    assert.equal(edit2.status, 200);
+    assert.equal(edit2.json.user.username, 'userubic2');
+
+    // Login con la nueva contraseña y nuevo username funciona
+    jar.cookie = null;
+    const loginNew = await api('POST', '/api/auth/login', { username: 'userubic2', password: 'ClaveRotada2*' }, false);
+    assert.equal(loginNew.status, 200);
+
+    // Limpieza y dejar cookie en maestro para el siguiente test
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    await api('DELETE', `/api/users/${uid}`);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'maestro', password: 'Test1234*' }, false);
+  });
   it('maestro no toca a quien no es su equipo (403)', async () => {
     const r = await api('PUT', '/api/users/1', { name: 'Hack' });
     assert.equal(r.status, 403);
