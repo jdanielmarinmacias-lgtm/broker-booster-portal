@@ -7531,6 +7531,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                 <p class="text-xs text-slate-500">Métricas consolidadas en tiempo real: Prospectos → Cotizaciones → Emisiones</p>
                             </div>
                             <div class="flex items-center gap-2">
+                                <button onclick="exportReporteEjecutivoPDF()" class="px-3.5 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Reporte Ejecutivo PDF</button>
                                 <button onclick="exportDashboardKPIsCSV()" class="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50/70 text-amber-900 text-xs font-semibold hover:bg-amber-100 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar KPIs CSV</button>
                                 <button onclick="navigateTo('messages')" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-comments"></i> Ir a Mensajes</button>
                             </div>
@@ -8486,6 +8487,242 @@ function renderGlossary() {
             a.download = 'kpis_ejecutivos_' + new Date().toISOString().slice(0,10) + '.csv';
             a.click();
             if (window.showToast) showToast('KPIs exportados en CSV', 'success');
+        }
+
+        // === REPORTE EJECUTIVO PDF CONSOLIDADO (KPIs: primas, comisiones, renovaciones y embudo) ===
+        async function exportReporteEjecutivoPDF() {
+            if(!window.jspdf){ if(window.showToast) showToast('Cargando motor PDF, intenta en un segundo','info'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            const s = db.settings || {};
+            const primary = s.primaryColor || '#0a2540';
+            const accent = s.accent || '#c9a86a';
+            const W = doc.internal.pageSize.getWidth();
+            const H = doc.internal.pageSize.getHeight();
+
+            // --- Ámbito: los agentes ven solo su producción; agencias/admin ven todo ---
+            const rolAct = (currentUser.role || '').toLowerCase();
+            const esAgente = ['agente','agente_agencia','agente_desarrollo'].includes(rolAct);
+            const ventasTodos = (db.ventas || []);
+            const ventas = esAgente ? ventasTodos.filter(v => String(v.agenteId) === String(currentUser.id)) : ventasTodos;
+            const clientesTodos = (db.clientes || []);
+            const cartera = esAgente ? clientesTodos.filter(c => String(c.agenteId) === String(currentUser.id)) : clientesTodos;
+            const sols = (db.solicitudes || []);
+            const cots = typeof cotDB === 'function' ? (function(){ try { return cotDB(); } catch(e) { return (db.cotizaciones || []); } })() : (db.cotizaciones || []);
+
+            // --- KPIs: primas ---
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            const mesActual = hoy.getMonth(), anioActual = hoy.getFullYear();
+            const primaTotal = ventas.reduce((t,v) => t + Number(v.prima || 0), 0);
+            const primaMes = ventas.filter(v => { const d = new Date(v.fecha||v.ts||0); return !isNaN(d) && d.getMonth() === mesActual && d.getFullYear() === anioActual; }).reduce((t,v) => t + Number(v.prima || 0), 0);
+            const primaCartera = cartera.reduce((t,c) => t + Number(c.primaTotal || c.primaNeta || 0), 0);
+
+            // --- KPIs: comisiones (mismos porcentajes del Estado de Cuenta) ---
+            const tasaRamo = (ramo) => { const r = String(ramo || '').toUpperCase();
+                if(r.includes('VIDA') || r.includes('INVERSI')) return 0.30;
+                if(r.includes('GMM')) return 0.18;
+                if(r.includes('AUTO')) return 0.12;
+                return 0.15; };
+            const comisionVentas = ventas.reduce((t,v) => t + Number(v.prima || 0) * tasaRamo(v.ramo), 0);
+            const comisionConciliada = cartera.filter(c => Boolean(c.fechaCobranza) || (c.recibosConciliados || 0) > 0).reduce((t,c) => t + Number(c.primaNeta || c.primaTotal || 0) * tasaRamo(c.ramo), 0);
+
+            // --- KPIs: renovaciones (motor 60/30/15) ---
+            const vFin = (c) => { try { return typeof cbzVigenciaFin === 'function' ? cbzVigenciaFin(c) : (c.fechaEmision ? new Date(c.fechaEmision) : (c.fechaCobranza ? new Date(c.fechaCobranza) : (c.fecha ? new Date(c.fecha) : null))); } catch(e) { return null; } };
+            const renItems = cartera.map(c => { const fin = vFin(c); const finMs = fin ? fin.getTime() : NaN;
+                return { c, fin, primas: finMs && !isNaN(finMs) ? Number(c.primaTotal || c.primaNeta || 0) : 0, dias: finMs && !isNaN(finMs) ? Math.round((finMs - hoy.getTime()) / 86400000) : 999, vigente: finMs && !isNaN(finMs) && finMs >= hoy.getTime() }; });
+            const ren15 = renItems.filter(x => x.vigente && x.dias <= 15);
+            const ren30 = renItems.filter(x => x.vigente && x.dias > 15 && x.dias <= 30);
+            const ren60 = renItems.filter(x => x.vigente && x.dias > 30 && x.dias <= 60);
+            const primaRenovables = [...ren15, ...ren30, ...ren60].reduce((t,x) => t + x.primas, 0);
+
+            // --- KPIs: embudo comercial ---
+            const nSols = sols.length, nCots = cots.length;
+            const enProceso = cots.filter(c => ['nueva','cotizando','enviada'].includes((c.estado || '').toLowerCase())).length;
+            const emitidas = cots.filter(c => ['emitida','pagada','cerrada'].includes((c.estado || '').toLowerCase())).length;
+            const tasaSolCot = nSols > 0 ? Math.round((nCots / nSols) * 100) : (nCots > 0 ? 100 : 0);
+            const tasaCotVenta = nCots > 0 ? Math.round((emitidas / nCots) * 100) : 0;
+
+            // --- Header ---
+            doc.setFillColor(primary);
+            doc.rect(0, 0, W, 92, 'F');
+            if (s.logo) { try { doc.addImage(s.logo, 'PNG', 40, 22, 48, 48); } catch(e) {} }
+            doc.setTextColor(255,255,255);
+            doc.setFontSize(20); doc.setFont(undefined, 'bold');
+            doc.text(s.institutionName || 'Portal Ejecutivo', 40 + (s.logo ? 58 : 0), 40);
+            doc.setFontSize(11); doc.setFont(undefined, 'normal');
+            doc.text('Reporte Ejecutivo Consolidado · Primas, Comisiones, Renovaciones y Embudo', 40 + (s.logo ? 58 : 0), 58);
+            doc.setFontSize(9);
+            doc.text('Generado: ' + new Date().toLocaleString('es-MX') + '  ·  Ámbito: ' + (esAgente ? 'Producción propia' : 'Toda la organización'), 40, 76);
+
+            const fmt = (n) => '$' + Math.round(n).toLocaleString('es-MX');
+
+            // --- Serie: primas por mes (últimos 12 meses) y gráfica de tendencia ---
+            const serieTrend = (function(){
+                const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+                const arr = [];
+                for (let i = 11; i >= 0; i--) {
+                    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+                    arr.push({ label: MESES[d.getMonth()] + ' ' + String(d.getFullYear()).slice(-2), y: d.getFullYear(), m: d.getMonth(), total: 0 });
+                }
+                ventas.forEach(v => {
+                    const d = new Date(v.fecha || v.ts || 0);
+                    if (isNaN(d)) return;
+                    const diff = (hoy.getFullYear() - d.getFullYear()) * 12 + (hoy.getMonth() - d.getMonth());
+                    if (diff >= 0 && diff < 12) arr[11 - diff].total += Number(v.prima || 0);
+                });
+                return arr;
+            })();
+            const renderTendenciaChart = (serie) => new Promise((resolve) => {
+                try {
+                    if (typeof Chart === 'undefined') return resolve(null);
+                    const cv = document.createElement('canvas');
+                    cv.width = 2000; cv.height = 680;
+                    const ctx2 = cv.getContext('2d');
+                    ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0, 0, cv.width, cv.height);
+                    const chart = new Chart(ctx2, {
+                        type: 'bar',
+                        data: { labels: serie.map(x => x.label), datasets: [{ label: 'Primas por mes', data: serie.map(x => x.total), backgroundColor: '#1e40af', hoverBackgroundColor: accent, borderRadius: 6, maxBarThickness: 110 }] },
+                        options: {
+                            responsive: false, animation: false, events: [],
+                            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                            scales: {
+                                x: { grid: { display: false }, ticks: { color: '#334155', font: { size: 26, weight: 600 } } },
+                                y: { beginAtZero: true, grid: { color: '#e2e8f0' }, border: { display: false }, ticks: { color: '#64748b', font: { size: 24 }, callback: (v) => (v >= 1000 ? '$' + Math.round(v / 100) / 10 + 'k' : '$' + v) } }
+                            }
+                        }
+                    });                        Promise.race([chart.ready || Promise.resolve(), new Promise(r => setTimeout(r, 800))]).then(() => {
+                        let url = null;
+                        try { url = cv.toDataURL('image/jpeg', 0.92); } catch(e) {}
+                        try { chart.destroy(); } catch(e) {}
+                        try { if (cv.remove) cv.remove(); } catch(e) {}
+                        resolve(url && url.length > 20000 ? url : null);
+                    });
+                } catch (e) { resolve(null); }
+            });
+            const imgTrend = await renderTendenciaChart(serieTrend);
+
+            // --- Bloque 1: KPIs financieros ---
+            let y = 118;
+            doc.setTextColor(primary); doc.setFontSize(13); doc.setFont(undefined, 'bold');
+            doc.text('1 · Primas y Comisiones', 40, y);
+            y += 12;
+            doc.autoTable({
+                startY: y,
+                head: [['Concepto', 'Valor']],
+                body: [
+                    ['Primas facturadas (ventas / pólizas nuevas)', fmt(primaTotal)],
+                    ['Primas en el mes en curso', fmt(primaMes)],
+                    ['Prima anual acumulada en cartera', fmt(primaCartera)],
+                    ['Ventas registradas', String(ventas.length)],
+                    ['Comisiones estimadas por ramo (ventas)', fmt(comisionVentas)],
+                    ['Comisiones conciliadas / cobradas (cartera)', fmt(comisionConciliada)],
+                    ['Comisión promedio ponderada', ventas.length ? Math.round((comisionVentas / Math.max(primaTotal, 1)) * 100) + '%' : '—']
+                ],
+                theme: 'grid', headStyles: { fillColor: primary, textColor: 255, fontSize: 10 },
+                bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [248,250,252] },
+                margin: { left: 40, right: 40 }, columnStyles: { 1: { halign: 'right' } }
+            });
+
+            // --- Bloque 2: renovaciones ---
+            let y2 = doc.lastAutoTable.finalY + 22;
+            doc.setTextColor(primary); doc.setFontSize(13); doc.setFont(undefined, 'bold');
+            doc.text('2 · Renovaciones por Vencer', 40, y2);
+            y2 += 12;
+            doc.autoTable({
+                startY: y2,
+                head: [['Horizonte', 'Pólizas', 'Prima anual en riesgo', 'Acción']],
+                body: [
+                    ['Urgentes (≤ 15 días)', String(ren15.length), fmt(ren15.reduce((t,x) => t + x.primas, 0)), 'Contactar hoy'],
+                    ['Próximas (16–30 días)', String(ren30.length), fmt(ren30.reduce((t,x) => t + x.primas, 0)), 'Propuesta de renovación'],
+                    ['Preventivas (31–60 días)', String(ren60.length), fmt(ren60.reduce((t,x) => t + x.primas, 0)), 'Seguimiento preventivo'],
+                    ['Total renovable a 60 días', String(ren15.length + ren30.length + ren60.length), fmt(primaRenovables), '—']
+                ],
+                theme: 'grid', headStyles: { fillColor: primary, textColor: 255, fontSize: 10 },
+                bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [248,250,252] },
+                margin: { left: 40, right: 40 }, columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'center' } }
+            });
+
+            // --- Bloque 3: embudo comercial ---
+            let y3 = doc.lastAutoTable.finalY + 22;
+            doc.setTextColor(primary); doc.setFontSize(13); doc.setFont(undefined, 'bold');
+            doc.text('3 · Embudo Comercial', 40, y3);
+            y3 += 12;
+            doc.autoTable({
+                startY: y3,
+                head: [['Etapa', 'Casos', 'Tasa de conversión a la etapa siguiente']],
+                body: [
+                    ['Solicitudes / Prospectos (web)', String(nSols), tasaSolCot + '%'] ,
+                    ['Cotizaciones recibidas', String(nCots), nCots > 0 ? Math.round((enProceso / nCots) * 100) + '%' : '0%'],
+                    ['En cotización / propuesta enviada', String(enProceso), nCots > 0 ? Math.round((emitidas / nCots) * 100) + '%' : '0%'],
+                    ['Pólizas / ventas emitidas', String(emitidas), 'Cierre: ' + tasaCotVenta + '%']
+                ],
+                theme: 'grid', headStyles: { fillColor: primary, textColor: 255, fontSize: 10 },
+                bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [248,250,252] },
+                margin: { left: 40, right: 40 }, columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' } }
+            });
+
+            // --- Bloque 4: tendencia de primas por mes (gráfica Chart.js incrustada) ---
+            let y4 = doc.lastAutoTable.finalY + 22;
+            doc.setTextColor(primary); doc.setFontSize(13); doc.setFont(undefined, 'bold');
+            const activ = serieTrend.reduce((t, x) => t + x.total, 0);
+            if (activ > 0 && imgTrend) {
+                doc.text('4 · Tendencia de Primas por Mes (12 meses)  ·  Total ' + fmt(activ), 40, y4);
+                y4 += 12;
+                const imgW = W - 80;
+                const imgH = Math.round(imgW * 680 / 2000);
+                if (y4 + imgH > H - 40) { doc.addPage(); y4 = 40; }
+                doc.addImage(imgTrend, 'JPEG', 40, y4, imgW, imgH);
+                doc.lastAutoTable = { finalY: y4 + imgH };
+            } else {
+                doc.text('4 · Tendencia de Primas por Mes (12 meses): sin ventas registradas en el periodo', 40, y4);
+                doc.lastAutoTable = { finalY: y4 + 10 };
+            }
+
+            // --- Bloque 5: producción por ramo ---
+            const ramos = {};
+            ventas.forEach(v => { const r = String(v.ramo || 'Otro').toUpperCase(); ramos[r] = ramos[r] || { n: 0, prima: 0, com: 0 }; ramos[r].n++; ramos[r].prima += Number(v.prima || 0); ramos[r].com += Number(v.prima || 0) * tasaRamo(v.ramo); });
+            let y5 = doc.lastAutoTable.finalY + 22;
+            doc.setTextColor(primary); doc.setFontSize(13); doc.setFont(undefined, 'bold');
+            doc.text('5 · Producción por Ramo', 40, y5);
+            y5 += 12;
+            doc.autoTable({
+                startY: y4,
+                head: [['Ramo', 'Ventas', 'Prima', 'Comisión estimada']],
+                body: Object.keys(ramos).sort((a,b) => ramos[b].prima - ramos[a].prima).map(r => [r, String(ramos[r].n), fmt(ramos[r].prima), fmt(ramos[r].com)])
+                    .concat(Object.keys(ramos).length ? [['TOTAL', String(ventas.length), fmt(primaTotal), fmt(comisionVentas)]] : [['Sin ventas registradas en el ámbito', '0', '$0', '$0']]),
+                theme: 'grid', headStyles: { fillColor: accent, textColor: 20, fontSize: 10 },
+                bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [248,250,252] },
+                margin: { left: 40, right: 40 }, columnStyles: { 1: { halign: 'center' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
+            });
+
+            // --- Bloque 6: próximas renovaciones (detalle, máx. 12) ---
+            const renTop = [...ren15, ...ren30, ...ren60].sort((a,b) => a.dias - b.dias).slice(0, 12);
+            let y6 = doc.lastAutoTable.finalY + 22;
+            doc.setTextColor(primary); doc.setFontSize(13); doc.setFont(undefined, 'bold');
+            doc.text('6 · Agenda de Renovación (próximas 12)', 40, y6);
+            y6 += 12;
+            doc.autoTable({
+                startY: y6,
+                head: [['Cliente', 'Compañía', 'Ramo', 'Aniversario', 'Prima anual']],
+                body: renTop.length ? renTop.map(x => {
+                    const f = x.fin && !isNaN(x.fin) ? x.fin.toLocaleDateString('es-MX') : '—';
+                    return [String(x.c.nombre || '—'), String(x.c.compania || '—'), String(x.c.ramo || '—'), f + (x.dias >= 0 ? ' (en ' + x.dias + 'd)' : ' (vencida)'), fmt(x.primas)];
+                }) : [['Sin renovaciones próximas', '—', '—', '—', '—']],
+                theme: 'grid', headStyles: { fillColor: primary, textColor: 255, fontSize: 10 },
+                bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [248,250,252] },
+                margin: { left: 40, right: 40 }, columnStyles: { 4: { halign: 'right' } }
+            });
+
+            // --- Footer en cada página ---
+            const total = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= total; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8); doc.setTextColor(150);
+                doc.text((s.footerText || 'Documento interno — uso ejecutivo'), 40, H - 24);
+                doc.text('Página ' + i + ' de ' + total, W - 40, H - 24, { align: 'right' });
+            }
+            doc.save('reporte_ejecutivo_' + new Date().toISOString().slice(0,10) + '.pdf');
+            if (window.showToast) showToast('Reporte Ejecutivo PDF generado', 'success');
         }
 
         function renderReports() {
