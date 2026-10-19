@@ -45,11 +45,20 @@ const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 module.exports = (store, config) => {
   const r = express.Router();
 
+  let publicPortalCache = null;
+  let publicPortalCacheAt = 0;
+
   r.get('/public/portal', async (req, res, next) => {
     try {
       let data = store.get();
       if (typeof store.isWarm === 'function' && !store.isWarm() && typeof store.adapter.loadCollections === 'function') {
-        data = await store.adapter.loadCollections(['settings', 'autoHub', 'inmPublica']);
+        if (publicPortalCache && Date.now() - publicPortalCacheAt < 30000) {
+          data = publicPortalCache;
+        } else {
+          data = await store.adapter.loadCollections(['settings', 'autoHub', 'inmPublica']);
+          publicPortalCache = data;
+          publicPortalCacheAt = Date.now();
+        }
       } else {
         await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
         data = store.get();

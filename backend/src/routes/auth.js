@@ -22,12 +22,10 @@ module.exports = (store) => {
         : String(stored) === String(password));
       if (!valid) {
         mw.noteFailedLogin(req);
-        // Auditoría ligera (1 fila en Supabase o quirúrgica en memoria/json):
-        // jamás reescribir la base ni bloquear con recarga de todas las filas.
         try {
           const entry = db.audit(store.get(), 'login_fallido', null, { username: String(username) });
           if (typeof store.adapter.pushAudit === 'function') {
-            await store.adapter.pushAudit(entry);
+            store.adapter.pushAudit(entry).catch(() => {});
           } else {
             await store.refreshForWrite(['auditoria']);
             db.audit(store.get(), 'login_fallido', null, { username: String(username) });
@@ -37,19 +35,17 @@ module.exports = (store) => {
         return res.status(401).json({ ok: false, error: 'Credenciales incorrectas' });
       }
       mw.forgiveLogin(req);
-      const entry = db.audit(store.get(), 'login', db.safeUser(u), {});
-      const auditTask = (async () => {
-        try {
-          if (typeof store.adapter.pushAudit === 'function') {
-            await store.adapter.pushAudit(entry);
-          } else {
-            await store.refreshForWrite(['auditoria']);
-            db.audit(store.get(), 'login', db.safeUser(u), {});
-            await store.persistCollections(['auditoria']);
-          }
-        } catch (e) { /* la auditoría nunca rompe el login */ }
-      })();
-      const [token] = await Promise.all([sessions.create(u.id), auditTask]);
+      try {
+        const entry = db.audit(store.get(), 'login', db.safeUser(u), {});
+        if (typeof store.adapter.pushAudit === 'function') {
+          store.adapter.pushAudit(entry).catch(() => {});
+        } else {
+          await store.refreshForWrite(['auditoria']);
+          db.audit(store.get(), 'login', db.safeUser(u), {});
+          await store.persistCollections(['auditoria']);
+        }
+      } catch (e) { /* la auditoría nunca rompe el login */ }
+      const token = await sessions.create(u.id);
       res.setHeader('Set-Cookie', sessions.cookieHeader(token));
       const safe = db.safeUser(u);
       res.json({ ok: true, user: safe, mustChangePassword: !!u.mustChangePassword });
