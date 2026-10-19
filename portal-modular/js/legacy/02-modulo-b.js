@@ -227,7 +227,7 @@
 
 
                 function renderEditor() {
-            if (!['admin','gm','desarrollador','editor'].includes(currentUser?.role)) {
+            if (!['admin','gm','desarrollador','editor'].includes((currentUser?.role || '').toLowerCase())) {
                 return '<div class="p-8 text-center"><p class="text-red-600">Acceso denegado</p></div>';
             }
             

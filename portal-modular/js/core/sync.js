@@ -55,10 +55,8 @@
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
   /* Colecciones-OBJETO: settings, autoHub, inmPublica, carruselCirculares,
-   * prospectos, expedientesProspectos, notifications, rolePermissions.
-   * Antes sólo viajaban arrays: ban/publicidad/capacitaciones/clientes/autos/
-   * inmuebles guardados dentro de estos objetos NO se compartían entre
-   * equipos (y el pull los reemplazaba por [] vacío = pérdida). */
+   * prospectos, expedientesProspectos, rolePermissions, guiaBase, guiaChats,
+   * practicaConfig, oferta_valor. */
   function isPlain(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
 
   /* El legacy vive en mundo numérico (id: 1, students: [3], === estricto) pero
@@ -146,6 +144,11 @@
           }
           pulled[n] = true;
         });
+        if (Array.isArray(r.users)) {
+          if (!Array.isArray(db.users)) db.users = [];
+          replaceArray(db.users, normIds(r.users));
+          usersPulled = true;
+        }
         return true;
       }
     } catch (e) { /* fallback individual */ }
@@ -231,7 +234,10 @@
     try {
       await pullBundle();
     } catch (e) { return false; }
-    await pullUsers(); // users: el servidor es la verdad (sin merge)
+    if (!usersPulled) {
+      await pullUsers(); // fallback si el servidor no adjuntó users en /api/data/bundle
+    }
+    try { if (typeof window.ensureDbDefaults === 'function') window.ensureDbDefaults(); } catch (e0) {}
     snapshot(); // foto del servidor ANTES de fusionar lo local
     let merged = 0;
     Object.keys(pre).forEach(function (n) {
@@ -260,6 +266,7 @@
     });
     // Lo solo-local (en db pero fuera de la sombra) siempre se sube; el diff
     // no encuentra nada que hacer en lo ya sincronizado.
+    try { if (typeof window.flushSaveDB === 'function') window.flushSaveDB(); } catch (e1) {}
     if (merged) pushSoon();
     return true;
   }
@@ -341,6 +348,10 @@
   }
 
   async function pushCollection(name, local, old) {
+    // Notifications siempre debe ser Array; si una versión previa la dejó como {} vacío, ignorar o normalizar
+    if (name === 'notifications' && !Array.isArray(local)) {
+      return;
+    }
     // Colección-OBJETO: diff por CLAVE top-level (última escritura gana POR
     // CLAVE, no por objeto entero → dos equipos editando apartados distintos
     // de settings no se pisan). PUT /:col/:clave {value} · DELETE /:col/:clave.
@@ -354,6 +365,11 @@
           if (e.status === 403 || e.status === 404) {
             await pullNames([name]);
             if (window.showToast) window.showToast(pushErrorMsg(e, name), 'warning');
+            return;
+          }
+          // Si el servidor aún no reconoce la ruta /:clave (400), caer a POST merge del objeto
+          if (e.status === 400) {
+            await send('POST', '/api/data/' + encodeURIComponent(name), local);
             return;
           }
           throw e;
@@ -499,25 +515,37 @@
     try { if (!(window.Backend && await window.Backend.detect())) return; }
     catch (e) { return; }
     hookSave();
-    // Siempre hidratar escaparate público (autos + propiedades) para que la portada
-    // los muestre desde el primer segundo, con o sin sesión iniciada.
-    try {
-      if (await pullPublicShowcase()) {
-        const pp = document.getElementById('public-portal');
-        if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
-          window.renderPublicPortal();
-        }
-      }
-    } catch (e) {}
-    // Sesión restaurada (incógnito con cookie, otro navegador ya logueado…).
+    // Revisar si hay sesión activa primero: si hay sesión, pullAll() ya trae
+    // autoHub, inmPublica y settings en un solo viaje (/api/data/bundle),
+    // ahorrando la petición extra a /api/public/portal.
+    let hasSession = false;
     try {
       const me = await window.Backend.me();
-      if (me && me.user) {
+      hasSession = !!(me && me.user);
+    } catch (e) { hasSession = false; }
+
+    if (hasSession) {
+      try {
         if (await pullAll()) {
-          try { if (typeof window.render === 'function') window.render(); } catch (e) {}
+          try { if (typeof window.applyBranding === 'function') window.applyBranding(); } catch (e0) {}
+          try { if (typeof window.render === 'function') window.render(); } catch (e1) {}
+          const pp = document.getElementById('public-portal');
+          if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+            try { window.renderPublicPortal(); } catch (e2) {}
+          }
         }
-      }
-    } catch (e) { /* sin sesión: el login hará pull */ }
+      } catch (e) {}
+    } else {
+      // Visitante sin sesión: hidratar solo el escaparate público (autos + propiedades).
+      try {
+        if (await pullPublicShowcase()) {
+          const pp = document.getElementById('public-portal');
+          if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+            window.renderPublicPortal();
+          }
+        }
+      } catch (e) {}
+    }
     // Novedades de otros usuarios → re-pull escaparate + trabajo + re-render.
     // Ej: agente carga solicitud → el cotizador la ve en ese momento + toast.
     document.addEventListener('public-feed', function (e) {
@@ -541,7 +569,18 @@
         if (shadow && target && db && (Array.isArray(db[target]) || isPlain(db[target]))) {
           shadow[target] = clone(db[target]);
         }
-        try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
+        // Evitar re-render completo si el menú desplegable está abierto o el usuario escribe en un campo o tiene un modal abierto
+        var sbEl = document.getElementById('sidebar');
+        var sbOpen = sbEl && !sbEl.classList.contains('-translate-x-full');
+        var mcEl = document.getElementById('modal-container');
+        var modalOpen = mcEl && mcEl.innerHTML.trim() !== '';
+        var ae = document.activeElement;
+        var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable);
+        if (!sbOpen && !modalOpen && !typing) {
+          try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
+        } else {
+          try { if (typeof window.renderNav === 'function') window.renderNav(); } catch (e2) {}
+        }
         const pp = document.getElementById('public-portal');
         if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
           try { window.renderPublicPortal(); } catch (e5) {}

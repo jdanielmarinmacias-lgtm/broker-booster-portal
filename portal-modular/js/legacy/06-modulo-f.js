@@ -4,7 +4,7 @@
     // Asegurar estructuras
     if (!window.db) window.db = {};
     if (!db.expedientesProspectos) db.expedientesProspectos = {};
-    if (!db.notifications) db.notifications = {};
+    if (!Array.isArray(db.notifications)) db.notifications = [];
 
     // Helper progreso
     window.getProspectProgress = window.getProspectProgress || function(userId){
@@ -175,20 +175,26 @@
 
     // Asegurar navigateTo maneje plan-carrera
     const _nav = window.navigateTo;
-    window.navigateTo = function(page){
+    window.navigateTo = function(page, opts){
         if (page === 'plan-carrera') {
+            window.lastPage = page;
+            if (!opts || !opts.keepSidebar) document.getElementById('sidebar')?.classList.add('-translate-x-full');
             document.getElementById('main-content').innerHTML = renderPlanCarrera();
             return;
         }
         if (page === 'agenda-prospectos') {
+            window.lastPage = page;
+            if (!opts || !opts.keepSidebar) document.getElementById('sidebar')?.classList.add('-translate-x-full');
             document.getElementById('main-content').innerHTML = renderAgendaProspectos();
             return;
         }
         if (page === 'mi-experiencia') {
+            window.lastPage = page;
+            if (!opts || !opts.keepSidebar) document.getElementById('sidebar')?.classList.add('-translate-x-full');
             document.getElementById('main-content').innerHTML = renderMiExperiencia();
             return;
         }
-        _nav(page);
+        _nav(page, opts);
         // Botón oferta valor
         if (page === 'oferta-valor' && currentUser?.role==='prospecto') {
             setTimeout(()=>{
@@ -200,8 +206,8 @@
 /* Hook global: refrescar gráficas de Mis Metas tras cada navegación (routers envueltos) */
 (function(){
     const _navHook = window.navigateTo;
-    window.navigateTo = function(page){
-        const r = _navHook ? _navHook.call(this,page) : undefined;
+    window.navigateTo = function(page, opts){
+        const r = _navHook ? _navHook.call(this, page, opts) : undefined;
         try{ if(page==='mis-metas' && typeof window.mmRenderCharts==='function'){ setTimeout(function(){ try{ window.mmRenderCharts(); }catch(e){} }, 280); } }catch(e){}
         return r;
     };

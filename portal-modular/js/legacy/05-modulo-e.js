@@ -816,8 +816,8 @@ window.addEventListener('load', ()=>{
 
   // Listen for navigation to practica-cliente
   const originalNavigate = window.navigateTo;
-  window.navigateTo = function(page) {
-    originalNavigate(page);
+  window.navigateTo = function(page, opts) {
+    originalNavigate(page, opts);
     if(page === 'practica-cliente') {
       setTimeout(initTeoWhenReady, 150);
     }

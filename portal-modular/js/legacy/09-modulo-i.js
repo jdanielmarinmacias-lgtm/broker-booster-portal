@@ -196,8 +196,8 @@ function showEnVivoModal(liveClassId) {
   const roleColor = isPresenter ? 'bg-[#0a2540] text-white' : 'bg-slate-100 text-slate-700';
   
   const html = `
-  <div id="en-vivo-modal" class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-2 sm:p-4 overflow-auto">
-    <div class="bg-[#f8fafc] w-full max-w-[1600px] h-[95vh] rounded-[16px] overflow-hidden flex flex-col shadow-2xl">
+  <div id="en-vivo-modal" class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-2 sm:p-4 overflow-auto" ondblclick="if(event.target.id==='en-vivo-modal') closeEnVivoModal()">
+    <div class="bg-[#f8fafc] w-full max-w-[1600px] h-[95vh] rounded-[16px] overflow-hidden flex flex-col shadow-2xl" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
       <!-- Header -->
       <div class="h-[64px] bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0">
         <div class="flex items-center gap-3">

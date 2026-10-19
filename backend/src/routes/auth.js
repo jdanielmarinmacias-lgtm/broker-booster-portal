@@ -26,7 +26,7 @@ module.exports = (store) => {
         // JAMÁS debe reescribir la base (el persist total con caché vieja
         // borraba registros ajenos en producción multi-instancia).
         try {
-          await store.refreshForWrite();
+          await store.refreshForWrite(['auditoria']);
           db.audit(store.get(), 'login_fallido', null, { username: String(username) });
           await store.persistCollections(['auditoria']);
         } catch (e) { /* la auditoría nunca rompe el login */ }
@@ -36,7 +36,7 @@ module.exports = (store) => {
       const token = await sessions.create(u.id);
       res.setHeader('Set-Cookie', sessions.cookieHeader(token));
       try {
-        await store.refreshForWrite();
+        await store.refreshForWrite(['auditoria']);
         db.audit(store.get(), 'login', db.safeUser(u), {});
         await store.persistCollections(['auditoria']);
       } catch (e) { /* idem */ }
@@ -70,7 +70,7 @@ module.exports = (store) => {
         : String(stored) === String(current));
       if (!okCurrent) return res.status(401).json({ ok: false, error: 'La contraseña actual no coincide' });
       const newHash = passwords.hash(nextPw);
-      await store.refreshForWrite();
+      await store.refreshForWrite(['users', 'auditoria']);
       const data = store.get();
       const local = db.byId(db.collection(data, 'users'), u.id);
       if (local) {

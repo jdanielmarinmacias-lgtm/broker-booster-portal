@@ -132,9 +132,12 @@
             </div>
         </div>
         
-        <div id="modal-prospecto" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto p-6">
-                <h3 class="text-xl font-black mb-4" id="modal-titulo">Nuevo Prospecto</h3>
+        <div id="modal-prospecto" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" ondblclick="if(event.target.id==='modal-prospecto') cerrarModalProspecto()">
+            <div class="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto p-6" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-black" id="modal-titulo">Nuevo Prospecto</h3>
+                    <button type="button" onclick="cerrarModalProspecto()" aria-label="Cerrar" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 flex items-center justify-center transition"><i class="fas fa-times"></i></button>
+                </div>
                 <div class="grid md:grid-cols-2 gap-3">
                     <div class="md:col-span-2"><label class="text-xs font-bold">Nombre completo *</label><input id="mp-nombre" class="w-full p-2 border rounded bg-white"></div>
                     <div><label class="text-xs font-bold">Fuente (A-O) *</label><select id="mp-fuente" class="w-full p-2 border rounded bg-white">${FUENTES.map(f=>`<option value="${f.id}">${f.id}. ${f.nombre}</option>`).join('')}</select></div>
@@ -359,8 +362,8 @@
             const prog = (typeof getProspectProgress==='function'?getProspectProgress(uid):{});
             const data = prog['mi-experiencia_data'] || ((db.prospectos||{})[uid] || {});
             const user = (db.users||[]).find(u=>u.id===uid) || {};
-            const html = `<div id="modal-exp" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onclick="if(event.target.id==='modal-exp') this.remove()">
-                <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-auto">
+            const html = `<div id="modal-exp" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" ondblclick="if(event.target.id==='modal-exp') this.remove()">
+                <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-auto" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
                     <div class="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
                         <div>
                             <h3 class="text-xl font-black">Mi Experiencia - ${user.name||'Prospecto'}</h3>

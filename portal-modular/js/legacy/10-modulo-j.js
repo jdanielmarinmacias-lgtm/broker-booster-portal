@@ -383,15 +383,16 @@ function initLazyLoad() {
   }
 }
 
-// PWA Service Worker inline
-if ('serviceWorker' in navigator) {
-  const swCode = `
-    self.addEventListener('install', e=>{ e.waitUntil(caches.open('guia-v65').then(c=>c.addAll(['/']))); self.skipWaiting(); });
-    self.addEventListener('fetch', e=>{ e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))); });
-  `;
-  const blob = new Blob([swCode], {type:'text/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(()=>{});
+// Limpiar Service Workers viejos (blob/guia-v65) que interceptaban fetch('/api/...') y dejaban el portal en blanco
+if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => { try { r.unregister(); } catch (e) {} });
+  }).catch(() => {});
+  if (window.caches && caches.keys) {
+    caches.keys().then(keys => {
+      keys.forEach(k => { if (k.indexOf('guia-') === 0) caches.delete(k).catch(() => {}); });
+    }).catch(() => {});
+  }
 }
 
 // Mejora debounce para búsquedas existentes

@@ -47,7 +47,7 @@ module.exports = (store) => {
   r.post('/', async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de leer/duplicar/mutar (ver collections.js).
-    await store.refreshForWrite();
+    await store.refreshForWrite(['users', 'auditoria']);
     if (!canCreate(req.user, roleAlias((req.body || {}).role))) {
       return res.status(403).json({ ok: false, error: 'Sin permiso para crear ese rol' });
     }
@@ -98,7 +98,7 @@ module.exports = (store) => {
   r.put('/:id', async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
-    await store.refreshForWrite();
+    await store.refreshForWrite(['users', 'auditoria']);
     const users = db.collection(store.get(), 'users');
     const target = db.byId(users, req.params.id);
     if (!target) return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -129,6 +129,9 @@ module.exports = (store) => {
       agenciaId, agencia, parentId, assignedTo, xp, students,
       lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy,
     } = req.body || {};
+    const HEARTBEAT_FIELDS = new Set(['lastActive', 'lastConnection', 'solicitudesVistasHasta', 'attendance', 'lastStudy']);
+    const bodyKeys = Object.keys(req.body || {}).filter((k) => req.body[k] !== undefined);
+    const isHeartbeatOnly = bodyKeys.length > 0 && bodyKeys.every((k) => HEARTBEAT_FIELDS.has(k));
     const antes = { ...target };
     if (username !== undefined && String(username).trim() !== '' && String(username) !== String(target.username)) {
       const nextU = String(username).trim();
@@ -164,8 +167,12 @@ module.exports = (store) => {
       }
       target.role = normRole;
     }
-    db.audit(store.get(), 'edicion_usuario', req.user, { usuarioId: target.id, antes: db.safeUser(antes) });
-    await store.persistCollections(['users', 'auditoria']);
+    if (isHeartbeatOnly) {
+      await store.persistCollections(['users']);
+    } else {
+      db.audit(store.get(), 'edicion_usuario', req.user, { usuarioId: target.id, antes: db.safeUser(antes) });
+      await store.persistCollections(['users', 'auditoria']);
+    }
     res.json({ ok: true, user: db.safeUser(target) });
     } catch (e) { next(e); }
   });
@@ -173,7 +180,7 @@ module.exports = (store) => {
   r.delete('/:id', async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
-    await store.refreshForWrite();
+    await store.refreshForWrite(['users', 'auditoria']);
     const data = store.get();
     const users = db.collection(data, 'users');
     const target = db.byId(users, req.params.id);

@@ -56,16 +56,20 @@
     if ($('login-screen')) $('login-screen').classList.add('hidden');
     if ($('public-portal')) $('public-portal').classList.add('hidden');
     if ($('main-app')) $('main-app').classList.remove('hidden');
+    // Pre-establecer la página destino ANTES de initializeApp() para que no
+    // renderice Dashboard primero y cambie a Editor 100ms después ni quede en blanco.
+    let targetPage = window.lastPage && window.lastPage !== 'login' ? window.lastPage : 'dashboard';
+    if (destination === 'admin') {
+      targetPage = (user.role || '').toLowerCase() === 'gm' ? 'dashboard' : 'editor';
+    }
+    if ((user.role || '').toLowerCase() === 'prospecto') {
+      targetPage = 'mi-experiencia';
+    }
+    window.lastPage = targetPage;
     if (typeof window.initializeApp === 'function') window.initializeApp();
-    const go = () => {
-      if (typeof window.navigateTo !== 'function') return;
-      if (destination === 'admin') {
-        window.navigateTo((user.role || '').toLowerCase() === 'gm' ? 'dashboard' : 'editor');
-      } else {
-        window.navigateTo(window.lastPage && window.lastPage !== 'login' ? window.lastPage : 'dashboard');
-      }
-    };
-    setTimeout(go, 100);
+    if (typeof window.navigateTo === 'function' && window.lastPage !== targetPage) {
+      window.navigateTo(targetPage);
+    }
   }
 
   function guardCampus(user) {
@@ -119,19 +123,42 @@
       e.stopPropagation();
       const u = ($('username') || {}).value || '';
       const p = ($('password') || {}).value || '';
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const prevBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Ingresando...';
+      }
       try {
         const r = await window.Backend.login(u, p);
-        try { if (window.BackendSync) window.BackendSync.normUser(r.user); } catch (e) {}
+        try { if (window.BackendSync) window.BackendSync.normUser(r.user); } catch (e0) {}
         const finalDest = guardCampus(r.user);
         if (!finalDest) return;
-        await syncUsersMirror();
-        // fase 2b: pull del servidor ANTES del primer render (datos de todos).
-        try { if (window.BackendSync) await window.BackendSync.pull(); } catch (e) {}
-        // Sin modal de cambio de clave (bloqueaba el ingreso): entra directo.
+        // Entrar DE INMEDIATO a la interfaz tras validar credenciales (sin bloquear
+        // ~10s esperando la descarga completa de todas las colecciones). El pull del
+        // servidor corre en paralelo y refresca la vista en cuanto llega.
         ensureIAKey();
         enterApp(r.user, finalDest);
+        if (window.BackendSync) {
+          window.BackendSync.pull().then((ok) => {
+            if (ok) {
+              try { if (typeof window.ensureDbDefaults === 'function') window.ensureDbDefaults(); } catch (e1) {}
+              try { if (typeof window.applyBranding === 'function') window.applyBranding(); } catch (e2) {}
+              try { if (typeof window.render === 'function') window.render(); } catch (e3) {}
+            }
+          }).catch(() => {});
+        } else {
+          syncUsersMirror().then(() => {
+            try { if (typeof window.render === 'function') window.render(); } catch (e4) {}
+          });
+        }
       } catch (err) {
         loginError(err.message || 'Credenciales incorrectas');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = prevBtnHtml;
+        }
       }
     }, true);
 
@@ -139,9 +166,7 @@
     try {
       const me = await window.Backend.me();
       if (me && me.user) {
-        await syncUsersMirror();
         try { if (window.BackendSync) window.BackendSync.normUser(me.user); } catch (e) {}
-        // fase 2b: el pull vive en sync.js (boot con sesión); aquí solo espejo.
         ensureIAKey();
         enterApp(me.user, 'campus');
       }

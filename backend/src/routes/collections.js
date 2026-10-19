@@ -34,8 +34,11 @@ const feedTitle = (collection, rec) => rec.titulo || rec.title || rec.nombre || 
  * DELETE/:clave borra la clave · POST mergea claves (no coacciona a []). */
 const KNOWN_OBJECTS = new Set([
   'settings', 'autoHub', 'inmPublica', 'carruselCirculares',
-  'prospectos', 'expedientesProspectos', 'notifications', 'rolePermissions',
+  'prospectos', 'expedientesProspectos', 'rolePermissions',
   'guiaBase', // {docs:[]} — Gu-IA: base de conocimiento del comercial (legacy 3148)
+  'guiaChats', // {[userId]: [...]} — historial de conversaciones Gu-IA por usuario
+  'practicaConfig', // configuración del simulador de práctica con cliente
+  'oferta_valor', // configuración de slides y video de Oferta de Valor
 ]);
 const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -146,7 +149,12 @@ module.exports = (store, config) => {
           bundle[col] = { shape: 'array', items: Array.isArray(data[col]) ? data[col] : [] };
         }
       }
-      res.json({ ok: true, bundle });
+      // Si el rol tiene permiso de listar usuarios (MANAGERS), incluirlos en el
+      // mismo viaje de red para ahorrar otra petición GET /api/users al entrar.
+      const users = roles.hasRole(req.user, ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'])
+        ? db.collection(data, 'users').map(db.safeUser)
+        : null;
+      res.json({ ok: true, bundle, users });
     } catch (e) { next(e); }
   });
 

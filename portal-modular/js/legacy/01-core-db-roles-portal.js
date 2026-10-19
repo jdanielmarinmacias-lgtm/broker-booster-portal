@@ -145,7 +145,7 @@ window.saveDB = function() {
     try {
       if (typeof originalSaveDB==='function') originalSaveDB();
       // Inicializar IDB si hay grabaciones grandes
-      if (!guiaIDB) initIDB().catch(()=>{});
+      if (typeof guiaIDB !== 'undefined' && !guiaIDB && typeof initIDB === 'function') initIDB().catch(()=>{});
     } catch(e) { console.warn('saveDB v6.5 error', e); }
   }, 500);
 };
@@ -259,16 +259,23 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
         // Verificar al cargar
         setTimeout(checkStorageUsage, 2000);
 
-        function loadDB() {
-            try {
-            const data = localStorage.getItem(DB_KEY);
-            db = data ? JSON.parse(data) : JSON.parse(JSON.stringify(defaultDB));
-            } catch(e) {
-                console.warn('DB corrupta, reiniciando:', e);
-                localStorage.removeItem(DB_KEY);
-                db = JSON.parse(JSON.stringify(defaultDB));
-            }
-            if (!db.settings) db.settings = JSON.parse(JSON.stringify(defaultDB.settings));
+        function ensureDbDefaults() {
+            if (!db || typeof db !== 'object') db = {};
+            if (!Array.isArray(db.users) || !db.users.length) db.users = JSON.parse(JSON.stringify(defaultDB.users));
+            if (!Array.isArray(db.categories)) db.categories = JSON.parse(JSON.stringify(defaultDB.categories));
+            if (!Array.isArray(db.lessons)) db.lessons = JSON.parse(JSON.stringify(defaultDB.lessons));
+            if (!Array.isArray(db.progress)) db.progress = JSON.parse(JSON.stringify(defaultDB.progress));
+            if (!Array.isArray(db.generations)) db.generations = [];
+            if (!Array.isArray(db.groups)) db.groups = [];
+            if (!Array.isArray(db.enrollments)) db.enrollments = [];
+            if (!Array.isArray(db.ventas)) db.ventas = [];
+            if (!Array.isArray(db.metas)) db.metas = [];
+            if (!Array.isArray(db.convenciones)) db.convenciones = [];
+            if (!db.settings || typeof db.settings !== 'object') db.settings = JSON.parse(JSON.stringify(defaultDB.settings));
+            if (!db.settings.logo) db.settings.logo = defaultDB.settings.logo;
+            if (!db.settings.institutionName) db.settings.institutionName = defaultDB.settings.institutionName;
+            if (!db.settings.primaryColor) db.settings.primaryColor = defaultDB.settings.primaryColor;
+            if (!db.settings.portalContent) db.settings.portalContent = JSON.parse(JSON.stringify(defaultDB.settings.portalContent));
             if (!db.settings.loginSubtitle) db.settings.loginSubtitle = "Excelencia académica, diseño premium";
             if (!db.settings.loginLine1) db.settings.loginLine1 = "Plataforma educativa";
             if (!db.settings.loginLine2) db.settings.loginLine2 = "Certificada ISO 21001";
@@ -321,7 +328,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (!db.glossaryCategories) db.glossaryCategories = [{ id: 1, name: 'General' }];
             if (!db.glossaryConcepts) db.glossaryConcepts = [];
             if (!db.liveClasses) db.liveClasses = [];
-            if (!db.notifications) db.notifications = [];
+            if (!Array.isArray(db.notifications)) db.notifications = [];
             if (!db.carruselCirculares) db.carruselCirculares = {
                 circulares: { titulo: 'Capacitación Semanal', dia: 'Martes', horario: '19:00', tema: 'Estrategias de Cierre', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200', zoom: 'https://zoom.us/j/123456789', participantes: [] },
                 carrusel: { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] }
@@ -365,7 +372,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (!db.inmPublica || typeof db.inmPublica !== 'object') db.inmPublica = { props: [] };
             if (!Array.isArray(db.inmPublica.props)) db.inmPublica.props = [];
             Object.keys(db.rolePermissions||{}).forEach(function(r){ var perms=db.rolePermissions[r]; if(Array.isArray(perms)&&perms.indexOf('inm-cartera')>=0){ ['inm-unidades','inm-cartera'].forEach(function(s){ if(perms.indexOf(s)<0) perms.push(s); }); } });
-            if (!db.rolePermissions) db.rolePermissions = {
+            const defaultPerms = {
                 admin: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','mi-equipo','convenciones','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
                 gm: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','control-accesos','mi-equipo','convenciones','mis-clientes','siniestros','ai-lobby','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
                 desarrollador: ['dashboard','leaderboard','carrusel-circulares','my-groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera', 'resultados-prospectos','guion-llamadas'],
@@ -378,6 +385,15 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                 agente_agencia: ['dashboard','leaderboard','carrusel-circulares','my-aula','my-courses','tareas','biblioteca','live-classes','my-progress','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','casos-exito','centro-mensajes'],
                 prospecto: ['mi-experiencia','oferta-valor','plan-carrera','chat-reclutador','agenda-prospectos']
             };
+            if (!db.rolePermissions || typeof db.rolePermissions !== 'object' || !Object.keys(db.rolePermissions).length) {
+                db.rolePermissions = JSON.parse(JSON.stringify(defaultPerms));
+            } else {
+                Object.keys(defaultPerms).forEach(r => {
+                    if (!Array.isArray(db.rolePermissions[r]) || !db.rolePermissions[r].length) {
+                        db.rolePermissions[r] = defaultPerms[r].slice();
+                    }
+                });
+            }
 
             // PATCH 2026-06-18: forzar permisos de monitoreo y mi-equipo para agencia/maestro
             if(db.rolePermissions){
@@ -481,7 +497,20 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                     { id: 3, groupId: 1, authorId: 3, content: '¡Perfecto, gracias!', createdAt: new Date(Date.now()-3600000*3).toISOString() }
                 );
             }
-            saveDB();
+        }
+        window.ensureDbDefaults = ensureDbDefaults;
+
+        function loadDB() {
+            try {
+            const data = localStorage.getItem(DB_KEY);
+            db = data ? JSON.parse(data) : JSON.parse(JSON.stringify(defaultDB));
+            } catch(e) {
+                console.warn('DB corrupta, reiniciando:', e);
+                localStorage.removeItem(DB_KEY);
+                db = JSON.parse(JSON.stringify(defaultDB));
+            }
+            ensureDbDefaults();
+            try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {}
         }
 
         // --- AUTH ---
@@ -2509,7 +2538,7 @@ function renderPracticaCliente() {
 
 
 <div id="analysisModal" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeAnalysis()"></div>
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" ondblclick="closeAnalysis()"></div>
   <div class="relative z-10 min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-3xl rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
       <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
@@ -3447,7 +3476,7 @@ async function psFinalizar(){
   window.psSesionActiva=null;
   const modal=document.createElement('div');
   modal.id='ps-modal-fb';
-  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="psCerrarModalFb()"></div>
+  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" ondblclick="psCerrarModalFb()"></div>
   <div class="relative z-10 min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg text-slate-900">🎓 Retroalimentación de la sesión</h3><button onclick="psCerrarModalFb()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">✕</button></div>
     <div class="p-6 overflow-y-auto space-y-4">${psRenderFeedback(fb,{...s, duracionMin:s.duracionMin})}</div>
@@ -3461,7 +3490,7 @@ function psVerSesion(id){
   const s=psSesionesUsuario().find(x=>x.id===id); if(!s) return;
   const modal=document.createElement('div');
   modal.id='ps-modal-ver';
-  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="psCerrarModalVer()"></div>
+  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" ondblclick="psCerrarModalVer()"></div>
   <div class="relative z-10 min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg text-slate-900">${psEscape(s.personaje.nombre)} <span class="text-xs font-normal text-slate-400">• ${new Date(s.inicio).toLocaleString('es-MX')}</span></h3><button onclick="psCerrarModalVer()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">✕</button></div>
     <div class="p-6 overflow-y-auto space-y-4">
@@ -6535,45 +6564,49 @@ function initializeApp() {
             
             // --- MEJORA: alarma solicitudes ---
             window.lastSolicitudesCount = (db.solicitudes||[]).length;
-            setInterval(checkNuevasSolicitudes, 15000);
+            if (!window._solicitudesPollTimer) {
+                window._solicitudesPollTimer = setInterval(checkNuevasSolicitudes, 15000);
+            }
             updateBadgeSolicitudes(solicitudesSinVer());
             initCotizacionesPoll();
             updateBadgeCotizaciones();
             try{ window.sinSnapPrev = JSON.stringify(sinDB().map(x=>({id:x.id, e:x.estado}))); }catch(e){}
             window.sinSnapPrevCount = sinDB().length;
-            setInterval(function(){
-                try{
-                    if(!currentUser) return;
-                    updateBadgeTramites();
-                    const snap = JSON.stringify(sinDB().map(x=>({id:x.id, e:x.estado})));
-                    if(snap !== window.sinSnapPrev){
-                        const antes = window.sinSnapPrev ? JSON.parse(window.sinSnapPrev) : [];
-                        const ahora = JSON.parse(snap);
-                        ahora.forEach(a=>{
-                            const b = antes.find(x=>x.id===a.id); if(b) return;
-                            const s = sinDB().find(x=>String(x.id)===String(a.id)); if(!s) return;
-                            if(['gm','admin','desarrollador','agencia'].includes(((currentUser||{}).role||'').toLowerCase())) showToast((s.tipo==='cancelacion'?'⚠️ Nueva cancelación registrada':'⚠️ Nuevo siniestro registrado')+': '+s.clienteNombre, 'info');
-                        });
-                        window.sinSnapPrev = snap;
+            if (!window._sinPollTimer) {
+                window._sinPollTimer = setInterval(function(){
+                    try{
+                        if(!currentUser) return;
                         updateBadgeTramites();
-                    }
-                }catch(e){}
-            }, 8000);
+                        const snap = JSON.stringify(sinDB().map(x=>({id:x.id, e:x.estado})));
+                        if(snap !== window.sinSnapPrev){
+                            const antes = window.sinSnapPrev ? JSON.parse(window.sinSnapPrev) : [];
+                            const ahora = JSON.parse(snap);
+                            ahora.forEach(a=>{
+                                const b = antes.find(x=>x.id===a.id); if(b) return;
+                                const s = sinDB().find(x=>String(x.id)===String(a.id)); if(!s) return;
+                                if(['gm','admin','desarrollador','agencia'].includes(((currentUser||{}).role||'').toLowerCase())) showToast((s.tipo==='cancelacion'?'⚠️ Nueva cancelación registrada':'⚠️ Nuevo siniestro registrado')+': '+s.clienteNombre, 'info');
+                            });
+                            window.sinSnapPrev = snap;
+                            updateBadgeTramites();
+                        }
+                    }catch(e){}
+                }, 8000);
+            }
             if (window.Notification && Notification.permission !== 'granted') { try { Notification.requestPermission(); } catch(e){} }
             
             renderNav();
-            // Prospecto entra directo a Mi experiencia
+            // Prospecto entra directo a Mi experiencia; otros respetan window.lastPage si ya se indicó
             if (currentUser && (currentUser.role||'').toLowerCase() === 'prospecto') {
                 navigateTo('mi-experiencia');
             } else {
-                navigateTo('dashboard');
+                navigateTo(window.lastPage && window.lastPage !== 'login' ? window.lastPage : 'dashboard');
             }
         }
 
         
             // === SISTEMA DE CANDADOS PROSPECTO ===
             function getProspectProgress(userId) {
-                const user = db.users.find(u => u.id === userId);
+                const user = (db.users || []).find(u => String(u.id) === String(userId)) || (typeof currentUser !== 'undefined' && currentUser && String(currentUser.id) === String(userId) ? currentUser : null) || {};
                 if (!user.prospectProgress) user.prospectProgress = { 'mi-experiencia': false, 'oferta-valor': false, 'plan-carrera': false, 'chat-reclutador': false, 'agenda-prospectos': false };
                 return user.prospectProgress;
             }
@@ -6589,22 +6622,32 @@ function initializeApp() {
                 return progress[order[idx-1]] === true;
             }
             function markProspectStep(userId, stepId, data = {}) {
-                const user = db.users.find(u => u.id === userId);
+                const user = (db.users || []).find(u => String(u.id) === String(userId)) || (typeof currentUser !== 'undefined' && currentUser && String(currentUser.id) === String(userId) ? currentUser : null) || { id: userId, name: 'Prospecto', email: '' };
                 const progress = getProspectProgress(userId);
                 progress[stepId] = true;
                 progress[stepId + '_fecha'] = new Date().toISOString();
                 progress[stepId + '_data'] = data;
                 // Guardar expediente visible para admin/gm/desarrollador
-                if (!db.expedientesProspectos) db.expedientesProspectos = [];
-                let exp = db.expedientesProspectos.find(e => e.userId === userId);
-                if (!exp) { exp = { userId, nombre: user.name, email: user.email, creado: new Date().toISOString(), pasos: {} }; db.expedientesProspectos.push(exp); }
-                exp.pasos[stepId] = { fecha: new Date().toISOString(), data };
-                exp.actualizado = new Date().toISOString();
+                if (!db.expedientesProspectos) db.expedientesProspectos = {};
+                if (Array.isArray(db.expedientesProspectos)) {
+                    let exp = db.expedientesProspectos.find(e => String(e.userId) === String(userId));
+                    if (!exp) { exp = { userId, nombre: user.name, email: user.email, creado: new Date().toISOString(), pasos: {} }; db.expedientesProspectos.push(exp); }
+                    exp.pasos = exp.pasos || {};
+                    exp.pasos[stepId] = { fecha: new Date().toISOString(), data };
+                    exp.actualizado = new Date().toISOString();
+                } else if (typeof db.expedientesProspectos === 'object') {
+                    let exp = db.expedientesProspectos[userId];
+                    if (!exp) { exp = db.expedientesProspectos[userId] = { userId, nombre: user.name, email: user.email, creado: new Date().toISOString(), pasos: {} }; }
+                    exp.pasos = exp.pasos || {};
+                    exp.pasos[stepId] = { fecha: new Date().toISOString(), data };
+                    exp.actualizado = new Date().toISOString();
+                }
                 saveDB();
             }
 
             function renderNav() {
             const nav = document.getElementById('nav-menu');
+            if (!nav || typeof currentUser === 'undefined' || !currentUser) return;
             const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
             const adminItems = [
                 { id: 'users', label: 'Usuarios', icon: 'fa-users' },
@@ -6824,16 +6867,17 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
 
             const groupHtml = (title, icon, id, list, open = true) => {
                 if (!list.length) return '';
+                const isOpen = (window._openMenuGroups && id in window._openMenuGroups) ? window._openMenuGroups[id] : open;
                 return `
                 <div class="mb-2">
-                    <button onclick="toggleGroup('${id}')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-50 transition group">
+                    <button type="button" onclick="toggleGroup('${id}')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-50 transition group">
                         <div class="flex items-center gap-3">
                             <i class="fas ${icon} w-5 text-center text-slate-700"></i>
                             <span class="font-semibold text-slate-800 text-sm uppercase tracking-wide">${title}</span>
                         </div>
-                        <i id="chev-${id}" class="fas fa-chevron-down text-xs text-slate-400 transition-transform ${open ? 'rotate-180' : ''}"></i>
+                        <i id="chev-${id}" class="fas fa-chevron-down text-xs text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}"></i>
                     </button>
-                    <div id="group-${id}" class="space-y-1 mt-1 ${open ? '' : 'hidden'}">
+                    <div id="group-${id}" class="space-y-1 mt-1 ${isOpen ? '' : 'hidden'}">
                         ${list.map(itemHtml).join('')}
                     </div>
                 </div>`;
@@ -6850,39 +6894,57 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 ${groupHtml('Academia', 'fa-graduation-cap', 'academia', academia, false)}
             `;
 
-            // función toggle global
+            // función toggle global (persiste estado de grupos abiertos para que renderNav no los cierre)
             window.toggleGroup = function(id) {
                 const el = document.getElementById('group-' + id);
                 const chev = document.getElementById('chev-' + id);
                 if (el) {
+                    const willOpen = el.classList.contains('hidden');
                     el.classList.toggle('hidden');
-                    chev.classList.toggle('rotate-180');
+                    if (chev) chev.classList.toggle('rotate-180');
+                    window._openMenuGroups = window._openMenuGroups || {};
+                    window._openMenuGroups[id] = willOpen;
                 }
             };
         }
 
-        function navigateTo(page) {
-            // MEJORA: actualizar actividad
-            if(typeof currentUser !== 'undefined' && currentUser){ currentUser.lastActive = Date.now(); const u = db.users.find(x=>x.id===currentUser.id); if(u){ u.lastActive = currentUser.lastActive; u.lastConnection = new Date().toISOString(); saveDB(); } }
+        function navigateTo(page, opts) {
+            try { if (typeof ensureDbDefaults === 'function') ensureDbDefaults(); } catch (e0) {}
+            // MEJORA: actualizar actividad (sin disparar saveDB en cada re-render para evitar ciclos de sync)
+            if(typeof currentUser !== 'undefined' && currentUser){
+                currentUser.lastActive = Date.now();
+                const u = (db.users||[]).find(x=>x.id===currentUser.id);
+                if(u){
+                    u.lastActive = currentUser.lastActive;
+                    u.lastConnection = new Date().toISOString();
+                }
+            }
             
+            page = page || 'dashboard';
             window.lastPage = page;
-            // Guard: editor solo puede ver 3 secciones
+            // Guard: editor solo puede ver sus secciones permitidas
             // FIX Monitoreo Agencias: normalizamos el rol a minúsculas (igual que ya hace renderNav())
             // para que la búsqueda en db.rolePermissions no falle por 'agencia' vs 'Agencia' vs 'AGENCIA'.
             const currentRole = (currentUser?.role || '').toLowerCase();
-            if (db.rolePermissions && currentUser && !db.rolePermissions[currentRole]?.includes(page) && currentRole !== 'gm') {
-                page = db.rolePermissions[currentRole]?.[0] || 'dashboard';
+            const rolePerms = db.rolePermissions && Array.isArray(db.rolePermissions[currentRole]) ? db.rolePermissions[currentRole] : null;
+            if (rolePerms && rolePerms.length && currentUser && !rolePerms.includes(page) && currentRole !== 'gm') {
+                page = rolePerms[0] || 'dashboard';
             }
             // Guard: prospecto nunca va a dashboard
             if (page === 'dashboard' && (currentUser?.role||'').toLowerCase() === 'prospecto') page = 'mi-experiencia';
+            window.lastPage = page;
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.toggle('bg-indigo-50', link.dataset.page === page);
                 link.classList.toggle('text-indigo-600', link.dataset.page === page);
             });
             const navLabel = document.querySelector(`[data-page="${page}"] span`); if(navLabel) document.getElementById('page-title').textContent = navLabel.textContent;
-            document.getElementById('sidebar').classList.add('-translate-x-full');
+            if (!opts || !opts.keepSidebar) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
             
             const content = document.getElementById('main-content');
+            if (!content) return;
+            try {
             switch(page) {
                 case 'dashboard': content.innerHTML = renderDashboard(); setTimeout(renderWeeklyChart, 0); break;
                 case 'mis-metas': content.innerHTML = renderMisMetas(); setTimeout(()=>{ try{ window.mmRenderCharts(); }catch(e){} }, 150); break;
@@ -6933,12 +6995,15 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 case 'live-classes': content.innerHTML = renderLiveClasses() /* v6.5: sanitizado con escapeHTML dentro de render */; break;
                 case 'my-courses': content.innerHTML = renderMyCourses(); break;
                 case 'my-progress': content.innerHTML = renderMyProgress(); break;
-                case 'my-aula': content.innerHTML = renderMyAula(); setTimeout(()=>{ const e=db.enrollments.find(en=>en.userId===currentUser.id); if(e) initGroupChat(e.groupId); }, 0); break;
+                case 'my-aula': content.innerHTML = renderMyAula(); setTimeout(()=>{ const e=(db.enrollments||[]).find(en=>en.userId===currentUser.id); if(e) initGroupChat(e.groupId); }, 0); break;
                 case 'leaderboard': content.innerHTML = renderLeaderboard(); break;
                 case 'my-groups': content.innerHTML = renderMisGrupos(); break;
                 case 'biblioteca': content.innerHTML = renderBiblioteca(); break;
                 case 'tareas': content.innerHTML = renderTareas(); break;
-                case 'editor': content.innerHTML = renderEditor(); break;
+                case 'editor':
+                    if (typeof renderEditor === 'function') content.innerHTML = renderEditor();
+                    else content.innerHTML = renderDashboard();
+                    break;
                 case 'solicitudes': content.innerHTML = renderSolicitudes(); if (typeof marcarSolicitudesVistas === 'function') marcarSolicitudesVistas(); break;
                 case 'mi-agenda': content.innerHTML = renderMiAgenda(); break;
                 case 'practica-cliente': content.innerHTML = renderPracticaCliente(); break;
@@ -6959,6 +7024,19 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 case 'glossary': content.innerHTML = renderGlossary(); break;
                 case 'biblioteca': content.innerHTML = renderBiblioteca(); break;
             }
+            if (!content.innerHTML || !content.innerHTML.trim()) {
+                content.innerHTML = renderDashboard();
+                setTimeout(renderWeeklyChart, 0);
+            }
+            } catch (errRender) {
+                console.error('Error al renderizar vista:', page, errRender);
+                try {
+                    if (page !== 'dashboard') {
+                        content.innerHTML = renderDashboard();
+                        setTimeout(renderWeeklyChart, 0);
+                    }
+                } catch (eFallback) {}
+            }
         }
 
         // FIX: 'render()' se invoca en numerosos puntos del archivo (editar/borrar venta,
@@ -6969,10 +7047,11 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         // mecanismo que ya usa el resto de la app: refresca el menú lateral y vuelve a
         // pintar la página que esté activa en ese momento (o 'dashboard' si no detecta ninguna).
         function render() {
+            if (typeof currentUser === 'undefined' || !currentUser) return;
             renderNav();
             const activeLink = document.querySelector('.nav-link.bg-indigo-50');
             const page = window.lastPage || activeLink?.dataset.page || 'dashboard';
-            navigateTo(page);
+            navigateTo(page, { keepSidebar: true });
         }
 
         function ensureCarruselDefaults(){
@@ -8852,8 +8931,11 @@ function filterReports(){
             // El contenedor adopta el mismo ancho máximo que declara el contenido (sin franjas vacías)
             const capMatch = isLarge ? html.match(/max-w-(?:[1-7]xl|\[95vw\])/) : null;
             const maxWidth = capMatch ? ('w-full ' + capMatch[0]) : (isLarge ? '' : 'w-full max-w-lg');
-            document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onclick="closeModal(event)"><div class="bg-white text-slate-800 rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()">${html}</div></div>`; }
-        function closeModal(e) { if(!e || e.target.classList.contains('modal-backdrop')){ document.getElementById('modal-container').innerHTML=''; window.cotModalId=null; } }
+            // Verificar si el modal ya incluye un botón superior de cerrar con ícono X (fa-times / fa-xmark)
+            const hasTopCloseX = /onclick=["'][^"']*closeModal\(|cotCerrarModal\(/i.test(html) && /fa-times|fa-xmark|✕/i.test(html);
+            const closeXBtn = hasTopCloseX ? '' : `<button type="button" aria-label="Cerrar ventana" title="Cerrar" onclick="if(window.stopChatLive)try{stopChatLive();}catch(e){} closeModal()" class="modal-auto-close-x sticky top-3 float-right mr-3 mt-3 z-30 w-8 h-8 rounded-full bg-slate-100/90 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center shadow-sm transition"><i class="fas fa-times text-sm"></i></button>`;
+            document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" ondblclick="closeModal(event)" title="Doble clic fuera de la ventana para cerrar"><div class="relative bg-white text-slate-800 rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">${closeXBtn}${html}</div></div>`; }
+        function closeModal(e) { if(!e || e.target.classList.contains('modal-backdrop')){ if(window._inExam && e) return; document.getElementById('modal-container').innerHTML=''; window.cotModalId=null; } }
 
         function openUserModal(id=null) {
             const user = id !== null && id !== undefined ? db.users.find(u => String(u.id) === String(id)) : null;
@@ -11084,9 +11166,13 @@ END:VCALENDAR`;
 
         // --- INIT ---
         loadDB();
-            document.addEventListener("visibilitychange", ()=>{ if(window._inExam && document.hidden){ window._examTabSwitches=(window._examTabSwitches||0)+1; if(window._examTabSwitches>2){ alert("Cambio de pestaña detectado. Examen finalizado."); if(typeof submitExam==="function") submitExam(); } } });
-            applyBranding();
-        checkSession();
+        document.addEventListener("visibilitychange", ()=>{ if(window._inExam && document.hidden){ window._examTabSwitches=(window._examTabSwitches||0)+1; if(window._examTabSwitches>2){ alert("Cambio de pestaña detectado. Examen finalizado."); if(typeof submitExam==="function") submitExam(); } } });
+        applyBranding();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkSession);
+        } else {
+            setTimeout(checkSession, 0);
+        }
     
 function agregarAgente(){
     // Solo agentes registrados en "Usuarios" y sin agencia asignada pueden agregarse al equipo

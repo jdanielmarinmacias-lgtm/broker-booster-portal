@@ -26,23 +26,52 @@
     return json;
   }
 
+  let detectPromise = null;
+  let cachedMe = undefined;
+  let cachedMeAt = 0;
+
   const Backend = {
     available: false,
 
-    /** Detecta presencia del backend sin romper el modo local. */
+    /** Detecta presencia del backend sin romper el modo local (una sola llamada compartida). */
     async detect() {
-      try {
-        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
-        const json = await res.json();
-        this.available = !!(json && (json.backend === true || json.ok === true));
-      } catch (e) { this.available = false; }
-      return this.available;
+      if (detectPromise) return detectPromise;
+      detectPromise = (async () => {
+        try {
+          const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+          const json = await res.json();
+          this.available = !!(json && (json.backend === true || json.ok === true));
+          if (this.available) {
+            cachedMe = json;
+            cachedMeAt = Date.now();
+          }
+        } catch (e) { this.available = false; }
+        return this.available;
+      })();
+      return detectPromise;
     },
 
     api: call,
-    me: () => call('/api/auth/me'),
-    login: (username, password) => call('/api/auth/login', { method: 'POST', body: { username, password } }),
-    logout: () => call('/api/auth/logout', { method: 'POST' }).catch(() => ({ ok: true })),
+    async me(force) {
+      if (!force && cachedMe !== undefined && (Date.now() - cachedMeAt < 3000)) {
+        return cachedMe;
+      }
+      const r = await call('/api/auth/me');
+      cachedMe = r;
+      cachedMeAt = Date.now();
+      return r;
+    },
+    async login(username, password) {
+      const r = await call('/api/auth/login', { method: 'POST', body: { username, password } });
+      cachedMe = { ok: true, backend: true, user: r.user };
+      cachedMeAt = Date.now();
+      return r;
+    },
+    async logout() {
+      cachedMe = { ok: true, backend: true, user: null };
+      cachedMeAt = Date.now();
+      return call('/api/auth/logout', { method: 'POST' }).catch(() => ({ ok: true }));
+    },
     changePassword: (current, next) =>
       call('/api/auth/change-password', { method: 'POST', body: { current, next } }),
     listUsers: () => call('/api/users').then((r) => r.users),

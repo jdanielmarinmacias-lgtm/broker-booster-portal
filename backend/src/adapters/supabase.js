@@ -88,30 +88,37 @@ function createSupabaseAdapter({ url, serviceKey }) {
   /* Carga quirúrgica de solo las colecciones solicitadas (evita descargar toda
    * la tabla documents y app_users en cada POST/PUT/DELETE de una colección). */
   async function loadCollections(names) {
-    const wanted = (names || []).filter((n) => n && n !== 'users');
+    const list = names || [];
+    const wanted = list.filter((n) => n && n !== 'users');
     const out = {};
-    if (!wanted.length) return out;
-    let from = 0;
-    const PAGE = 1000;
-    const objects = {};
-    for (;;) {
-      const { data, error } = await sb.from('documents')
-        .select('collection,doc_id,data')
-        .in('collection', wanted)
-        .range(from, from + PAGE - 1);
-      if (error) throw new Error('Supabase loadCollections: ' + error.message);
-      for (const row of data) {
-        if (row.doc_id === '__object__') {
-          objects[row.collection] = row.data || {};
-        } else {
-          out[row.collection] = out[row.collection] || [];
-          out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+    if (wanted.length) {
+      let from = 0;
+      const PAGE = 1000;
+      const objects = {};
+      for (;;) {
+        const { data, error } = await sb.from('documents')
+          .select('collection,doc_id,data')
+          .in('collection', wanted)
+          .range(from, from + PAGE - 1);
+        if (error) throw new Error('Supabase loadCollections: ' + error.message);
+        for (const row of data) {
+          if (row.doc_id === '__object__') {
+            objects[row.collection] = row.data || {};
+          } else {
+            out[row.collection] = out[row.collection] || [];
+            out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+          }
         }
+        if (data.length < PAGE) break;
+        from += PAGE;
       }
-      if (data.length < PAGE) break;
-      from += PAGE;
+      for (const [c, v] of Object.entries(objects)) out[c] = v;
     }
-    for (const [c, v] of Object.entries(objects)) out[c] = v;
+    if (list.includes('users')) {
+      const { data: users, error: uerr } = await sb.from('app_users').select('*');
+      if (uerr) throw new Error('Supabase users: ' + uerr.message);
+      out.users = (users || []).map(fromUserRow);
+    }
     return out;
   }
 
@@ -184,7 +191,7 @@ function createSupabaseAdapter({ url, serviceKey }) {
 
   return {
     kind: 'supabase',
-    cacheTtlMs: 10 * 1000, // caché cálida 10s; sesiones/usuarios auth siempre en directo
+    cacheTtlMs: 30 * 1000, // caché cálida 30s; sesiones/usuarios auth siempre en directo y escrituras hacen refresh quirúrgico
     loadDocuments,
     loadCollections,
     saveDocuments,

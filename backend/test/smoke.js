@@ -16,6 +16,8 @@ process.env.SUPABASE_SERVICE_KEY = '';
 // El suite hace >10 logins desde la misma IP: sube el tope (el limitador se
 // verifica aparte en producción con su default de 10).
 process.env.LOGIN_RATE_MAX = '100';
+// Hermeticidad del reporte semanal: ningún test debe enviar correo real.
+process.env.RESEND_API_KEY = ''; // vacío ⇒ dry-run (solo registra, no envía)
 // Subidas locales de los tests a tmp (no ensucian el repo).
 process.env.DATA_DIR = require('os').tmpdir() + '/bb-test-' + process.pid;
 
@@ -510,6 +512,25 @@ describe('colecciones-objeto: settings/autoHub (publicidad, capacitaciones, clie
     const d2 = await api('DELETE', '/api/data/settings/no_existe_abc');
     assert.equal(d2.status, 404);
   });
+  it('guiaChats y practicaConfig funcionan como colecciones-objeto (PUT /:clave)', async () => {
+    const p1 = await api('PUT', '/api/data/guiaChats/1', { value: [{ rol: 'user', texto: 'Hola Gu-IA' }] });
+    assert.equal(p1.status, 200);
+    const g1 = await api('GET', '/api/data/guiaChats');
+    assert.ok(g1.json.object && Array.isArray(g1.json.object['1']));
+    assert.equal(g1.json.object['1'][0].texto, 'Hola Gu-IA');
+
+    const p2 = await api('PUT', '/api/data/practicaConfig/proveedor', { value: 'groq' });
+    assert.equal(p2.status, 200);
+    const g2 = await api('GET', '/api/data/practicaConfig');
+    assert.equal(g2.json.object.proveedor, 'groq');
+  });
+  it('notifications funciona como colección-array (POST registro)', async () => {
+    const p = await api('POST', '/api/data/notifications', { id: 'notif-test-1', msg: 'Prueba', readBy: [] });
+    assert.ok(p.status === 200 || p.status === 201);
+    const g = await api('GET', '/api/data/notifications');
+    assert.ok(Array.isArray(g.json.items));
+    assert.ok(g.json.items.some((x) => x.id === 'notif-test-1'));
+  });
   it('escritura por clave NO pisa claves de otra instancia (stale-safe)', async () => {
     await externalWrite((d) => {
       d.settings = d.settings || {};
@@ -589,5 +610,65 @@ describe('paso 4: archivos compartidos (modo local)', () => {
     const row = feed.json.items.find((x) => x.title === 'Auto con foto');
     assert.ok(row);
     assert.equal(row.image_url, item.url);
+  });
+});
+
+describe('reporte ejecutivo semanal (cron y envío dry-run)', () => {
+  before(() => { process.env.REPORT_CRON_SECRET = 'sec_test_' + process.pid; });
+
+  it('cron sin secretHeader responde 401', async () => {
+    const r = await fetch(base + '/api/report/weekly');
+    assert.equal(r.status, 401);
+  });
+
+  it('cron con secretHeader genera PDF y entra en dry-run (sin RESEND_API_KEY)', async () => {
+    const r = await fetch(base + '/api/report/weekly', {
+      headers: { Authorization: 'Bearer ' + process.env.REPORT_CRON_SECRET },
+    });
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.equal(j.dryRun, true);
+    assert.equal(j.sent, false);
+    assert.ok(j.attachmentKB > 1, 'el PDF adjunto tiene contenido');
+    assert.ok(j.subject.includes('Reporte Ejecutivo'));
+    assert.ok(Array.isArray(j.destinatarios) && j.destinatarios.length >= 1, 'destinatarios directivos con email');
+    assert.ok(j.destinatarios.every((d) => /.+@.+\..+/.test(d.email)));
+    assert.ok(j.resumen && typeof j.resumen.primas.total === 'number');
+  });
+
+  it('disparo manual solo para dirección (alumno 403, admin 200)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const rNo = await api('POST', '/api/report/weekly/run', {});
+    assert.equal(rNo.status, 403);
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const rOk = await api('POST', '/api/report/weekly/run', {});
+    assert.equal(rOk.status, 200);
+    assert.equal(rOk.json.dryRun, true);
+  });
+
+  it('status lista destinatarios y proveedor (sin enviar nada)', async () => {
+    const r = await api('GET', '/api/report/weekly/status');
+    assert.equal(r.status, 200);
+    assert.equal(r.json.proveedor, 'dry-run');
+    assert.ok(Array.isArray(r.json.destinatarios));
+    assert.equal(r.json.cron, 'lunes 07:00 (America/Mexico_City)');
+  });
+
+  it('bundle incluye users (sin hashes) para roles manager y null para alumno', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const rAdmin = await api('GET', '/api/data/bundle');
+    assert.equal(rAdmin.status, 200);
+    assert.ok(rAdmin.json.bundle && typeof rAdmin.json.bundle === 'object');
+    assert.ok(Array.isArray(rAdmin.json.users) && rAdmin.json.users.length >= 3);
+    assert.ok(rAdmin.json.users.every((u) => !u.password && !u.passwordHash));
+
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const rAlumno = await api('GET', '/api/data/bundle');
+    assert.equal(rAlumno.status, 200);
+    assert.equal(rAlumno.json.users, null);
   });
 });

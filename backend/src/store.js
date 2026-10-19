@@ -19,6 +19,7 @@ function selectAdapter(config) {
 function createStore(adapter) {
   let cache = {};
   let cacheAt = 0;
+  let refreshPromise = null;
   return {
     adapter,
     async init(initial) {
@@ -31,8 +32,15 @@ function createStore(adapter) {
     async refreshIfStale() {
       const ttl = adapter.cacheTtlMs ?? Infinity;
       if (Date.now() - cacheAt > ttl) {
-        cache = await adapter.loadDocuments();
-        cacheAt = Date.now();
+        if (!refreshPromise) {
+          refreshPromise = adapter.loadDocuments().then((loaded) => {
+            cache = loaded;
+            cacheAt = Date.now();
+          }).finally(() => {
+            refreshPromise = null;
+          });
+        }
+        await refreshPromise;
       }
     },
     /* Recarga INCONDICIONAL para rutas de escritura: en serverless la caché
@@ -43,7 +51,6 @@ function createStore(adapter) {
       if (Array.isArray(collections) && collections.length && typeof adapter.loadCollections === 'function' && cacheAt > 0) {
         const subset = await adapter.loadCollections(collections);
         for (const col of collections) {
-          if (col === 'users') continue;
           if (col in subset) cache[col] = subset[col];
         }
         return;

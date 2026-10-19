@@ -21,12 +21,16 @@ function createApp(store) {
   // todos modos; el payload grande falla con 413 visible, no en silencio).
   app.use(express.json({ limit: '10mb' }));
   app.use(mw.loadSession(store));
-  app.use('/api', mw.refreshCache(store));
+  // NOTA: No montar refreshCache global en /api: rutas rápidas como /api/auth/me,
+  // /api/auth/login, /api/public/config y /api/ia/key no necesitan recargar
+  // toda la tabla documents. Las rutas de datos invocan store.refreshIfStale()
+  // o store.refreshForWrite(collections) explícitamente.
 
   app.use('/api/auth', mw.noStorePrivate, require('./routes/auth')(store));
   app.use('/api/users', mw.noStorePrivate, require('./routes/users')(store));
   app.use('/api', mw.noStorePrivate, require('./routes/collections')(store, config));
   app.use('/api', mw.noStorePrivate, require('./routes/media')(store, config));
+  app.use('/api', mw.noStorePrivate, require('./routes/reporte')(store, config));
 
   if (store.adapter.kind !== 'supabase') {
     // Solo local: sirve lo subido por POST /api/media. En producción los

@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "portal-modular",
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }],
+  "crons": [
+    {
+      "path": "/api/report/weekly",
+      "schedule": "0 13 * * 1"
+    }
+  ],
   "headers": [
     {
       "source": "/(js|css)/(.*)",
