@@ -66,9 +66,16 @@ async function boot(adapter) {
   adapter = adapter || selectAdapter(config);
   sessions.bind(adapter);
   const store = createStore(adapter);
-  await store.init();
-  // Asegura el bucket público de archivos (no-op salvo supabase; no fatal).
-  try { await store.adapter.ensureMediaBucket(); } catch (e) { console.error('[backend] bucket:', e.message); }
+  if (adapter.kind === 'supabase') {
+    // Arranque instantáneo en serverless (<100ms): no bloquear /api/auth/login
+    // ni /api/auth/me descargando toda la tabla documents en el cold-start.
+    // Las rutas que leen colecciones llaman a store.refreshIfStale() (cacheAt=0)
+    // y el bucket se asegura en segundo plano sin frenar la primera petición.
+    store.adapter.ensureMediaBucket().catch((e) => { console.error('[backend] bucket:', e.message); });
+  } else {
+    await store.init();
+    try { await store.adapter.ensureMediaBucket(); } catch (e) { console.error('[backend] bucket:', e.message); }
+  }
   return { store, app: createApp(store) };
 }
 

@@ -43,18 +43,20 @@ function safeUser(u) {
 
 function audit(db, tipo, actor, detalle) {
   const col = collection(db, 'auditoria');
-  col.push({
+  const entry = {
     id: newId(),
     tipo,
     fecha: new Date().toISOString(),
     usuarioId: actor ? actor.id : null,
     usuarioNombre: actor ? (actor.name || actor.username) : 'sistema',
     ...(detalle || {}),
-  });
+  };
+  col.push(entry);
   // #1 Refuerzo: cota de auditoría a los últimos 500 registros para evitar crecimiento infinito
   if (col.length > 500) {
     col.splice(0, col.length - 500);
   }
+  return entry;
 }
 
 module.exports = { DB_FILE, load, save, collection, newId, byId, safeUser, audit };

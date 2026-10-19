@@ -22,24 +22,35 @@ module.exports = (store) => {
         : String(stored) === String(password));
       if (!valid) {
         mw.noteFailedLogin(req);
-        // Solo auditoría (quirúrgica y con caché fresca): un login fallido
-        // JAMÁS debe reescribir la base (el persist total con caché vieja
-        // borraba registros ajenos en producción multi-instancia).
+        // Auditoría ligera (1 fila en Supabase o quirúrgica en memoria/json):
+        // jamás reescribir la base ni bloquear con recarga de todas las filas.
         try {
-          await store.refreshForWrite(['auditoria']);
-          db.audit(store.get(), 'login_fallido', null, { username: String(username) });
-          await store.persistCollections(['auditoria']);
+          const entry = db.audit(store.get(), 'login_fallido', null, { username: String(username) });
+          if (typeof store.adapter.pushAudit === 'function') {
+            await store.adapter.pushAudit(entry);
+          } else {
+            await store.refreshForWrite(['auditoria']);
+            db.audit(store.get(), 'login_fallido', null, { username: String(username) });
+            await store.persistCollections(['auditoria']);
+          }
         } catch (e) { /* la auditoría nunca rompe el login */ }
         return res.status(401).json({ ok: false, error: 'Credenciales incorrectas' });
       }
       mw.forgiveLogin(req);
-      const token = await sessions.create(u.id);
+      const entry = db.audit(store.get(), 'login', db.safeUser(u), {});
+      const auditTask = (async () => {
+        try {
+          if (typeof store.adapter.pushAudit === 'function') {
+            await store.adapter.pushAudit(entry);
+          } else {
+            await store.refreshForWrite(['auditoria']);
+            db.audit(store.get(), 'login', db.safeUser(u), {});
+            await store.persistCollections(['auditoria']);
+          }
+        } catch (e) { /* la auditoría nunca rompe el login */ }
+      })();
+      const [token] = await Promise.all([sessions.create(u.id), auditTask]);
       res.setHeader('Set-Cookie', sessions.cookieHeader(token));
-      try {
-        await store.refreshForWrite(['auditoria']);
-        db.audit(store.get(), 'login', db.safeUser(u), {});
-        await store.persistCollections(['auditoria']);
-      } catch (e) { /* idem */ }
       const safe = db.safeUser(u);
       res.json({ ok: true, user: safe, mustChangePassword: !!u.mustChangePassword });
     } catch (e) { next(e); }

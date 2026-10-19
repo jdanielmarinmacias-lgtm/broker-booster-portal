@@ -47,8 +47,13 @@ module.exports = (store, config) => {
 
   r.get('/public/portal', async (req, res, next) => {
     try {
-      await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
-      const data = store.get();
+      let data = store.get();
+      if (typeof store.isWarm === 'function' && !store.isWarm() && typeof store.adapter.loadCollections === 'function') {
+        data = await store.adapter.loadCollections(['settings', 'autoHub', 'inmPublica']);
+      } else {
+        await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
+        data = store.get();
+      }
       const settings = data.settings || {};
       const rawAutos = Array.isArray(data.autoHub)
         ? data.autoHub

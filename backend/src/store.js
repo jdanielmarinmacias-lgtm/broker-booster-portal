@@ -22,6 +22,7 @@ function createStore(adapter) {
   let refreshPromise = null;
   return {
     adapter,
+    isWarm: () => cacheAt > 0,
     async init(initial) {
       const loaded = await adapter.loadDocuments();
       cache = (loaded && Object.keys(loaded).length) ? loaded : (initial || {});
@@ -48,7 +49,7 @@ function createStore(adapter) {
      * Mutar sin esto = reescribir (y borrar) lo ajeno. Un read extra por
      * escritura es barato frente a perder datos. */
     async refreshForWrite(collections) {
-      if (Array.isArray(collections) && collections.length && typeof adapter.loadCollections === 'function' && cacheAt > 0) {
+      if (Array.isArray(collections) && collections.length && typeof adapter.loadCollections === 'function') {
         const subset = await adapter.loadCollections(collections);
         for (const col of collections) {
           if (col in subset) cache[col] = subset[col];

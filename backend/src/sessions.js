@@ -25,7 +25,12 @@ async function get(token) {
     if (s) await adapter.deleteSession(token).catch(() => {});
     return null;
   }
-  await adapter.setSession(token, { userId: s.userId, expiresAt: Date.now() + config.sessionTtlMs }); // rolling
+  // Rolling: solo renueva en base si ha transcurrido más de 10 minutos,
+  // evitando una escritura extra a Supabase en cada petición autenticada.
+  const targetExp = Date.now() + config.sessionTtlMs;
+  if (targetExp - s.expiresAt > 10 * 60 * 1000) {
+    await adapter.setSession(token, { userId: s.userId, expiresAt: targetExp }).catch(() => {});
+  }
   return s;
 }
 

@@ -62,6 +62,7 @@ function createSupabaseAdapter({ url, serviceKey }) {
     const objects = {}; // colecciones-objeto (doc_id __object__)
     let from = 0;
     const PAGE = 1000;
+    const usersPromise = sb.from('app_users').select('*');
     for (;;) {
       const { data, error } = await sb.from('documents').select('collection,doc_id,data').range(from, from + PAGE - 1);
       if (error) throw new Error('Supabase documents: ' + error.message);
@@ -79,7 +80,7 @@ function createSupabaseAdapter({ url, serviceKey }) {
     }
     // El objeto gana si hubiera filas mixtas (colección migrada de array→objeto).
     for (const [c, v] of Object.entries(objects)) out[c] = v;
-    const { data: users, error: uerr } = await sb.from('app_users').select('*');
+    const { data: users, error: uerr } = await usersPromise;
     if (uerr) throw new Error('Supabase users: ' + uerr.message);
     out.users = (users || []).map(fromUserRow);
     return out;
@@ -196,6 +197,16 @@ function createSupabaseAdapter({ url, serviceKey }) {
     loadCollections,
     saveDocuments,
     saveCollections,
+    async pushAudit(entry) {
+      const rec = entry || {};
+      const doc_id = String(rec.id ?? Date.now());
+      const { error } = await sb.from('documents').upsert(
+        [{ collection: 'auditoria', doc_id, data: { ...rec, id: undefined } }],
+        { onConflict: 'collection,doc_id' }
+      );
+      if (error) throw new Error('Supabase audit: ' + error.message);
+      return rec;
+    },
     async getUserByUsername(username) {
       const { data, error } = await sb.from('app_users').select('*')
         .ilike('username', String(username)).limit(1).maybeSingle();

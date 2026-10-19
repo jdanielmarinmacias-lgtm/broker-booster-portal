@@ -80,35 +80,8 @@
   }
 
   async function boot() {
-    // 1) Pintado inicial desde el backend (funciona sin socket).
-    try {
-      if (portalVisible()) {
-        const res = await fetch('/api/public/feed', { credentials: 'same-origin' });
-        const data = await res.json();
-        if (data && Array.isArray(data.items) && data.items.length) {
-          const list = ensureStrip();
-          if (list) list.innerHTML = data.items.map(card).join('');
-        }
-      }
-    } catch (e) { /* sin backend: nada */ }
-
-    // 1b) Si la portada aparece después (logout), píntala en ese momento.
-    try {
-      var portalEl = document.getElementById('public-portal');
-      if (portalEl) {
-        new MutationObserver(function () {
-          if (!portalVisible()) return;
-          if (document.getElementById(LIST_ID)) return;
-          fetch('/api/public/feed', { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-              var list = ensureStrip();
-              if (list && data && Array.isArray(data.items)) list.innerHTML = data.items.map(card).join('');
-            })
-            .catch(function () {});
-        }).observe(portalEl, { attributes: true, attributeFilter: ['class'] });
-      }
-    } catch (e2) { /* sin observer: queda el boot inicial */ }
+    // 1) El strip visual de la portada está desactivado (ensureStrip devuelve null).
+    // No hacer GET /api/public/feed al cargar para ahorrar 1 viaje de red en el arranque.
 
     // 2) Realtime Supabase (solo si el backend lo anuncia).
     let cfg = null;
