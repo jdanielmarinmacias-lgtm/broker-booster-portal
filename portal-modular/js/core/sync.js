@@ -162,21 +162,48 @@
     });
     const results = await Promise.all(jobs);
     let changed = false;
+    let hadPendingLocal = false;
     results.forEach(function ({ n, v }) {
       if (!v) return; // sin permiso: no tocar
       if (v.shape === 'array') {
         if (!Array.isArray(db[n])) db[n] = [];
-        replaceArray(db[n], normIds(v.items));
+        const prevLocal = db[n].slice();
+        const prevShadowArr = (shadow && Array.isArray(shadow[n])) ? shadow[n] : [];
+        const wasOnServer = {};
+        prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
+        const serverItems = normIds(v.items);
+        if (shadow) shadow[n] = clone(serverItems);
+        replaceArray(db[n], serverItems);
+        const have = {};
+        db[n].forEach(function (x) { if (x && x.id !== undefined) have[String(x.id)] = true; });
+        prevLocal.forEach(function (x) {
+          // Conservar registros optimistas recién creados localmente que aún no suben al servidor
+          if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]) {
+            db[n].push(x);
+            hadPendingLocal = true;
+          }
+        });
       } else {
         // Objeto: reemplaza por claves (el objeto puede almacenar arrays adentro:
         // settings.publicidad, comparisons... tocar in-place preserva referencias).
         if (!isPlain(db[n])) db[n] = {};
+        const prevLocalObj = clone(db[n]);
+        const prevShadowObj = (shadow && isPlain(shadow[n])) ? shadow[n] : null;
+        const serverVal = normIds(v.value);
+        if (shadow) shadow[n] = clone(serverVal);
         Object.keys(db[n]).forEach(function (k) { delete db[n][k]; });
-        Object.assign(db[n], normIds(v.value));
+        Object.assign(db[n], serverVal);
+        Object.keys(prevLocalObj).forEach(function (k) {
+          if (!(k in db[n]) && !(prevShadowObj && (k in prevShadowObj))) {
+            db[n][k] = prevLocalObj[k];
+            hadPendingLocal = true;
+          }
+        });
       }
       pulled[n] = true; // verdad del servidor: entra a la sombra
       changed = true;
     });
+    if (hadPendingLocal) pushSoon();
     return changed;
   }
 
@@ -566,9 +593,6 @@
       // descargamos esa colección en vez de volver a bajar las 5 de SHOWCASE.
       var cols = target ? [target] : SHOWCASE.concat(LIVE_WORK.filter(function (c) { return SHOWCASE.indexOf(c) === -1; }));
       pullNames(cols).then(function () {
-        if (shadow && target && db && (Array.isArray(db[target]) || isPlain(db[target]))) {
-          shadow[target] = clone(db[target]);
-        }
         // Evitar re-render completo si el menú desplegable está abierto o el usuario escribe en un campo o tiene un modal abierto
         var sbEl = document.getElementById('sidebar');
         var sbOpen = sbEl && !sbEl.classList.contains('-translate-x-full');
@@ -597,12 +621,28 @@
     });
   }
 
+  async function pushCollectionsImmediate(names) {
+    if (!active || !shadow) return false;
+    const db = legDb();
+    if (!db) return false;
+    for (const n of (names || [])) {
+      if (SKIP[n] || n === 'users') continue;
+      try {
+        await pushCollection(n, db[n] || [], shadow[n] || []);
+        shadow[n] = clone(db[n] || []);
+      } catch (e) { /* pushSoon general reintentará */ }
+    }
+    return true;
+  }
+
   window.BackendSync = {
     normUser: function (u) { return normIds(u) || u; },
     pull: pullAll,
     pullPublicShowcase,
     pullShowcase: function () { return pullNames(SHOWCASE); },
     pullCollections: function (names) { return pullNames(names || []); },
+    pushCollectionsImmediate,
+    pushNow,
     hookSave,
     get active() { return active; },
   };

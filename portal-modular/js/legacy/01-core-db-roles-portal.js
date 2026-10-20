@@ -4069,6 +4069,9 @@ function cmEnviarBroadcast(){
   });
   cmRegistrarAuditoria('Centro de Mensajes', 'Difusión masiva (' + rol + ')', texto.slice(0, 80));
   saveDB();
+  if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+    window.BackendSync.pushCollectionsImmediate(['messages']);
+  }
   closeModal();
   showToast('Anuncio enviado a ' + targets.length + ' usuarios', 'success');
   render();
@@ -6981,7 +6984,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 case 'categories': content.innerHTML = renderCategories(); break;
                 case 'lessons': content.innerHTML = renderLessons(); break;
                 case 'exams': content.innerHTML = renderExams(); break;
-                case 'messages': content.innerHTML = renderMessages(); break;
+                case 'messages': content.innerHTML = renderMessages(); startMessagesPagePoll(); break;
                 case 'control-accesos': content.innerHTML = renderControlAccesos(); break;
                 case 'centro-mensajes': content.innerHTML = renderCentroMensajes(); break;
                 case 'guion-llamadas': content.innerHTML = renderGuionLlamadas(); break;
@@ -7290,32 +7293,53 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         }
 
         function renderGroupChat(groupId) {
-            const msgs = db.groupMessages.filter(m=>m.groupId===groupId).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+            const msgs = (db.groupMessages || []).filter(m=>String(m.groupId)===String(groupId)).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
             return `<div class="bg-white rounded-2xl border border-slate-200 flex flex-col h-[400px]">
                 <div class="p-4 border-b"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-comments text-indigo-600"></i> Chat Grupal</h3></div>
                 <div id="chat-${groupId}" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-                    ${msgs.map(m=>{const author=db.users.find(u=>u.id===m.authorId); const isMe=m.authorId===currentUser.id; return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}"><p class="break-words">${escapeHTML(m.content)}</p><span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('')}
+                    ${msgs.map(m=>{const author=(db.users||[]).find(u=>String(u.id)===String(m.authorId)); const isMe=String(m.authorId)===String(currentUser.id); return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(author?.name||'U')}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}"><p class="break-words">${escapeHTML(m.content)}</p><span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('')}
                 </div>
                 <form id="chat-form-${groupId}" class="p-3 border-t flex gap-2"><input id="chat-input-${groupId}" type="text" placeholder="Escribe un mensaje..." class="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white text-slate-900 border-slate-300"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-full text-sm hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button></form>
             </div>`;
         }
 
+        function renderGroupChatBox(groupId) {
+            const chatDiv = document.getElementById(`chat-${groupId}`);
+            if (!chatDiv) return false;
+            const msgs = (db.groupMessages || []).filter(m=>String(m.groupId)===String(groupId)).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
+            chatDiv.innerHTML = msgs.map(m=>{const author=(db.users||[]).find(u=>String(u.id)===String(m.authorId)); const isMe=String(m.authorId)===String(currentUser.id); return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(author?.name||'U')}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}"><p class="break-words">${escapeHTML(m.content)}</p><span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('');
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+            return true;
+        }
+
+        let groupChatLiveTimer = null;
+        let groupChatLiveId = null;
+        function stopGroupChatLive() { if (groupChatLiveTimer) { clearInterval(groupChatLiveTimer); groupChatLiveTimer = null; } groupChatLiveId = null; }
         function initGroupChat(groupId) {
+            stopGroupChatLive();
             const form = document.getElementById(`chat-form-${groupId}`);
             if(!form) return;
+            groupChatLiveId = groupId;
+            groupChatLiveTimer = setInterval(async () => {
+                if (!document.getElementById(`chat-${groupId}`)) { stopGroupChatLive(); return; }
+                try {
+                    if (window.BackendSync && window.BackendSync.pullCollections) await window.BackendSync.pullCollections(['groupMessages']);
+                } catch (e) {}
+                try { renderGroupChatBox(groupId); } catch (e2) {}
+            }, 2500);
             form.onsubmit = e => {
                 e.preventDefault();
                 const input = document.getElementById(`chat-input-${groupId}`);
                 const content = input.value.trim();
                 if(!content) return;
-                const msg = { id: Date.now(), groupId, authorId: currentUser.id, content, createdAt: new Date().toISOString() };
+                const msg = { id: Date.now() + Math.floor(Math.random()*1000), groupId, authorId: currentUser.id, content, createdAt: new Date().toISOString() };
                 db.groupMessages.push(msg);
                 saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    window.BackendSync.pushCollectionsImmediate(['groupMessages']);
+                }
                 input.value = '';
-                const chatDiv = document.getElementById(`chat-${groupId}`);
-                const author = currentUser;
-                chatDiv.innerHTML += `<div class="flex justify-end"><div class="max-w-[75%]"><div class="flex items-end gap-2 flex-row-reverse"><img src="${author.avatar}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm bg-indigo-600 text-white"><p class="break-words">${msg.content}</p><span class="text-[10px] opacity-70 block mt-1">${new Date(msg.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`;
-                chatDiv.scrollTop = chatDiv.scrollHeight;
+                renderGroupChatBox(groupId);
             };
             const chatDiv = document.getElementById(`chat-${groupId}`);
             if(chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight;
@@ -9874,15 +9898,66 @@ function renderMessages() {
          * aplica cambios si llegó algo del servidor (paridad local). ====== */
         let chatLiveTimer = null;
         let chatLiveUserId = null;
-        function stopChatLive() { if (chatLiveTimer) { clearInterval(chatLiveTimer); chatLiveTimer = null; } chatLiveUserId = null; }
+        let chatLiveChannelName = null;
+        let messagesPageTimer = null;
+        function stopMessagesPagePoll() {
+            if (messagesPageTimer) { clearInterval(messagesPageTimer); messagesPageTimer = null; }
+        }
+        function startMessagesPagePoll() {
+            stopMessagesPagePoll();
+            messagesPageTimer = setInterval(async () => {
+                if (window.lastPage !== 'messages') { stopMessagesPagePoll(); return; }
+                const mcEl = document.getElementById('modal-container');
+                const modalOpen = mcEl && mcEl.innerHTML.trim() !== '';
+                if (modalOpen) return; // cuando el modal de chat está abierto, chatLiveTick se encarga
+                try {
+                    if (window.BackendSync && window.BackendSync.pullCollections) {
+                        const prevSig = JSON.stringify((db.messages || []).map(m => m.id + ':' + (m.read ? 1 : 0)));
+                        await window.BackendSync.pullCollections(['messages']);
+                        const nextSig = JSON.stringify((db.messages || []).map(m => m.id + ':' + (m.read ? 1 : 0)));
+                        if (prevSig !== nextSig) {
+                            const ae = document.activeElement;
+                            const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
+                            if (!typing) {
+                                const content = document.getElementById('main-content');
+                                if (content && window.lastPage === 'messages') content.innerHTML = renderMessages();
+                            }
+                            try { renderNav(); } catch (e0) {}
+                        }
+                    }
+                } catch (e) {}
+            }, 3000);
+        }
+        function stopChatLive() { if (chatLiveTimer) { clearInterval(chatLiveTimer); chatLiveTimer = null; } chatLiveUserId = null; chatLiveChannelName = null; }
+        function renderChannelConversationBox(channelId, channelName) {
+            const box = document.getElementById('chat-messages');
+            if (!box) return false;
+            const msgs = (db.messages || []).filter(m => String(m.toId) === String(channelId)).sort((a,b) => new Date(a.date) - new Date(b.date));
+            box.innerHTML = msgs.length === 0 ? `<p class="text-center text-slate-400 py-8">Sé el primero en escribir en ${psEscape(channelName || channelId)}</p>` : msgs.map(m => {
+                const mine = String(m.fromId) === String(currentUser.id);
+                const sender = m.fromName || ((db.users||[]).find(u=>String(u.id)===String(m.fromId))?.name) || 'Miembro';
+                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p><p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+            return true;
+        }
         function renderConversationBox(userId) {
+            if (String(userId).startsWith('canal:')) {
+                return renderChannelConversationBox(userId, chatLiveChannelName || userId);
+            }
             const box = document.getElementById('chat-messages');
             if (!box) return false;
             const conv = db.messages.filter(m => (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(userId)) || (String(m.fromId) === String(userId) && String(m.toId) === String(currentUser.id))).sort((a, b) => new Date(a.date) - new Date(b.date));
             let hayLeidos = false;
             const nowIso = new Date().toISOString();
             conv.forEach(m => { if (String(m.toId) === String(currentUser.id) && !m.read) { m.read = true; m.readAt = nowIso; hayLeidos = true; } });
-            if (hayLeidos) { saveDB(); try { renderNav(); } catch(e){} }
+            if (hayLeidos) {
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    window.BackendSync.pushCollectionsImmediate(['messages']);
+                }
+                try { renderNav(); } catch(e){}
+            }
             box.innerHTML = conv.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación con un mensaje o adjunto</p>' : conv.map(m => {
                 const mine = String(m.fromId) === String(currentUser.id);
                 const seenIcon = mine ? (m.read ? '<i class="fas fa-check-double text-amber-300 ml-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-300 ml-1" title="Enviado"></i>') : '';
@@ -9899,51 +9974,67 @@ function renderMessages() {
             } catch (e) { /* sin backend o sin red: se queda con lo local */ }
             try { renderConversationBox(chatLiveUserId); } catch (e2) { /* render en otro estado */ }
         }
-        function startChatLive(userId) {
+        function startChatLive(userId, channelName) {
             stopChatLive();
             chatLiveUserId = userId;
-            chatLiveTimer = setInterval(chatLiveTick, 2500);
+            chatLiveChannelName = channelName || null;
+            chatLiveTimer = setInterval(chatLiveTick, 2000);
         }
-        window.chatLiveRefresh = function () { if (chatLiveUserId !== null) { try { renderConversationBox(chatLiveUserId); } catch (e) {} } };
+        window.chatLiveRefresh = function () {
+            if (chatLiveUserId !== null) { try { renderConversationBox(chatLiveUserId); } catch (e) {} }
+            if (groupChatLiveId !== null) { try { renderGroupChatBox(groupChatLiveId); } catch (e2) {} }
+        };
         function openChat(userId) {
             const otherUser = db.users.find(u => String(u.id) === String(userId));
             if (!otherUser) { if (window.showToast) window.showToast('Contacto no disponible, reingresa para sincronizar', 'warning'); return; }
             const conversation = db.messages.filter(m => (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(userId)) || (String(m.fromId) === String(userId) && String(m.toId) === String(currentUser.id))).sort((a,b) => new Date(a.date) - new Date(b.date));
             const nowIso = new Date().toISOString();
-            conversation.forEach(m => { if (String(m.toId) === String(currentUser.id)) { m.read = true; m.readAt = m.readAt || nowIso; } }); saveDB();
+            let marked = false;
+            conversation.forEach(m => { if (String(m.toId) === String(currentUser.id) && !m.read) { m.read = true; m.readAt = m.readAt || nowIso; marked = true; } });
+            if (marked) {
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    window.BackendSync.pushCollectionsImmediate(['messages']);
+                }
+            }
             try { renderNav(); } catch(e){}
             showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderConversationBox(userId);
             startChatLive(userId);
-            document.getElementById('chat-form').onsubmit = e => { e.preventDefault(); const text = document.getElementById('chat-input').value.trim(); if (!text) return; db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: otherUser.id, text: text, date: new Date().toISOString(), read: false }); saveDB(); document.getElementById('chat-input').value = ''; renderConversationBox(userId); };
+            document.getElementById('chat-form').onsubmit = e => {
+                e.preventDefault();
+                const text = document.getElementById('chat-input').value.trim();
+                if (!text) return;
+                db.messages.push({ id: Date.now() + Math.floor(Math.random()*1000), fromId: currentUser.id, fromName: currentUser.name, toId: otherUser.id, text: text, date: new Date().toISOString(), read: false });
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    window.BackendSync.pushCollectionsImmediate(['messages']);
+                }
+                document.getElementById('chat-input').value = '';
+                renderConversationBox(userId);
+            };
             setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
         }
 
         // FASE 2 (#1): Chat de Canal Grupal
         function openChannelChat(channelId, channelName) {
             stopChatLive();
-            const renderChBox = () => {
-                const box = document.getElementById('chat-messages');
-                if (!box) return;
-                const msgs = (db.messages || []).filter(m => String(m.toId) === String(channelId)).sort((a,b) => new Date(a.date) - new Date(b.date));
-                box.innerHTML = msgs.length === 0 ? `<p class="text-center text-slate-400 py-8">Sé el primero en escribir en ${psEscape(channelName)}</p>` : msgs.map(m => {
-                    const mine = String(m.fromId) === String(currentUser.id);
-                    const sender = m.fromName || ((db.users||[]).find(u=>String(u.id)===String(m.fromId))?.name) || 'Miembro';
-                    return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p><p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
-                }).join('');
-                box.scrollTop = box.scrollHeight;
-            };
             showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold"><i class="fas fa-hashtag"></i></div><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(channelName)}</h3><p class="text-xs text-slate-500">Canal grupal abierto para todo el equipo · Usa @nombre para mencionar</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span>IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)}..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
-            renderChBox();
+            renderChannelConversationBox(channelId, channelName);
+            startChatLive(channelId, channelName);
             document.getElementById('chat-form').onsubmit = e => {
                 e.preventDefault();
                 const text = document.getElementById('chat-input').value.trim();
                 if (!text) return;
-                db.messages.push({ id: Date.now(), fromId: currentUser.id, fromName: currentUser.name, toId: channelId, text, date: new Date().toISOString(), read: true });
+                db.messages.push({ id: Date.now() + Math.floor(Math.random()*1000), fromId: currentUser.id, fromName: currentUser.name, toId: channelId, text, date: new Date().toISOString(), read: true });
                 saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    window.BackendSync.pushCollectionsImmediate(['messages']);
+                }
                 document.getElementById('chat-input').value = '';
-                renderChBox();
+                renderChannelConversationBox(channelId, channelName);
             };
+            setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
         }
 
         // FASE 2 (#7): Copiloto IA en el Chat y Centro de Mensajes
@@ -9976,8 +10067,9 @@ function renderMessages() {
                 }
                 if (url) {
                     db.messages.push({
-                        id: Date.now(),
+                        id: Date.now() + Math.floor(Math.random()*1000),
                         fromId: currentUser.id,
+                        fromName: currentUser.name,
                         toId: otherUser.id,
                         text: '📎 Archivo adjunto: ' + file.name,
                         attachmentUrl: url,
@@ -9986,6 +10078,9 @@ function renderMessages() {
                         read: false
                     });
                     saveDB();
+                    if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                        window.BackendSync.pushCollectionsImmediate(['messages']);
+                    }
                     renderConversationBox(userId);
                     if (window.showToast) showToast('Archivo enviado', 'success');
                 }

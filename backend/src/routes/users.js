@@ -16,9 +16,11 @@ const MANAGERS = ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'];
 
 module.exports = (store) => {
   const r = express.Router();
-  r.use(mw.requireRole(...MANAGERS));
 
-  r.get('/', async (req, res, next) => {
+  // Propio usuario actualiza su actividad/asistencia/racha (heartbeat) sin requerir rol MANAGER:
+  const SELF_FIELDS = new Set(['lastActive', 'lastConnection', 'solicitudesVistasHasta', 'attendance', 'lastStudy', 'xp', 'streak']);
+
+  r.get('/', mw.requireRole(...MANAGERS), async (req, res, next) => {
     try {
       await store.refreshIfStale(); // lectura: el TTL basta
       const users = db.collection(store.get(), 'users');
@@ -44,7 +46,7 @@ module.exports = (store) => {
     return k;
   };
 
-  r.post('/', async (req, res, next) => {
+  r.post('/', mw.requireRole(...MANAGERS), async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de leer/duplicar/mutar (ver collections.js).
     await store.refreshForWrite(['users', 'auditoria']);
@@ -95,8 +97,15 @@ module.exports = (store) => {
     } catch (e) { next(e); }
   });
 
-  r.put('/:id', async (req, res, next) => {
+  r.put('/:id', mw.requireAuth, async (req, res, next) => {
     try {
+    const bodyKeys = Object.keys(req.body || {}).filter((k) => req.body[k] !== undefined);
+    const isSelfProgressOnly = String(req.params.id) === String(req.user.id)
+      && bodyKeys.length > 0
+      && bodyKeys.every((k) => SELF_FIELDS.has(k));
+    if (!isSelfProgressOnly && !roles.hasRole(req.user, MANAGERS)) {
+      return res.status(403).json({ ok: false, error: 'Permisos insuficientes' });
+    }
     // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
     await store.refreshForWrite(['users', 'auditoria']);
     const users = db.collection(store.get(), 'users');
@@ -129,8 +138,7 @@ module.exports = (store) => {
       agenciaId, agencia, parentId, assignedTo, xp, students,
       lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy,
     } = req.body || {};
-    const HEARTBEAT_FIELDS = new Set(['lastActive', 'lastConnection', 'solicitudesVistasHasta', 'attendance', 'lastStudy']);
-    const bodyKeys = Object.keys(req.body || {}).filter((k) => req.body[k] !== undefined);
+    const HEARTBEAT_FIELDS = new Set(['lastActive', 'lastConnection', 'solicitudesVistasHasta', 'attendance', 'lastStudy', 'xp', 'streak']);
     const isHeartbeatOnly = bodyKeys.length > 0 && bodyKeys.every((k) => HEARTBEAT_FIELDS.has(k));
     const antes = { ...target };
     if (username !== undefined && String(username).trim() !== '' && String(username) !== String(target.username)) {
@@ -177,7 +185,7 @@ module.exports = (store) => {
     } catch (e) { next(e); }
   });
 
-  r.delete('/:id', async (req, res, next) => {
+  r.delete('/:id', mw.requireRole(...MANAGERS), async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
     await store.refreshForWrite(['users', 'auditoria']);

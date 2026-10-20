@@ -656,7 +656,7 @@ describe('reporte ejecutivo semanal (cron y envío dry-run)', () => {
     assert.equal(r.json.cron, 'lunes 07:00 (America/Mexico_City)');
   });
 
-  it('bundle incluye users (sin hashes) para roles manager y null para alumno', async () => {
+  it('bundle incluye users seguros (sin hashes) para todos los usuarios autenticados (directorio de chat)', async () => {
     jar.cookie = null;
     await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
     const rAdmin = await api('GET', '/api/data/bundle');
@@ -669,6 +669,15 @@ describe('reporte ejecutivo semanal (cron y envío dry-run)', () => {
     await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
     const rAlumno = await api('GET', '/api/data/bundle');
     assert.equal(rAlumno.status, 200);
-    assert.equal(rAlumno.json.users, null);
+    assert.ok(Array.isArray(rAlumno.json.users) && rAlumno.json.users.length >= 3);
+    assert.ok(rAlumno.json.users.every((u) => !u.password && !u.passwordHash));
+
+    // Alumno puede actualizar su propio heartbeat (lastActive/streak) pero NO datos de otro usuario (403)
+    const me = await api('GET', '/api/auth/me');
+    const myId = me.json.user.id;
+    const putSelf = await api('PUT', `/api/users/${myId}`, { lastActive: Date.now(), streak: 2 });
+    assert.equal(putSelf.status, 200);
+    const putSelfRole = await api('PUT', `/api/users/${myId}`, { role: 'admin' });
+    assert.equal(putSelfRole.status, 403);
   });
 });

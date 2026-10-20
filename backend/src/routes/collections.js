@@ -163,11 +163,10 @@ module.exports = (store, config) => {
           bundle[col] = { shape: 'array', items: Array.isArray(data[col]) ? data[col] : [] };
         }
       }
-      // Si el rol tiene permiso de listar usuarios (MANAGERS), incluirlos en el
-      // mismo viaje de red para ahorrar otra petición GET /api/users al entrar.
-      const users = roles.hasRole(req.user, ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'])
-        ? db.collection(data, 'users').map(db.safeUser)
-        : null;
+      // Todos los usuarios autenticados reciben el directorio de usuarios seguros
+      // (sin passwordHash) para poder ver contactos reales en Mensajes/Chat y Ranking
+      // sin disparar GET /api/users (403 para alumnos/agentes).
+      const users = db.collection(data, 'users').map(db.safeUser);
       res.json({ ok: true, bundle, users });
     } catch (e) { next(e); }
   });
