@@ -117,5 +117,16 @@
     return out;
   }
 
-  window.Media = { subir, subirMuchos, comprimirImagen };
+  /* Sube archivo a Storage si hay backend activo, o devuelve dataURL (comprimido
+   * si es imagen) como fallback seguro para adjuntos en chat/cotizaciones. */
+  async function subirOUrl(file, scope, opts) {
+    if (!file) return '';
+    try {
+      const item = await subir(file, Object.assign({ scope: scope || 'media' }, opts || {}));
+      if (item && item.url) return item.url;
+    } catch (e) { /* fallback a dataURL comprimido */ }
+    return (await comprimirImagen(file, 1280, 0.82)) || '';
+  }
+
+  window.Media = { subir, subirMuchos, comprimirImagen, subirOUrl };
 })();

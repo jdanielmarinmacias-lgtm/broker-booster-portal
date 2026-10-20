@@ -7295,11 +7295,11 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         function renderGroupChat(groupId) {
             const msgs = (db.groupMessages || []).filter(m=>String(m.groupId)===String(groupId)).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
             return `<div class="bg-white rounded-2xl border border-slate-200 flex flex-col h-[400px]">
-                <div class="p-4 border-b"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-comments text-indigo-600"></i> Chat Grupal</h3></div>
+                <div class="p-4 border-b flex items-center justify-between"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-comments text-indigo-600"></i> Chat Grupal</h3><span class="text-[11px] text-slate-400">Soporta pegar capturas con Ctrl+V</span></div>
                 <div id="chat-${groupId}" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-                    ${msgs.map(m=>{const author=(db.users||[]).find(u=>String(u.id)===String(m.authorId)); const isMe=String(m.authorId)===String(currentUser.id); return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(author?.name||'U')}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}"><p class="break-words">${escapeHTML(m.content)}</p><span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('')}
+                    ${msgs.map(m=>{const author=(db.users||[]).find(u=>String(u.id)===String(m.authorId)); const isMe=String(m.authorId)===String(currentUser.id); const att=renderChatAttachmentHtml(m, isMe); const showTxt=m.content && !(isChatImageAttachment(m) && /^📷 |^📎 Archivo adjunto:/i.test(m.content)); return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(author?.name||'U')}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}">${showTxt?`<p class="break-words">${escapeHTML(m.content)}</p>`:''}${att}<span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('')}
                 </div>
-                <form id="chat-form-${groupId}" class="p-3 border-t flex gap-2"><input id="chat-input-${groupId}" type="text" placeholder="Escribe un mensaje..." class="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white text-slate-900 border-slate-300"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-full text-sm hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button></form>
+                <form id="chat-form-${groupId}" class="p-3 border-t flex gap-2 items-center"><input id="chat-input-${groupId}" type="text" placeholder="Escribe un mensaje o pega imagen (Ctrl+V)..." class="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white text-slate-900 border-slate-300"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-full text-sm hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button></form>
             </div>`;
         }
 
@@ -7307,7 +7307,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const chatDiv = document.getElementById(`chat-${groupId}`);
             if (!chatDiv) return false;
             const msgs = (db.groupMessages || []).filter(m=>String(m.groupId)===String(groupId)).sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
-            chatDiv.innerHTML = msgs.map(m=>{const author=(db.users||[]).find(u=>String(u.id)===String(m.authorId)); const isMe=String(m.authorId)===String(currentUser.id); return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(author?.name||'U')}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}"><p class="break-words">${escapeHTML(m.content)}</p><span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('');
+            chatDiv.innerHTML = msgs.map(m=>{const author=(db.users||[]).find(u=>String(u.id)===String(m.authorId)); const isMe=String(m.authorId)===String(currentUser.id); const att=renderChatAttachmentHtml(m, isMe); const showTxt=m.content && !(isChatImageAttachment(m) && /^📷 |^📎 Archivo adjunto:/i.test(m.content)); return `<div class="flex ${isMe?'justify-end':'justify-start'}"><div class="max-w-[75%]"><div class="flex items-end gap-2 ${isMe?'flex-row-reverse':''}"><img src="${author?.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(author?.name||'U')}" class="w-6 h-6 rounded-full"><div class="px-3 py-2 rounded-2xl text-sm ${isMe?'bg-indigo-600 text-white':'bg-white border'}">${showTxt?`<p class="break-words">${escapeHTML(m.content)}</p>`:''}${att}<span class="text-[10px] opacity-70 block mt-1">${new Date(m.createdAt).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span></div></div></div></div>`}).join('');
             chatDiv.scrollTop = chatDiv.scrollHeight;
             return true;
         }
@@ -7327,6 +7327,40 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 } catch (e) {}
                 try { renderGroupChatBox(groupId); } catch (e2) {}
             }, 2500);
+            const gInput = document.getElementById(`chat-input-${groupId}`);
+            if (gInput && !gInput.__pasteBound) {
+                gInput.__pasteBound = true;
+                gInput.addEventListener('paste', async (ev) => {
+                    const items = (ev.clipboardData && ev.clipboardData.items) ? Array.from(ev.clipboardData.items) : [];
+                    const imgItem = items.find(it => it.kind === 'file' && /^image\//i.test(it.type || ''));
+                    const files = (!imgItem && ev.clipboardData && ev.clipboardData.files) ? Array.from(ev.clipboardData.files).filter(f => /^image\//i.test(f.type || '')) : [];
+                    const rawBlob = imgItem ? imgItem.getAsFile() : (files[0] || null);
+                    if (!rawBlob) return;
+                    ev.preventDefault();
+                    const ext = (rawBlob.type || 'image/png').split('/')[1] || 'png';
+                    const file = rawBlob instanceof File && rawBlob.name ? rawBlob : new File([rawBlob], `captura-${Date.now()}.${ext}`, { type: rawBlob.type || 'image/png' });
+                    if (window.showToast) showToast('Subiendo captura al chat grupal...', 'info');
+                    const url = (window.Media && window.Media.subirOUrl) ? await window.Media.subirOUrl(file, 'groupMessages') : '';
+                    if (!url) return;
+                    const caption = gInput.value.trim();
+                    gInput.value = '';
+                    db.groupMessages.push({
+                        id: Date.now() + Math.floor(Math.random()*1000),
+                        groupId,
+                        authorId: currentUser.id,
+                        content: caption || ('📷 ' + file.name),
+                        attachmentUrl: url,
+                        attachmentName: file.name,
+                        attachmentMime: file.type || 'image/png',
+                        createdAt: new Date().toISOString()
+                    });
+                    saveDB();
+                    if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                        window.BackendSync.pushCollectionsImmediate(['groupMessages']);
+                    }
+                    renderGroupChatBox(groupId);
+                });
+            }
             form.onsubmit = e => {
                 e.preventDefault();
                 const input = document.getElementById(`chat-input-${groupId}`);
@@ -9929,14 +9963,37 @@ function renderMessages() {
             }, 3000);
         }
         function stopChatLive() { if (chatLiveTimer) { clearInterval(chatLiveTimer); chatLiveTimer = null; } chatLiveUserId = null; chatLiveChannelName = null; }
+        function isChatImageAttachment(m) {
+            if (!m || !m.attachmentUrl) return false;
+            if (m.attachmentMime && /^image\//i.test(m.attachmentMime)) return true;
+            const u = String(m.attachmentUrl || '');
+            if (/^data:image\//i.test(u)) return true;
+            const n = String(m.attachmentName || u).split('?')[0].toLowerCase();
+            return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(n);
+        }
+        function renderChatAttachmentHtml(m, mine) {
+            if (!m || !m.attachmentUrl) return '';
+            const safeUrl = psEscape(m.attachmentUrl);
+            const safeName = psEscape(m.attachmentName || 'imagen.png');
+            if (isChatImageAttachment(m)) {
+                return `<div class="mt-2 pt-1.5">
+                    <a href="${safeUrl}" target="_blank" rel="noopener" title="Clic para abrir imagen completa" class="block">
+                        <img src="${safeUrl}" alt="${safeName}" loading="lazy" class="max-h-64 max-w-full rounded-xl border ${mine ? 'border-amber-400/40' : 'border-slate-200'} object-contain bg-black/5 cursor-zoom-in shadow-sm hover:opacity-95 transition">
+                    </a>
+                </div>`;
+            }
+            return `<div class="mt-2 pt-2 border-t ${mine ? 'border-amber-400/30' : 'border-slate-200'}"><a href="${safeUrl}" target="_blank" download="${safeName}" class="inline-flex items-center gap-1.5 text-xs underline font-semibold"><i class="fas fa-paperclip"></i> ${psEscape(m.attachmentName || 'Ver archivo adjunto')}</a></div>`;
+        }
         function renderChannelConversationBox(channelId, channelName) {
             const box = document.getElementById('chat-messages');
             if (!box) return false;
             const msgs = (db.messages || []).filter(m => String(m.toId) === String(channelId)).sort((a,b) => new Date(a.date) - new Date(b.date));
-            box.innerHTML = msgs.length === 0 ? `<p class="text-center text-slate-400 py-8">Sé el primero en escribir en ${psEscape(channelName || channelId)}</p>` : msgs.map(m => {
+            box.innerHTML = msgs.length === 0 ? `<p class="text-center text-slate-400 py-8">Sé el primero en escribir o pegar una captura (Ctrl+V) en ${psEscape(channelName || channelId)}</p>` : msgs.map(m => {
                 const mine = String(m.fromId) === String(currentUser.id);
                 const sender = m.fromName || ((db.users||[]).find(u=>String(u.id)===String(m.fromId))?.name) || 'Miembro';
-                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p><p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
+                const attachmentHtml = renderChatAttachmentHtml(m, mine);
+                const showText = m.text && !(isChatImageAttachment(m) && /^📷 |^📎 Archivo adjunto:/i.test(m.text));
+                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}${showText ? `<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p>` : ''}${attachmentHtml}<p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
             }).join('');
             box.scrollTop = box.scrollHeight;
             return true;
@@ -9958,11 +10015,12 @@ function renderMessages() {
                 }
                 try { renderNav(); } catch(e){}
             }
-            box.innerHTML = conv.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación con un mensaje o adjunto</p>' : conv.map(m => {
+            box.innerHTML = conv.length === 0 ? '<p class="text-center text-slate-400 py-8">Inicia la conversación con un mensaje, adjunto o pega una captura con Ctrl+V</p>' : conv.map(m => {
                 const mine = String(m.fromId) === String(currentUser.id);
                 const seenIcon = mine ? (m.read ? '<i class="fas fa-check-double text-amber-300 ml-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-300 ml-1" title="Enviado"></i>') : '';
-                const attachmentHtml = m.attachmentUrl ? `<div class="mt-2 pt-2 border-t ${mine?'border-amber-400/30':'border-slate-200'}"><a href="${m.attachmentUrl}" target="_blank" download="${psEscape(m.attachmentName||'adjunto')}" class="inline-flex items-center gap-1.5 text-xs underline font-semibold"><i class="fas fa-paperclip"></i> ${psEscape(m.attachmentName||'Ver archivo adjunto')}</a></div>` : '';
-                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm"><p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p>${attachmentHtml}<p class="text-[10px] mt-1 flex items-center justify-end gap-1 ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}${seenIcon}</p></div></div>`;
+                const attachmentHtml = renderChatAttachmentHtml(m, mine);
+                const showText = m.text && !(isChatImageAttachment(m) && /^📷 |^📎 Archivo adjunto:/i.test(m.text));
+                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${showText ? `<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p>` : ''}${attachmentHtml}<p class="text-[10px] mt-1 flex items-center justify-end gap-1 ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}${seenIcon}</p></div></div>`;
             }).join('');
             box.scrollTop = box.scrollHeight;
             return true;
@@ -9998,9 +10056,10 @@ function renderMessages() {
                 }
             }
             try { renderNav(); } catch(e){}
-            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe tu mensaje..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe tu mensaje o pega una captura (Ctrl+V)..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderConversationBox(userId);
             startChatLive(userId);
+            bindChatPasteTarget(userId);
             document.getElementById('chat-form').onsubmit = e => {
                 e.preventDefault();
                 const text = document.getElementById('chat-input').value.trim();
@@ -10019,9 +10078,10 @@ function renderMessages() {
         // FASE 2 (#1): Chat de Canal Grupal
         function openChannelChat(channelId, channelName) {
             stopChatLive();
-            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold"><i class="fas fa-hashtag"></i></div><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(channelName)}</h3><p class="text-xs text-slate-500">Canal grupal abierto para todo el equipo · Usa @nombre para mencionar</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span>IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)}..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold"><i class="fas fa-hashtag"></i></div><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(channelName)}</h3><p class="text-xs text-slate-500">Canal grupal abierto para todo el equipo · Soporta capturas con Ctrl+V</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${channelId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span>IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)} o pega imagen (Ctrl+V)..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderChannelConversationBox(channelId, channelName);
             startChatLive(channelId, channelName);
+            bindChatPasteTarget(channelId);
             document.getElementById('chat-form').onsubmit = e => {
                 e.preventDefault();
                 const text = document.getElementById('chat-input').value.trim();
@@ -10055,37 +10115,73 @@ function renderMessages() {
                     return `<div onclick="document.getElementById('chat-input').value=this.dataset.txt;document.getElementById('chat-ai-suggestions').classList.add('hidden');document.getElementById('chat-input').focus();" data-txt="${psEscape(clean)}" class="p-2 rounded-lg bg-white border border-amber-200 hover:border-amber-500 text-xs text-slate-700 cursor-pointer transition">${psEscape(s)}</div>`;
                 }).join('');
         }
-        async function enviarAdjuntoChat(userId, inputEl) {
-            const file = inputEl && inputEl.files && inputEl.files[0];
-            if (!file) return;
-            const otherUser = db.users.find(u => String(u.id) === String(userId));
-            if (!otherUser) return;
+        async function enviarArchivoAlChat(targetId, file, optionalCaption) {
+            if (!file) return false;
+            const isChannel = String(targetId).startsWith('canal:');
+            const otherUser = isChannel ? null : db.users.find(u => String(u.id) === String(targetId));
+            if (!isChannel && !otherUser) return false;
+            const isImg = /^image\//i.test(file.type || '') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name || '');
             try {
+                if (window.showToast) showToast(isImg ? 'Enviando imagen...' : 'Enviando archivo...', 'info');
                 let url = '';
                 if (window.Media && window.Media.subirOUrl) {
                     url = await window.Media.subirOUrl(file, 'messages');
                 }
                 if (url) {
+                    const caption = (optionalCaption || '').trim();
                     db.messages.push({
                         id: Date.now() + Math.floor(Math.random()*1000),
                         fromId: currentUser.id,
                         fromName: currentUser.name,
-                        toId: otherUser.id,
-                        text: '📎 Archivo adjunto: ' + file.name,
+                        toId: isChannel ? targetId : otherUser.id,
+                        text: caption || (isImg ? ('📷 ' + (file.name || 'Imagen')) : ('📎 Archivo adjunto: ' + file.name)),
                         attachmentUrl: url,
-                        attachmentName: file.name,
+                        attachmentName: file.name || (isImg ? 'captura.png' : 'adjunto'),
+                        attachmentMime: file.type || (isImg ? 'image/png' : ''),
                         date: new Date().toISOString(),
-                        read: false
+                        read: isChannel ? true : false
                     });
                     saveDB();
                     if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
                         window.BackendSync.pushCollectionsImmediate(['messages']);
                     }
-                    renderConversationBox(userId);
-                    if (window.showToast) showToast('Archivo enviado', 'success');
+                    renderConversationBox(targetId);
+                    if (window.showToast) showToast(isImg ? 'Imagen enviada' : 'Archivo enviado', 'success');
+                    return true;
                 }
             } catch (e) {
                 if (window.showToast) showToast('No se pudo adjuntar el archivo', 'error');
+            }
+            return false;
+        }
+        function bindChatPasteTarget(targetId) {
+            const inp = document.getElementById('chat-input');
+            if (!inp || inp.__pasteBound) return;
+            inp.__pasteBound = true;
+            inp.addEventListener('paste', async (ev) => {
+                const items = (ev.clipboardData && ev.clipboardData.items) ? Array.from(ev.clipboardData.items) : [];
+                const imgItem = items.find(it => it.kind === 'file' && /^image\//i.test(it.type || ''));
+                const files = (!imgItem && ev.clipboardData && ev.clipboardData.files) ? Array.from(ev.clipboardData.files).filter(f => /^image\//i.test(f.type || '')) : [];
+                const rawBlob = imgItem ? imgItem.getAsFile() : (files[0] || null);
+                if (!rawBlob) return;
+                ev.preventDefault();
+                const ext = (rawBlob.type || 'image/png').split('/')[1] || 'png';
+                const file = rawBlob instanceof File && rawBlob.name && rawBlob.name !== 'image.png'
+                    ? rawBlob
+                    : new File([rawBlob], `captura-${Date.now()}.${ext}`, { type: rawBlob.type || 'image/png' });
+                const caption = inp.value.trim();
+                inp.value = '';
+                await enviarArchivoAlChat(targetId, file, caption);
+            });
+        }
+        async function enviarAdjuntoChat(userId, inputEl) {
+            const file = inputEl && inputEl.files && inputEl.files[0];
+            if (!file) return;
+            try {
+                const inp = document.getElementById('chat-input');
+                const caption = inp ? inp.value.trim() : '';
+                if (inp && caption) inp.value = '';
+                await enviarArchivoAlChat(userId, file, caption);
             } finally {
                 inputEl.value = '';
             }
