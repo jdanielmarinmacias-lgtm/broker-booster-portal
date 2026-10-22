@@ -401,3 +401,251 @@ body.theme-obsidian #btn-theme-toggle i {
     color: #0a192f !important;
 }
 
+/* === EXPERIENCIA MÓVIL Y PWA (iPhone / Android Safe Areas, Bottom Nav, Modales y Tarjetas) === */
+:root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --mobile-nav-h: 64px;
+}
+
+html, body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+}
+
+/* Safe-areas superiores en header y sidebar cuando se ejecuta como PWA instalada */
+#main-app header {
+    padding-top: max(0.75rem, calc(var(--sat) + 0.35rem));
+    padding-left: max(1rem, calc(var(--sal) + 1rem));
+    padding-right: max(1rem, calc(var(--sar) + 1rem));
+}
+#sidebar .sidebar-header-safe {
+    padding-top: max(1.25rem, calc(var(--sat) + 0.75rem));
+}
+#sidebar > div:last-child {
+    padding-bottom: max(1rem, calc(var(--sab) + 0.75rem));
+}
+
+/* Barra de navegación inferior móvil */
+.mobile-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 1023px) {
+    .mobile-bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 45;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        align-items: center;
+        min-height: calc(var(--mobile-nav-h) + var(--sab));
+        padding: 4px max(6px, var(--sal)) calc(6px + var(--sab)) max(6px, var(--sar));
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-top: 1px solid rgba(201, 168, 106, 0.38);
+        box-shadow: 0 -8px 28px -10px rgba(10, 37, 64, 0.16);
+    }
+    .mobile-bottom-nav .mob-nav-btn {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 6px 2px;
+        border-radius: 12px;
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.1;
+        transition: all 0.18s ease;
+        user-select: none;
+        min-height: 48px;
+    }
+    .mobile-bottom-nav .mob-nav-btn i {
+        font-size: 17px;
+        transition: transform 0.18s ease;
+    }
+    .mobile-bottom-nav .mob-nav-btn span.mob-nav-label {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 2px;
+    }
+    .mobile-bottom-nav .mob-nav-btn.active {
+        color: var(--primary, #0a2540);
+        background: linear-gradient(180deg, rgba(201, 168, 106, 0.20) 0%, rgba(201, 168, 106, 0.06) 100%);
+        font-weight: 700;
+    }
+    .mobile-bottom-nav .mob-nav-btn.active i {
+        color: var(--primary, #0a2540);
+        transform: translateY(-1px);
+    }
+    .mobile-bottom-nav .mob-nav-btn:active {
+        transform: scale(0.95);
+    }
+    .mobile-bottom-nav .mob-nav-badge {
+        position: absolute;
+        top: 3px;
+        right: calc(50% - 18px);
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 9999px;
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 9px;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 2px #ffffff;
+    }
+
+    /* Elevar barra de noticias y botón flotante sobre la barra inferior en móvil */
+    #news-ticker-wrapper {
+        bottom: calc(var(--mobile-nav-h) + var(--sab)) !important;
+        z-index: 38 !important;
+    }
+    #show-news-btn {
+        bottom: calc(var(--mobile-nav-h) + var(--sab) + 12px) !important;
+        right: 12px !important;
+        z-index: 42 !important;
+        padding: 0.5rem 0.85rem !important;
+        font-size: 0.75rem !important;
+    }
+    #main-content {
+        padding-bottom: calc(var(--mobile-nav-h) + var(--sab) + 4.25rem) !important;
+    }
+}
+
+/* Ajustes responsivos de modales, tarjetas, tablas e inputs en celulares (< 640px) */
+@media (max-width: 640px) {
+    /* Evita zoom automático en iOS Safari al enfocar inputs con font-size < 16px */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* Modales estilo hoja inferior (Bottom Sheet) cómoda para pulgar en celular */
+    .modal-backdrop {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+    .modal-backdrop > div {
+        position: relative;
+        width: 100% !important;
+        max-width: 100vw !important;
+        max-height: calc(92dvh - var(--sat)) !important;
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+        border-top-left-radius: 1.35rem !important;
+        border-top-right-radius: 1.35rem !important;
+        padding-bottom: max(1rem, var(--sab)) !important;
+        margin: 0 !important;
+        animation: mobileSheetUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-backdrop > div::before {
+        content: "";
+        display: block;
+        width: 40px;
+        height: 4px;
+        border-radius: 9999px;
+        background: rgba(148, 163, 184, 0.55);
+        margin: 8px auto 2px auto;
+        flex-shrink: 0;
+    }
+    @keyframes mobileSheetUp {
+        from { transform: translateY(24px); opacity: 0.85; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Modal de Chat a altura dinámica táctil en celulares */
+    .modal-backdrop > div:has(.chat-modal-shell) {
+        padding-bottom: 0 !important;
+        max-height: calc(94dvh - var(--sat)) !important;
+    }
+    .chat-modal-shell {
+        height: calc(88dvh - var(--sat)) !important;
+    }
+    .chat-modal-shell #chat-form {
+        padding-bottom: max(0.75rem, calc(var(--sab) + 0.5rem)) !important;
+    }
+
+    /* Compactar espaciados de tarjetas y encabezados en pantallas angostas */
+    #main-content {
+        padding-left: max(0.75rem, var(--sal)) !important;
+        padding-right: max(0.75rem, var(--sar)) !important;
+        padding-top: 0.85rem !important;
+    }
+    #main-content .p-8 {
+        padding: 1.15rem !important;
+    }
+    #main-content .p-6 {
+        padding: 1rem !important;
+    }
+    #main-content h2.text-2xl,
+    #main-content h1.text-2xl,
+    #main-content h1.text-3xl {
+        font-size: 1.25rem !important;
+        line-height: 1.65rem !important;
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.85rem !important;
+    }
+    #page-title {
+        font-size: 1.05rem !important;
+    }
+
+    /* Tablas desplazables horizontalmente sin romper el layout móvil */
+    #main-content table,
+    .modal-backdrop table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    #main-content .calc-wrap,
+    #public-portal .sim-embed .calc-wrap,
+    #public-portal .sim-embed .tiers,
+    #public-portal .sim-embed .testi-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1.25rem !important;
+    }
+}
+
+/* Safe-area superior en la pantalla de login y portal público en modo standalone iPhone */
+#login-screen {
+    padding-top: max(3rem, calc(var(--sat) + 1.5rem));
+    padding-bottom: max(2rem, calc(var(--sab) + 1rem));
+}
+
+/* Soporte Modo Oscuro Ejecutivo (Obsidiana y Oro) para Barra Móvil */
+body.theme-obsidian .mobile-bottom-nav {
+    background: linear-gradient(180deg, rgba(11, 17, 30, 0.97) 0%, rgba(17, 25, 43, 0.98) 100%) !important;
+    border-top: 1px solid rgba(201, 168, 106, 0.42) !important;
+    box-shadow: 0 -10px 30px -8px rgba(0, 0, 0, 0.75) !important;
+}
+body.theme-obsidian .mobile-bottom-nav .mob-nav-btn {
+    color: #94a3b8 !important;
+}
+body.theme-obsidian .mobile-bottom-nav .mob-nav-btn.active {
+    color: #dfbe7f !important;
+    background: linear-gradient(180deg, rgba(201, 168, 106, 0.24) 0%, rgba(22, 33, 56, 0.8) 100%) !important;
+}
+body.theme-obsidian .mobile-bottom-nav .mob-nav-btn.active i {
+    color: #dfbe7f !important;
+}
+body.theme-obsidian .mobile-bottom-nav .mob-nav-badge {
+    box-shadow: 0 0 0 2px #0b111e !important;
+}
+
+

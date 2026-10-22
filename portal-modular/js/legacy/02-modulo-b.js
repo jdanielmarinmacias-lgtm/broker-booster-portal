@@ -1132,7 +1132,39 @@ return '<div class="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm 
                     </div>` : ''}
                     ${renderMapaEstados(solicitudes)}
                     <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                        <div class="overflow-x-auto">
+                        <!-- Vista de tarjetas táctiles para móviles (< md) -->
+                        <div class="md:hidden divide-y divide-slate-100">
+                            ${filtradas.length ? filtradas.map(s => {
+                                const estGeo = estadoFromCiudad(s.ciudad);
+                                const uCreado = s.usuarioCreadoId ? (db.users||[]).find(u => String(u.id) === String(s.usuarioCreadoId)) : (db.users||[]).find(u => u.username && s.usuarioCreadoUsername && String(u.username).toLowerCase() === String(s.usuarioCreadoUsername).toLowerCase());
+                                const msgClean = s.mensaje ? String(s.mensaje).replace(/\s*\|\s*Prima calculada: [^|]*/g, '') : '';
+                                return `<div class="p-3.5 space-y-2">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                                <span class="px-2 py-0.5 text-[10px] rounded-full font-bold uppercase ${s.estado==='nuevo'?'bg-blue-100 text-blue-700':s.estado==='contactado'?'bg-amber-100 text-amber-700':s.estado==='convertido'?'bg-emerald-100 text-emerald-700':'bg-green-100 text-green-700'}">${escapeHTML(s.estado)}</span>
+                                                <span class="text-[11px] text-slate-400">${new Date(s.fecha).toLocaleDateString('es-MX')}</span>
+                                            </div>
+                                            <h4 class="font-bold text-slate-900 text-sm truncate">${escapeHTML(s.nombre)}</h4>
+                                            <p class="text-xs text-slate-500 truncate">${escapeHTML(s.ciudad || '-')}${estGeo ? ` (${escapeHTML(estGeo)})` : ''} · ${escapeHTML(s.whatsapp || s.email || '-')}</p>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <a href="https://wa.me/${(s.whatsapp||'').replace(/[^0-9]/g,'')}?text=Hola%20${encodeURIComponent(s.nombre)}%2C%20vimos%20tu%20solicitud%20de%20informaci%C3%B3n%20sobre%20${encodeURIComponent(s.plan||s.tipo)}.%20%C2%BFTe%20ayudo%3F" target="_blank" class="w-9 h-9 flex items-center justify-center bg-green-600 text-white rounded-xl text-xs hover:bg-green-700" title="WhatsApp"><i class="fab fa-whatsapp text-sm"></i></a>
+                                            <button onclick="marcarContactado('${s.id}')" class="w-9 h-9 flex items-center justify-center bg-amber-500 text-white rounded-xl text-xs hover:bg-amber-600" title="Marcar contactado"><i class="fas fa-check"></i></button>
+                                            ${s.estado!=='convertido' ? `<button onclick="crearUsuarioDesdeSolicitud('${s.id}')" class="w-9 h-9 flex items-center justify-center bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700" title="Crear usuario"><i class="fas fa-user-plus"></i></button>` : `<button onclick="navigateTo('users')" class="w-9 h-9 flex items-center justify-center bg-emerald-100 text-emerald-700 rounded-xl text-xs" title="Ver en Usuarios"><i class="fas fa-user-check"></i></button>`}
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                                        ${s.interes ? `<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold">${escapeHTML(s.interes)}</span>` : `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">${escapeHTML(s.tipo||'')}</span>`}
+                                        ${s.referido ? `<span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded">Ref: ${escapeHTML(s.referido)}</span>` : ''}
+                                        ${uCreado ? `<span class="text-[11px] text-slate-500 font-mono">@${escapeHTML(uCreado.username)}</span>` : ''}
+                                    </div>
+                                    ${msgClean ? `<div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-2">${escapeHTML(msgClean)}</div>` : ''}
+                                </div>`;
+                            }).join('') : `<div class="p-8 text-center text-slate-500 text-sm">No hay solicitudes${solEstadoFiltro ? ' en ' + escapeHTML(solEstadoFiltro) : ''} aún</div>`}
+                        </div>
+                        <!-- Tabla de escritorio (md+) -->
+                        <div class="hidden md:block overflow-x-auto">
                             <table class="w-full">
                                 <thead class="bg-slate-50 border-b border-slate-200">
                                     <tr>

@@ -92,16 +92,119 @@ function verAuditoriaVentas(){
     }catch(e){ console.log('verAuditoriaVentas error', e); alert('Error auditoría: '+e.message); }
 }
 
-// === FASE 2 (#3): PWA Service Worker + Notificaciones Nativas del Navegador ===
+// === FASE 2 (#3): PWA Service Worker + Instalación y Notificaciones Nativas ===
+window.isPWAStandalone = function(){
+    try {
+        return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+               window.navigator.standalone === true;
+    } catch (e) {
+        return false;
+    }
+};
+
+window.syncPWAInstallUI = function(){
+    try {
+        const installed = window.isPWAStandalone();
+        const sidebarWrap = document.getElementById('pwa-install-sidebar-wrap');
+        const headerBtn = document.getElementById('btn-install-pwa-header');
+        if (sidebarWrap) {
+            sidebarWrap.classList.toggle('hidden', installed);
+        }
+        if (headerBtn) {
+            headerBtn.classList.toggle('hidden', installed);
+            headerBtn.classList.toggle('flex', !installed);
+        }
+    } catch (e) {}
+};
+
 (function initPWAAndNotifications(){
     try {
         if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
             window.addEventListener('load', function(){
-                navigator.serviceWorker.register('/sw.js').catch(function(){});
+                navigator.serviceWorker.register('./sw.js').then(function(reg){
+                    if (reg && typeof reg.update === 'function') {
+                        setInterval(function(){ reg.update().catch(function(){}); }, 60 * 60 * 1000);
+                    }
+                }).catch(function(){
+                    navigator.serviceWorker.register('/sw.js').catch(function(){});
+                });
             });
+        }
+        window._deferredPwaPrompt = null;
+        window.addEventListener('beforeinstallprompt', function(e){
+            e.preventDefault();
+            window._deferredPwaPrompt = e;
+            window.syncPWAInstallUI();
+        });
+        window.addEventListener('appinstalled', function(){
+            window._deferredPwaPrompt = null;
+            window.syncPWAInstallUI();
+            if (window.showToast) showToast('Aplicación instalada en tu dispositivo', 'success');
+        });
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', window.syncPWAInstallUI);
+        } else {
+            setTimeout(window.syncPWAInstallUI, 0);
         }
     } catch (e) {}
 })();
+
+window.instalarPWA = async function(){
+    if (window.isPWAStandalone && window.isPWAStandalone()) {
+        if (window.showToast) showToast('La aplicación ya está instalada en tu dispositivo', 'success');
+        return;
+    }
+    if (window._deferredPwaPrompt) {
+        window._deferredPwaPrompt.prompt();
+        try {
+            const choice = await window._deferredPwaPrompt.userChoice;
+            if (choice && choice.outcome === 'accepted' && window.showToast) {
+                showToast('Instalando Broker Booster...', 'success');
+            }
+        } catch (e) {}
+        window._deferredPwaPrompt = null;
+        window.syncPWAInstallUI();
+        return;
+    }
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (typeof showModal === 'function') {
+        showModal(`<div class="p-6 max-w-md w-full">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-2xl bg-slate-900 text-amber-300 flex items-center justify-center shrink-0 shadow-sm">
+                    <i class="fas fa-mobile-screen-button text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Instalar Broker Booster</h3>
+                    <p class="text-xs text-slate-500">Acceso directo en pantalla completa como App nativa</p>
+                </div>
+            </div>
+            ${isIOS ? `
+                <div class="space-y-3 text-sm text-slate-700 bg-amber-50/60 border border-amber-200 rounded-xl p-4">
+                    <p class="font-semibold text-slate-900 flex items-center gap-2"><i class="fab fa-apple text-base"></i> En iPhone o iPad (Safari):</p>
+                    <ol class="list-decimal list-inside space-y-2 text-xs text-slate-700">
+                        <li>Toca el botón <b>Compartir</b> <span class="inline-block px-1.5 py-0.5 bg-white border rounded text-slate-800 font-semibold"><i class="fas fa-arrow-up-from-bracket"></i></span> en la barra de Safari.</li>
+                        <li>Desliza hacia abajo y selecciona <b>"Agregar a pantalla de inicio"</b> <i class="fas fa-plus-square text-slate-600"></i>.</li>
+                        <li>Toca <b>Agregar</b> en la esquina superior derecha.</li>
+                    </ol>
+                </div>
+            ` : `
+                <div class="space-y-3 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p class="font-semibold text-slate-900 flex items-center gap-2"><i class="fab fa-chrome text-amber-600"></i> En Android o Escritorio (Chrome / Edge):</p>
+                    <ol class="list-decimal list-inside space-y-2 text-xs text-slate-700">
+                        <li>Abre el menú del navegador <span class="inline-block px-1.5 py-0.5 bg-white border rounded font-bold">⋮</span> en la esquina superior derecha.</li>
+                        <li>Selecciona <b>"Instalar aplicación"</b> o <b>"Agregar a pantalla principal"</b>.</li>
+                        <li>Confirma tocando <b>Instalar</b>.</li>
+                    </ol>
+                </div>
+            `}
+            <div class="mt-5 flex justify-end">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800">Entendido</button>
+            </div>
+        </div>`);
+    } else if (window.showToast) {
+        showToast(isIOS ? 'En iPhone/iPad toca Compartir y luego "Agregar a pantalla de inicio"' : 'Usa el menú del navegador → "Instalar aplicación"', 'info');
+    }
+};
 
 window.activarNotificacionesPush = async function(){
     if (!('Notification' in window)) {

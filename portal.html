@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title id="dynamic-title">Academia - Plataforma</title>
     <script src="https://cdn.tailwindcss.com">
 </script>
@@ -291,8 +291,14 @@ function verAuditoriaVentas(){
 </style>
 
 
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUmlubyBQb3J0YWwgUHJlbWl1bSIsInNob3J0X25hbWUiOiJSaW5vIiwic3RhcnRfdXJsIjoiLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmOGZhZmMiLCJ0aGVtZV9jb2xvciI6IiMwYTI1NDAiLCJpY29ucyI6W3sic3JjIjoiaHR0cHM6Ly9pLnByYXZhdGFyLmNjLzE5MiIsInNpemVzIjoiMTkyeDE5MiIsInR5cGUiOiJpbWFnZS9wbmcifV19">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a2540">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Broker Booster">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=BB&background=0a2540&color=c9a86a&size=192">
 <meta name="description" content="Portal de Desarrollo Comercial — Academia con clases en vivo por roles.">
 
 </head>
@@ -337,12 +343,23 @@ function verAuditoriaVentas(){
 
         <!-- Main App -->
         <div id="main-app" class="hidden min-h-screen flex-1 flex flex-col ">
+            <!-- Overlay móvil del menú lateral -->
+            <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-30 hidden transition-opacity duration-200" aria-hidden="true"></div>
             <!-- Sidebar -->
             <aside id="sidebar" class="sidebar bg-white w-72 fixed inset-y-0 left-0 z-40 transform -translate-x-full flex flex-col shadow-2xl transition-transform duration-300">
-                <div class="flex items-center gap-3 px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center justify-between gap-3 px-6 py-5 border-b border-slate-200 sidebar-header-safe">
                      <img id="sidebar-logo" src="" alt="Logo" class="h-10 w-auto object-contain rounded-xl">
+                     <button type="button" onclick="toggleSidebar()" class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition" aria-label="Cerrar menú">
+                         <i class="fas fa-times text-lg"></i>
+                     </button>
                 </div>
                 <nav id="nav-menu" class="flex-1 px-5 py-6 space-y-2 overflow-y-auto"></nav>
+                <div id="pwa-install-sidebar-wrap" class="px-4 pt-3 hidden">
+                    <button id="btn-install-pwa-sidebar" type="button" onclick="if(window.instalarPWA) instalarPWA()" class="w-full px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-amber-300 border border-amber-400/50 hover:border-amber-400 text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition">
+                        <i class="fas fa-mobile-screen-button text-amber-400"></i>
+                        <span>Instalar App en tu dispositivo</span>
+                    </button>
+                </div>
                 <div class="px-4 py-4 border-t border-slate-200">
                     <div class="flex items-center gap-3">
                         <img id="user-avatar" src="https://i.pravatar.cc/40" class="w-10 h-10 rounded-full" alt="avatar">
@@ -358,13 +375,21 @@ function verAuditoriaVentas(){
 
             <!-- Main Content -->
             <div class="flex-1 flex flex-col min-h-screen lg:min-w-0">
-                <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-20">
-                    <button id="menu-toggle" class="text-slate-600 hover:text-slate-900 p-2 -ml-2 rounded-lg hover:bg-slate-100"><i class="fas fa-bars text-xl"></i></button>
-                    <h2 id="page-title" class="text-xl font-semibold text-slate-800">Dashboard</h2>
-                    <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
-                        <i class="fas fa-bell text-lg"></i>
-                        <span id="badge-solicitudes-header" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white">0</span>
-                    </button>
+                <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between gap-3 sticky top-0 z-20">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <button id="menu-toggle" class="text-slate-600 hover:text-slate-900 p-2 -ml-2 rounded-lg hover:bg-slate-100"><i class="fas fa-bars text-xl"></i></button>
+                        <h2 id="page-title" class="text-xl font-semibold text-slate-800 truncate">Dashboard</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-install-pwa-header" type="button" onclick="if(window.instalarPWA) instalarPWA()" class="hidden px-2.5 py-1.5 rounded-xl border border-amber-300/80 bg-amber-50/70 hover:bg-amber-100 text-amber-900 text-xs font-semibold items-center gap-1.5 transition shadow-xs" title="Instalar aplicación en tu celular o escritorio">
+                            <i class="fas fa-download text-amber-600 text-xs"></i>
+                            <span class="hidden sm:inline">Instalar App</span>
+                        </button>
+                        <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
+                            <i class="fas fa-bell text-lg"></i>
+                            <span id="badge-solicitudes-header" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white">0</span>
+                        </button>
+                    </div>
                 </header>
                 <main id="main-content" class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50"></main>
                 <!-- Barra Noticias - con botón cerrar visible -->
@@ -387,6 +412,8 @@ function verAuditoriaVentas(){
                     <i class="fas fa-bullhorn"></i> <span>Ver Noticias</span>
                     <span id="news-badge-btn" class="news-badge-count hidden absolute -top-1.5 -right-1.5 ring-2 ring-white">0</span>
                 </button>
+                <!-- Barra de navegación inferior para celulares (PWA Mobile Bottom Nav) -->
+                <nav id="mobile-bottom-nav" class="mobile-bottom-nav lg:hidden" aria-label="Navegación rápida móvil"></nav>
             </div>
         </div>
     </div>
@@ -1483,11 +1510,11 @@ function renderPublicPortal() {
                 <header class="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between items-center h-16">
-                            <div class="flex items-center gap-3">
-                                <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-11 w-auto">
-                                <span class="text-xl font-bold text-slate-800">${s.institutionName}</span>
+                            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-8 sm:h-11 w-auto shrink-0">
+                                <span class="hidden sm:inline text-xl font-bold text-slate-800 truncate">${s.institutionName}</span>
                             </div>
-                            <nav class="hidden md:flex items-center gap-7">
+                            <nav class="hidden lg:flex items-center gap-5">
                                 <a href="#servicios" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Servicios</a>
                                 <a href="#unirse" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Cómo ganarías</a>
                                 <a href="#ingresos" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Simulador</a>
@@ -1508,10 +1535,10 @@ function renderPublicPortal() {
                                     </div>
                                 </div>
                             </nav>
-                            <div class="flex items-center gap-3">
-                                <button onclick="showCampusLogin()" class="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition">Campus</button>
-                                <button onclick="openSolicitudModal('aplicar')" class="px-5 py-2.5 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
-                                <button onclick="showAdminLogin()" class="hidden lg:inline-flex px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg">Acceso administrativo</button>
+                            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                                <button onclick="showCampusLogin()" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-emerald-700"></i><span>Campus</span></button>
+                                <button onclick="openSolicitudModal('aplicar')" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-emerald-700 text-white font-semibold rounded-xl hover:bg-emerald-800 transition"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
+                                <button onclick="showAdminLogin()" title="Acceso administrativo" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg"><i class="fas fa-lock text-[11px]"></i><span class="lg:hidden">Admin</span><span class="hidden lg:inline">Acceso administrativo</span></button>
                             </div>
                         </div>
                     </div>

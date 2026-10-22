@@ -314,11 +314,13 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                     if (!u.lastStudy) u.lastStudy = null;
                 });
             }
-            // Gamificación - flags en progreso
+            // Gamificación - flags en progreso y SRS por usuario
             if (db.progress) {
                 db.progress.forEach(p => { 
+                    if (!p.id) p.id = Date.now() + Math.floor(Math.random() * 100000);
                     if (p.xpAwardedView === undefined) p.xpAwardedView = false;
                     if (p.xpAwardedQuiz === undefined) p.xpAwardedQuiz = false;
+                    if (!p.srs || typeof p.srs !== 'object') p.srs = {};
                 });
             }
             // Exámenes - inicializar arrays
@@ -1459,11 +1461,11 @@ function renderPublicPortal() {
                 <header class="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div class="flex justify-between items-center h-16">
-                            <div class="flex items-center gap-3">
-                                <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-11 w-auto">
-                                <span class="text-xl font-bold text-slate-800">${s.institutionName}</span>
+                            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-8 sm:h-11 w-auto shrink-0">
+                                <span class="hidden sm:inline text-xl font-bold text-slate-800 truncate">${s.institutionName}</span>
                             </div>
-                            <nav class="hidden md:flex items-center gap-7">
+                            <nav class="hidden lg:flex items-center gap-5">
                                 <a href="#servicios" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Servicios</a>
                                 <a href="#unirse" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Cómo ganarías</a>
                                 <a href="#ingresos" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Simulador</a>
@@ -1484,10 +1486,10 @@ function renderPublicPortal() {
                                     </div>
                                 </div>
                             </nav>
-                            <div class="flex items-center gap-3">
-                                <button onclick="showCampusLogin()" class="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg">Campus</button>
-                                <button onclick="openSolicitudModal('aplicar')" class="px-5 py-2.5 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
-                                <button onclick="showAdminLogin()" class="hidden lg:inline-flex px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg">Acceso administrativo</button>
+                            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                                <button onclick="showCampusLogin()" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-emerald-700"></i><span>Campus</span></button>
+                                <button onclick="openSolicitudModal('aplicar')" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-emerald-700 text-white font-semibold rounded-xl hover:bg-emerald-800 transition"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
+                                <button onclick="showAdminLogin()" title="Acceso administrativo" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg"><i class="fas fa-lock text-[11px]"></i><span class="lg:hidden">Admin</span><span class="hidden lg:inline">Acceso administrativo</span></button>
                             </div>
                         </div>
                     </div>
@@ -6731,6 +6733,7 @@ function initializeApp() {
                         ${lockIcon}
                     </button>`;
                 }).join('');
+                if (typeof renderMobileBottomNav === 'function') renderMobileBottomNav();
                 return;
             } else {
                 items = [...common];
@@ -6909,7 +6912,101 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     window._openMenuGroups[id] = willOpen;
                 }
             };
+            if (typeof renderMobileBottomNav === 'function') renderMobileBottomNav();
         }
+
+        function getMobileBottomNavTabs() {
+            if (typeof currentUser === 'undefined' || !currentUser) return [];
+            const role = (currentUser.role || '').toLowerCase();
+            if (role === 'prospecto') {
+                return [
+                    { id: 'mi-experiencia', label: 'Experiencia', icon: 'fa-id-badge' },
+                    { id: 'oferta-valor', label: 'Oferta', icon: 'fa-star' },
+                    { id: 'plan-carrera', label: 'Carrera', icon: 'fa-road' },
+                    { id: 'chat-reclutador', label: 'Chat', icon: 'fa-comments' },
+                    { id: '__menu__', label: 'Menú', icon: 'fa-bars' }
+                ];
+            }
+            if (role === 'editor') {
+                return [
+                    { id: 'editor', label: 'Editor', icon: 'fa-paint-brush' },
+                    { id: 'oferta-valor', label: 'Oferta', icon: 'fa-star' },
+                    { id: 'personalizar', label: 'Marca', icon: 'fa-palette' },
+                    { id: '__menu__', label: 'Menú', icon: 'fa-bars' }
+                ];
+            }
+            if (role === 'alumno') {
+                return [
+                    { id: 'dashboard', label: 'Inicio', icon: 'fa-home' },
+                    { id: 'my-courses', label: 'Cursos', icon: 'fa-book-open' },
+                    { id: 'my-aula', label: 'Mi Aula', icon: 'fa-door-open' },
+                    { id: 'messages', label: 'Mensajes', icon: 'fa-comments' },
+                    { id: '__menu__', label: 'Menú', icon: 'fa-bars' }
+                ];
+            }
+            if (['agente', 'agente_agencia', 'agente_desarrollo'].includes(role)) {
+                return [
+                    { id: 'dashboard', label: 'Inicio', icon: 'fa-home' },
+                    { id: 'mis-clientes', label: 'Clientes', icon: 'fa-address-book' },
+                    { id: 'cotizaciones', label: 'Cotizar', icon: 'fa-file-signature' },
+                    { id: 'my-courses', label: 'Academia', icon: 'fa-graduation-cap' },
+                    { id: '__menu__', label: 'Menú', icon: 'fa-bars' }
+                ];
+            }
+            if (['maestro', 'capacitador'].includes(role)) {
+                return [
+                    { id: 'dashboard', label: 'Inicio', icon: 'fa-home' },
+                    { id: 'my-groups', label: 'Grupos', icon: 'fa-chalkboard-teacher' },
+                    { id: 'lessons', label: 'Lecciones', icon: 'fa-book-open' },
+                    { id: 'messages', label: 'Mensajes', icon: 'fa-comments' },
+                    { id: '__menu__', label: 'Menú', icon: 'fa-bars' }
+                ];
+            }
+            // Admin, GM, Agencia, Desarrollador
+            return [
+                { id: 'dashboard', label: 'Inicio', icon: 'fa-home' },
+                { id: 'monitoreo', label: 'Monitoreo', icon: 'fa-chart-line' },
+                { id: 'cotizaciones', label: 'Cotizar', icon: 'fa-file-signature' },
+                { id: 'messages', label: 'Mensajes', icon: 'fa-comments' },
+                { id: '__menu__', label: 'Menú', icon: 'fa-bars' }
+            ];
+        }
+
+        function renderMobileBottomNav() {
+            const bar = document.getElementById('mobile-bottom-nav');
+            if (!bar) return;
+            if (typeof currentUser === 'undefined' || !currentUser) {
+                bar.innerHTML = '';
+                return;
+            }
+            const tabs = getMobileBottomNavTabs();
+            const activePage = window.lastPage || 'dashboard';
+            const unreadMsgCount = (db.messages || []).filter(m => String(m.toId) === String(currentUser.id) && !m.read).length;
+            const dueCards = (typeof getDueFlashcardsCount === 'function') ? getDueFlashcardsCount(currentUser.id) : 0;
+            const role = (currentUser.role || '').toLowerCase();
+
+            bar.style.gridTemplateColumns = `repeat(${tabs.length || 5}, minmax(0, 1fr))`;
+            bar.innerHTML = tabs.map(t => {
+                if (t.id === '__menu__') {
+                    return `<button type="button" onclick="toggleSidebar()" class="mob-nav-btn" data-mob-page="__menu__" aria-label="Abrir menú completo">
+                        <i class="fas ${t.icon}"></i>
+                        <span class="mob-nav-label">${t.label}</span>
+                    </button>`;
+                }
+                const isLockedProspect = role === 'prospecto' && typeof canAccessProspectStep === 'function' && !canAccessProspectStep(currentUser.id, t.id);
+                const isActive = activePage === t.id;
+                let badge = 0;
+                if (t.id === 'messages' || t.id === 'chat-reclutador') badge = unreadMsgCount;
+                else if (t.id === 'my-courses' && dueCards > 0) badge = dueCards;
+
+                return `<button type="button" ${isLockedProspect ? 'disabled' : `onclick="navigateTo('${t.id}')"`} class="mob-nav-btn ${isActive ? 'active' : ''} ${isLockedProspect ? 'opacity-40' : ''}" data-mob-page="${t.id}">
+                    <i class="fas ${isLockedProspect ? 'fa-lock' : t.icon}"></i>
+                    <span class="mob-nav-label">${t.label}</span>
+                    ${badge > 0 ? `<span class="mob-nav-badge">${badge > 99 ? '99+' : badge}</span>` : ''}
+                </button>`;
+            }).join('');
+        }
+        window.renderMobileBottomNav = renderMobileBottomNav;
 
         function navigateTo(page, opts) {
             try { if (typeof ensureDbDefaults === 'function') ensureDbDefaults(); } catch (e0) {}
@@ -6942,8 +7039,12 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             });
             const navLabel = document.querySelector(`[data-page="${page}"] span`); if(navLabel) document.getElementById('page-title').textContent = navLabel.textContent;
             if (!opts || !opts.keepSidebar) {
-                document.getElementById('sidebar').classList.add('-translate-x-full');
+                const sb = document.getElementById('sidebar');
+                const ov = document.getElementById('sidebar-overlay');
+                if (sb) sb.classList.add('-translate-x-full');
+                if (ov) ov.classList.add('hidden');
             }
+            if (typeof renderMobileBottomNav === 'function') renderMobileBottomNav();
             
             const content = document.getElementById('main-content');
             if (!content) return;
@@ -7540,15 +7641,10 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 }
             }
             
-            // Spaced Repetition - flashcards vencidas
-            const now = new Date();
+            // Spaced Repetition - flashcards vencidas por usuario
             let dueFlashcards = 0;
             db.lessons.forEach(l => {
-                if (l.flashcards) {
-                    l.flashcards.forEach(f => {
-                        if (new Date(f.due) <= now) dueFlashcards++;
-                    });
-                }
+                dueFlashcards += getDueFlashcardsCount(l.id, currentUser?.id);
             });
             
             // Badges
@@ -8258,9 +8354,10 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="p-4 font-medium">Título</th><th class="p-4 font-medium">Categoría</th><th class="p-4 font-medium">Video</th><th class="p-4 font-medium">Quiz</th><th class="p-4 font-medium">Flashcards</th><th class="p-4 font-medium">Acciones</th></tr></thead>
                         <tbody id="lessons-tbody">${db.lessons.map(l => {
                             const cat = db.categories.find(c => c.id === l.categoryId);
-                            const videoBadge = l.videoType==='drive' && l.videoUrl ? '<span class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Drive</span>' : '<span class="px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded">Sin video</span>';
+                            const videoBadge = getLessonVideoBadge(l);
                             return `
-                            <tr class="border-t lesson-row" data-category="${l.categoryId}"><td class="p-4 font-medium">${l.title}</td><td class="p-4 text-slate-600">${cat?.name || 'N/A'}</td><td class="p-4">${videoBadge}</td><td class="p-4">${l.quiz.length} preguntas</td><td class="p-4">${l.flashcards?.length||0}</td><td class="p-4 space-x-2">
+                            <tr class="border-t lesson-row" data-category="${l.categoryId}"><td class="p-4 font-medium">${escapeHTML(l.title)}</td><td class="p-4 text-slate-600">${escapeHTML(cat?.name || 'N/A')}</td><td class="p-4">${videoBadge}</td><td class="p-4">${l.quiz.length} preguntas</td><td class="p-4">${l.flashcards?.length||0}</td><td class="p-4 space-x-2">
+                                <button onclick="openLesson(${l.id})" class="text-slate-500 hover:text-indigo-600" title="Ver lección"><i class="fas fa-eye"></i></button>
                                 ${canEdit?`<button onclick="openLessonModal(${l.id})" class="text-slate-500 hover:text-indigo-600" title="Editar"><i class="fas fa-edit"></i></button>`:''}
                                 ${canEdit?`<button onclick="openQuizModal(${l.id})" class="text-slate-500 hover:text-green-600" title="Quiz"><i class="fas fa-question-circle"></i></button>`:''}
                                 ${canEdit?`<button onclick="openFlashcardsModal(${l.id})" class="text-slate-500 hover:text-amber-600" title="Flashcards"><i class="fas fa-layer-group"></i></button>`:''}
@@ -8287,10 +8384,12 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 <div class="space-y-6">${myCategories.map(cat => {
                     const lessons = db.lessons.filter(l => l.categoryId === cat.id);
                     return `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="h-28 relative">${cat.image?`<img src="${cat.image}" class="w-full h-full object-cover">`:`<div class="w-full h-full bg-gradient-to-r from-slate-100 to-slate-200"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div><div class="absolute bottom-0 p-4 text-white"><h3 class="font-bold text-xl">${cat.name}</h3><p class="text-xs opacity-90">${cat.description}</p></div></div><div class="divide-y">${lessons.map(l => {
-                        const progress = db.progress.find(p => p.userId === currentUser.id && p.lessonId === l.id);
+                        const progress = db.progress.find(p => String(p.userId) === String(currentUser.id) && String(p.lessonId) === String(l.id));
                         const isCompleted = progress?.completed;
-                        const dueCount = l.flashcards ? l.flashcards.filter(fc => new Date(fc.due) <= new Date()).length : 0;
-                        return `<div class="p-4 flex items-center justify-between hover:bg-slate-50 gap-4"><div class="flex-1 min-w-0"><p class="font-medium truncate">${l.title}</p><p class="text-xs text-slate-500 truncate">${l.content.substring(0,60)}...</p>${dueCount>0?`<span class="inline-flex items-center gap-1 mt-1.5 text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><i class="fas fa-brain"></i>${dueCount} repasos</span>`:''}</div><div class="flex gap-2 flex-shrink-0">${dueCount>0?`<button onclick="startSRSStudy(${l.id})" class="px-3 py-2 text-sm font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600 whitespace-nowrap"><i class="fas fa-brain mr-1"></i>Repasar</button>`:''}<button onclick="openLesson(${l.id})" class="px-4 py-2 text-sm font-semibold rounded-lg whitespace-nowrap ${isCompleted?'bg-green-100 text-green-700':'bg-indigo-600 text-white hover:bg-indigo-700'}">${isCompleted?'Completada':'Iniciar'}</button></div></div>`;
+                        const dueCount = getDueFlashcardsCount(l.id, currentUser?.id);
+                        const plainSnippet = stripRichText(l.content || '').substring(0, 80);
+                        const hasVideo = (l.videoType && l.videoType !== 'none' && (l.videoUrl || l.videoData));
+                        return `<div class="p-4 flex items-center justify-between hover:bg-slate-50 gap-4"><div class="flex-1 min-w-0"><p class="font-medium truncate flex items-center gap-2">${escapeHTML(l.title)} ${hasVideo ? '<span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold"><i class="fas fa-play-circle"></i>Video</span>' : ''}</p><p class="text-xs text-slate-500 truncate">${escapeHTML(plainSnippet)}...</p>${dueCount>0?`<span class="inline-flex items-center gap-1 mt-1.5 text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><i class="fas fa-brain"></i>${dueCount} repasos</span>`:''}</div><div class="flex gap-2 flex-shrink-0">${dueCount>0?`<button onclick="startSRSStudy(${l.id})" class="px-3 py-2 text-sm font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600 whitespace-nowrap"><i class="fas fa-brain mr-1"></i>Repasar</button>`:''}<button onclick="openLesson(${l.id})" class="px-4 py-2 text-sm font-semibold rounded-lg whitespace-nowrap ${isCompleted?'bg-green-100 text-green-700':'bg-indigo-600 text-white hover:bg-indigo-700'}">${isCompleted?'Completada':'Iniciar'}</button></div></div>`;
                     }).join('')}</div></div>`;
                 }).join('')}</div>`;
         }
@@ -9131,12 +9230,17 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const preview = document.getElementById('cat-image-preview');
             let imageData = cat?.image || '';
             if (imageInput) {
-                imageInput.onchange = e => {
+                imageInput.onchange = async e => {
                     const file = e.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                        reader.readAsDataURL(file);
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            imageData = await window.Media.subirOUrl(file, 'categories', { title: file.name });
+                            preview.src = imageData; preview.classList.remove('hidden');
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
+                            reader.readAsDataURL(file);
+                        }
                     }
                 };
             }
@@ -9150,45 +9254,293 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
         function saveAssign(catId){ const cat=db.categories.find(c=>c.id===catId); cat.assignedTo=Array.from(document.querySelectorAll('.assign-check:checked')).map(c=>parseInt(c.value)); saveDB(); closeModal(); navigateTo('categories'); }
 
-        // --- LECCIONES CON VIDEO OPCIONAL ---
+        // --- FORMATO ENRIQUECIDO Y REPRODUCTOR DE VIDEO EN LECCIONES ---
+        function stripRichText(raw) {
+            return String(raw || '')
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+                .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+                .replace(/[#*_>`~-]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function formatInlineRichText(escapedLine) {
+            return String(escapedLine || '')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>')
+                .replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
+                .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 bg-slate-100 text-indigo-700 rounded text-xs font-mono">$1</code>')
+                .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline hover:text-indigo-800 font-medium">$1 <i class="fas fa-external-link-alt text-[10px]"></i></a>');
+        }
+
+        function formatLessonContent(raw) {
+            const text = String(raw || '').trim();
+            if (!text) return '<p class="text-slate-400 italic">Sin contenido</p>';
+            const lines = text.split(/\r?\n/);
+            const html = [];
+            let inUl = false;
+            let inOl = false;
+
+            const closeLists = () => {
+                if (inUl) { html.push('</ul>'); inUl = false; }
+                if (inOl) { html.push('</ol>'); inOl = false; }
+            };
+
+            for (let i = 0; i < lines.length; i++) {
+                const rawLine = lines[i];
+                const trimmed = rawLine.trim();
+                if (!trimmed) {
+                    closeLists();
+                    continue;
+                }
+                const esc = escapeHTML(trimmed);
+                if (/^---+$/.test(trimmed)) {
+                    closeLists();
+                    html.push('<hr class="my-4 border-slate-200">');
+                } else if (trimmed.startsWith('### ')) {
+                    closeLists();
+                    html.push(`<h5 class="text-base font-bold text-slate-800 mt-4 mb-1.5">${formatInlineRichText(escapeHTML(trimmed.slice(4)))}</h5>`);
+                } else if (trimmed.startsWith('## ')) {
+                    closeLists();
+                    html.push(`<h4 class="text-lg font-bold text-slate-900 mt-5 mb-2 flex items-center gap-2"><span class="w-1.5 h-5 rounded-full bg-indigo-600 inline-block"></span>${formatInlineRichText(escapeHTML(trimmed.slice(3)))}</h4>`);
+                } else if (trimmed.startsWith('# ')) {
+                    closeLists();
+                    html.push(`<h3 class="text-xl font-extrabold text-slate-900 mt-5 mb-2">${formatInlineRichText(escapeHTML(trimmed.slice(2)))}</h3>`);
+                } else if (trimmed.startsWith('> ')) {
+                    closeLists();
+                    html.push(`<div class="my-3 p-3.5 rounded-xl bg-amber-50/90 border-l-4 border-amber-500 text-amber-950 text-sm flex items-start gap-2.5"><i class="fas fa-lightbulb text-amber-500 mt-0.5"></i><div class="flex-1">${formatInlineRichText(escapeHTML(trimmed.slice(2)))}</div></div>`);
+                } else if (/^[-*•]\s+/.test(trimmed)) {
+                    if (inOl) { html.push('</ol>'); inOl = false; }
+                    if (!inUl) { html.push('<ul class="list-disc pl-5 space-y-1.5 my-2.5 text-slate-700">'); inUl = true; }
+                    html.push(`<li>${formatInlineRichText(escapeHTML(trimmed.replace(/^[-*•]\s+/, '')))}</li>`);
+                } else if (/^\d+\.\s+/.test(trimmed)) {
+                    if (inUl) { html.push('</ul>'); inUl = false; }
+                    if (!inOl) { html.push('<ol class="list-decimal pl-5 space-y-1.5 my-2.5 text-slate-700">'); inOl = true; }
+                    html.push(`<li>${formatInlineRichText(escapeHTML(trimmed.replace(/^\d+\.\s+/, '')))}</li>`);
+                } else {
+                    closeLists();
+                    html.push(`<p class="text-slate-700 leading-relaxed mb-3">${formatInlineRichText(esc)}</p>`);
+                }
+            }
+            closeLists();
+            return html.join('');
+        }
+
+        function insertLessonFormat(tag) {
+            const ta = document.getElementById('lesson-content-input');
+            if (!ta) return;
+            const start = ta.selectionStart || 0;
+            const end = ta.selectionEnd || 0;
+            const sel = ta.value.substring(start, end);
+            let rep = '';
+            if (tag === 'h2') rep = `\n## ${sel || 'Subtítulo de sección'}\n`;
+            else if (tag === 'h3') rep = `\n### ${sel || 'Apartado'}\n`;
+            else if (tag === 'bold') rep = `**${sel || 'texto en negrita'}**`;
+            else if (tag === 'italic') rep = `*${sel || 'texto en cursiva'}*`;
+            else if (tag === 'ul') rep = `\n- ${sel || 'Punto clave 1'}\n- Punto clave 2\n`;
+            else if (tag === 'ol') rep = `\n1. ${sel || 'Primer paso'}\n2. Segundo paso\n`;
+            else if (tag === 'callout') rep = `\n> ${sel || 'Nota importante o tip comercial para recordar.'}\n`;
+            else if (tag === 'link') {
+                const url = prompt('URL del enlace (https://...):', 'https://');
+                if (!url) return;
+                rep = `[${sel || 'Recurso externo'}](${url.trim()})`;
+            }
+            ta.value = ta.value.substring(0, start) + rep + ta.value.substring(end);
+            ta.focus();
+            ta.selectionStart = ta.selectionEnd = start + rep.length;
+            updateLessonFormatPreview();
+        }
+
+        function updateLessonFormatPreview() {
+            const ta = document.getElementById('lesson-content-input');
+            const prev = document.getElementById('lesson-content-preview');
+            if (ta && prev) prev.innerHTML = formatLessonContent(ta.value);
+        }
+
+        function resolveLessonVideoInfo(lesson) {
+            if (!lesson) return { kind: 'none', src: '', rawUrl: '' };
+            const rawUrl = String(lesson.videoUrl || lesson.videoData || '').trim();
+            const vType = String(lesson.videoType || 'none').toLowerCase();
+            if (vType === 'none' || (!rawUrl && vType !== 'envivo')) return { kind: 'none', src: '', rawUrl: '' };
+            if (vType === 'envivo') return { kind: 'enVivo', src: '', rawUrl: '' };
+
+            // Detectar YouTube (explícito o por URL)
+            if (vType === 'youtube' || /youtube\.com|youtu\.be/i.test(rawUrl)) {
+                let vid = '';
+                const mShort = rawUrl.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/);
+                const mEmbed = rawUrl.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{6,})/);
+                const mShorts = rawUrl.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/);
+                if (mShort) vid = mShort[1];
+                else if (mEmbed) vid = mEmbed[1];
+                else if (mShorts) vid = mShorts[1];
+                else {
+                    try { vid = new URL(rawUrl).searchParams.get('v') || ''; } catch (e) {}
+                }
+                const embed = vid ? `https://www.youtube.com/embed/${vid}?rel=0` : rawUrl;
+                return { kind: 'youtube', src: embed, rawUrl };
+            }
+
+            // Detectar Google Drive (explícito o por URL)
+            if (vType === 'drive' || /drive\.google\.com/i.test(rawUrl)) {
+                const match = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+                const embed = match ? `https://drive.google.com/file/d/${match[1]}/preview` : rawUrl;
+                return { kind: 'drive', src: embed, rawUrl };
+            }
+
+            // Video subido a Storage o URL directa MP4/WebM
+            return { kind: 'upload', src: rawUrl, rawUrl };
+        }
+
+        function getLessonVideoBadge(lesson) {
+            const info = resolveLessonVideoInfo(lesson);
+            if (info.kind === 'youtube') return '<span class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded font-medium inline-flex items-center gap-1"><i class="fab fa-youtube"></i>YouTube</span>';
+            if (info.kind === 'drive') return '<span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded font-medium inline-flex items-center gap-1"><i class="fab fa-google-drive"></i>Drive</span>';
+            if (info.kind === 'upload') return '<span class="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded font-medium inline-flex items-center gap-1"><i class="fas fa-film"></i>Video</span>';
+            if (info.kind === 'enVivo') return '<span class="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded font-medium inline-flex items-center gap-1"><i class="fas fa-broadcast-tower"></i>En Vivo</span>';
+            return '<span class="px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded">Sin video</span>';
+        }
+
+        function renderLessonVideoEmbed(lesson) {
+            const info = resolveLessonVideoInfo(lesson);
+            if (info.kind === 'none') return '';
+            if (info.kind === 'enVivo') {
+                return `<div class="mb-6 p-4 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between">
+                    <div class="flex items-center gap-3"><i class="fas fa-broadcast-tower text-purple-600 text-xl"></i><div><p class="font-semibold text-purple-900 text-sm">Sesión grabada de Estudio En Vivo</p><p class="text-xs text-purple-700">Incluye notas y preguntas de la sesión.</p></div></div>
+                </div>`;
+            }
+            if (info.kind === 'youtube' || info.kind === 'drive') {
+                const label = info.kind === 'youtube' ? 'YouTube' : 'Google Drive';
+                const icon = info.kind === 'youtube' ? 'fab fa-youtube text-red-600' : 'fab fa-google-drive text-blue-600';
+                return `<div id="lesson-video-player" class="mb-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-sm">
+                    <div class="px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between text-xs">
+                        <span class="font-medium flex items-center gap-2"><i class="${icon}"></i> Reproductor integrado (${label})</span>
+                        <a href="${escapeHTML(info.rawUrl)}" target="_blank" rel="noopener noreferrer" class="text-slate-300 hover:text-white flex items-center gap-1">Abrir en pestaña <i class="fas fa-external-link-alt text-[10px]"></i></a>
+                    </div>
+                    <div class="relative w-full aspect-video bg-black">
+                        <iframe src="${escapeHTML(info.src)}" class="w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    </div>
+                </div>`;
+            }
+            if (info.kind === 'upload') {
+                return `<div id="lesson-video-player" class="mb-6 rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-sm">
+                    <div class="px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between text-xs">
+                        <span class="font-medium flex items-center gap-2"><i class="fas fa-play-circle text-emerald-400"></i> Video de la lección</span>
+                        <a href="${escapeHTML(info.src)}" target="_blank" rel="noopener noreferrer" class="text-slate-300 hover:text-white flex items-center gap-1">Abrir archivo <i class="fas fa-external-link-alt text-[10px]"></i></a>
+                    </div>
+                    <div class="relative w-full aspect-video bg-black flex items-center justify-center">
+                        <video src="${escapeHTML(info.src)}" controls playsinline preload="metadata" onended="markLessonViewed(${lesson.id}, true)" class="w-full h-full max-h-[480px]"></video>
+                    </div>
+                </div>`;
+            }
+            return '';
+        }
+
+        // --- LECCIONES CON VIDEO EMBEBIDO Y FORMATO ENRIQUECIDO ---
         function openLessonModal(id=null){
             const lesson = id ? db.lessons.find(l=>l.id===id) : null;
-            const videoType = lesson?.videoType || 'none';
-            showModal(`<form id="lesson-form" class="p-6"><h3 class="text-xl font-bold mb-4">${lesson?'Editar':'Nueva'} Lección</h3>
+            const info = resolveLessonVideoInfo(lesson);
+            const videoType = lesson ? (info.kind !== 'none' ? info.kind : (lesson.videoType || 'none')) : 'none';
+            showModal(`<form id="lesson-form" class="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"><h3 class="text-xl font-bold mb-4">${lesson?'Editar':'Nueva'} Lección</h3>
                 <div class="space-y-4">
-                    <div><label class="text-sm">Título</label><input name="title" value="${lesson?.title||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                    <div><label class="text-sm">Categoría</label><select name="categoryId" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${db.categories.map(c=>`<option value="${c.id}" ${lesson?.categoryId==c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
-                    <div><label class="text-sm">Contenido</label><textarea name="content" rows="4" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${lesson?.content||''}</textarea></div>
-                    <div><label class="text-sm font-medium">Video (opcional)</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="text-sm font-medium">Título</label><input name="title" value="${escapeHTML(lesson?.title||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                        <div><label class="text-sm font-medium">Categoría</label><select name="categoryId" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${db.categories.map(c=>`<option value="${c.id}" ${lesson?.categoryId==c.id?'selected':''}>${escapeHTML(c.name)}</option>`).join('')}</select></div>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-sm font-medium">Contenido de la lección (formato enriquecido)</label>
+                            <button type="button" onclick="document.getElementById('lesson-content-preview-wrap').classList.toggle('hidden'); updateLessonFormatPreview();" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fas fa-eye mr-1"></i>Vista previa</button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1 p-1.5 bg-slate-100 border border-slate-300 rounded-t-lg">
+                            <button type="button" onclick="insertLessonFormat('h2')" class="px-2 py-1 text-xs font-bold bg-white border border-slate-200 rounded hover:bg-slate-50" title="Título de sección">H2</button>
+                            <button type="button" onclick="insertLessonFormat('h3')" class="px-2 py-1 text-xs font-semibold bg-white border border-slate-200 rounded hover:bg-slate-50" title="Subtítulo">H3</button>
+                            <button type="button" onclick="insertLessonFormat('bold')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Negrita"><i class="fas fa-bold"></i></button>
+                            <button type="button" onclick="insertLessonFormat('italic')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Cursiva"><i class="fas fa-italic"></i></button>
+                            <button type="button" onclick="insertLessonFormat('ul')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Lista de viñetas"><i class="fas fa-list-ul"></i></button>
+                            <button type="button" onclick="insertLessonFormat('ol')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Lista numerada"><i class="fas fa-list-ol"></i></button>
+                            <button type="button" onclick="insertLessonFormat('callout')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50 text-amber-700" title="Nota destacada"><i class="fas fa-lightbulb mr-1"></i>Nota</button>
+                            <button type="button" onclick="insertLessonFormat('link')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50 text-indigo-700" title="Insertar enlace"><i class="fas fa-link"></i></button>
+                        </div>
+                        <textarea id="lesson-content-input" name="content" rows="6" oninput="updateLessonFormatPreview()" required class="w-full px-3 py-2 border border-t-0 rounded-b-lg bg-white text-slate-900 border-slate-300 font-sans text-sm">${escapeHTML(lesson?.content||'')}</textarea>
+                        <div id="lesson-content-preview-wrap" class="hidden mt-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <p class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 mb-2">Vista previa del formato</p>
+                            <div id="lesson-content-preview" class="text-sm"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium">Video integrado en la lección (opcional)</label>
                         <select id="video-type" name="videoType" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
                             <option value="none" ${videoType==='none'?'selected':''}>Sin video</option>
-                            <option value="drive" ${videoType==='drive'?'selected':''}>Google Drive</option>
+                            <option value="youtube" ${videoType==='youtube'?'selected':''}>YouTube (embebido)</option>
+                            <option value="drive" ${videoType==='drive'?'selected':''}>Google Drive (embebido)</option>
+                            <option value="upload" ${videoType==='upload'?'selected':''}>Archivo de Video / Storage (MP4/WebM)</option>
                         </select>
                     </div>
-                    <div id="drive-field" class="${videoType!=='drive'?'hidden':''}"><label class="text-sm">Link de Google Drive</label><input name="videoUrl" value="${lesson?.videoUrl||''}" placeholder="https://drive.google.com/file/d/..." class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><p class="text-xs text-slate-500 mt-1">Pega el enlace compartido de Drive. Se abrirá en una pestaña externa.</p></div>
+                    <div id="video-url-field" class="${(videoType==='none')?'hidden':''}">
+                        <label id="video-url-label" class="text-sm font-medium">${videoType==='youtube'?'Enlace de YouTube':videoType==='drive'?'Enlace compartido de Google Drive':'URL directa del video o sube un archivo'}</label>
+                        <input id="lesson-video-url" name="videoUrl" value="${escapeHTML(lesson?.videoUrl||'')}" placeholder="https://..." class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300 text-sm">
+                        <p id="video-url-hint" class="text-xs text-slate-500 mt-1">Se reproducirá directamente dentro del modal de la lección.</p>
+                    </div>
+                    <div id="video-upload-field" class="${videoType!=='upload'?'hidden':''}">
+                        <label class="text-sm font-medium">Subir archivo de video (Media.subir / Storage)</label>
+                        <input id="lesson-video-file" type="file" accept="video/mp4,video/webm,video/quicktime" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300">
+                        <p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube directo al servidor/Storage mediante Media.subir sin saturar la base de datos.</p>
+                    </div>
                 </div>
-                <div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div>
+                <div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button id="lesson-save-btn" type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Guardar</button></div>
             </form>`);
             document.getElementById('video-type').onchange = e => {
-                document.getElementById('drive-field').classList.toggle('hidden', e.target.value!=='drive');
+                const v = e.target.value;
+                const urlWrap = document.getElementById('video-url-field');
+                const upWrap = document.getElementById('video-upload-field');
+                const lbl = document.getElementById('video-url-label');
+                const inp = document.getElementById('lesson-video-url');
+                urlWrap.classList.toggle('hidden', v === 'none');
+                upWrap.classList.toggle('hidden', v !== 'upload');
+                if (v === 'youtube') {
+                    lbl.textContent = 'Enlace de YouTube';
+                    inp.placeholder = 'https://www.youtube.com/watch?v=... o https://youtu.be/...';
+                } else if (v === 'drive') {
+                    lbl.textContent = 'Enlace compartido de Google Drive';
+                    inp.placeholder = 'https://drive.google.com/file/d/.../view';
+                } else if (v === 'upload') {
+                    lbl.textContent = 'URL de video existente (o selecciona un archivo abajo)';
+                    inp.placeholder = 'https://.../video.mp4';
+                }
             };
             document.getElementById('lesson-form').onsubmit = async e => {
                 e.preventDefault();
+                const btn = document.getElementById('lesson-save-btn');
                 const fd = new FormData(e.target);
                 const data = Object.fromEntries(fd);
                 data.categoryId = parseInt(data.categoryId);
                 const type = data.videoType;
-                
                 let videoData = null;
-                let videoUrl = data.videoUrl || '';
-                
-                if(type === 'drive') {
-                    videoData = null;
-                    // limpiar espacios
-                    videoUrl = videoUrl.trim();
-                } else {
-                    videoData = null;
+                let videoUrl = (data.videoUrl || '').trim();
+
+                if (type === 'none') {
                     videoUrl = '';
+                    videoData = null;
+                } else if (type === 'upload') {
+                    const fileInput = document.getElementById('lesson-video-file');
+                    const file = fileInput && fileInput.files && fileInput.files[0];
+                    if (file) {
+                        try {
+                            if (btn) { btn.disabled = true; btn.textContent = 'Subiendo video...'; }
+                            if (window.Media && typeof window.Media.subir === 'function') {
+                                const uploaded = await window.Media.subir(file, { scope: 'lessons', title: data.title || file.name });
+                                if (uploaded && uploaded.url) videoUrl = uploaded.url;
+                            } else if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                                videoUrl = await window.Media.subirOUrl(file, 'lessons', { title: data.title || file.name });
+                            }
+                        } catch (err) {
+                            if (window.showToast) showToast('No se pudo subir al Storage (' + (err.message || 'modo local') + '). Usa URL directa o inicia sesión en servidor.', 'warning');
+                            if (!videoUrl && lesson && lesson.videoUrl) videoUrl = lesson.videoUrl;
+                        } finally {
+                            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+                        }
+                    }
+                    if (!videoUrl && lesson && lesson.videoUrl) videoUrl = lesson.videoUrl;
                 }
 
                 if(lesson) {
@@ -9253,79 +9605,188 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         // --- FLASHCARDS ---
+        function ensureUserLessonProgress(userId, lessonId) {
+            if (!Array.isArray(db.progress)) db.progress = [];
+            const uid = userId != null ? userId : (currentUser && currentUser.id);
+            let prog = db.progress.find(p => String(p.userId) === String(uid) && String(p.lessonId) === String(lessonId));
+            if (!prog) {
+                prog = {
+                    id: Date.now() + Math.floor(Math.random() * 10000),
+                    userId: uid,
+                    lessonId: lessonId,
+                    completed: false,
+                    score: 0,
+                    date: new Date().toISOString(),
+                    xpAwardedView: false,
+                    xpAwardedQuiz: false,
+                    srs: {}
+                };
+                db.progress.push(prog);
+            }
+            if (!prog.id) prog.id = Date.now() + Math.floor(Math.random() * 10000);
+            if (!prog.srs || typeof prog.srs !== 'object') prog.srs = {};
+            return prog;
+        }
+
+        function getFlashcardKey(f, idx) {
+            if (f && f.id) return String(f.id);
+            return 'idx_' + idx + '_' + String((f && f.front) || '').trim().toLowerCase().slice(0, 40);
+        }
+
+        function getUserFlashcardSRS(lessonId, idx, f, userId) {
+            const uid = userId != null ? userId : (currentUser && currentUser.id);
+            const prog = (db.progress || []).find(p => String(p.userId) === String(uid) && String(p.lessonId) === String(lessonId));
+            const key = getFlashcardKey(f, idx);
+            const legacyKey = String(idx);
+            const saved = prog && prog.srs && (prog.srs[key] || prog.srs[legacyKey]);
+            if (saved && typeof saved === 'object') {
+                return {
+                    interval: Number(saved.interval) || 1,
+                    ease: Number(saved.ease) || 2.5,
+                    due: saved.due || new Date(0).toISOString(),
+                    reps: Number(saved.reps) || 0,
+                    lapses: Number(saved.lapses) || 0
+                };
+            }
+            // Estado inicial independiente por alumno: lista para estudiar hoy
+            return {
+                interval: 1,
+                ease: 2.5,
+                due: new Date(0).toISOString(),
+                reps: 0,
+                lapses: 0
+            };
+        }
+
+        function saveUserFlashcardSRS(lessonId, idx, f, srsState, userId) {
+            const prog = ensureUserLessonProgress(userId, lessonId);
+            const key = getFlashcardKey(f, idx);
+            prog.srs[key] = {
+                interval: srsState.interval,
+                ease: srsState.ease,
+                due: srsState.due,
+                reps: srsState.reps,
+                lapses: srsState.lapses,
+                updatedAt: new Date().toISOString()
+            };
+            // Limpiar llave numérica legacy si existiera para evitar duplicidad
+            if (key !== String(idx) && prog.srs[String(idx)]) {
+                delete prog.srs[String(idx)];
+            }
+            prog.date = new Date().toISOString();
+        }
+
+        function isLessonAssignedToStudent(lesson, user) {
+            const u = user || currentUser;
+            if (!u || !lesson) return false;
+            if (!isStudent(u)) return true;
+            const cat = (db.categories || []).find(c => String(c.id) === String(lesson.categoryId));
+            if (!cat) return true;
+            if (!Array.isArray(cat.assignedTo) || cat.assignedTo.length === 0) return true;
+            return cat.assignedTo.some(id => String(id) === String(u.id));
+        }
+
+        function getDueFlashcardsForUser(lessonId = null, userId = null) {
+            const uid = userId != null ? userId : (currentUser && currentUser.id);
+            const now = new Date();
+            const cards = [];
+            const lessons = lessonId
+                ? (db.lessons || []).filter(l => String(l.id) === String(lessonId))
+                : (db.lessons || []).filter(l => isLessonAssignedToStudent(l, currentUser));
+            lessons.forEach(l => {
+                if (!Array.isArray(l.flashcards)) return;
+                l.flashcards.forEach((f, idx) => {
+                    const srs = getUserFlashcardSRS(l.id, idx, f, uid);
+                    if (new Date(srs.due) <= now) {
+                        cards.push({
+                            front: f.front,
+                            back: f.back,
+                            id: f.id,
+                            lessonId: l.id,
+                            idx: idx,
+                            srs: srs
+                        });
+                    }
+                });
+            });
+            return cards;
+        }
+
+        function getDueFlashcardsCount(lessonId = null, userId = null) {
+            return getDueFlashcardsForUser(lessonId, userId).length;
+        }
+
         function openFlashcardsModal(lessonId){
             const lesson = db.lessons.find(l=>l.id===lessonId);
             if(!lesson.flashcards) lesson.flashcards = [];
-            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Flashcards: ${lesson.title}</h3><div id="fc-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto">${lesson.flashcards.map((f,i)=>`<div class="p-3 border rounded-lg flex justify-between items-center"><div><p class="font-medium text-sm">${f.front}</p><p class="text-xs text-slate-500">${f.back}</p></div><button onclick="deleteFlashcard(${lessonId},${i})" class="text-red-500"><i class="fas fa-trash"></i></button></div>`).join('') || '<p class="text-slate-500">Sin flashcards</p>'}</div>
+            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Flashcards: ${escapeHTML(lesson.title)}</h3><div id="fc-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto">${lesson.flashcards.map((f,i)=>`<div class="p-3 border rounded-lg flex justify-between items-center"><div><p class="font-medium text-sm">${escapeHTML(f.front)}</p><p class="text-xs text-slate-500">${escapeHTML(f.back)}</p></div><button onclick="deleteFlashcard(${lessonId},${i})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`).join('') || '<p class="text-slate-500">Sin flashcards</p>'}</div>
                 <form id="fc-form" class="border-t pt-4 space-y-3"><div><label class="text-sm">Frente</label><input id="fc-front" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Pregunta o término"></div><div><label class="text-sm">Reverso</label><input id="fc-back" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Respuesta o definición"></div><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white">Agregar</button></div></form></div>`);
-            document.getElementById('fc-form').onsubmit = e => { e.preventDefault(); lesson.flashcards.push({ front: document.getElementById('fc-front').value, back: document.getElementById('fc-back').value, interval: 1, ease: 2.5, due: new Date().toISOString(), reps: 0, lapses: 0 }); saveDB(); openFlashcardsModal(lessonId); };
+            document.getElementById('fc-form').onsubmit = e => { e.preventDefault(); lesson.flashcards.push({ id: 'fc_' + Date.now() + '_' + Math.floor(Math.random()*1000), front: document.getElementById('fc-front').value.trim(), back: document.getElementById('fc-back').value.trim(), interval: 1, ease: 2.5, due: new Date(0).toISOString(), reps: 0, lapses: 0 }); saveDB(); openFlashcardsModal(lessonId); };
         }
         
         function deleteFlashcard(lessonId, idx){ const lesson=db.lessons.find(l=>l.id===lessonId); lesson.flashcards.splice(idx,1); saveDB(); openFlashcardsModal(lessonId); }
 
-        // --- SRS STUDY MODE ---
+        // --- SRS STUDY MODE (Progreso individual por usuario) ---
         function startSRSStudy(lessonId=null){
-            const now = new Date();
-            let cards = [];
-            if(lessonId){
-                const lesson = db.lessons.find(l=>l.id===lessonId);
-                if(lesson && lesson.flashcards) cards = lesson.flashcards.map((f,i)=>({...f, lessonId, idx:i})).filter(f=> new Date(f.due) <= now);
-            } else {
-                db.lessons.forEach(l=>{
-                    if(l.flashcards) l.flashcards.forEach((f,i)=>{ if(new Date(f.due) <= now) cards.push({...f, lessonId:l.id, idx:i}); });
-                });
-            }
+            const cards = getDueFlashcardsForUser(lessonId, currentUser?.id);
             if(cards.length===0){ showToast('¡Al día! No hay repasos pendientes', 'success'); return; }
             let current = 0;
             function showCard(){
                 const card = cards[current];
                 const lesson = db.lessons.find(l=>l.id===card.lessonId);
                 const total = cards.length;
+                const srs = card.srs || { reps: 0, interval: 1, ease: 2.5 };
                 showModal(`<div class="p-6 max-w-lg mx-auto">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold">Repaso SRS</h3>
-                        <span class="text-sm text-slate-500">${current+1} / ${total}</span>
+                        <div>
+                            <h3 class="text-lg font-bold">Repaso SRS Personalizado</h3>
+                            <p class="text-xs text-slate-500">${escapeHTML(lesson?.title || '')} · Repeticiones: ${srs.reps || 0}</p>
+                        </div>
+                        <span class="text-sm font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full">${current+1} / ${total}</span>
                     </div>
-                    <div class="bg-slate-50 rounded-xl p-8 min-h-[200px] flex flex-col items-center justify-center text-center mb-4">
-                        <p class="text-sm text-slate-500 mb-2">Frente</p>
-                        <p class="text-2xl font-semibold" id="card-front">${card.front}</p>
-                        <div id="card-back" class="hidden mt-6 pt-6 border-t w-full">
-                            <p class="text-sm text-slate-500 mb-2">Reverso</p>
-                            <p class="text-xl">${card.back}</p>
+                    <div class="bg-slate-50 rounded-xl p-8 min-h-[200px] flex flex-col items-center justify-center text-center mb-4 border border-slate-200/80">
+                        <p class="text-xs uppercase tracking-wider text-slate-400 mb-2 font-semibold">Frente</p>
+                        <p class="text-2xl font-semibold text-slate-800" id="card-front">${escapeHTML(card.front)}</p>
+                        <div id="card-back" class="hidden mt-6 pt-6 border-t border-slate-200 w-full">
+                            <p class="text-xs uppercase tracking-wider text-amber-600 mb-2 font-semibold">Reverso</p>
+                            <p class="text-xl text-slate-700">${escapeHTML(card.back)}</p>
                         </div>
                     </div>
                     <div id="reveal-btn" class="flex justify-center">
-                        <button onclick="document.getElementById('card-back').classList.remove('hidden'); document.getElementById('reveal-btn').classList.add('hidden'); document.getElementById('rate-btns').classList.remove('hidden')" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold">Mostrar respuesta</button>
+                        <button onclick="document.getElementById('card-back').classList.remove('hidden'); document.getElementById('reveal-btn').classList.add('hidden'); document.getElementById('rate-btns').classList.remove('hidden')" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">Mostrar respuesta</button>
                     </div>
                     <div id="rate-btns" class="hidden grid grid-cols-2 gap-3">
-                        <button onclick="rateCard(false)" class="px-4 py-3 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200"><i class="fas fa-times mr-2"></i>No supe</button>
-                        <button onclick="rateCard(true)" class="px-4 py-3 bg-green-100 text-green-700 rounded-lg font-semibold hover:bg-green-200"><i class="fas fa-check mr-2"></i>Lo supe</button>
+                        <button onclick="rateCard(false)" class="px-4 py-3 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200 transition"><i class="fas fa-times mr-2"></i>No supe (1d)</button>
+                        <button onclick="rateCard(true)" class="px-4 py-3 bg-green-100 text-green-700 rounded-lg font-semibold hover:bg-green-200 transition"><i class="fas fa-check mr-2"></i>Lo supe</button>
                     </div>
                 </div>`);
                 window.rateCard = function(known){
                     const l = db.lessons.find(ll=>ll.id===card.lessonId);
-                    const f = l.flashcards[card.idx];
-                    // Actualizar SRS (algoritmo SM-2 simplificado)
+                    const f = l && l.flashcards ? l.flashcards[card.idx] : card;
+                    const userSrs = getUserFlashcardSRS(card.lessonId, card.idx, f, currentUser?.id);
+                    // Actualizar SRS por usuario (algoritmo SM-2 simplificado) sin mutar para otros alumnos
                     if(known){
-                        f.reps = (f.reps||0) + 1;
-                        if(f.reps === 1) f.interval = 1;
-                        else if(f.reps === 2) f.interval = 3;
-                        else f.interval = Math.round((f.interval||1) * (f.ease||2.5));
-                        f.ease = Math.min(2.8, (f.ease||2.5) + 0.1);
+                        userSrs.reps = (userSrs.reps||0) + 1;
+                        if(userSrs.reps === 1) userSrs.interval = 1;
+                        else if(userSrs.reps === 2) userSrs.interval = 3;
+                        else userSrs.interval = Math.round((userSrs.interval||1) * (userSrs.ease||2.5));
+                        userSrs.ease = Math.min(2.8, (userSrs.ease||2.5) + 0.1);
                     } else {
-                        f.lapses = (f.lapses||0) + 1;
-                        f.reps = 0;
-                        f.interval = 1;
-                        f.ease = Math.max(1.3, (f.ease||2.5) - 0.2);
+                        userSrs.lapses = (userSrs.lapses||0) + 1;
+                        userSrs.reps = 0;
+                        userSrs.interval = 1;
+                        userSrs.ease = Math.max(1.3, (userSrs.ease||2.5) - 0.2);
                     }
-                    const next = new Date(); next.setDate(next.getDate() + f.interval);
-                    f.due = next.toISOString();
+                    const next = new Date(); next.setDate(next.getDate() + userSrs.interval);
+                    userSrs.due = next.toISOString();
+                    saveUserFlashcardSRS(card.lessonId, card.idx, f, userSrs, currentUser?.id);
                     // XP
                     const user = db.users.find(u=>u.id===currentUser.id);
-                    user.xp = (user.xp||0) + 5;
-                    currentUser.xp = user.xp;
-                    // Actualizar racha
-                    user.lastStudy = new Date().toISOString();
+                    if (user) {
+                        user.xp = (user.xp||0) + 5;
+                        currentUser.xp = user.xp;
+                        user.lastStudy = new Date().toISOString();
+                    }
                     saveDB();
                     sessionStorage.setItem('pepes_user', JSON.stringify(currentUser));
                     current++;
@@ -9334,7 +9795,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     } else {
                         closeModal();
                         showToast(`¡Completado! +${cards.length*5} XP`, 'success');
-                        navigateTo('dashboard');
+                        if (typeof currentSection !== 'undefined' && currentSection === 'my-courses') navigateTo('my-courses');
+                        else navigateTo('dashboard');
                     }
                 };
             }
@@ -9345,48 +9807,58 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         // --- STUDENT VIEW ---
         function openLesson(lessonId) {
             const lesson = db.lessons.find(l=>l.id===lessonId);
-            let progress = db.progress.find(p=>p.userId===currentUser.id && p.lessonId===lessonId);
-            if(!progress){ progress={userId:currentUser.id, lessonId, completed:false, score:0, date: new Date().toISOString()}; db.progress.push(progress); }
+            if (!lesson) return;
+            const progress = ensureUserLessonProgress(currentUser?.id, lessonId);
+            const dueCount = getDueFlashcardsCount(lessonId, currentUser?.id);
 
             const flashcardsHtml = lesson.flashcards && lesson.flashcards.length > 0 ? `
-                <div class="mt-8">
-                    <h4 class="font-bold text-lg mb-4 flex items-center gap-2"><i class="fas fa-layer-group text-amber-500"></i> Flashcards de repaso</h4>
+                <div id="flashcards-section" class="mt-8">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-layer-group text-amber-500"></i> Flashcards de repaso (${lesson.flashcards.length})</h4>
+                        ${dueCount > 0 ? `<button onclick="startSRSStudy(${lesson.id})" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition flex items-center gap-1.5"><i class="fas fa-brain"></i> Iniciar Repaso SRS (${dueCount} pendientes)</button>` : `<span class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full font-medium"><i class="fas fa-check-circle mr-1"></i>SRS al día para ti</span>`}
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        ${lesson.flashcards.map(f=>`
-                            <div class="flashcard h-40" onclick="this.classList.toggle('flipped')">
+                        ${lesson.flashcards.map((f, idx)=>{
+                            const uSrs = getUserFlashcardSRS(lesson.id, idx, f, currentUser?.id);
+                            return `
+                            <div class="flashcard h-40 cursor-pointer" onclick="this.classList.toggle('flipped')">
                                 <div class="flashcard-inner">
-                                    <div class="flashcard-front bg-white border-2 border-amber-200 rounded-xl p-4 flex items-center justify-center text-center shadow-sm"><p class="font-medium">${f.front}</p></div>
-                                    <div class="flashcard-back bg-amber-500 text-white rounded-xl p-4 flex items-center justify-center text-center shadow-sm"><p class="font-medium">${f.back}</p></div>
+                                    <div class="flashcard-front bg-white border-2 border-amber-200 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm"><p class="font-medium text-slate-800">${escapeHTML(f.front)}</p><span class="text-[10px] text-slate-400 mt-2">Repeticiones: ${uSrs.reps || 0}</span></div>
+                                    <div class="flashcard-back bg-amber-500 text-white rounded-xl p-4 flex items-center justify-center text-center shadow-sm"><p class="font-medium">${escapeHTML(f.back)}</p></div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            </div>`;
+                        }).join('')}
                     </div>
                     <p class="text-xs text-slate-500 mt-2 text-center">Haz clic en una tarjeta para voltearla</p>
                 </div>
             ` : '';
 
-            const hasVideo = lesson.videoType === 'drive' && lesson.videoUrl;
+            const vInfo = resolveLessonVideoInfo(lesson);
+            const hasVideo = vInfo.kind !== 'none';
             const hasFlashcards = lesson.flashcards && lesson.flashcards.length > 0;
             const hasQuiz = lesson.quiz && lesson.quiz.length > 0;
+            const videoEmbedHtml = renderLessonVideoEmbed(lesson);
+            const formattedContentHtml = formatLessonContent(lesson.content);
             
             const actionsHtml = (hasVideo || hasFlashcards || hasQuiz) ? `
                 <div class="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i class="fas fa-bolt text-indigo-600"></i> Acciones</h4>
+                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i class="fas fa-bolt text-indigo-600"></i> Actividades de la Lección</h4>
                     <div class="flex flex-wrap gap-3">
-                        ${hasVideo ? `<button onclick="openDriveVideo('${lesson.videoUrl}')" class="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2"><i class="fab fa-google-drive"></i> Ver Video</button>` : ''}
-                        ${hasFlashcards ? `<button onclick="document.getElementById('flashcards-section').scrollIntoView({behavior:'smooth'})" class="px-4 py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition flex items-center gap-2"><i class="fas fa-layer-group"></i> Flashcards</button>` : ''}
-                        ${hasQuiz ? `<button onclick="startQuiz(${lessonId})" class="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-2"><i class="fas fa-question-circle"></i> Quiz</button>` : ''}
+                        ${hasVideo ? `<button onclick="const vp=document.getElementById('lesson-video-player'); if(vp) vp.scrollIntoView({behavior:'smooth'}); else openDriveVideo('${escapeHTML(vInfo.rawUrl)}');" class="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2"><i class="fas fa-play"></i> Ir al Video</button>` : ''}
+                        ${hasFlashcards ? `<button onclick="document.getElementById('flashcards-section').scrollIntoView({behavior:'smooth'})" class="px-4 py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition flex items-center gap-2"><i class="fas fa-layer-group"></i> Flashcards (${lesson.flashcards.length})</button>` : ''}
+                        ${dueCount > 0 ? `<button onclick="startSRSStudy(${lessonId})" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2"><i class="fas fa-brain"></i> Repasar SRS (${dueCount})</button>` : ''}
+                        ${hasQuiz ? `<button onclick="startQuiz(${lessonId})" class="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-2"><i class="fas fa-question-circle"></i> Resolver Quiz (${lesson.quiz.length})</button>` : ''}
                     </div>
                 </div>
             ` : '';
             
-            showModal(`<div class="p-6 max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div><h3 class="text-2xl font-bold">${lesson.title}</h3><p class="text-slate-500">${db.categories.find(c=>c.id===lesson.categoryId)?.name}</p></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
-                <div class="prose max-w-none"><p>${lesson.content}</p></div>
+            const viewedAlready = lesson.views && lesson.views.includes(currentUser.id);
+            showModal(`<div class="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
+                ${videoEmbedHtml}
+                <div class="prose max-w-none bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">${formattedContentHtml}</div>
                 ${actionsHtml}
-                ${flashcardsHtml.replace('<div class="mt-8">', '<div id="flashcards-section" class="mt-8">')}
-                <div class="mt-8 pt-6 border-t flex justify-between items-center"><div>${lesson.quiz.length>0?`<span class="text-sm text-slate-600"><i class="fas fa-question-circle mr-1"></i>${lesson.quiz.length} preguntas</span>`:''}</div><div class="flex gap-3"><button id="mark-viewed" onclick="markLessonViewed(${lessonId})" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">Marcar como vista</button></div></div></div>`);
-            
-            // Video externo en Drive, no se marca automáticamente
+                ${flashcardsHtml}
+                <div class="mt-8 pt-6 border-t flex justify-between items-center"><div>${lesson.quiz.length>0?`<span class="text-sm text-slate-600"><i class="fas fa-question-circle mr-1"></i>${lesson.quiz.length} preguntas en el quiz</span>`:''}</div><div class="flex gap-3"><button id="mark-viewed" onclick="markLessonViewed(${lessonId})" class="px-5 py-2.5 ${viewedAlready?'bg-green-600':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-semibold transition">${viewedAlready?'¡Vista!':'Marcar como vista'}</button></div></div></div>`);
         }
         function openDriveVideo(url) {
             // Convierte link de Drive a preview
@@ -9842,14 +10314,14 @@ function renderMessages() {
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         <input type="text" value="${psEscape(window.msgSearchQuery || '')}" oninput="window.msgSearchQuery=this.value;render()" placeholder="Buscar usuario por nombre, correo o rol..." class="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 text-sm bg-white text-slate-900">
                     </div>
-                    <div class="flex flex-wrap gap-1.5">
+                    <div class="flex flex-wrap gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                         ${[
                             ['todos','Todos'],
                             ['no-leidos','No leídos ('+totalUnread+')'],
                             ['admin','Admins'],
                             ['maestro','Capacitadores'],
                             ['alumno','Asesores']
-                        ].map(([id,lbl]) => `<button onclick="window.msgRoleFilter='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${roleFilter===id ? 'bg-slate-900 text-amber-300 border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}">${lbl}</button>`).join('')}
+                        ].map(([id,lbl]) => `<button onclick="window.msgRoleFilter='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition ${roleFilter===id ? 'bg-slate-900 text-amber-300 border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}">${lbl}</button>`).join('')}
                     </div>
                 </div>
 
@@ -9857,9 +10329,9 @@ function renderMessages() {
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-2.5">
                         <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5"><i class="fas fa-hashtag text-amber-600"></i> Canales Grupales del Equipo (#1)</h4>
-                        <span class="text-[11px] text-slate-400">Salas abiertas por ramo y especialidad</span>
+                        <span class="text-[11px] text-slate-400 hidden sm:inline">Salas abiertas por ramo y especialidad</span>
                     </div>
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                         ${[
                             { id: 'canal:general', nombre: '#General-Promotoría', desc: 'Avisos, cierres y dudas generales', icon: 'fa-users' },
                             { id: 'canal:seguros', nombre: '#Seguros-Vida-GMM', desc: 'Cotizaciones, aseguradoras y coberturas', icon: 'fa-shield-heart' },
@@ -9868,7 +10340,7 @@ function renderMessages() {
                         ].map(ch => {
                             const chMsgs = (db.messages || []).filter(m => String(m.toId) === ch.id);
                             const lastCh = chMsgs[chMsgs.length - 1];
-                            return `<div onclick="openChannelChat('${ch.id}', '${ch.nombre}')" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                            return `<div onclick="openChannelChat('${ch.id}', '${ch.nombre}')" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
                                 <div>
                                     <div class="flex items-center justify-between gap-2 mb-1">
                                         <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5"><i class="fas ${ch.icon} text-amber-600"></i> ${ch.nombre}</span>
@@ -9891,7 +10363,7 @@ function renderMessages() {
                         const seenTick = lastMsg && String(lastMsg.fromId) === String(currentUser.id)
                             ? (lastMsg.read ? '<i class="fas fa-check-double text-sky-500 mr-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-400 mr-1" title="Enviado"></i>')
                             : '';
-                        return `<div class="border ${unread > 0 ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200 bg-white'} rounded-xl p-4 hover:shadow-md cursor-pointer transition" onclick="openChat('${contact.id}')">
+                        return `<div class="border ${unread > 0 ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200 bg-white'} rounded-2xl p-3.5 sm:p-4 hover:shadow-md active:scale-[0.99] cursor-pointer transition" onclick="openChat('${contact.id}')">
                             <div class="flex items-center gap-3">
                                 <div class="relative shrink-0">
                                     <img src="${contact.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(contact.name||'U')}" class="w-12 h-12 rounded-full object-cover border border-amber-200">
@@ -9900,22 +10372,22 @@ function renderMessages() {
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex justify-between items-start gap-2">
-                                        <h4 class="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-                                            ${psEscape(contact.name)}
-                                            <span class="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] rounded font-semibold uppercase">${roleBadge}</span>
+                                        <h4 class="font-semibold text-slate-900 truncate flex items-center gap-1.5 text-sm sm:text-base">
+                                            <span class="truncate">${psEscape(contact.name)}</span>
+                                            <span class="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] rounded font-semibold uppercase shrink-0">${roleBadge}</span>
                                         </h4>
-                                        ${lastMsg ? `<span class="text-[11px] text-slate-400 whitespace-nowrap">${new Date(lastMsg.date).toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</span>` : ''}
+                                        ${lastMsg ? `<span class="text-[11px] text-slate-400 whitespace-nowrap shrink-0">${new Date(lastMsg.date).toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</span>` : ''}
                                     </div>
                                     <p class="text-xs text-slate-500 truncate mb-1">${psEscape(contact.email || '')}</p>
-                                    <p class="text-sm ${unread > 0 ? 'font-semibold text-slate-900' : 'text-slate-600'} truncate">
-                                        ${lastMsg ? `${seenTick}${String(lastMsg.fromId) === String(currentUser.id) ? 'Tú: ' : ''}${psEscape(lastMsg.text)}` : '<span class="text-slate-400 italic">Iniciar conversación...</span>'}
+                                    <p class="text-xs sm:text-sm ${unread > 0 ? 'font-semibold text-slate-900' : 'text-slate-600'} truncate">
+                                        ${lastMsg ? `${seenTick}${String(lastMsg.fromId) === String(currentUser.id) ? 'Tú: ' : ''}${psEscape(lastMsg.text)}` : '<span class="text-slate-400 italic">Toca para iniciar conversación...</span>'}
                                     </p>
                                 </div>
                                 <div class="flex flex-col items-end gap-1.5 shrink-0">
-                                    <span class="text-[11px] text-slate-400">${totalMsgs} msgs</span>
-                                    <div class="flex gap-1">
-                                        ${contact.phone ? `<button onclick="event.stopPropagation();openWhatsApp('${contact.id}')" class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ''}
-                                        <span class="p-1.5 text-amber-700"><i class="fas fa-chevron-right text-xs"></i></span>
+                                    <span class="text-[10px] text-slate-400 hidden sm:inline">${totalMsgs} msgs</span>
+                                    <div class="flex items-center gap-1">
+                                        ${contact.phone ? `<button onclick="event.stopPropagation();openWhatsApp('${contact.id}')" class="w-9 h-9 flex items-center justify-center text-emerald-600 bg-emerald-50/70 hover:bg-emerald-100 rounded-xl transition" title="WhatsApp"><i class="fab fa-whatsapp text-base"></i></button>` : ''}
+                                        <span class="w-8 h-8 flex items-center justify-center text-amber-700 bg-amber-50/60 rounded-xl"><i class="fas fa-chevron-right text-xs"></i></span>
                                     </div>
                                 </div>
                             </div>
@@ -9971,6 +10443,25 @@ function renderMessages() {
             const n = String(m.attachmentName || u).split('?')[0].toLowerCase();
             return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(n);
         }
+
+        // Nuevo: renderiza menciones @usuario en texto de chat
+        function renderMentions(text) {
+          if (!text) return '';
+          // Busca todos los patrones @username
+          return text.replace(/@(\w+)/g, function(match, username) {
+            // Busca al usuario por username en la base de datos
+            const user = (db.users || []).find(u => u.username === username);
+            if (user) {
+              // Renderiza como mención etiquetada con tooltip
+              return `<span class="relative inline-block text-indigo-600 hover:text-indigo-800" 
+                      title="Mencionar a ${user.name || username}"
+                      onclick="if(event) event.stopPropagation();">
+                @${username}
+              </span>`;
+            }
+            return match; // Mantiene original si el usuario no existe
+          });
+        }
         function renderChatAttachmentHtml(m, mine) {
             if (!m || !m.attachmentUrl) return '';
             const safeUrl = psEscape(m.attachmentUrl);
@@ -9982,7 +10473,9 @@ function renderMessages() {
                     </a>
                 </div>`;
             }
-            return `<div class="mt-2 pt-2 border-t ${mine ? 'border-amber-400/30' : 'border-slate-200'}"><a href="${safeUrl}" target="_blank" download="${safeName}" class="inline-flex items-center gap-1.5 text-xs underline font-semibold"><i class="fas fa-paperclip"></i> ${psEscape(m.attachmentName || 'Ver archivo adjunto')}</a></div>`;
+            // Render mentions in the attachment name
+            const attachmentDisplay = psEscape(m.attachmentName || 'Ver archivo adjunto');
+            return `<div class="mt-2 pt-2 border-t ${mine ? 'border-amber-400/30' : 'border-slate-200'}"><a href="${safeUrl}" target="_blank" download="${safeName}" class="inline-flex items-center gap-1.5 text-xs underline font-semibold"><i class="fas fa-paperclip"></i> ${renderMentions(attachmentDisplay)}</a></div>`;
         }
         function renderChannelConversationBox(channelId, channelName) {
             const box = document.getElementById('chat-messages');
@@ -9992,8 +10485,10 @@ function renderMessages() {
                 const mine = String(m.fromId) === String(currentUser.id);
                 const sender = m.fromName || ((db.users||[]).find(u=>String(u.id)===String(m.fromId))?.name) || 'Miembro';
                 const attachmentHtml = renderChatAttachmentHtml(m, mine);
+                // Render @mentions in the message text
+                const textWithMentions = m.text ? renderMentions(m.text) : '';
                 const showText = m.text && !(isChatImageAttachment(m) && /^📷 |^📎 Archivo adjunto:/i.test(m.text));
-                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}${showText ? `<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p>` : ''}${attachmentHtml}<p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
+                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${!mine ? `<p class="text-[11px] font-bold text-amber-700 mb-0.5">${psEscape(sender)}</p>` : ''}${showText ? `<p class="text-sm whitespace-pre-wrap">${textWithMentions}</p>` : ''}${attachmentHtml}<p class="text-[10px] mt-1 text-right ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}</p></div></div>`;
             }).join('');
             box.scrollTop = box.scrollHeight;
             return true;
@@ -10019,8 +10514,10 @@ function renderMessages() {
                 const mine = String(m.fromId) === String(currentUser.id);
                 const seenIcon = mine ? (m.read ? '<i class="fas fa-check-double text-amber-300 ml-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-300 ml-1" title="Enviado"></i>') : '';
                 const attachmentHtml = renderChatAttachmentHtml(m, mine);
+                // Render @mentions in the message text
+                const textWithMentions = m.text ? renderMentions(m.text) : '';
                 const showText = m.text && !(isChatImageAttachment(m) && /^📷 |^📎 Archivo adjunto:/i.test(m.text));
-                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${showText ? `<p class="text-sm whitespace-pre-wrap">${psEscape(m.text)}</p>` : ''}${attachmentHtml}<p class="text-[10px] mt-1 flex items-center justify-end gap-1 ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}${seenIcon}</p></div></div>`;
+                return `<div class="flex ${mine ? 'justify-end' : 'justify-start'}"><div class="max-w-[78%] ${mine ? 'bg-slate-900 text-white border border-amber-500/40' : 'bg-white border border-slate-200 text-slate-800'} rounded-2xl px-4 py-2.5 shadow-sm">${showText ? `<p class="text-sm whitespace-pre-wrap">${textWithMentions}</p>` : ''}${attachmentHtml}<p class="text-[10px] mt-1 flex items-center justify-end gap-1 ${mine ? 'text-amber-200/80' : 'text-slate-400'}">${new Date(m.date).toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})}${seenIcon}</p></div></div>`;
             }).join('');
             box.scrollTop = box.scrollHeight;
             return true;
@@ -10056,7 +10553,7 @@ function renderMessages() {
                 }
             }
             try { renderNav(); } catch(e){}
-            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300"><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe tu mensaje o pega una captura (Ctrl+V)..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300 shrink-0"><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500 truncate">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="w-9 h-9 flex items-center justify-center text-green-600 hover:bg-green-50 rounded-xl shrink-0" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe un mensaje..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderConversationBox(userId);
             startChatLive(userId);
             bindChatPasteTarget(userId);
@@ -10078,7 +10575,7 @@ function renderMessages() {
         // FASE 2 (#1): Chat de Canal Grupal
         function openChannelChat(channelId, channelName) {
             stopChatLive();
-            showModal(`<div class="flex flex-col h-[80vh] max-w-2xl w-full"><div class="px-5 py-4 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold"><i class="fas fa-hashtag"></i></div><div class="flex-1"><h3 class="font-semibold text-slate-900">${psEscape(channelName)}</h3><p class="text-xs text-slate-500">Canal grupal abierto para todo el equipo · Soporta capturas con Ctrl+V</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="p-2 text-slate-400 hover:bg-slate-200 rounded-lg"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-3"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5"></div><form id="chat-form" class="p-4 border-t bg-white rounded-b-2xl"><div class="flex gap-2 items-center"><label class="p-2.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${channelId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="p-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span>IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)} o pega imagen (Ctrl+V)..." class="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="px-5 py-2.5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas fa-hashtag"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(channelName)}</h3><p class="text-xs text-slate-500 truncate">Canal grupal abierto para todo el equipo</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${channelId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderChannelConversationBox(channelId, channelName);
             startChatLive(channelId, channelName);
             bindChatPasteTarget(channelId);
@@ -10316,12 +10813,17 @@ function renderMessages() {
             const preview = document.getElementById('plan-image-preview');
             let imageData = p?.image || '';
             if (imageInput) {
-                imageInput.onchange = e => {
+                imageInput.onchange = async e => {
                     const file = e.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                        reader.readAsDataURL(file);
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            imageData = await window.Media.subirOUrl(file, 'planes', { title: file.name });
+                            preview.src = imageData; preview.classList.remove('hidden');
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
+                            reader.readAsDataURL(file);
+                        }
                     }
                 };
             }
@@ -10360,12 +10862,17 @@ function renderMessages() {
             const preview = document.getElementById('gen-image-preview');
             let imageData = g?.image || '';
             if (imageInput) {
-                imageInput.onchange = e => {
+                imageInput.onchange = async e => {
                     const file = e.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                        reader.readAsDataURL(file);
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            imageData = await window.Media.subirOUrl(file, 'generations', { title: file.name });
+                            preview.src = imageData; preview.classList.remove('hidden');
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
+                            reader.readAsDataURL(file);
+                        }
                     }
                 };
             }
@@ -10433,12 +10940,17 @@ function renderMessages() {
             const preview = document.getElementById('gr-image-preview');
             let imageData = gr?.image || '';
             if (imageInput) {
-                imageInput.onchange = e => {
+                imageInput.onchange = async e => {
                     const file = e.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                        reader.readAsDataURL(file);
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            imageData = await window.Media.subirOUrl(file, 'groups', { title: file.name });
+                            preview.src = imageData; preview.classList.remove('hidden');
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
+                            reader.readAsDataURL(file);
+                        }
                     }
                 };
             }
@@ -11064,16 +11576,16 @@ END:VCALENDAR`;
                     <div><label class="text-sm font-medium">Categoría</label><select id="lib-cat" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">General</option>${db.categories.map(c=>`<option value="${c.id}" ${m&&m.categoryId==c.id?'selected':''}>${c.name}</option>`).join('')}</select></div>
                     <div><label class="text-sm font-medium">Lección (opcional)</label><select id="lib-lesson" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Ninguna</option></select></div>
                 </div>
-                <div><label class="text-sm font-medium">Tipo</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="lib-type" value="link" ${!m||m.type==='link'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace (Drive, Docs, etc.)</span></label><label class="flex items-center gap-2"><input type="radio" name="lib-type" value="file" ${m&&m.type==='file'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo</span></label></div></div>
-                <div id="lib-link-wrap"><label class="text-sm font-medium">URL</label><input id="lib-url" type="url" placeholder="https://drive.google.com/..." value="${m&&m.url?m.url:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div id="lib-file-wrap" class="hidden"><label class="text-sm font-medium">Archivo (se guardará localmente)</label><input id="lib-file" type="file" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-amber-600 mt-1">Recomendado: usar enlace para no saturar el portal</p></div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                <div><label class="text-sm font-medium">Tipo</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="lib-type" value="link" ${!m||m.type==='link'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace (Drive, Docs, etc.)</span></label><label class="flex items-center gap-2"><input type="radio" name="lib-type" value="file" ${m&&m.type==='file'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo (Storage / PDF / Doc)</span></label></div></div>
+                <div id="lib-link-wrap"><label class="text-sm font-medium">URL</label><input id="lib-url" type="url" placeholder="https://drive.google.com/..." value="${escapeHTML(m&&m.url?m.url:'')}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                <div id="lib-file-wrap" class="hidden"><label class="text-sm font-medium">Archivo (se subirá con Media.subir al Storage)</label><input id="lib-file" type="file" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage para no guardar base64 pesado en la base de datos.</p></div>
+                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button id="lib-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const updateLessonOptions = () => {
                 const catId = document.getElementById('lib-cat').value;
                 const sel = document.getElementById('lib-lesson');
                 const lessons = catId ? db.lessons.filter(l=>l.categoryId==catId) : db.lessons;
-                sel.innerHTML = '<option value="">Ninguna</option>' + lessons.map(l=>`<option value="${l.id}" ${m&&m.lessonId==l.id?'selected':''}>${l.title}</option>`).join('');
+                sel.innerHTML = '<option value="">Ninguna</option>' + lessons.map(l=>`<option value="${l.id}" ${m&&m.lessonId==l.id?'selected':''}>${escapeHTML(l.title)}</option>`).join('');
             };
             document.getElementById('lib-cat').onchange = updateLessonOptions;
             updateLessonOptions();
@@ -11084,8 +11596,9 @@ END:VCALENDAR`;
             };
             document.querySelectorAll('input[name="lib-type"]').forEach(r=>r.onchange=toggleType);
             toggleType();
-            document.getElementById('lib-form').onsubmit = e => {
+            document.getElementById('lib-form').onsubmit = async e => {
                 e.preventDefault();
+                const saveBtn = document.getElementById('lib-save-btn');
                 const data = {
                     title: document.getElementById('lib-title').value.trim(),
                     description: document.getElementById('lib-desc').value.trim(),
@@ -11106,11 +11619,42 @@ END:VCALENDAR`;
                     const file = document.getElementById('lib-file').files[0];
                     if (!m && !file) return alert('Selecciona un archivo');
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = ev => { data.fileData = ev.target.result; data.fileName = file.name; finalizeSave(data); };
-                        reader.readAsDataURL(file);
+                        data.fileName = file.name;
+                        try {
+                            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Subiendo...'; }
+                            if (window.Media && typeof window.Media.subir === 'function') {
+                                const uploaded = await window.Media.subir(file, { scope: 'library', title: data.title || file.name });
+                                if (uploaded && uploaded.url) {
+                                    data.url = uploaded.url;
+                                    data.fileData = '';
+                                    finalizeSave(data);
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            // Fallback local (sin backend o sesión offline): usar subirOUrl / FileReader
+                        } finally {
+                            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+                        }
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            const fallbackUrl = await window.Media.subirOUrl(file, 'library', { title: data.title || file.name });
+                            if (fallbackUrl && !fallbackUrl.startsWith('data:')) {
+                                data.url = fallbackUrl;
+                                data.fileData = '';
+                            } else {
+                                data.fileData = fallbackUrl || '';
+                            }
+                            finalizeSave(data);
+                        } else {
+                            const reader = new FileReader();
+                            reader.onload = ev => { data.fileData = ev.target.result; finalizeSave(data); };
+                            reader.readAsDataURL(file);
+                        }
                     } else {
-                        data.fileData = m.fileData; data.fileName = m.fileName; finalizeSave(data);
+                        data.url = m.url || '';
+                        data.fileData = m.fileData || '';
+                        data.fileName = m.fileName || '';
+                        finalizeSave(data);
                     }
                 }
                 function finalizeSave(d) {
@@ -11129,9 +11673,12 @@ END:VCALENDAR`;
 
         function downloadLibraryFile(id) {
             const m = db.library.find(x=>x.id===id);
-            if (!m || !m.fileData) return;
+            const src = m && (m.url || m.fileData);
+            if (!src) return;
             const a = document.createElement('a');
-            a.href = m.fileData;
+            a.href = src;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
             a.download = m.fileName || 'archivo';
             a.click();
         }
@@ -11141,6 +11688,7 @@ END:VCALENDAR`;
             if (!m) return;
             let embedUrl = '';
             let title = m.title;
+            const fileSrc = m.url || m.fileData || '';
             if (m.type === 'link' && m.url) {
                 const url = m.url;
                 // YouTube
@@ -11162,8 +11710,11 @@ END:VCALENDAR`;
                     embedUrl = url;
                 }
             }
-            const isPdfFile = m.type==='file' && m.fileData && m.fileName && m.fileName.toLowerCase().endsWith('.pdf');
-            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${title}</h3><div class="flex items-center gap-2"><a href="${m.type==='link'?m.url:'#'}" target="_blank" onclick="markAttendance(this.dataset.lesson||0)" class="text-xs text-slate-500 hover:text-indigo-600">${m.type==='link'?'Abrir en nueva pestaña':''}</a><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900">${m.type==='link' ? `<iframe src="${embedUrl}" class="w-full h-full" frameborder="0" allowfullscreen></iframe>` : isPdfFile ? `<iframe src="${m.fileData}" class="w-full h-full" frameborder="0"></iframe>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa no disponible para este archivo</p><button onclick="downloadLibraryFile(${m.id})" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${m.fileName||''}</button></div>`}</div></div>`);
+            const lowerName = String(m.fileName || fileSrc || '').toLowerCase();
+            const isPdfFile = m.type==='file' && fileSrc && (lowerName.endsWith('.pdf') || /^data:application\/pdf/i.test(fileSrc));
+            const isImageFile = m.type==='file' && fileSrc && (/\.(png|jpe?g|gif|webp|svg)$/i.test(lowerName) || /^data:image\//i.test(fileSrc));
+            const isVideoFile = m.type==='file' && fileSrc && (/\.(mp4|webm|mov)$/i.test(lowerName) || /^data:video\//i.test(fileSrc));
+            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" onclick="markAttendance(this.dataset.lesson||0)" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen></iframe>` : isPdfFile ? `<iframe src="${escapeHTML(fileSrc)}" class="w-full h-full" frameborder="0"></iframe>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button onclick="downloadLibraryFile(${m.id})" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
         }
 
         // --- TAREAS ---
@@ -11247,36 +11798,65 @@ END:VCALENDAR`;
         function openTaskSubmit(taskId) {
             const t = db.tasks.find(x=>x.id===taskId);
             const existing = db.taskSubmissions.find(s=>s.taskId===taskId && s.studentId===currentUser.id);
-            showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-1">${t.title}</h3><p class="text-sm text-slate-500 mb-4">${t.description||''}</p><form id="submit-form" class="space-y-4">
-                <div><label class="text-sm font-medium">Tipo de entrega</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="link" checked class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="file" class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo PDF</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="text" class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Texto</span></label></div></div>
-                <div id="sub-link"><input id="sub-url" type="url" placeholder="https://..." value="${existing&&existing.type==='link'?existing.content:''}" class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div id="sub-file" class="hidden"><input id="sub-file" type="file" accept=".pdf,.doc,.docx" class="w-full px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"></div>
-                <div id="sub-text" class="hidden"><textarea id="sub-textarea" rows="4" placeholder="Escribe tu respuesta..." class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${existing&&existing.type==='text'?existing.content:''}</textarea></div>
-                ${existing && existing.feedback?`<div class="p-3 bg-amber-50 border border-amber-200 rounded-lg"><p class="text-xs font-medium text-amber-800">Retroalimentación del maestro:</p><p class="text-sm text-amber-900 mt-1">${existing.feedback}</p>${existing.grade!=null?`<p class="text-sm font-semibold mt-1">Calificación: ${existing.grade}/100</p>`:''}</div>`:''}
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cerrar</button>${!existing||existing.status!=='revisado'?`<button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">${existing?'Actualizar':'Entregar'}</button>`:''}</div>
+            const initType = existing && existing.type ? existing.type : 'link';
+            showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-1">${escapeHTML(t.title)}</h3><p class="text-sm text-slate-500 mb-4">${escapeHTML(t.description||'')}</p><form id="submit-form" class="space-y-4">
+                <div><label class="text-sm font-medium">Tipo de entrega</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="link" ${initType==='link'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="file" ${initType==='file'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo (PDF/Doc/Img)</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="text" ${initType==='text'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Texto</span></label></div></div>
+                <div id="sub-link"><input id="sub-url" type="url" placeholder="https://..." value="${escapeHTML(existing&&existing.type==='link'?existing.content:'')}" class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                <div id="sub-file-wrap" class="hidden"><input id="sub-file-input" type="file" accept=".pdf,.doc,.docx,image/*" class="w-full px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage sin saturar la base de datos.</p>${existing&&existing.fileName?`<p class="text-xs text-slate-500 mt-1">Archivo actual: <strong>${escapeHTML(existing.fileName)}</strong></p>`:''}</div>
+                <div id="sub-text" class="hidden"><textarea id="sub-textarea" rows="4" placeholder="Escribe tu respuesta..." class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${escapeHTML(existing&&existing.type==='text'?existing.content:'')}</textarea></div>
+                ${existing && existing.feedback?`<div class="p-3 bg-amber-50 border border-amber-200 rounded-lg"><p class="text-xs font-medium text-amber-800">Retroalimentación del maestro:</p><p class="text-sm text-amber-900 mt-1">${escapeHTML(existing.feedback)}</p>${existing.grade!=null?`<p class="text-sm font-semibold mt-1">Calificación: ${existing.grade}/100</p>`:''}</div>`:''}
+                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cerrar</button>${!existing||existing.status!=='revisado'?`<button id="sub-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">${existing?'Actualizar':'Entregar'}</button>`:''}</div>
             </form></div>`);
             const toggle = ()=>{
                 const type = document.querySelector('input[name="sub-type"]:checked').value;
                 document.getElementById('sub-link').classList.toggle('hidden', type!=='link');
-                document.getElementById('sub-file').classList.toggle('hidden', type!=='file');
+                document.getElementById('sub-file-wrap').classList.toggle('hidden', type!=='file');
                 document.getElementById('sub-text').classList.toggle('hidden', type!=='text');
             };
             document.querySelectorAll('input[name="sub-type"]').forEach(r=>r.onchange=toggle); toggle();
-            document.getElementById('submit-form').onsubmit = e=>{
+            document.getElementById('submit-form').onsubmit = async e=>{
                 e.preventDefault();
+                const saveBtn = document.getElementById('sub-save-btn');
                 const type = document.querySelector('input[name="sub-type"]:checked').value;
                 const base = { taskId, studentId: currentUser.id, type, status: 'entregado', submittedAt: new Date().toISOString() };
                 const save = (data)=>{
-                    if (existing) Object.assign(existing, data); else db.taskSubmissions.push({ id: Date.now(), ...base, ...data });
+                    if (existing) Object.assign(existing, base, data); else db.taskSubmissions.push({ id: Date.now(), ...base, ...data });
                     saveDB(); closeModal(); navigateTo('tareas');
                 };
                 if (type==='link') {
-                    const url = document.getElementById('sub-url').value.trim(); if(!url) return alert('Ingresa URL'); save({ content: url });
+                    const url = document.getElementById('sub-url').value.trim(); if(!url) return alert('Ingresa URL'); save({ content: url, fileUrl: url });
                 } else if (type==='text') {
                     const txt = document.getElementById('sub-textarea').value.trim(); if(!txt) return alert('Escribe respuesta'); save({ content: txt });
                 } else {
-                    const file = document.getElementById('sub-file').files[0]; if(!existing && !file) return alert('Selecciona archivo');
-                    if (file) { const r = new FileReader(); r.onload = ev=> save({ content: ev.target.result, fileName: file.name }); r.readAsDataURL(file); } else { save({}); }
+                    const fileInput = document.getElementById('sub-file-input');
+                    const file = fileInput && fileInput.files && fileInput.files[0];
+                    if(!existing && !file) return alert('Selecciona archivo');
+                    if (file) {
+                        try {
+                            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Subiendo...'; }
+                            if (window.Media && typeof window.Media.subir === 'function') {
+                                const uploaded = await window.Media.subir(file, { scope: 'taskSubmissions', title: `${t.title} - ${currentUser.name || file.name}`, refId: taskId });
+                                if (uploaded && uploaded.url) {
+                                    save({ content: uploaded.url, fileUrl: uploaded.url, fileName: file.name });
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            // Fallback local
+                        } finally {
+                            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = existing ? 'Actualizar' : 'Entregar'; }
+                        }
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            const fallbackUrl = await window.Media.subirOUrl(file, 'taskSubmissions', { title: file.name, refId: taskId });
+                            save({ content: fallbackUrl, fileUrl: fallbackUrl, fileName: file.name });
+                        } else {
+                            const r = new FileReader();
+                            r.onload = ev=> save({ content: ev.target.result, fileName: file.name });
+                            r.readAsDataURL(file);
+                        }
+                    } else {
+                        save({ content: existing.content, fileUrl: existing.fileUrl || existing.content, fileName: existing.fileName });
+                    }
                 }
             };
         }
@@ -11308,8 +11888,14 @@ END:VCALENDAR`;
 
         function downloadSubmission(id) {
             const s = db.taskSubmissions.find(x=>x.id===id);
-            if (!s || !s.content) return;
-            const a = document.createElement('a'); a.href = s.content; a.download = s.fileName || 'entrega'; a.click();
+            const src = s && (s.fileUrl || s.content);
+            if (!src) return;
+            const a = document.createElement('a');
+            a.href = src;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.download = s.fileName || 'entrega';
+            a.click();
         }
 
 
@@ -11330,8 +11916,10 @@ END:VCALENDAR`;
         function toggleSidebar(){
             const s=document.getElementById('sidebar');
             const o=document.getElementById('sidebar-overlay');
-            s.classList.toggle('-translate-x-full');
-            if(o) o.classList.toggle('hidden');
+            if (!s) return;
+            const willHide = !s.classList.contains('-translate-x-full');
+            s.classList.toggle('-translate-x-full', willHide);
+            if(o) o.classList.toggle('hidden', willHide);
         }
         function toggleNewsBar(){
             const bar = document.getElementById('news-ticker-wrapper');

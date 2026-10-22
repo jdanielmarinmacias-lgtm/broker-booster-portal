@@ -695,11 +695,39 @@ function renderMiEquipo(){
                 </div>
             </div>
             
-            <div class="bg-white border rounded-xl overflow-auto">
+            <div class="bg-white border rounded-xl overflow-hidden">
+                <!-- Vista de tarjetas móviles para Agentes del Equipo (< md) -->
+                <div class="md:hidden divide-y divide-slate-100">
+                    ${agentes.map(a=>{
+                        const v = ventas.filter(x=>String(x.agenteId)===String(a.id));
+                        const total = v.reduce((s,x)=>s+Number(x.prima||0),0);
+                        return `<div class="p-3.5 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="font-bold text-slate-900 text-sm truncate">${escapeHTML(a.nombre||a.name||'-')}</p>
+                                    <p class="text-xs text-slate-500 truncate">${escapeHTML(a.email||'')}</p>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <p class="font-bold text-emerald-700 text-sm">$${total.toLocaleString('es-MX')}</p>
+                                    <p class="text-[11px] text-slate-400">${v.length} venta${v.length===1?'':'s'}</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-4 gap-1.5 pt-1">
+                                <button onclick="localStorage.setItem('detalleAgenteId','${a.id}');render()" class="py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">Detalle</button>
+                                <button onclick="asignarMeta(${a.id})" class="py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">Meta</button>
+                                <button onclick="registrarVenta(${a.id})" class="py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold">Venta</button>
+                                <button onclick="quitarAgente(${a.id})" class="py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-semibold">Quitar</button>
+                            </div>
+                        </div>`;
+                    }).join('') || `<div class="p-6 text-center text-slate-500 text-sm">Sin agentes asignados. El administrador asigna agentes desde la sección Usuarios.</div>`}
+                </div>
+                <!-- Tabla de escritorio (md+) -->
+                <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50"><tr><th class="p-2 text-left">Agente</th><th class="text-left">Email</th><th class="text-right pr-2">Producción</th><th class="w-56"></th></tr></thead>
                     <tbody>${lista || '<tr><td colspan=4 class="p-6 text-center text-slate-500">Sin agentes asignados. El administrador asigna agentes desde la sección Usuarios (editar usuario → Agencia asignada).</td></tr>'}</tbody>
                 </table>
+                </div>
             </div>
             ${detalleHTML}
         </div>`;
@@ -1399,7 +1427,36 @@ function renderSiniestros(){
                     <button onclick="window.sinFQ='';window.sinFRamo='';window.sinFComp='';window.sinFTipo='';window.sinFEstado='';window.sinFAgente='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
                 </div>
             </div>
-            <div class="overflow-x-auto">
+            <div>
+                <!-- Vista de tarjetas táctiles para móviles (< md) en Siniestros y Cancelaciones -->
+                <div class="md:hidden space-y-3">
+                    ${lista.map(s => {
+                        const dias = sinDiasSinActualizar(s);
+                        const urgente = !['Cerrado','Pagado','Efectiva','Rechazada'].includes(s.estado) && dias>=21;
+                        return `<div class="rounded-2xl border ${urgente?'border-orange-300 bg-orange-50/50':'border-slate-200 bg-white'} p-3.5 shadow-xs space-y-2.5">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                                        ${s.tipo==='cancelacion'
+                                            ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">Cancelación</span>'
+                                            : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">Siniestro</span>'}
+                                        ${sinBadge(s.estado)}
+                                        ${urgente ? `<span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px] font-bold"><i class="fas fa-triangle-exclamation mr-0.5"></i>${dias}d</span>` : `<span class="text-[11px] text-slate-400">${dias===0?'Hoy':dias+' d'}</span>`}
+                                    </div>
+                                    <h4 class="font-bold text-slate-900 text-sm truncate">${escapeHTML(s.clienteNombre)}</h4>
+                                    <p class="text-xs text-slate-500 truncate">${escapeHTML(s.compania)} · ${escapeHTML(s.ramo)} · Póliza <span class="font-mono font-semibold text-slate-700">${escapeHTML(s.poliza)}</span></p>
+                                </div>
+                                <button onclick="sinDetalle(${s.id})" class="px-3 py-2 bg-slate-900 text-amber-300 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1"><i class="fas fa-folder-open"></i><span>Abrir</span></button>
+                            </div>
+                            <div class="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                                <span class="truncate"><i class="fas fa-user-tie mr-1 text-slate-400"></i>${escapeHTML(s.agenteNombre)} · ${new Date(s.fechaReporte).toLocaleDateString('es-MX')}</span>
+                                <div class="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0" title="${sinProgreso(s)}% del proceso"><div class="h-full rounded-full ${['Cerrado','Pagado','Efectiva'].includes(s.estado)?'bg-emerald-500':'bg-indigo-500'}" style="width:${sinProgreso(s)}%"></div></div>
+                            </div>
+                        </div>`;
+                    }).join('') || `<div class="p-8 text-center text-slate-500 text-sm">No hay expedientes que coincidan. Reporta un siniestro o solicita una cancelación desde tus clientes.</div>`}
+                </div>
+                <!-- Tabla para escritorio (md+) -->
+                <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-left text-slate-600">
                         <tr>
@@ -1420,6 +1477,7 @@ function renderSiniestros(){
                         ${lista.map(fila).join('') || `<tr><td colspan="11" class="p-8 text-center text-slate-500">No hay expedientes que coincidan. Reporta un siniestro o solicita una cancelación desde tus clientes.</td></tr>`}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
         ${sinPanelSiniestralidad(casos)}
@@ -4118,7 +4176,43 @@ function renderMisClientes(){
                         </div>`;
                     }).join('')}
                 </div>`;
-            })() : `<div class="overflow-x-auto">
+            })() : `<div>
+                <!-- Vista de tarjetas táctiles para móviles (< md) -->
+                <div class="md:hidden space-y-3">
+                    ${clientes.map(c => {
+                        const puedeEditar = puedeVerTodos || String(c.agenteId)===String(currentUser.id);
+                        const nivelCob = cbzNivel(c);
+                        return `<div class="rounded-2xl border ${nivelCob==='rojo'?'border-red-300 bg-red-50/40':'border-slate-200 bg-white'} p-3.5 shadow-xs space-y-2.5">
+                            <div class="flex items-start justify-between gap-2.5">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    ${c.fotoCliente ? `<img src="${c.fotoCliente}" class="w-11 h-11 rounded-full object-cover border shrink-0">` : `<div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-user text-slate-400"></i></div>`}
+                                    <div class="min-w-0">
+                                        <h4 class="font-bold text-slate-900 text-sm truncate">${escapeHTML(c.nombre)}</h4>
+                                        <p class="text-xs text-slate-500 truncate">${escapeHTML(c.compania || '')} · Póliza <span class="font-mono font-semibold text-slate-700">${escapeHTML(c.poliza || '')}</span></p>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <p class="font-bold text-slate-900 text-sm">$${Number(c.primaTotal||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</p>
+                                    <div class="flex items-center justify-end gap-1 mt-0.5"><span class="text-[11px] text-slate-500">${escapeHTML(c.periodo||'')}</span>${cbzBadge(c)}</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                                <span><i class="fas fa-user-tie mr-1 text-slate-400"></i>${escapeHTML(c.agenteNombre||'')}</span>
+                                <span><i class="fas fa-calendar mr-1 text-slate-400"></i>${c.fechaEmision?new Date(c.fechaEmision).toLocaleDateString('es-MX'):new Date(c.fecha).toLocaleDateString('es-MX')}</span>
+                                ${c.evidencia ? `<button onclick="verEvidenciaCliente(${c.id})" class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold"><i class="fas fa-eye mr-1"></i>Póliza</button>` : ''}
+                            </div>
+                            ${puedeEditar ? `<div class="grid grid-cols-5 gap-1.5 pt-1">
+                                <button onclick="openExpediente360(${c.id})" class="py-2 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Expediente 360°"><i class="fas fa-id-card-clip text-sm"></i><span>360°</span></button>
+                                <button onclick="openCobranza(${c.id})" class="py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Cobranza"><i class="fas fa-hand-holding-dollar text-sm"></i><span>Cobro</span></button>
+                                <button onclick="sinDesdeCliente(${c.id})" class="py-2 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Siniestro"><i class="fas fa-file-shield text-sm"></i><span>Siniestro</span></button>
+                                <button onclick="editarCliente(${c.id})" class="py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Editar"><i class="fas fa-pen text-sm"></i><span>Editar</span></button>
+                                <button onclick="borrarCliente(${c.id})" class="py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Borrar"><i class="fas fa-trash text-sm"></i><span>Borrar</span></button>
+                            </div>` : ''}
+                        </div>`;
+                    }).join('') || `<div class="p-8 text-center text-slate-500 text-sm">No hay clientes registrados</div>`}
+                </div>
+                <!-- Tabla completa para escritorio (md+) -->
+                <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-left text-slate-600">
                         <tr>
@@ -4157,6 +4251,7 @@ function renderMisClientes(){
                         }).join('') || `<tr><td colspan="12" class="p-8 text-center text-slate-500">No hay clientes registrados</td></tr>`}
                     </tbody>
                 </table>
+                </div>
             </div>`}
         </div>
     </div>`;
