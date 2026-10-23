@@ -4,7 +4,7 @@
  * - Navegación HTML: network-first con fallback a index.html en caché
  * - App Shell (CSS, JS, manifest, iconos): stale-while-revalidate
  * ========================================================================== */
-const CACHE_NAME = 'broker-booster-shell-v20261022d';
+const CACHE_NAME = 'broker-booster-shell-v20261023a';
 const CDN_HOSTS = [
   'cdnjs.cloudflare.com',
   'cdn.jsdelivr.net',
@@ -17,6 +17,10 @@ const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
+  './img/favicon-32.png',
+  './img/apple-touch-icon.png',
+  './img/logo-icon-192.png',
+  './img/logo-icon-512.png',
   './css/styles.css',
   './js/core/store.js',
   './js/core/backend.js',
