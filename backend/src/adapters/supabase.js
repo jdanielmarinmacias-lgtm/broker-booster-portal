@@ -144,11 +144,14 @@ function createSupabaseAdapter({ url, serviceKey }) {
       if (Array.isArray(items)) {
         for (const item of items) {
           const doc_id = String(item.id ?? Date.now());
-          seenRows.set(collection + '∅' + doc_id, { collection, doc_id, data: { ...item, id: undefined } });
+          // updated_at explícito: la tabla no tiene trigger, sin esto la fila
+          // parece congelada en Supabase aunque el contenido cambie.
+          const ts = new Date().toISOString();
+          seenRows.set(collection + '∅' + doc_id, { collection, doc_id, updated_at: ts, data: { ...item, id: undefined } });
         }
       } else if (items && typeof items === 'object') {
         // Colección-objeto: UNA fila con el objeto completo (sin id que quitar).
-        seenRows.set(collection + '∅__object__', { collection, doc_id: '__object__', data: items });
+        seenRows.set(collection + '∅__object__', { collection, doc_id: '__object__', updated_at: new Date().toISOString(), data: items });
       }
     }
     const rows = [...seenRows.values()];
@@ -201,7 +204,7 @@ function createSupabaseAdapter({ url, serviceKey }) {
       const rec = entry || {};
       const doc_id = String(rec.id ?? Date.now());
       const { error } = await sb.from('documents').upsert(
-        [{ collection: 'auditoria', doc_id, data: { ...rec, id: undefined } }],
+        [{ collection: 'auditoria', doc_id, updated_at: new Date().toISOString(), data: { ...rec, id: undefined } }],
         { onConflict: 'collection,doc_id' }
       );
       if (error) throw new Error('Supabase audit: ' + error.message);

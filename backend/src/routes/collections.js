@@ -23,6 +23,21 @@ const FEED_COLLECTIONS = new Set([
 const feedTitle = (collection, rec) => rec.titulo || rec.title || rec.nombre || rec.name
   || (`Nuevo en ${collection}`);
 
+/* Detección de duplicado de post: mismo contenido + autor + grupo. Devuelve
+ * índice en el array o -1. Normaliza espacio y comparación por String para
+ * tolerar tipos int/Autor mezclados entre versiones del frontend. */
+function findPostDupe(col, body) {
+  const content = String(body.content ?? body.texto ?? '').replace(/\s+/g, ' ').trim();
+  if (!content) return -1;
+  const author = String(body.authorId ?? body.userId ?? '');
+  const group = String(body.groupId ?? body.grupoId ?? '');
+  return col.findIndex((x) => !x || typeof x !== 'object' ? -1 : (
+    String(x.content ?? x.texto ?? '').replace(/\s+/g, ' ').trim() === content
+    && String(x.authorId ?? x.userId ?? '') === author
+    && String(x.groupId ?? x.grupoId ?? '') === group
+  ));
+}
+
 /* COLECCIONES-OBJETO: el legacy guarda varias secciones COMO OBJETO, no array
  * (settings.publicidad, settings.comparadorProductos/casosExito/comisiones,
  * autoHub.unidades/clientes/publicidad/practica/guion, inmPublica.props,
@@ -231,6 +246,25 @@ module.exports = (store, config) => {
           await store.persistCollections([collection, 'auditoria']);
           return res.json({ ok: true, item: col[ix], upserted: true });
         }
+        // El cliente manda el mismo contenido con id nuevo (dispositivo sin
+        // sincronidad): en vez de duplicar el post cada día, se actualiza la
+        // fila existente conservando su id y createdAt originales.
+        const dupe = collection === 'posts' ? findPostDupe(col, body) : -1;
+        if (dupe >= 0) {
+          col[dupe] = { ...body, id: col[dupe].id, createdAt: col[dupe].createdAt || body.createdAt || new Date().toISOString() };
+          db.audit(store.get(), `edicion_posts`, req.user, { id: col[dupe].id, dedupe: true });
+          await store.persistCollections([collection, 'auditoria']);
+          return res.json({ ok: true, item: col[dupe], upserted: true, deduped: true });
+        }
+      }
+      // POST de post idéntico (mismo autor y grupo): actualiza el existente
+      // en vez de crear otra copia que contamine el muro público.
+      const dupe = collection === 'posts' ? findPostDupe(col, body) : -1;
+      if (dupe >= 0) {
+        col[dupe] = { ...body, id: col[dupe].id, createdAt: col[dupe].createdAt || body.createdAt || new Date().toISOString() };
+        db.audit(store.get(), `edicion_posts`, req.user, { id: col[dupe].id, dedupe: true });
+        await store.persistCollections([collection, 'auditoria']);
+        return res.json({ ok: true, item: col[dupe], deduped: true });
       }
       const rec = { ...body, id: body.id ?? db.newId() };
       col.push(rec);
