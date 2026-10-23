@@ -19,6 +19,17 @@
                 radial-gradient(circle at 80% 10%, rgba(201, 168, 106, 0.08), transparent 45%),
                 linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,248,244,0.92) 50%, rgba(245,241,234,0.88) 100%);
         }
+        /* Fondo de marca en el login: imagen marmol Broker Booster TAL CUAL.
+        /* Override del bloque anterior (efecto ámbar_piedra) solo para el login. */
+        #login-screen:not(.hidden) {
+            background-color: #ffffff !important;
+            background-image: none !important;
+            background-image: url('../img/splash-source.webp') !important;
+            background-position: center !important;
+            background-size: cover !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+        }
         /* Detalles dorados y acabado mármol en contenedores y tarjetas */
         #main-content .bg-white.rounded-2xl,
         #main-content .bg-white.rounded-xl,
