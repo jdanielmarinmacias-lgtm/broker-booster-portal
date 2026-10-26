@@ -11752,7 +11752,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     if (file) {
                         let url = '';
                         try {
-                            url = await window.Media.subir(file, { scope: 'groups', title: file.name }).then(it => it && it.url || '');
+                            url = await window.Media.subirOUrl(file, 'groups', { title: file.name });
                         } catch (errImg) {
                             showToast('No se pudo subir la imagen: ' + (errImg.message || 'error'), 'error');
                         }
