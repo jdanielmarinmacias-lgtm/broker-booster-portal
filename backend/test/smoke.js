@@ -681,3 +681,15 @@ describe('reporte ejecutivo semanal (cron y envío dry-run)', () => {
     assert.equal(putSelfRole.status, 403);
   });
 });
+
+describe('invitaciones de Mi Agenda (colección sincronizada)', () => {
+  it('admin crea una invitación y el invitado la lee en su bundle', async () => {
+    const adminJar = { ...jar };
+    const r = await api('POST', '/api/data/invitaciones', { id: 'inv-test-1', deId: 1, paraId: 2, titulo: 'Acompañamiento', estado: 'pendiente', inicio: '2026-11-02T16:00:00.000Z', fin: '2026-11-02T17:00:00.000Z' });
+    assert.ok(r.status < 300, 'POST invitaciones debe aceptarse: ' + r.status);
+    const list = await api('GET', '/api/data/invitaciones');
+    assert.equal(list.status, 200);
+    assert.ok(JSON.stringify(list.json).includes('inv-test-1'), 'la invitación debe estar en la colección');
+    assert.ok(adminJar.cookie);
+  });
+});

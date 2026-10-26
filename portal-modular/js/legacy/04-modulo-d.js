@@ -4744,6 +4744,12 @@ function renderMiAgenda(){
         </div>`;
     }).join('') : '<p class="text-sm text-slate-500 text-center py-8">No tienes clases programadas</p>';
     
+    const otros = db.users.filter(u=>String(u.id)!==String(currentUser.id) && !['prospecto'].includes((u.role||'').toLowerCase()));
+    const invUsuarioOpts = '<option value="">Selecciona a la persona…</option>' + otros.map(u=>`<option value="${psEscape(String(u.id))}">${psEscape(u.name||u.username||'')} (${psEscape(u.role||'')})</option>`).join('');
+    const invs = invDB();
+    const fmt = iso => new Date(iso).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
+    const invRecibidasHtml = invs.filter(i=>String(i.paraId)===String(currentUser.id)).map(i=>`<div class="border border-slate-200 rounded-lg p-2 text-xs"><p class="font-medium text-slate-800">${psEscape(i.titulo)}</p><p class="text-slate-500">De ${psEscape(i.deNombre)} · ${fmt(i.inicio)}</p><p class="mt-1 font-semibold ${i.estado==='aceptada'?'text-emerald-600':i.estado==='rechazada'?'text-rose-600':'text-amber-600'}">${i.estado}</p>${i.estado==='pendiente'?`<div class="flex gap-1 mt-1"><button onclick="invResponder('${i.id}','aceptada')" class="px-2 py-1 bg-emerald-600 text-white rounded">Aceptar</button><button onclick="invResponder('${i.id}','rechazada')" class="px-2 py-1 bg-slate-200 rounded">Rechazar</button></div>`:''}</div>`).join('') || '<p class="text-xs text-slate-400">Sin invitaciones</p>';
+    const invEnviadasHtml = invs.filter(i=>String(i.deId)===String(currentUser.id)).map(i=>`<div class="border border-slate-200 rounded-lg p-2 text-xs"><p class="font-medium text-slate-800">${psEscape(i.titulo)}</p><p class="text-slate-500">Para ${psEscape(i.paraNombre)} · ${fmt(i.inicio)}</p><p class="mt-1 font-semibold ${i.estado==='aceptada'?'text-emerald-600':i.estado==='rechazada'?'text-rose-600':'text-amber-600'}">${i.estado}</p></div>`).join('') || '<p class="text-xs text-slate-400">Sin invitaciones</p>';
     return `
     <div class="max-w-5xl mx-auto space-y-6">
         <div class="flex items-center justify-between">
@@ -4759,6 +4765,27 @@ function renderMiAgenda(){
             <p class="text-xs text-slate-500 mt-3">Estas clases se agregan automáticamente cuando te asignan una sesión.</p>
         </div>
         
+        <div class="bg-white rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold mb-1 flex items-center gap-2"><i class="fas fa-user-plus text-indigo-600"></i> Invitaciones a sesiones</h3>
+            <p class="text-xs text-slate-500 mb-4">Invita a otra persona a una sesión. Revisamos su disponibilidad antes de enviar para evitar empalmes.</p>
+            <div class="grid md:grid-cols-4 gap-2">
+                <select id="inv-usuario" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${invUsuarioOpts}</select>
+                <input id="inv-fecha" type="date" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <input id="inv-hora" type="time" value="10:00" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select id="inv-duracion" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="30">30 min</option><option value="60" selected>1 hora</option><option value="120">2 horas</option></select>
+            </div>
+            <input id="inv-titulo" placeholder="Motivo, p. ej. Acompañamiento a cita con cliente" class="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+            <div class="flex flex-wrap items-center gap-2 mt-3">
+                <button onclick="invRevisarDisponibilidad()" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">Revisar disponibilidad</button>
+                <button onclick="invEnviar()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Enviar invitación</button>
+                <span id="inv-disp" class="text-xs"></span>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4 mt-5">
+                <div><p class="text-xs font-semibold text-slate-600 mb-2">Recibidas</p><div class="space-y-2">${invRecibidasHtml}</div></div>
+                <div><p class="text-xs font-semibold text-slate-600 mb-2">Enviadas</p><div class="space-y-2">${invEnviadasHtml}</div></div>
+            </div>
+        </div>
+
         <div class="bg-white rounded-2xl border border-slate-200 p-4">
             <h3 class="font-semibold mb-3">Google Calendar</h3>
             <div id="cal-embed-zone" class="text-center py-6">
@@ -4782,6 +4809,52 @@ function renderMiAgenda(){
             </div>
         </div>
     </div>`;
+}
+function invDB(){ if(!Array.isArray(db.invitaciones)) db.invitaciones=[]; return db.invitaciones; }
+/* Eventos de un usuario en un rango: clases asignadas y sesiones ya aceptadas/pendientes que se empalman. */
+function invOcupacion(userId, ini, fin, ignorarId){
+    const choques = [];
+    (db.liveClasses||[]).forEach(c=>{ if((c.assignedTo||[]).map(String).includes(String(userId)) && new Date(c.start)<fin && new Date(c.end)>ini) choques.push('clase: '+c.title); });
+    invDB().forEach(i=>{ if(i.id!==ignorarId && ['pendiente','aceptada'].includes(i.estado) && [String(i.paraId),String(i.deId)].includes(String(userId)) && new Date(i.inicio)<fin && new Date(i.fin)>ini) choques.push('invitación: '+i.titulo); });
+    return choques;
+}
+function invLeerForm(){
+    const uid=(document.getElementById('inv-usuario')||{}).value||'';
+    const fecha=(document.getElementById('inv-fecha')||{}).value||'';
+    const hora=(document.getElementById('inv-hora')||{}).value||'';
+    const dur=Number((document.getElementById('inv-duracion')||{}).value||60);
+    const titulo=((document.getElementById('inv-titulo')||{}).value||'').trim();
+    if(!uid||!fecha||!hora){ showToast('Elige persona, fecha y hora','warning'); return null; }
+    const ini=new Date(fecha+'T'+hora); const fin=new Date(ini.getTime()+dur*60000);
+    const para=db.users.find(u=>String(u.id)===uid);
+    return { uid, para, ini, fin, dur, titulo: titulo || 'Sesión en agenda' };
+}
+function invRevisarDisponibilidad(){
+    const f=invLeerForm(); if(!f) return;
+    const ch=invOcupacion(f.uid, f.ini, f.fin);
+    const el=document.getElementById('inv-disp'); if(!el) return;
+    el.innerHTML = ch.length ? '<span class="text-rose-600">'+psEscape(f.para.name)+' está ocupado: '+psEscape(ch.join('; '))+'</span>' : '<span class="text-emerald-600">'+psEscape(f.para.name)+' está disponible en ese horario</span>';
+}
+function invEnviar(){
+    const f=invLeerForm(); if(!f) return;
+    const ch=invOcupacion(f.uid, f.ini, f.fin);
+    if(ch.length){ showToast('Empalme: '+ch.join('; '),'error'); invRevisarDisponibilidad(); return; }
+    const inv={ id:'inv-'+Date.now(), deId:currentUser.id, deNombre:currentUser.name, paraId:f.uid, paraNombre:f.para.name, titulo:f.titulo, inicio:f.ini.toISOString(), fin:f.fin.toISOString(), estado:'pendiente', ts:new Date().toISOString() };
+    invDB().unshift(inv);
+    if(!Array.isArray(db.notifications)) db.notifications=[];
+    db.notifications.unshift({ id:'inv-n-'+inv.id, type:'invitacion', userId:f.uid, msg:'Invitación de '+currentUser.name+': '+inv.titulo+' ('+f.ini.toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})+')', ts:inv.ts, readBy:[] });
+    if(db.notifications.length>300) db.notifications.length=300;
+    saveDB(); showToast('Invitación enviada a '+f.para.name,'success');
+    if(window.render) render();
+}
+function invResponder(id, estado){
+    const inv=invDB().find(i=>i.id===id); if(!inv || String(inv.paraId)!==String(currentUser.id)) return;
+    if(estado==='aceptada'){ const ch=invOcupacion(currentUser.id, new Date(inv.inicio), new Date(inv.fin), inv.id); if(ch.length){ showToast('Tienes un empalme: '+ch.join('; '),'error'); return; } }
+    inv.estado=estado;
+    if(!Array.isArray(db.notifications)) db.notifications=[];
+    db.notifications.unshift({ id:'inv-r-'+inv.id+'-'+Date.now(), type:'invitacion', userId:inv.deId, msg:currentUser.name+' '+(estado==='aceptada'?'aceptó':'rechazó')+' la invitación: '+inv.titulo, ts:new Date().toISOString(), readBy:[] });
+    saveDB(); showToast('Invitación '+estado,'success');
+    if(window.render) render();
 }
 function cargarCalAgenda(){
     const calId = (currentUser && currentUser.googleCalendarId) || 'primary';

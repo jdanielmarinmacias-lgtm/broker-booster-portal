@@ -66,6 +66,7 @@ async function boot(adapter) {
   adapter = adapter || selectAdapter(config);
   sessions.bind(adapter);
   const store = createStore(adapter);
+  mw.bindLoginStore(store);
   if (adapter.kind === 'supabase') {
     // Arranque instantáneo en serverless (<100ms): no bloquear /api/auth/login
     // ni /api/auth/me descargando toda la tabla documents en el cold-start.

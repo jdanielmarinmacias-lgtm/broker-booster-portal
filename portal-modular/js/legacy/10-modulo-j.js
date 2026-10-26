@@ -258,7 +258,7 @@ window.initEnVivoStudio = function(liveClassId) {
     
     if (lc) {
       if (!lc.participantesReales) lc.participantesReales = [];
-      if (!lc.participantesReales.find(p=>p.id===currentUser.id)) {
+      if (!lc.participantesReales.find(p=>String(p.id)===String(currentUser.id))) {
         lc.participantesReales.push({
           id: currentUser.id,
           name: currentUser.name,
@@ -268,6 +268,18 @@ window.initEnVivoStudio = function(liveClassId) {
           entrada: new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}),
           role: currentUser.role
         });
+        // v6.9: asistencia + XP AUTOMÁTICOS al entrar a la sala (una sola vez por clase)
+        try {
+          const u = db.users.find(x=>String(x.id)===String(currentUser.id));
+          if (u && !isCapacitacionRole(u.role)) {
+            u.attendance = u.attendance || [];
+            if (!u.attendance.includes(lc.id)) {
+              u.attendance.push(lc.id);
+              u.xp = (u.xp||0) + 10;
+              if (window.showToast) showToast('Asistencia registrada (+10 XP)', 'success');
+            }
+          }
+        } catch(e) {}
         saveDB();
       }
       enVivoState.participants = lc.participantesReales.map(p=>({...p, duracion: getDuracionEnVivo(p.entradaTs)}));
@@ -283,7 +295,9 @@ window.initEnVivoStudio = function(liveClassId) {
     broadcastEnVivo('participante-join', enVivoState.participants[0]);
   }
   
-  setInterval(()=>{ enVivoState.nowTick = Date.now(); }, 1000);
+  // v6.9 FIX: guardar el intervalo y limpiar el anterior al re-entrar (evita acumulación de intervals y degrada el rendimiento)
+  if (enVivoState.tickInterval) { try { clearInterval(enVivoState.tickInterval); } catch(e) {} }
+  enVivoState.tickInterval = setInterval(()=>{ enVivoState.nowTick = Date.now(); }, 1000);
 };
 
 // Override close para detener broadcast
@@ -294,6 +308,8 @@ window.closeEnVivoModal = function() {
     try { enVivoChannel.close(); } catch(e) {}
     enVivoChannel = null;
   }
+  // v6.9 FIX: detener el intervalo de TICK al cerrar la sala (no más intervals fugados)
+  if (enVivoState.tickInterval) { try { clearInterval(enVivoState.tickInterval); } catch(e) {} enVivoState.tickInterval = null; }
   const modal = document.getElementById('en-vivo-modal');
   if (modal) modal.remove();
   if (enVivoState.stream) enVivoState.stream.getTracks().forEach(t=>t.stop());

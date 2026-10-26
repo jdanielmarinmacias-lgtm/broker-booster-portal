@@ -16,13 +16,13 @@
 <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="img/favicon-48.png">
 <!-- Splash de inicio (iOS/PWA): imagen Broker Booster en pantalla completa -->
-<link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1290x2796.png">
-<link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1179x2556.png">
-<link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1284x2778.png">
-<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1170x2532.png">
-<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="img/splash-828x1792.png">
-<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="img/splash-750x1334.png">
-<link rel="apple-touch-startup-image" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" href="img/splash-2732x2732.png">
+<link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1290x2796.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1179x2556.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1284x2778.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="img/splash-1170x2532.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="img/splash-828x1792.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="img/splash-750x1334.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" href="img/splash-2732x2732.jpg">
 <meta name="theme-color" content="#0a2540">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -41,6 +41,24 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body class="text-slate-800">
+    <!-- Pantalla de carga (splash) Broker Booster: imagen completa en pantalla -->
+    <div id="splash-screen" aria-hidden="true"></div>
+    <script>
+    (function () {
+        var el = document.getElementById('splash-screen');
+        if (!el) return;
+        var hidden = false;
+        function hide() {
+            if (hidden) return;
+            hidden = true;
+            el.classList.add('splash-hide');
+            setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+        }
+        if (document.readyState === 'complete') setTimeout(hide, 350);
+        else window.addEventListener('load', function () { setTimeout(hide, 350); });
+        setTimeout(hide, 4000); // failsafe: nunca bloquear la app
+    })();
+    </script>
     <div id="public-portal"></div>
     <div id="app" class="flex flex-col">
         <!-- Login Screen -->
@@ -94,8 +112,8 @@
                 </div>
                 <nav id="nav-menu" class="flex-1 px-5 py-6 space-y-2 overflow-y-auto"></nav>
                 <div id="pwa-install-sidebar-wrap" class="px-4 pt-3 hidden">
-                    <button id="btn-install-pwa-sidebar" type="button" onclick="if(window.instalarPWA) instalarPWA()" class="w-full px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-amber-300 border border-amber-400/50 hover:border-amber-400 text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition">
-                        <i class="fas fa-mobile-screen-button text-amber-400"></i>
+                    <button id="btn-install-pwa-sidebar" type="button" onclick="if(window.instalarPWA) instalarPWA()" class="btn-marble w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-mobile-screen-button"></i>
                         <span>Instalar App en tu dispositivo</span>
                     </button>
                 </div>
@@ -157,12 +175,11 @@
                             <i class="fas fa-times"></i> <span class="hidden sm:inline">CERRAR</span>
                         </button>
                     </div>
-                </div>
-                <!-- Botón para mostrar noticias (oculto por defecto) -->
-                <button id="show-news-btn" onclick="toggleNewsBar()" class="fixed bottom-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-full shadow-xl font-semibold text-sm hidden items-center gap-2 transition-all" title="Mostrar noticias">
-                    <i class="fas fa-bullhorn"></i> <span>Ver Noticias</span>
-                    <span id="news-badge-btn" class="news-badge-count hidden absolute -top-1.5 -right-1.5 ring-2 ring-white">0</span>
-                </button>
+                </div><!-- Botón para mostrar noticias (oculto por defecto, solo icono) -->
+<button id="show-news-btn" onclick="toggleNewsBar()" class="fixed bottom-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white p-3.5 rounded-full shadow-xl hidden items-center justify-center transition-all" title="Mostrar noticias" aria-label="Mostrar noticias">
+    <i class="fas fa-bullhorn text-base"></i>
+    <span id="news-badge-btn" class="news-badge-count hidden absolute -top-1.5 -right-1.5 ring-2 ring-white">0</span>
+</button>
                 <!-- Barra de navegación inferior para celulares (PWA Mobile Bottom Nav) -->
                 <nav id="mobile-bottom-nav" class="mobile-bottom-nav lg:hidden" aria-label="Navegación rápida móvil"></nav>
             </div>
@@ -200,10 +217,10 @@
     <script src="js/services/userService.js?v=20261019b"></script>
     <script src="js/services/repository.js?v=20261019b"></script>
     <script src="js/legacy/00-head-utils.js?v=20261022b"></script>
-    <script src="js/legacy/01-core-db-roles-portal.js?v=20261022d"></script>
+    <script src="js/legacy/01-core-db-roles-portal.js?v=20261024a"></script>
     <script src="js/legacy/02-modulo-b.js?v=20261019b"></script>
     <script src="js/legacy/03-config-73l.js?v=20261019b"></script>
-    <script src="js/legacy/04-modulo-d.js?v=20261022b"></script>
+    <script src="js/legacy/04-modulo-d.js?v=20261024b"></script>
     <script src="js/legacy/05-modulo-e.js?v=20261019b"></script>
     <script src="js/legacy/06-modulo-f.js?v=20261019b"></script>
     <script src="js/legacy/07-modulo-g.js?v=20261019b"></script>
@@ -216,6 +233,6 @@
     <script src="js/modules/ventas.js?v=20261019b"></script>
     <script src="js/modules/inventario.js?v=20261019b"></script>
     <script src="js/core/backend-shim.js?v=20261019b"></script>
-    <script src="js/core/sync.js?v=20261020c"></script>
+    <script src="js/core/sync.js?v=20261024b"></script>
     <script src="js/legacy/11-init.js?v=20261019b"></script>
 </html>

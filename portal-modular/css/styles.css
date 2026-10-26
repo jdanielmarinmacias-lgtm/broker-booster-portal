@@ -1,61 +1,55 @@
 /* portal-modular/css/styles.css — EXTRAÍDO de portal.html (Paso 1, por líneas) */
 
 /* ---------- bloque <style> líneas 100-157 ---------- */
-:root { --primary: #0a2540; --primary-dark: #081c30; --accent: #c9a86a; --gold: #c9a86a; --gold-soft: rgba(201, 168, 106, 0.28); }
-        body {
-            font-family: 'Inter', 'Poppins', sans-serif;
-            background-color: #faf8f5;
-            background-image:
-                radial-gradient(ellipse at 12% 18%, rgba(201, 168, 106, 0.11) 0%, transparent 48%),
-                radial-gradient(ellipse at 88% 82%, rgba(201, 168, 106, 0.09) 0%, transparent 52%),
-                linear-gradient(125deg, transparent 38%, rgba(201, 168, 106, 0.06) 44%, rgba(148, 163, 184, 0.05) 45%, transparent 51%),
-                linear-gradient(295deg, transparent 58%, rgba(201, 168, 106, 0.05) 62%, transparent 66%);
-            background-attachment: fixed;
-            letter-spacing: -0.01em;
-        }
-        #main-content, #public-portal, #login-screen {
-            background-color: transparent !important;
-            background-image:
-                radial-gradient(circle at 80% 10%, rgba(201, 168, 106, 0.08), transparent 45%),
-                linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(250,248,244,0.92) 50%, rgba(245,241,234,0.88) 100%);
-        }
-        /* Fondo de marca en el login: imagen marmol Broker Booster TAL CUAL.
-        /* Override del bloque anterior (efecto ámbar_piedra) solo para el login. */
-        #login-screen:not(.hidden) {
-            background-color: #ffffff !important;
-            background-image: none !important;
-            background-image: url('../img/splash-source.webp') !important;
-            background-position: center !important;
-            background-size: cover !important;
-            background-repeat: no-repeat !important;
-            background-attachment: fixed !important;
-        }
-        /* Detalles dorados y acabado mármol en contenedores y tarjetas */
-        #main-content .bg-white.rounded-2xl,
-        #main-content .bg-white.rounded-xl,
-        #public-portal .bg-white.rounded-2xl,
-        #public-portal .bg-white.rounded-3xl {
-            border-color: rgba(201, 168, 106, 0.30) !important;
-            box-shadow: 0 8px 26px -12px rgba(10, 37, 64, 0.09), 0 0 0 1px rgba(201, 168, 106, 0.12);
-        }
-        header.bg-white, header.bg-white\/95 {
-            border-bottom: 1px solid rgba(201, 168, 106, 0.35) !important;
-            background: linear-gradient(90deg, rgba(255,255,255,0.96) 0%, rgba(252,249,243,0.96) 100%) !important;
-        }
-        #sidebar {
-            background: linear-gradient(180deg, #ffffff 0%, #fcfaf6 100%) !important;
-            border-right: 1px solid rgba(201, 168, 106, 0.32) !important;
-        }
-        .nav-link.bg-indigo-50 {
-            background: linear-gradient(90deg, rgba(201, 168, 106, 0.16) 0%, rgba(240, 244, 248, 0.65) 100%) !important;
-            border-left: 3px solid var(--accent) !important;
-            color: var(--primary) !important;
-        }
-        .gold-pill {
-            background: linear-gradient(135deg, #dfbe7f 0%, #b89146 100%);
-            color: #0a2540;
-            font-weight: 700;
-        }
+/* Paleta Broker Booster (logo + mármol): dorado, verde bosque, esmeralda y mármol blanco. */
+:root {
+  --bb-gold: #c9a86a;
+  --bb-gold-deep: #a8842f;
+  --bb-forest: #0f3d2e;
+  --bb-forest-dark: #0a2d22;
+  --bb-emerald: #0f8a5f;
+  --bb-emerald-dark: #0b6b4a;
+  --bb-marble: #f7f6f2;
+  --bb-ink: #14201b;
+  --primary: var(--bb-forest);
+  --primary-dark: var(--bb-forest-dark);
+  --accent: var(--bb-gold);
+  --news-bg: var(--bb-forest);
+  --news-accent: var(--bb-gold-deep);
+}
+/* Portada pública: mármol blanco con acentos dorados y verde bosque. */
+#public-portal { background: var(--bb-marble); }
+#public-portal section.bg-white { background-color: #ffffff; }
+#public-portal .bg-emerald-50 { background-color: #eef6f1 !important; }
+#public-portal .border-emerald-200 { border-color: rgba(201,168,106,0.55) !important; }
+#public-portal .text-emerald-800, #public-portal .text-emerald-700 { color: var(--bb-forest) !important; }
+#public-portal .bg-emerald-700, #public-portal .bg-emerald-600 { background-color: var(--bb-forest) !important; }
+#public-portal .hover\:bg-emerald-800:hover, #public-portal .hover\:bg-emerald-700:hover { background-color: var(--bb-emerald) !important; }
+#public-portal .hover\:text-emerald-700:hover { color: var(--bb-gold-deep) !important; }
+#public-portal .text-emerald-600 { color: var(--bb-emerald) !important; }
+#public-portal .bg-emerald-100 { background-color: #e3f0e8 !important; }
+#public-portal .shadow-xl { box-shadow: 0 12px 32px -14px rgba(15,61,46,0.28) !important; }
+#public-portal .rounded-2xl { border-color: rgba(201,168,106,0.35); }
+#public-portal h1, #public-portal h2 { color: var(--bb-ink); }
+
+/* Modo oscuro (Obsidiana): verde bosque profundo con detalles dorados y texto claro. */
+body.theme-obsidian {
+  --primary: #d4b47a;
+  --primary-dark: #e8cc96;
+  --accent: #d4b47a;
+  --news-bg: #0a1f18;
+  --news-accent: #a8842f;
+  background-color: #0c1a15;
+  color: #e9efe9;
+}
+body.theme-obsidian .bg-white { background-color: #132821 !important; color: #e9efe9 !important; }
+body.theme-obsidian .bg-slate-50, body.theme-obsidian .bg-slate-100 { background-color: #0c1a15 !important; }
+body.theme-obsidian .text-slate-900, body.theme-obsidian .text-slate-800, body.theme-obsidian .text-slate-700 { color: #e9efe9 !important; }
+body.theme-obsidian .text-slate-600, body.theme-obsidian .text-slate-500 { color: #a9bbb1 !important; }
+body.theme-obsidian .border-slate-200, body.theme-obsidian .border-slate-300 { border-color: #24402f !important; }
+body.theme-obsidian #sidebar { background: #10241c; }
+body.theme-obsidian input, body.theme-obsidian select, body.theme-obsidian textarea { background-color: #0c1a15 !important; color: #e9efe9 !important; border-color: #2c4a3a !important; }
+        body { font-family: 'Inter', 'Poppins', sans-serif; background-color: #f6f7f9; letter-spacing: -0.01em; }
         .sidebar { transition: transform 0.3s ease-in-out; }
         .modal-backdrop { background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
         .flashcard { perspective: 1000px; cursor: pointer; }
@@ -97,8 +91,8 @@
         .rounded-2xl { border-radius: 1rem !important; }
         .shadow-xl { box-shadow: 0 10px 30px -12px rgba(10,37,64,0.18) !important; }
         /* Sidebar premium */
-        #sidebar { background: #ffffff; border-right: none; }
-        .nav-link.bg-indigo-50 { background: #f0f4f8 !important; border-left: 3px solid var(--primary); }
+        #sidebar { background: #ffffff; border-right: none; border-right: 1px solid rgba(201,168,106,0.35); }
+        .nav-link.bg-indigo-50 { background: #f3efe4 !important; border-left: 3px solid var(--bb-gold); }
         .nav-link { padding: 0.65rem 0.75rem !important; border-radius: 0.75rem !important; }
         /* Métricas sin sombra */
         .metric-card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
@@ -244,419 +238,36 @@
 #public-portal .sim-embed .t-author strong {display:block;font-size:14.4px;color:#202838}
 #public-portal .sim-embed .t-author span {display:block;font-size:12.8px;color:#6c7686}
 
-/* ---------- bloque <style> líneas 9773-9819 ---------- */
-@keyframes news-ticker-scroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-        #news-ticker-content {
-            display: inline-block;
-            white-space: nowrap;
-            padding-left: 100%;
-            animation: news-ticker-scroll 90s linear infinite;
-        }
-        #news-ticker-content:hover {
-            animation-play-state: paused;
-        }
-        .news-chip-nuevo {
-            background: var(--news-accent, #dc2626);
-            color: #fff;
-            font-size: 9px;
-            font-weight: 800;
-            letter-spacing: .08em;
-            padding: 1px 7px;
-            border-radius: 9999px;
-            box-shadow: 0 0 0 2px rgba(255,255,255,.25);
-            animation: news-pulse 1.2s ease-in-out infinite;
-        }
-        @keyframes news-pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
-        .news-badge-count {
-            background: #fff;
-            color: var(--news-accent, #dc2626);
-            font-size: 10px;
-            font-weight: 800;
-            min-width: 18px;
-            height: 18px;
-            padding: 0 5px;
-            border-radius: 9999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-        }
-        #main-content {
-            padding-bottom: 4.5rem !important;
-        }
-        @media (max-width: 1024px) {
-            #news-ticker-wrapper { left: 0 !important; }
-        }
 
-/* ---------- bloque <style> líneas 16454-16458 ---------- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  .en-vivo-studio { font-family: 'Inter', system-ui, sans-serif; }
-  @keyframes floatUp { 0% { transform: translateY(0) scale(0.8); opacity:1 } 100% { transform: translateY(-180px) scale(1.4); opacity:0 } }
-
-/* === MODO OSCURO EJECUTIVO: OBSIDIANA Y ORO === */
-body.theme-obsidian {
-    --primary: #c9a86a;
-    --primary-dark: #b89146;
-    --accent: #dfbe7f;
-    background-color: #070b14 !important;
-    background-image:
-        radial-gradient(ellipse at 14% 16%, rgba(201, 168, 106, 0.14) 0%, transparent 48%),
-        radial-gradient(ellipse at 86% 84%, rgba(201, 168, 106, 0.10) 0%, transparent 52%),
-        linear-gradient(135deg, #070b14 0%, #0d1424 52%, #090e1a 100%) !important;
-    color: #e2e8f0 !important;
-}
-body.theme-obsidian #main-content,
-body.theme-obsidian #login-screen {
-    background-color: transparent !important;
-    background-image:
-        radial-gradient(circle at 80% 10%, rgba(201, 168, 106, 0.10), transparent 45%),
-        linear-gradient(135deg, rgba(11, 17, 30, 0.94) 0%, rgba(15, 23, 42, 0.95) 55%, rgba(9, 14, 26, 0.96) 100%) !important;
-    color: #e2e8f0 !important;
-}
-body.theme-obsidian header.bg-white,
-body.theme-obsidian header.bg-white\/95 {
-    background: linear-gradient(90deg, rgba(11, 17, 30, 0.97) 0%, rgba(17, 25, 43, 0.97) 100%) !important;
-    border-bottom: 1px solid rgba(201, 168, 106, 0.42) !important;
-}
-body.theme-obsidian #sidebar {
-    background: linear-gradient(180deg, #0b111e 0%, #11192b 100%) !important;
-    border-right: 1px solid rgba(201, 168, 106, 0.35) !important;
-    color: #e2e8f0 !important;
-}
-body.theme-obsidian #sidebar .border-slate-200 {
-    border-color: rgba(201, 168, 106, 0.24) !important;
-}
-body.theme-obsidian #main-content .bg-white,
-body.theme-obsidian #login-screen .bg-white,
-body.theme-obsidian #modal-backdrop .bg-white,
-body.theme-obsidian .modal-backdrop .bg-white {
-    background-color: #11192b !important;
-    color: #e2e8f0 !important;
-    border-color: rgba(201, 168, 106, 0.28) !important;
-    box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(201, 168, 106, 0.16) !important;
-}
-body.theme-obsidian #main-content .bg-slate-50,
-body.theme-obsidian #main-content .bg-slate-50\/70,
-body.theme-obsidian #main-content .bg-slate-50\/80,
-body.theme-obsidian #main-content .bg-slate-100,
-body.theme-obsidian .modal-backdrop .bg-slate-50,
-body.theme-obsidian .modal-backdrop .bg-slate-100 {
-    background-color: #162138 !important;
-    color: #e2e8f0 !important;
-    border-color: rgba(201, 168, 106, 0.22) !important;
-}
-body.theme-obsidian .text-slate-900,
-body.theme-obsidian .text-slate-800,
-body.theme-obsidian #page-title,
-body.theme-obsidian #user-name {
-    color: #f8fafc !important;
-}
-body.theme-obsidian .text-slate-700,
-body.theme-obsidian .text-slate-600 {
-    color: #cbd5e1 !important;
-}
-body.theme-obsidian .text-slate-500,
-body.theme-obsidian .text-slate-400 {
-    color: #94a3b8 !important;
-}
-body.theme-obsidian .border-slate-200,
-body.theme-obsidian .border-slate-100,
-body.theme-obsidian .border-slate-300 {
-    border-color: rgba(201, 168, 106, 0.25) !important;
-}
-body.theme-obsidian .nav-link {
-    color: #cbd5e1 !important;
-}
-body.theme-obsidian .nav-link:hover {
-    background-color: rgba(201, 168, 106, 0.12) !important;
-    color: #f8fafc !important;
-}
-body.theme-obsidian .nav-link.bg-indigo-50 {
-    background: linear-gradient(90deg, rgba(201, 168, 106, 0.22) 0%, rgba(22, 33, 56, 0.85) 100%) !important;
-    border-left: 3px solid #dfbe7f !important;
-    color: #f8fafc !important;
-}
-body.theme-obsidian #main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
-body.theme-obsidian #main-content select,
-body.theme-obsidian #main-content textarea,
-body.theme-obsidian .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
-body.theme-obsidian .modal-backdrop select,
-body.theme-obsidian .modal-backdrop textarea {
-    background-color: #0b111e !important;
-    color: #f8fafc !important;
-    border-color: rgba(201, 168, 106, 0.35) !important;
-    color-scheme: dark;
-}
-body.theme-obsidian table thead,
-body.theme-obsidian table thead tr {
-    background-color: #162138 !important;
-    color: #dfbe7f !important;
-}
-body.theme-obsidian table tbody tr:hover {
-    background-color: rgba(201, 168, 106, 0.08) !important;
-}
-body.theme-obsidian #btn-global-search {
-    background-color: #162138 !important;
-    color: #e2e8f0 !important;
-    border-color: rgba(201, 168, 106, 0.45) !important;
-}
-body.theme-obsidian #btn-theme-toggle {
-    background: linear-gradient(135deg, #dfbe7f 0%, #b89146 100%) !important;
-    color: #0a192f !important;
-    border-color: #dfbe7f !important;
-}
-body.theme-obsidian #btn-theme-toggle i {
-    color: #0a192f !important;
+/* ===== Pantalla de carga (splash) ===== */
+#splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #ffffff url('../img/splash-source.webp') center / cover no-repeat;
+    overflow: hidden;
 }
 
-/* === EXPERIENCIA MÓVIL Y PWA (iPhone / Android Safe Areas, Bottom Nav, Modales y Tarjetas) === */
-:root {
-    --sat: env(safe-area-inset-top, 0px);
-    --sar: env(safe-area-inset-right, 0px);
-    --sab: env(safe-area-inset-bottom, 0px);
-    --sal: env(safe-area-inset-left, 0px);
-    --mobile-nav-h: 64px;
+.splash-hide {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.35s ease, visibility 0.35s ease;
 }
 
-html, body {
-    -webkit-tap-highlight-color: transparent;
-    -webkit-text-size-adjust: 100%;
-    overflow-x: hidden;
+/* ===== Botón marmol (Instalar App) ===== */
+.btn-marble {
+    background: #e8e8e3 url('../img/marble-tile.jpg') center / cover no-repeat;
+    color: #0a2540 !important;
+    border: 1px solid #b8963e !important;
+    box-shadow: 0 2px 8px rgba(10, 37, 64, 0.18) !important;
 }
 
-/* Safe-areas superiores en header y sidebar cuando se ejecuta como PWA instalada */
-#main-app header {
-    padding-top: max(0.75rem, calc(var(--sat) + 0.35rem));
-    padding-left: max(1rem, calc(var(--sal) + 1rem));
-    padding-right: max(1rem, calc(var(--sar) + 1rem));
-}
-#sidebar .sidebar-header-safe {
-    padding-top: max(1.25rem, calc(var(--sat) + 0.75rem));
-}
-#sidebar > div:last-child {
-    padding-bottom: max(1rem, calc(var(--sab) + 0.75rem));
+.btn-marble:hover {
+    border-color: #8a6d1f !important;
+    box-shadow: 0 3px 12px rgba(10, 37, 64, 0.28) !important;
 }
 
-/* Barra de navegación inferior móvil */
-.mobile-bottom-nav {
-    display: none;
+.btn-marble i {
+    color: #a37d1f !important;
 }
-
-@media (max-width: 1023px) {
-    .mobile-bottom-nav {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 45;
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        align-items: center;
-        min-height: calc(var(--mobile-nav-h) + var(--sab));
-        padding: 4px max(6px, var(--sal)) calc(6px + var(--sab)) max(6px, var(--sar));
-        background: rgba(255, 255, 255, 0.96);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        border-top: 1px solid rgba(201, 168, 106, 0.38);
-        box-shadow: 0 -8px 28px -10px rgba(10, 37, 64, 0.16);
-    }
-    .mobile-bottom-nav .mob-nav-btn {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        padding: 6px 2px;
-        border-radius: 12px;
-        color: #64748b;
-        font-size: 10px;
-        font-weight: 600;
-        line-height: 1.1;
-        transition: all 0.18s ease;
-        user-select: none;
-        min-height: 48px;
-    }
-    .mobile-bottom-nav .mob-nav-btn i {
-        font-size: 17px;
-        transition: transform 0.18s ease;
-    }
-    .mobile-bottom-nav .mob-nav-btn span.mob-nav-label {
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        padding: 0 2px;
-    }
-    .mobile-bottom-nav .mob-nav-btn.active {
-        color: var(--primary, #0a2540);
-        background: linear-gradient(180deg, rgba(201, 168, 106, 0.20) 0%, rgba(201, 168, 106, 0.06) 100%);
-        font-weight: 700;
-    }
-    .mobile-bottom-nav .mob-nav-btn.active i {
-        color: var(--primary, #0a2540);
-        transform: translateY(-1px);
-    }
-    .mobile-bottom-nav .mob-nav-btn:active {
-        transform: scale(0.95);
-    }
-    .mobile-bottom-nav .mob-nav-badge {
-        position: absolute;
-        top: 3px;
-        right: calc(50% - 18px);
-        min-width: 16px;
-        height: 16px;
-        padding: 0 4px;
-        border-radius: 9999px;
-        background: #ef4444;
-        color: #ffffff;
-        font-size: 9px;
-        font-weight: 800;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 0 2px #ffffff;
-    }
-
-    /* Elevar barra de noticias y botón flotante sobre la barra inferior en móvil */
-    #news-ticker-wrapper {
-        bottom: calc(var(--mobile-nav-h) + var(--sab)) !important;
-        z-index: 38 !important;
-    }
-    #show-news-btn {
-        bottom: calc(var(--mobile-nav-h) + var(--sab) + 12px) !important;
-        right: 12px !important;
-        z-index: 42 !important;
-        padding: 0.5rem 0.85rem !important;
-        font-size: 0.75rem !important;
-    }
-    #main-content {
-        padding-bottom: calc(var(--mobile-nav-h) + var(--sab) + 4.25rem) !important;
-    }
-}
-
-/* Ajustes responsivos de modales, tarjetas, tablas e inputs en celulares (< 640px) */
-@media (max-width: 640px) {
-    /* Evita zoom automático en iOS Safari al enfocar inputs con font-size < 16px */
-    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
-    select,
-    textarea {
-        font-size: 16px !important;
-    }
-
-    /* Modales estilo hoja inferior (Bottom Sheet) cómoda para pulgar en celular */
-    .modal-backdrop {
-        align-items: flex-end !important;
-        padding: 0 !important;
-    }
-    .modal-backdrop > div {
-        position: relative;
-        width: 100% !important;
-        max-width: 100vw !important;
-        max-height: calc(92dvh - var(--sat)) !important;
-        border-bottom-left-radius: 0 !important;
-        border-bottom-right-radius: 0 !important;
-        border-top-left-radius: 1.35rem !important;
-        border-top-right-radius: 1.35rem !important;
-        padding-bottom: max(1rem, var(--sab)) !important;
-        margin: 0 !important;
-        animation: mobileSheetUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .modal-backdrop > div::before {
-        content: "";
-        display: block;
-        width: 40px;
-        height: 4px;
-        border-radius: 9999px;
-        background: rgba(148, 163, 184, 0.55);
-        margin: 8px auto 2px auto;
-        flex-shrink: 0;
-    }
-    @keyframes mobileSheetUp {
-        from { transform: translateY(24px); opacity: 0.85; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-
-    /* Modal de Chat a altura dinámica táctil en celulares */
-    .modal-backdrop > div:has(.chat-modal-shell) {
-        padding-bottom: 0 !important;
-        max-height: calc(94dvh - var(--sat)) !important;
-    }
-    .chat-modal-shell {
-        height: calc(88dvh - var(--sat)) !important;
-    }
-    .chat-modal-shell #chat-form {
-        padding-bottom: max(0.75rem, calc(var(--sab) + 0.5rem)) !important;
-    }
-
-    /* Compactar espaciados de tarjetas y encabezados en pantallas angostas */
-    #main-content {
-        padding-left: max(0.75rem, var(--sal)) !important;
-        padding-right: max(0.75rem, var(--sar)) !important;
-        padding-top: 0.85rem !important;
-    }
-    #main-content .p-8 {
-        padding: 1.15rem !important;
-    }
-    #main-content .p-6 {
-        padding: 1rem !important;
-    }
-    #main-content h2.text-2xl,
-    #main-content h1.text-2xl,
-    #main-content h1.text-3xl {
-        font-size: 1.25rem !important;
-        line-height: 1.65rem !important;
-        margin-top: 0.25rem !important;
-        margin-bottom: 0.85rem !important;
-    }
-    #page-title {
-        font-size: 1.05rem !important;
-    }
-
-    /* Tablas desplazables horizontalmente sin romper el layout móvil */
-    #main-content table,
-    .modal-backdrop table {
-        display: block;
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    #main-content .calc-wrap,
-    #public-portal .sim-embed .calc-wrap,
-    #public-portal .sim-embed .tiers,
-    #public-portal .sim-embed .testi-grid {
-        grid-template-columns: 1fr !important;
-        gap: 1.25rem !important;
-    }
-}
-
-/* Safe-area superior en la pantalla de login y portal público en modo standalone iPhone */
-#login-screen {
-    padding-top: max(3rem, calc(var(--sat) + 1.5rem));
-    padding-bottom: max(2rem, calc(var(--sab) + 1rem));
-}
-
-/* Soporte Modo Oscuro Ejecutivo (Obsidiana y Oro) para Barra Móvil */
-body.theme-obsidian .mobile-bottom-nav {
-    background: linear-gradient(180deg, rgba(11, 17, 30, 0.97) 0%, rgba(17, 25, 43, 0.98) 100%) !important;
-    border-top: 1px solid rgba(201, 168, 106, 0.42) !important;
-    box-shadow: 0 -10px 30px -8px rgba(0, 0, 0, 0.75) !important;
-}
-body.theme-obsidian .mobile-bottom-nav .mob-nav-btn {
-    color: #94a3b8 !important;
-}
-body.theme-obsidian .mobile-bottom-nav .mob-nav-btn.active {
-    color: #dfbe7f !important;
-    background: linear-gradient(180deg, rgba(201, 168, 106, 0.24) 0%, rgba(22, 33, 56, 0.8) 100%) !important;
-}
-body.theme-obsidian .mobile-bottom-nav .mob-nav-btn.active i {
-    color: #dfbe7f !important;
-}
-body.theme-obsidian .mobile-bottom-nav .mob-nav-badge {
-    box-shadow: 0 0 0 2px #0b111e !important;
-}
-
-

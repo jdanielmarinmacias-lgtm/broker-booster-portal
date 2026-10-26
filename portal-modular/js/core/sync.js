@@ -20,13 +20,15 @@
   /* Promotoría + escuela + chat: si otro equipo publica, el encargado lo ve
    * en vivo (el backend espeja estas al public_feed). */
   var LIVE_WORK = ['solicitudes', 'cotizaciones', 'ventas', 'siniestros',
-    'messages', 'groupMessages', 'notifications', 'lessons', 'liveClasses', 'exams'];
+    'messages', 'groupMessages', 'notifications', 'lessons', 'liveClasses', 'exams',
+    'chatGroups', 'forumPosts', 'invitaciones'];
   var KIND_TO_COL = {
     solicitudes: 'solicitudes', cotizaciones: 'cotizaciones', ventas: 'ventas',
     siniestros: 'siniestros', messages: 'messages', groupMessages: 'groupMessages',
     notifications: 'notifications', lessons: 'lessons', liveClasses: 'liveClasses',
     exams: 'exams', posts: 'posts', inmPublica: 'inmPublica', autoHub: 'autoHub',
-    carruselCirculares: 'carruselCirculares', media: 'media'
+    carruselCirculares: 'carruselCirculares', media: 'media',
+    chatGroups: 'chatGroups', forumPosts: 'forumPosts', invitaciones: 'invitaciones'
   };
   var KIND_TOAST = {
     solicitudes: '🔔 Nueva solicitud de cotización',
@@ -37,7 +39,9 @@
     groupMessages: '👥 Mensaje grupal nuevo',
     lessons: '📚 Nuevo contenido de escuela',
     liveClasses: '🎥 Nueva clase en vivo',
-    exams: '📝 Nuevo examen disponible'
+    exams: '📝 Nuevo examen disponible',
+    forumPosts: '🗣️ Nueva participación en el Foro',
+    chatGroups: '👥 Grupos actualizados'
   };
   var pushTimer = null;
   var shadow = null; // {col: [{...}]} última foto DEL SERVIDOR (solo lo traído por pull)
@@ -130,20 +134,49 @@
     try {
       const r = await get('/api/data/bundle');
       if (r && r.bundle && typeof r.bundle === 'object') {
+        let hayPendienteLocal = false;
         Object.keys(r.bundle).forEach(function (n) {
           if (SKIP[n]) return;
           const v = r.bundle[n];
           if (!v) return;
           if (v.shape === 'array') {
             if (!Array.isArray(db[n])) db[n] = [];
-            replaceArray(db[n], normIds(v.items));
+            /* Igual que pullNames: conservar registros optimistas creados
+             * localmente y aún no subidos (evita perder mensajes_rápidos si un
+             * bundle aterriza entre el save local y el push). */
+            const prevLocal = db[n].slice();
+            const prevShadowArr = (shadow && Array.isArray(shadow[n])) ? shadow[n] : [];
+            const wasOnServer = {};
+            prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
+            const serverItems = normIds(v.items);
+            if (shadow) shadow[n] = clone(serverItems);
+            replaceArray(db[n], serverItems);
+            const have = {};
+            db[n].forEach(function (x) { if (x && x.id !== undefined) have[String(x.id)] = true; });
+            prevLocal.forEach(function (x) {
+              if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]) {
+                db[n].push(x);
+                hayPendienteLocal = true;
+              }
+            });
           } else if (v.shape === 'object') {
             if (!isPlain(db[n])) db[n] = {};
+            const prevLocalObj = clone(db[n]);
+            const prevShadowObj = (shadow && isPlain(shadow[n])) ? shadow[n] : null;
+            const serverVal = normIds(v.value);
+            if (shadow) shadow[n] = clone(serverVal);
             Object.keys(db[n]).forEach(function (k) { delete db[n][k]; });
-            Object.assign(db[n], normIds(v.value));
+            Object.assign(db[n], serverVal);
+            Object.keys(prevLocalObj).forEach(function (k) {
+              if (!(k in db[n]) && !(prevShadowObj && (k in prevShadowObj))) {
+                db[n][k] = prevLocalObj[k];
+                hayPendienteLocal = true;
+              }
+            });
           }
           pulled[n] = true;
         });
+        if (hayPendienteLocal) pushSoon();
         if (Array.isArray(r.users)) {
           if (!Array.isArray(db.users)) db.users = [];
           replaceArray(db.users, normIds(r.users));

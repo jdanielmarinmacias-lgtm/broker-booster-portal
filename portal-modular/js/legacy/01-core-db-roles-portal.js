@@ -186,10 +186,11 @@ window.saveDB = function() {
                 return d.getFullYear()===now.getFullYear();
             }
             var ranking=agentes.map(function(a){
-                var vs=ventas.filter(function(v){ return (v.agente===a.id || v.agenteId===a.id) && inPeriod(v, window.currentRankingTab); });
+                var esDelAgente=function(v){ return String(v.agenteId!=null?v.agenteId:v.agente)===String(a.id); };
+                var vs=ventas.filter(function(v){ return esDelAgente(v) && inPeriod(v, window.currentRankingTab); });
                 var total=0; for(var i=0;i<vs.length;i++) total+=Number(vs[i].prima||0);
                 var prevDate=new Date(now); prevDate.setMonth(now.getMonth()-1);
-                var vsPrev=ventas.filter(function(v){ var d=new Date(v.fecha||v.ts||0); return (v.agente===a.id||v.agenteId===a.id) && d.getMonth()===prevDate.getMonth() && d.getFullYear()===prevDate.getFullYear(); });
+                var vsPrev=ventas.filter(function(v){ var d=new Date(v.fecha||v.ts||0); return esDelAgente(v) && d.getMonth()===prevDate.getMonth() && d.getFullYear()===prevDate.getFullYear(); });
                 var totalPrev=0; for(var i=0;i<vsPrev.length;i++) totalPrev+=Number(vsPrev[i].prima||0);
                 var variacion=totalPrev>0?Math.round((total-totalPrev)/totalPrev*100):(total>0?100:0);
                 return {id:a.id,name:a.name||a.nombre||'Agente',avatar:a.avatar||'https://i.pravatar.cc/40',total:total,count:vs.length,variacion:variacion,totalPrev:totalPrev};
@@ -376,7 +377,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             Object.keys(db.rolePermissions||{}).forEach(function(r){ var perms=db.rolePermissions[r]; if(Array.isArray(perms)&&perms.indexOf('inm-cartera')>=0){ ['inm-unidades','inm-cartera'].forEach(function(s){ if(perms.indexOf(s)<0) perms.push(s); }); } });
             const defaultPerms = {
                 admin: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','mi-equipo','convenciones','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
-                gm: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','control-accesos','mi-equipo','convenciones','mis-clientes','siniestros','ai-lobby','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
+                gm: ['dashboard','reportes-progreso','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','control-accesos','mi-equipo','convenciones','mis-clientes','siniestros','ai-lobby','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
                 desarrollador: ['dashboard','leaderboard','carrusel-circulares','my-groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera', 'resultados-prospectos','guion-llamadas'],
                 maestro: ['dashboard','leaderboard','carrusel-circulares','my-groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mi-equipo','convenciones','monitoreo','guion-llamadas','centro-mensajes'],
                 capacitador: ['dashboard','leaderboard','carrusel-circulares','my-groups','tareas','biblioteca','live-classes','exams'],
@@ -405,6 +406,15 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                 const migracionF5 = { admin:['publicidad','comparador-productos'], gm:['publicidad','comparador-productos'], editor:['publicidad','comparador-productos','guion-llamadas','casos-exito'], desarrollador:['publicidad','comparador-productos'], maestro:['comparador-productos'], agencia:['comparador-productos'], capacitador:['comparador-productos'], alumno:['comparador-productos'], agente_desarrollo:['comparador-productos'], agente_agencia:['comparador-productos'] };
                 Object.keys(migracionF5).forEach(r => { if(db.rolePermissions[r]){ migracionF5[r].forEach(s => { if(!db.rolePermissions[r].includes(s)) db.rolePermissions[r].push(s); }); } });
                 Object.keys(migracionSecciones).forEach(r => { if(db.rolePermissions[r]){ migracionSecciones[r].forEach(s => { if(!db.rolePermissions[r].includes(s)) db.rolePermissions[r].push(s); }); } });
+                // PATCH Academia GM 2026-10 (rev. Kardex):
+                // a) GM: lista guardada vieja podría NO traer 'groups/formacion/etc'; los restauramos
+                //    (incluye 'reports', que una versión previa retiraba al mover el embudo).
+                // b) 'reportes-progreso' = Embudo Comercial + SLA, sección GM bajo Dashboard.
+                //    'reports' permanece en Academia como "Kardex de Capacitación".
+                const gmAcademia2026 = ['formacion','generations','groups','categories','lessons','reportes-progreso','reports'];
+                if (db.rolePermissions.gm && Array.isArray(db.rolePermissions.gm)) {
+                    gmAcademia2026.forEach(s => { if (!db.rolePermissions.gm.includes(s)) db.rolePermissions.gm.push(s); });
+                }
                 if(db.rolePermissions.agencia && !db.rolePermissions.agencia.includes('monitoreo')){
                     db.rolePermissions.agencia.push('monitoreo','mi-equipo','convenciones');
                 }
@@ -486,13 +496,15 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (!db.enrollments.some(e=>e.userId===3)) {
                 db.enrollments.push({ id: 1, userId: 3, generationId: 1, groupId: 1, enrolledAt: new Date().toISOString() });
             }
-            if (!db.posts.some(p=>p.groupId===1)) {
+            const demoYaSembrado = !!db.demoSeeded;
+            db.demoSeeded = true;
+            if (!demoYaSembrado && !db.posts.some(p=>p.groupId===1)) {
                 if(!db.posts.some(p=>p.id)) db.posts.forEach(p=>{if(p.isBestAnswer===undefined) p.isBestAnswer=false;}); db.posts.push(
                     { id: Date.now()-20000, groupId: 1, authorId: 2, content: '¡Bienvenidos a la nueva generación! Recuerden revisar el material de Álgebra.', pinned: true, createdAt: new Date(Date.now()-86400000*2).toISOString() },
                     { id: Date.now()-10000, groupId: 1, authorId: 2, content: 'Recordatorio: clase en vivo mañana a las 18:00.', pinned: false, createdAt: new Date(Date.now()-86400000).toISOString() }
                 );
             }
-            if (!db.groupMessages.some(m=>m.groupId===1)) {
+            if (!demoYaSembrado && !db.groupMessages.some(m=>m.groupId===1)) {
                 db.groupMessages.push(
                     { id: 1, groupId: 1, authorId: 3, content: 'Hola profe, ¿dónde encuentro la tarea?', createdAt: new Date(Date.now()-3600000*5).toISOString() },
                     { id: 2, groupId: 1, authorId: 2, content: 'Hola Ana, está en Mis Cursos > Matemáticas', createdAt: new Date(Date.now()-3600000*4).toISOString() },
@@ -546,7 +558,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
         }
 
         function login(username, password) {
-            const user = db.users.find(u => u.username === username && u.password === password);
+            const user = null; // Login local retirado: la autenticación es solo en el servidor.
             if (user) {
                 const destination = sessionStorage.getItem('login_destination') || 'campus';
                 sessionStorage.removeItem('login_destination');
@@ -612,7 +624,7 @@ const MULTI_SECTOR_SECCIONES = [
     { id:'ms-construccion', label:'Construcción', icon:'fa-helmet-safety' },
     { id:'ms-nutricion', label:'Nutrición y Medicina General', icon:'fa-heart-pulse' }
 ];
-function allowedRolesForMulti(id){ return true; }
+function allowedRolesForMulti(id){ return isAdmin(currentUser) || isAgencia(currentUser) || isTeacher(currentUser) || isStudent(currentUser); }
 function renderMultiSector(page){
     const sec = MULTI_SECTOR_SECCIONES.find(x=>x.id===page) || { label:'Multi-Sector', icon:'fa-shapes' };
     return `
@@ -1443,6 +1455,26 @@ function servTab(id){
             });
             document.querySelectorAll('[data-serv-grupo]').forEach(d=>{ d.classList.toggle('hidden', d.getAttribute('data-serv-grupo')!==id); });
         }
+/* Pestañas de la portada: cada sección ocupa su propia vista (hash en la URL). */
+const PUB_PESTANAS = ['servicios','unirse','ingresos','historias','blog','proceso'];
+function pubMostrarPestana(){
+  const h = String(location.hash || '').replace('#','');
+  const activa = PUB_PESTANAS.indexOf(h) >= 0 ? h : 'servicios';
+  PUB_PESTANAS.forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.style.display = (id === activa) ? '' : 'none';
+  });
+  document.querySelectorAll('[data-pub-tab]').forEach(function(a){
+    const on = a.getAttribute('data-pub-tab') === activa;
+    a.classList.toggle('text-[var(--bb-forest)]', on);
+    a.classList.toggle('font-semibold', on);
+    a.classList.toggle('border-b-2', on);
+    a.classList.toggle('border-[var(--bb-gold)]', on);
+  });
+  if(h && PUB_PESTANAS.indexOf(h) >= 0) window.scrollTo({ top: 0, behavior: 'auto' });
+}
+window.addEventListener('hashchange', function(){ if(document.getElementById('public-portal') && !document.getElementById('public-portal').classList.contains('hidden')) pubMostrarPestana(); });
+
 function renderPublicPortal() {
             const hh0=String(location.hash||"");
             if(hh0.indexOf("#auto-")===0 && typeof auVerAuto==="function"){ auVerAuto(hh0.slice(6)); return; }
@@ -1466,12 +1498,12 @@ function renderPublicPortal() {
                                 <span class="hidden sm:inline text-xl font-bold text-slate-800 truncate">${s.institutionName}</span>
                             </div>
                             <nav class="hidden lg:flex items-center gap-5">
-                                <a href="#servicios" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Servicios</a>
-                                <a href="#unirse" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Cómo ganarías</a>
-                                <a href="#ingresos" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Simulador</a>
-                                <a href="#historias" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Historias</a>
-                                <a href="#blog" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Blog</a>
-                                <a href="#proceso" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition">Proceso</a>
+                                <a href="#servicios" data-pub-tab="servicios" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Servicios</a>
+                                <a href="#unirse" data-pub-tab="unirse" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Cómo ganarías</a>
+                                <a href="#ingresos" data-pub-tab="ingresos" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Simulador</a>
+                                <a href="#historias" data-pub-tab="historias" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Historias</a>
+                                <a href="#blog" data-pub-tab="blog" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Blog</a>
+                                <a href="#proceso" data-pub-tab="proceso" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Proceso</a>
                                 <div class="relative" id="nav-subs">
                                     <button onclick="var m=document.getElementById('nav-subs-menu'); m.classList.toggle('hidden');" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition flex items-center gap-1">Disponible <i class="fas fa-chevron-down text-[10px]"></i></button>
                                     <div id="nav-subs-menu" class="hidden absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 z-50">
@@ -1487,12 +1519,20 @@ function renderPublicPortal() {
                                 </div>
                             </nav>
                             <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                                <button onclick="showCampusLogin()" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-emerald-700"></i><span>Campus</span></button>
-                                <button onclick="openSolicitudModal('aplicar')" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-emerald-700 text-white font-semibold rounded-xl hover:bg-emerald-800 transition"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
+                                <button onclick="showCampusLogin()" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-[var(--bb-gold-deep)]"></i><span>Campus</span></button>
+                                <button onclick="openSolicitudModal('aplicar')" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-[var(--bb-forest)] text-white font-semibold rounded-xl hover:bg-[var(--bb-emerald)] transition border border-[var(--bb-gold)]"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
                                 <button onclick="showAdminLogin()" title="Acceso administrativo" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg"><i class="fas fa-lock text-[11px]"></i><span class="lg:hidden">Admin</span><span class="hidden lg:inline">Acceso administrativo</span></button>
                             </div>
                         </div>
                     </div>
+                    <nav class="lg:hidden flex gap-2 overflow-x-auto px-4 pb-3 bg-white" aria-label="Secciones de la portada">
+                        <a href="#servicios" data-pub-tab="servicios" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Servicios</a>
+                        <a href="#unirse" data-pub-tab="unirse" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Cómo ganarías</a>
+                        <a href="#ingresos" data-pub-tab="ingresos" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Simulador</a>
+                        <a href="#historias" data-pub-tab="historias" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Historias</a>
+                        <a href="#blog" data-pub-tab="blog" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Blog</a>
+                        <a href="#proceso" data-pub-tab="proceso" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Proceso</a>
+                    </nav>
                 </header>
 
                 <!-- Hero reclutamiento (formal, blanco/verde/negro) -->
@@ -1517,7 +1557,7 @@ function renderPublicPortal() {
                                 <span class="flex items-center gap-1.5"><i class="fas fa-check-circle text-emerald-600"></i> Certificación y supervisión CNSF</span>
                             </p>
                             <div class="flex flex-col sm:flex-row gap-4">
-                                <a href="#servicios" class="group px-8 py-4 bg-[#c9a86a] text-slate-900 font-bold rounded-2xl hover:bg-[#b8912f] transition text-center shadow-xl flex items-center justify-center gap-2">
+                                <a href="#servicios" class="group px-8 py-4 bg-[var(--bb-gold)] text-[var(--bb-ink)] font-bold rounded-2xl hover:bg-[var(--bb-gold-deep)] hover:text-white transition text-center shadow-xl flex items-center justify-center gap-2">
                                     ${db.settings.hero?.textoBoton1 || "Conoce nuestros servicios"}
                                     <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
                                 </a>
@@ -1579,7 +1619,7 @@ function renderPublicPortal() {
                                         </div>
                                         <h3 class="text-lg font-bold text-slate-900 mb-2">${psEscape(x.n)}</h3>
                                         <p class="text-sm text-slate-600 leading-relaxed">${psEscape(x.d)}</p>
-                                        <a href="https://wa.me/526643640670?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20${encodeURIComponent(x.n)}" target="_blank" class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:text-emerald-800">Cotizar / agendar <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></a>
+                                        <a href="https://wa.me/526643640670?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20${encodeURIComponent(x.n)}" target="_blank" class="mt-4 inline-flex items-center gap-1.5 min-h-[44px] py-2 text-sm font-semibold text-[var(--bb-forest)] hover:text-[var(--bb-emerald)]">Cotizar / agendar <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></a>
                                     </div>`).join('')}
                             </div>
                         </div>`).join('')}
@@ -1978,10 +2018,12 @@ function renderPublicPortal() {
 
             <!-- CTA móvil sticky -->
             <div class="md:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur border-t border-slate-200 z-30">
-                <button onclick="document.getElementById('ingresos').scrollIntoView({behavior:'smooth'})" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl">Calcular mi ingreso</button>
+                <a href="#ingresos" class="block w-full py-3 text-center bg-[var(--bb-forest)] text-white font-bold rounded-xl">Calcular mi ingreso</a>
             </div>
             `;
             
+            // Pestañas de la portada: cada sección se muestra sola según el hash.
+            setTimeout(() => { pubMostrarPestana(); }, 0);
             // Inicializar calculadora v2
             setTimeout(() => {
                 const range = document.getElementById('primaRangeV2');
@@ -2206,11 +2248,7 @@ function auD(){
             if(l2) l2.textContent = s.loginLine2;
             const l3 = document.getElementById('login-line3');
             if(l3) l3.textContent = s.loginLine3;
-            if(s.primaryColor){
-                document.documentElement.style.setProperty('--primary', s.primaryColor);
-                document.documentElement.style.setProperty('--primary-dark', s.primaryDark);
-                document.documentElement.style.setProperty('--accent', s.accent);
-            }
+            // Paleta de marca (styles.css): ya no se sobreescribe con colores antiguos guardados.
             applyExecutiveTheme(localStorage.getItem('bb_exec_theme') || (s.execTheme || 'marble'));
         }
 
@@ -2864,7 +2902,7 @@ CÓMO RESPONDES: SOLO como ese personaje, español mexicano natural, nunca como 
     const txt = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
     return txt ? txt.trim() : 'Perdón, ¿me lo puedes repetir?';
   }catch(e){
-    showToast('IA remota no disponible ('+e.message+') — usando motor local','warning');
+    showToast('La IA no respondió — se usa el motor local para continuar la sesión','warning');
     window.psAPIKey = '';
     return esInicio ? psSaludoLocal(s) : psMotorProspecto(mensajeAsesor);
   }
@@ -3098,7 +3136,7 @@ async function psAnalizarIA(){
   let mxLocal=null;
   try{ mxLocal = psAnalizarMuletillas(s.mensajes.filter(m=>m.rol==='asesor').map(m=>m.texto).join(' ')); }catch(e){}
   const rub = PS_RUBRICA.map(r=>r.label+' (0-100)').join(', ');
-  const sys = 'Eres un director de formación en ventas de seguros en México con 20 años de experiencia. Evalúas transcripciones de sesiones de práctica de asesores de Skandia. Responde EXCLUSIVAMENTE en JSON válido sin markdown: {"total":0-100,"claves":[{"key":"rapport","score":0-100,"nota":"1 frase"}], "fortalezas":["..."],"mejoras":["..."],"proximo":"1 frase"} usando las claves: rapport, descubrimiento, escucha, manejoObjeciones, propuestaValor, cierre.';
+  const sys = 'Eres un director de formación en ventas de seguros en México con 20 años de experiencia. Evalúas transcripciones de sesiones de práctica de asesores de Skandia. Responde EXCLUSIVAMENTE en JSON válido sin markdown: {"total":0-100,"claves":[{"key":"rapport","score":0-100,"nota":"1 frase","evidencia":"cita textual corta del ASESOR que sustenta el score, o vacía si no hubo"}], "fortalezas":["..."],"mejoras":["..."],"proximo":"1 frase"} usando las claves: rapport, descubrimiento, escucha, manejoObjeciones, propuestaValor, cierre. RÚBRICA: 0-30 si no aparece la conducta; 31-60 si aparece de forma básica; 61-85 si aparece con preguntas o argumentos concretos; 86-100 si el asesor la ejecuta de forma clara y sostenida. Cada score debe tener evidencia textual del ASESOR; sin evidencia el score no pasa de 30. No califiques por la longitud del texto ni por el tono del prospecto.';
   const trans = s.mensajes.map(m=>(m.rol==='asesor'?'ASESOR: ':'PROSPECTO: ')+m.texto).join('\n');
   try{
     const res = await fetch(window.psAPIUrl || PS_PROVEEDORES.groq.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+psKeyIA()}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages:[{role:'system',content:sys},{role:'user',content:'Transcripción:\n'+trans}], max_tokens: 1500, temperature: 0.3 }, window.psAPIExtra||{})) });
@@ -3106,6 +3144,8 @@ async function psAnalizarIA(){
     const txt = (j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'').replace(/```json|```/g,'').trim();
     const fb = JSON.parse(txt);
     if(fb && typeof fb.total==='number'){
+      if(Array.isArray(fb.claves)) fb.claves.forEach(c=>{ if(typeof c.score==='number' && !String(c.evidencia||'').trim() && c.score>30) c.score=30; });
+      if(Array.isArray(fb.claves) && fb.claves.length) fb.total=Math.round(fb.claves.reduce((a,c)=>a+(Number(c.score)||0),0)/fb.claves.length);
       if(Array.isArray(fb.mejoras) && fb.mejoras.length && typeof fb.mejoras[0]==='object') fb.mejoras = fb.mejoras.map(m=>m.texto||m.label||JSON.stringify(m));
       if(mxLocal && mxLocal.total>0){
         const det = Object.entries(mxLocal.hallazgos).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>k+' ×'+v).join(', ');
@@ -3143,7 +3183,7 @@ function psRenderFeedback(fb, s){
   </div>
   ${mxHTML}
   <div class="grid md:grid-cols-2 gap-3">
-    ${fb.claves.map(c=>{ const cc = c.score>=70?'bg-emerald-500':c.score>=40?'bg-amber-500':'bg-rose-500'; const nota = c.nota?`<div class="text-[11px] text-slate-500 mt-1">${psEscape(c.nota)}</div>`:''; return `<div class="bg-white border border-slate-200 rounded-xl p-3"><div class="flex items-center justify-between text-sm"><span class="font-medium text-slate-700">${c.label}</span><span class="font-bold text-slate-900">${c.score}</span></div><div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="${cc} h-full rounded-full" style="width:${c.score}%"></div></div>${nota}</div>`; }).join('')}
+    ${fb.claves.map(c=>{ const cc = c.score>=70?'bg-emerald-500':c.score>=40?'bg-amber-500':'bg-rose-500'; const nota = c.nota?`<div class="text-[11px] text-slate-500 mt-1">${psEscape(c.nota)}</div>`+(c.evidencia?`<div class="text-[11px] text-slate-400 italic mt-1">“${psEscape(c.evidencia)}”</div>`:''):''; return `<div class="bg-white border border-slate-200 rounded-xl p-3"><div class="flex items-center justify-between text-sm"><span class="font-medium text-slate-700">${c.label}</span><span class="font-bold text-slate-900">${c.score}</span></div><div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="${cc} h-full rounded-full" style="width:${c.score}%"></div></div>${nota}</div>`; }).join('')}
   </div>
   ${fb.fortalezas&&fb.fortalezas.length?`<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4"><div class="text-sm font-bold text-emerald-800 mb-1">✓ Lo que hiciste bien</div><ul class="text-sm text-emerald-700 space-y-1 list-disc pl-5">${fb.fortalezas.map(f=>`<li>${psEscape(f)}</li>`).join('')}</ul></div>`:''}
   <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
@@ -3191,7 +3231,7 @@ function psRenderSesion(){
   const activa = window.psSesionActiva;
   if(activa) return psRenderConfig() + `<div id="ps-chat-col" class="lg:col-span-2">${psRenderChat()}</div>`;
   return psRenderConfig() + `<div id="ps-chat-col" class="lg:col-span-2"><div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-      <div class="w-16 h-16 rounded-2xl bg-indigo-50 grid place-items-center mx-auto mb-4"><i class="fas fa-comments text-2xl text-indigo-600"></i></div>
+      <div class="w-16 h-16 rounded-2xl bg-[#f3efe4] border border-[var(--bb-gold)] grid place-items-center mx-auto mb-4"><i class="fas fa-comments text-2xl text-[var(--bb-forest)]"></i></div>
       <h3 class="font-bold text-lg text-slate-900">Configura tu prospecto y presiona "Iniciar sesión de práctica"</h3>
       <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Elegirás personaje, dificultad y voz. Durante la sesión tendrás tips sugeridos en vivo y al finalizar recibes tu calificación con plan de mejora. El historial queda guardado.</p>
       <div class="grid md:grid-cols-3 gap-3 max-w-2xl mx-auto mt-6 text-left">
@@ -3567,6 +3607,9 @@ const GUIA_SYS = [
 let guiaEl=null, guiaOpen=false, guiaMsgs=null, guiaBusy=false, guiaRecognition=null, guiaMicOn=false, guiaDocText='';
 function guiaUserKey(){ return String(currentUser.id); }
 function guiaGetChat(){ const d=psGetDB(); d.guiaChats=d.guiaChats||{}; const k=guiaUserKey(); d.guiaChats[k]=d.guiaChats[k]||[]; return d.guiaChats[k]; }
+function guiaRegistrar(texto, estado){
+  try{ const d=psGetDB(); d.guiaLog=Array.isArray(d.guiaLog)?d.guiaLog:[]; d.guiaLog.unshift({ts:new Date().toISOString(), usuario:currentUser?currentUser.name:'—', chars:String(texto||'').length, estado}); if(d.guiaLog.length>200) d.guiaLog.length=200; psSaveDB(d); }catch(e){}
+}
 function guiaSaveChat(arr){ const d=psGetDB(); d.guiaChats=d.guiaChats||{}; d.guiaChats[guiaUserKey()]=arr; psSaveDB(d); }
 function guiaContexto(texto){
   try{
@@ -3704,9 +3747,9 @@ function guiaMount(){
   if(document.getElementById('guia-fab')) return;
   const fab=document.createElement('div'); fab.id='guia-fab';
   fab.innerHTML=`
-  <button id="guia-fab-btn" title="GUIA — tu asesor IA (clic derecho: limpiar chat)" class="fixed bottom-20 right-5 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-2xl shadow-indigo-900/40 hover:scale-105 transition grid place-items-center text-xl">🤖</button>
+  <button id="guia-fab-btn" title="GUIA — tu asesor IA (clic derecho: limpiar chat)" class="fixed bottom-20 right-5 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-[var(--bb-forest)] to-[var(--bb-emerald)] text-white shadow-2xl border-2 border-[var(--bb-gold)] hover:scale-105 transition grid place-items-center text-xl">🤖</button>
   <div id="guia-panel" class="hidden fixed bottom-36 right-5 z-[60] w-[380px] max-w-[92vw] h-[560px] max-h-[72vh] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-    <div class="px-4 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center gap-3">
+    <div class="px-4 py-3 bg-gradient-to-r from-[var(--bb-forest)] to-[var(--bb-emerald)] text-white flex items-center gap-3 border-b-2 border-[var(--bb-gold)]">
       <div class="w-9 h-9 rounded-full bg-white/20 grid place-items-center text-lg">🤖</div>
       <div class="flex-1 min-w-0">
         <div class="font-bold text-sm leading-tight">Gu-IA</div>
@@ -3720,9 +3763,9 @@ function guiaMount(){
     <div class="p-3 border-t border-slate-200 bg-white">
       <div class="flex items-end gap-2">
         <label id="guia-attach" title="Adjuntar documento (PDF, TXT, CSV, MD)" class="p-2 rounded-xl border border-slate-300 text-slate-500 hover:bg-slate-50 cursor-pointer"><i class="fas fa-paperclip"></i><input id="guia-file" type="file" accept=".pdf,.txt,.csv,.md,.json" class="hidden" multiple></label>
-        <textarea id="guia-input" rows="1" placeholder="¿Qué necesitamos resolver hoy?" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        <textarea id="guia-input" rows="1" placeholder="¿Qué necesitamos resolver hoy?" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 resize-none outline-none focus:ring-2 focus:ring-[var(--bb-gold)]"></textarea>
         <button id="guia-mic" title="Hablarle a GUIA" class="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50"><i class="fas fa-microphone"></i></button>
-        <button id="guia-send" class="px-3 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button>
+        <button id="guia-send" class="px-3 py-2 rounded-xl bg-[var(--bb-forest)] text-white hover:bg-[var(--bb-emerald)]"><i class="fas fa-paper-plane"></i></button>
       </div>
     </div>
   </div>`;
@@ -3738,6 +3781,14 @@ function guiaMount(){
   document.getElementById('guia-mic').onclick=()=>guiaToggleMic();
   if(window.guiaVozOn===undefined) window.guiaVozOn=false;
   guiaRenderMsgs();
+}
+/* Traduce fallos de red o del proveedor a un mensaje útil (sin texto crudo). */
+function guiaMensajeError(e){
+  const m=String((e&&e.message)||'');
+  if(/401|403|invalid|api key|unauthori/i.test(m)) return '⚠️ La IA no aceptó la clave configurada. Avisa al administrador para revisarla.';
+  if(/429|rate|limit/i.test(m)) return '⏳ Gu-IA está atendiendo muchas consultas. Intenta de nuevo en un minuto.';
+  if(/Failed to fetch|NetworkError|network/i.test(m)) return '⚠️ Sin conexión con Gu-IA. Revisa tu internet e intenta de nuevo.';
+  return '⚠️ Gu-IA no pudo responder en este momento. Intenta de nuevo.';
 }
 function guiaShow(){ guiaOpen=true; const p=document.getElementById('guia-panel'); if(p){ p.classList.remove('hidden'); guiaRenderMsgs(); setTimeout(()=>{ const i=document.getElementById('guia-input'); if(i) i.focus(); },80); } }
 function guiaHide(){ guiaOpen=false; const p=document.getElementById('guia-panel'); if(p) p.classList.add('hidden'); if(guiaMicOn) guiaToggleMic(); }
@@ -3833,12 +3884,13 @@ async function guiaSend(){
     const contenidoDoc=tieneDoc?('\n\n=== CONTENIDO DEL DOCUMENTO ADJUNTO ===\n'+guiaDocText+'\n=== FIN DEL DOCUMENTO ==='):'';
     guiaDocText='';
     const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaContexto(texto)+web}]
-      .concat(arr.slice(-20).map((m,i)=>({role:m.rol==='user'?'user':'assistant', content:(m.doc&&i===arr.length-1?(contenidoDoc+'\n'):'')+m.texto})));
+      .concat(arr.slice(-12).map((m,i,a)=>({role:m.rol==='user'?'user':'assistant', content:(m.doc&&i===a.length-1?(contenidoDoc+'\n'):'')+String(m.texto||'').slice(0,1500)})));
     const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
     const j=await res.json();
     if(j.error) throw new Error(j.error.message||'API error');
     respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'Me quedé sin palabras (respuesta vacía). Insiste o reformula.';
-  }catch(e){ respuesta='⚠️ No pude conectarme a mi cerebro IA ('+e.message+'). Revisa conexión o la API key.'; }
+    guiaRegistrar(texto,'ok');
+  }catch(e){ respuesta=guiaMensajeError(e); guiaRegistrar(texto,'error: '+(e&&e.message||'desconocido')); }
   const datosAgenda=guiaDetectarAgenda(texto+' '+respuesta);
   let agendado=null;
   if(datosAgenda){ agendado=guiaAgendar(datosAgenda); }
@@ -4387,7 +4439,7 @@ function renderPublicidad(){
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       ${items.map(p=>`
       <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col hover:shadow-md transition">
-        ${pubEsImagen(p)?`<button type="button" onclick="pubVerImagen('${p.id}')" title="Ver imagen completa" class="mb-3 -mx-1"><img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="h-36 w-full object-cover rounded-xl border border-slate-200" loading="lazy"></button>`:''}
+        ${pubEsImagen(p)?`<button type="button" onclick="pubVerImagen('${p.id}')" title="Ver imagen completa" class="block w-full mb-3 -mx-4 -mt-4"><img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="h-64 sm:h-80 w-full object-cover rounded-t-2xl border-b border-slate-200" loading="lazy"></button>`:''}
         <div class="flex items-start justify-between mb-2">
           <div class="w-10 h-10 rounded-xl bg-emerald-50 grid place-items-center"><i class="fas ${p.tipo==='enlace'?'fa-link':'fa-file-lines'} text-emerald-600"></i></div>
           ${puede?`<div class="flex gap-2"><button onclick="openPublicidadModal('${p.id}')" class="text-slate-400 hover:text-indigo-600 text-xs"><i class="fas fa-pen"></i></button><button onclick="borrarPublicidad('${p.id}')" class="text-slate-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button></div>`:''}
@@ -4413,9 +4465,9 @@ function pubEsImagen(p){ return /^data:image\//.test(String((p&&p.fileData)||'')
 function pubVerImagen(id){
   const p=(db.settings&&db.settings.publicidad||[]).find(x=>String(x.id)===String(id));
   if(!p||!pubEsImagen(p)){ showToast('No hay imagen para mostrar','warning'); return; }
-  showModal(`<div class="p-4 max-w-md w-full text-center">
+  showModal(`<div class="p-4 max-w-3xl w-full text-center">
     <div class="flex items-center justify-between mb-3"><h3 class="text-base font-bold truncate">${psEscape(p.titulo)}</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
-    <img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="w-full max-h-[60vh] object-contain rounded-xl border border-slate-200 bg-white">
+    <img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="w-full max-h-[78vh] object-contain rounded-xl border border-slate-200 bg-white">
     ${p.descripcion?`<p class="text-xs text-slate-500 mt-2">${psEscape(p.descripcion)}</p>`:''}
   </div>`);
 }
@@ -6653,7 +6705,7 @@ function initializeApp() {
             function renderNav() {
             const nav = document.getElementById('nav-menu');
             if (!nav || typeof currentUser === 'undefined' || !currentUser) return;
-            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
+            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, ...( (currentUser.role||'').toLowerCase() === 'gm' ? [{ id: 'reportes-progreso', label: 'Embudo Comercial y SLA', icon: 'fa-funnel-dollar' }] : [] ), { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
             const adminItems = [
                 { id: 'users', label: 'Usuarios', icon: 'fa-users' },
                 { id: 'monitoreo', label: 'Monitoreo Agencias', icon: 'fa-chart-line' },
@@ -6668,7 +6720,7 @@ function initializeApp() {
                 { id: 'biblioteca', label: 'Biblioteca', icon: 'fa-book-reader' },
                 { id: 'exams', label: 'Exámenes', icon: 'fa-clipboard-check' },
                 { id: 'messages', label: 'Mensajes', icon: 'fa-comments' },
-                { id: 'reports', label: 'Reportes', icon: 'fa-chart-pie' },
+                { id: 'reports', label: 'Kardex de Capacitación', icon: 'fa-chart-pie' },
                 { id: 'glossary', label: 'Glosario de Conceptos', icon: 'fa-book-atlas' },
                 { id: 'personalizar', label: 'Personalización', icon: 'fa-palette' },
                 { id: 'solicitudes', label: 'Solicitudes', icon: 'fa-inbox' },
@@ -6687,7 +6739,7 @@ function initializeApp() {
                 { id: 'biblioteca', label: 'Biblioteca', icon: 'fa-book-reader' },
                 { id: 'exams', label: 'Exámenes', icon: 'fa-clipboard-check' },
                 { id: 'messages', label: 'Mensajes', icon: 'fa-comments' },
-                { id: 'reports', label: 'Reportes', icon: 'fa-chart-pie' },
+                { id: 'reports', label: 'Kardex de Capacitación', icon: 'fa-chart-pie' },
                 { id: 'glossary', label: 'Glosario de Conceptos', icon: 'fa-book-atlas' }
             ];
             const alumnoItems = [
@@ -6785,7 +6837,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     {id:'biblioteca', label:'Biblioteca', icon:'fa-book-reader'},
                     {id:'exams', label:'Exámenes', icon:'fa-clipboard-check'},
                     {id:'messages', label:'Mensajes', icon:'fa-comments'},
-                    {id:'reports', label:'Reportes', icon:'fa-chart-pie'},
+                    {id:'reports', label:'Kardex de Capacitación', icon:'fa-chart-pie'},
                     {id:'glossary', label:'Glosario de Conceptos', icon:'fa-book-atlas'},
                     {id:'personalizar', label:'Personalización', icon:'fa-palette'},
                     {id:'solicitudes', label:'Solicitudes', icon:'fa-inbox'},
@@ -6837,7 +6889,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const unreadMsgCount = currentUser ? (db.messages || []).filter(m => String(m.toId) === String(currentUser.id) && !m.read).length : 0;
 
             // === NUEVA AGRUPACIÓN DE MENÚ ===
-            const generalesIds = ['dashboard','messages','carrusel-circulares','mi-agenda','live-classes','control-accesos','editor','oferta-valor','solicitudes','personalizar','users','centro-mensajes','ai-lobby'];
+            // PATCH 2026-10: 'reportes-progreso' va como sección independiente bajo Dashboard (solo GM)
+            const generalesIds = ['dashboard','reportes-progreso','messages','carrusel-circulares','mi-agenda','live-classes','control-accesos','editor','oferta-valor','solicitudes','personalizar','users','centro-mensajes','ai-lobby'];
             const comercialIds = ['monitoreo','mi-equipo','mis-clientes','mis-metas','mis-logros','convenciones','mi-experiencia','simulador','practica-sesiones','guion-llamadas','publicidad','cotizaciones','comparador-productos','siniestros'];
             const exitoIds = ['casos-exito'];
             const itemHtml = (item) => `
@@ -7096,6 +7149,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 case 'glossary': content.innerHTML = renderGlossary(); break;
                 case 'branding': content.innerHTML = renderBranding(); break;
                 case 'reports': content.innerHTML = renderReports(); break;
+                case 'reportes-progreso': content.innerHTML = renderReportesProgreso(); break;
                 case 'live-classes': content.innerHTML = renderLiveClasses() /* v6.5: sanitizado con escapeHTML dentro de render */; break;
                 case 'my-courses': content.innerHTML = renderMyCourses(); break;
                 case 'my-progress': content.innerHTML = renderMyProgress(); break;
@@ -7446,7 +7500,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     const caption = gInput.value.trim();
                     gInput.value = '';
                     db.groupMessages.push({
-                        id: Date.now() + Math.floor(Math.random()*1000),
+                        id: idUnico(),
                         groupId,
                         authorId: currentUser.id,
                         content: caption || ('📷 ' + file.name),
@@ -7467,7 +7521,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const input = document.getElementById(`chat-input-${groupId}`);
                 const content = input.value.trim();
                 if(!content) return;
-                const msg = { id: Date.now() + Math.floor(Math.random()*1000), groupId, authorId: currentUser.id, content, createdAt: new Date().toISOString() };
+                const msg = { id: idUnico(), groupId, authorId: currentUser.id, content, createdAt: new Date().toISOString() };
                 db.groupMessages.push(msg);
                 saveDB();
                 if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
@@ -8270,7 +8324,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         }
 
         function renderCategories() {
-            const canEdit = ['admin', 'maestro'].includes(currentUser.role);
+            // PATCH GM 2026-10: GM tiene acceso total a Academia (mismos permisos que maestro/capacitador)
+            const canEdit = hasRole(currentUser, ['admin', 'maestro', 'gm', 'capacitador']);
             const filtroTipo = window.filtroCatTipo || 'all';
             const filtroPlan = window.filtroCatPlan ? parseInt(window.filtroCatPlan) : null;
             const filtroGen = window.filtroCatGen ? parseInt(window.filtroCatGen) : null;
@@ -8287,6 +8342,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const gen = db.generations.find(g=>g.id===filtroGen);
                 if (gen?.planId) cats = cats.filter(c => c.planId === gen.planId);
             }
+            window._catsRenderList = cats;
+            setTimeout(() => { if (canEdit) initCatsDragSort(); }, 80);
             return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200">
                     <div class="p-4 sm:p-6 border-b">
@@ -8309,21 +8366,35 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             </div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6" id="cats-grid">
                         ${cats.map(cat => {
                             const lessonCount = db.lessons.filter(l => l.categoryId === cat.id).length;
                             const assignedUsers = db.users.filter(u => cat.assignedTo.includes(u.id));
                             const plan = db.planes.find(p=>p.id===cat.planId);
+                            // PATCH 2026-10 Mejoras Categorías: barra de progreso global (lecciones completadas / lecciones x alumnos asignados)
+                            const alumnosAsig = assignedUsers.filter(u => isStudent(u));
+                            const lessonsCat = db.lessons.filter(l => l.categoryId === cat.id);
+                            const totalCeldas = lessonsCat.length * alumnosAsig.length;
+                            const completos = alumnosAsig.reduce((acc, al) => acc + lessonsCat.filter(l => { const pr = db.progress.find(p => String(p.userId)===String(al.id) && String(p.lessonId)===String(l.id)); return pr && pr.completed; }).length, 0);
+                            const pctProgreso = totalCeldas ? Math.round((completos / totalCeldas) * 100) : 0;
+                            const colorProgreso = pctProgreso >= 80 ? 'bg-emerald-500' : pctProgreso >= 40 ? 'bg-amber-500' : 'bg-indigo-400';
+                            const textoProgreso = pctProgreso >= 80 ? 'text-emerald-600' : pctProgreso >= 40 ? 'text-amber-600' : 'text-slate-500';
                             return `
-                            <div class="group relative bg-white border border-slate-200/70 rounded-xl overflow-hidden hover:shadow-md hover:border-slate-300 transition-all">
+                            <div ${canEdit?'draggable="true"':''} data-cat-id="${cat.id}" ${canEdit?'title="Arrastra para ordenar"':''} class="group relative bg-white border border-slate-200/70 rounded-xl overflow-hidden hover:shadow-md hover:border-slate-300 transition-all ${canEdit?'cursor-move':''}">
                                 <div class="h-32 bg-slate-100 relative">
-                                    ${cat.image ? `<img src="${cat.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-2xl"></i></div>`}
+                                    ${cat.image ? `<img src="${cat.image}" class="w-full h-full object-cover pointer-events-none" onerror="this.remove()">` : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-2xl"></i></div>`}
                                     ${plan?`<span class="absolute bottom-2 left-2 text-[10px] px-2 py-0.5 bg-white/90 backdrop-blur rounded-full text-indigo-700 font-medium">${plan.nombre}</span>`:''}
+                                    ${canEdit?`<span class="absolute top-2 left-2 w-7 h-7 flex items-center justify-center bg-white/80 backdrop-blur rounded-lg text-slate-400" title="Arrastra para ordenar"><i class="fas fa-arrows-alt text-xs"></i></span>`:''}
                                     ${canEdit?`<div class="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition"><button onclick="openCategoryModal(${cat.id})" class="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur text-slate-600 hover:text-[var(--primary)] rounded-lg shadow" title="Editar"><i class="fas fa-pen text-xs"></i></button>${isAdmin(currentUser)?`<button onclick="deleteCategory(${cat.id})" class="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur text-slate-600 hover:text-red-600 rounded-lg shadow" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div>`:''}
                                 </div>
                                 <div class="p-5">
                                 <div class="flex justify-between items-start"><div><h4 class="text-[17px] font-medium text-slate-900 tracking-tight">${cat.name}</h4><p class="text-sm text-slate-500 mt-0.5 line-clamp-2">${cat.description}</p></div></div>
                                 <div class="mt-4 flex justify-between items-center"><span class="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-full"><i class="fas fa-book-open"></i>${lessonCount} lecciones</span><div class="flex -space-x-2">${assignedUsers.slice(0,3).map(u=>`<img src="${u.avatar}" class="w-6 h-6 rounded-full border-2 border-white shadow-sm" title="${u.name}">`).join('')}${assignedUsers.length>3?`<span class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-medium text-slate-600">+${assignedUsers.length-3}</span>`:''}</div></div>
+                                <div class="mt-3" ${totalCeldas?`title="${completos} de ${totalCeldas} lecciones-alumno completadas por los alumnos asignados"`:''}>
+                                    <div class="flex justify-between text-[11px] text-slate-500 mb-1"><span class="inline-flex items-center gap-1"><i class="fas fa-chart-bar"></i> Progreso global</span><span class="font-semibold ${textoProgreso}">${totalCeldas? pctProgreso+'%':'—'}</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full rounded-full ${colorProgreso} transition-all" style="width:${totalCeldas?pctProgreso:0}%"></div></div>
+                                </div>
                                 ${canEdit?`<div class="mt-4 pt-3 border-t border-slate-100 flex justify-end"><button onclick="openAssignModal(${cat.id})" class="text-[13px] font-medium text-[var(--primary)] opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5">Asignar alumnos <i class="fas fa-arrow-right text-[10px]"></i></button></div>`:''}
                                 </div>
                             </div>`;
@@ -8333,8 +8404,70 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 </div>`;
         }
 
+        /* PATCH 2026-10 Mejoras Categorías: arrastre para ordenar (persistente en db.categories) */
+        function initCatsDragSort() {
+            const grid = document.getElementById('cats-grid');
+            if (!grid || grid.dataset.dragInit) return;
+            const cards = [...grid.querySelectorAll('[data-cat-id]')];
+            if (!cards.length) return;
+            grid.dataset.dragInit = '1';
+            let dragEl = null;
+            cards.forEach(card => {
+                card.addEventListener('dragstart', e => {
+                    dragEl = card;
+                    card.classList.add('opacity-40','ring-2','ring-indigo-400');
+                    try { e.dataTransfer.setData('text/plain', card.dataset.catId); } catch(_) {}
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('opacity-40','ring-2','ring-indigo-400');
+                    dragEl = null;
+                });
+                card.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    if (!dragEl || dragEl === card) return;
+                    e.dataTransfer.dropEffect = 'move';
+                    const rect = card.getBoundingClientRect();
+                    const antes = (e.clientY - rect.top) < rect.height / 2;
+                    grid.insertBefore(dragEl, antes ? card : card.nextSibling);
+                });
+                card.addEventListener('drop', e => {
+                    e.preventDefault();
+                    commitCatsDragSort();
+                });
+            });
+            grid.addEventListener('drop', e => { e.preventDefault(); commitCatsDragSort(); });
+        }
+
+        function commitCatsDragSort() {
+            const grid = document.getElementById('cats-grid');
+            const lista = window._catsRenderList || [];
+            if (!grid || !lista.length) return;
+            const idsDom = [...grid.querySelectorAll('[data-cat-id]')].map(el => el.dataset.catId);
+            const visiblesNuevos = idsDom.map(id => lista.find(c => String(c.id) === id)).filter(Boolean);
+            if (visiblesNuevos.length !== lista.length) return;
+            // Reordena conservando las posiciones del arreglo completo (no afecta a categorías ocultas por filtro)
+            db.categories = db.categories.map(c => {
+                const idx = lista.findIndex(x => String(x.id) === String(c.id));
+                return idx >= 0 ? visiblesNuevos[idx] : c;
+            });
+            saveDB();
+            if (window.showToast) showToast('Orden de categorías guardado', 'success');
+            navigateTo('categories');
+        }
+
+        /* PATCH 2026-10 Lecciones: cuadro de imagen de la categoría junto al título */
+        function catCoverBox(catId, cls){
+            const cat = (db.categories||[]).find(c=>String(c.id)===String(catId));
+            return `<div class="${cls} rounded-lg overflow-hidden border border-slate-200 bg-slate-100 relative flex-shrink-0">
+                <i class="fas fa-book text-slate-300 flex items-center justify-center h-full text-xs"></i>
+                ${cat && cat.image ? `<img src="${cat.image}" alt="${escapeHTML(cat.name||'')}" title="Categoría: ${escapeHTML(cat.name||'')}" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">` : ''}
+            </div>`;
+        }
+
         function renderLessons() {
-            const canEdit = ['admin', 'maestro'].includes(currentUser.role);
+            // PATCH GM 2026-10: GM tiene acceso total a Academia (mismos permisos que maestro/capacitador)
+            const canEdit = hasRole(currentUser, ['admin', 'maestro', 'gm', 'capacitador']);
             return `
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200">
                     <div class="p-4 sm:p-6 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -8356,7 +8489,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             const cat = db.categories.find(c => c.id === l.categoryId);
                             const videoBadge = getLessonVideoBadge(l);
                             return `
-                            <tr class="border-t lesson-row" data-category="${l.categoryId}"><td class="p-4 font-medium">${escapeHTML(l.title)}</td><td class="p-4 text-slate-600">${escapeHTML(cat?.name || 'N/A')}</td><td class="p-4">${videoBadge}</td><td class="p-4">${l.quiz.length} preguntas</td><td class="p-4">${l.flashcards?.length||0}</td><td class="p-4 space-x-2">
+                            <tr class="border-t lesson-row" data-category="${l.categoryId}"><td class="p-4 font-medium"><div class="flex items-center gap-3">${catCoverBox(l.categoryId,'w-11 h-11')}<span class="min-w-0">${escapeHTML(l.title)}</span></div></td><td class="p-4 text-slate-600">${escapeHTML(cat?.name || 'N/A')}</td><td class="p-4">${videoBadge}</td><td class="p-4">${l.quiz.length} preguntas</td><td class="p-4">${l.flashcards?.length||0}</td><td class="p-4 space-x-2">
                                 <button onclick="openLesson(${l.id})" class="text-slate-500 hover:text-indigo-600" title="Ver lección"><i class="fas fa-eye"></i></button>
                                 ${canEdit?`<button onclick="openLessonModal(${l.id})" class="text-slate-500 hover:text-indigo-600" title="Editar"><i class="fas fa-edit"></i></button>`:''}
                                 ${canEdit?`<button onclick="openQuizModal(${l.id})" class="text-slate-500 hover:text-green-600" title="Quiz"><i class="fas fa-question-circle"></i></button>`:''}
@@ -8383,7 +8516,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             return `
                 <div class="space-y-6">${myCategories.map(cat => {
                     const lessons = db.lessons.filter(l => l.categoryId === cat.id);
-                    return `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="h-28 relative">${cat.image?`<img src="${cat.image}" class="w-full h-full object-cover">`:`<div class="w-full h-full bg-gradient-to-r from-slate-100 to-slate-200"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div><div class="absolute bottom-0 p-4 text-white"><h3 class="font-bold text-xl">${cat.name}</h3><p class="text-xs opacity-90">${cat.description}</p></div></div><div class="divide-y">${lessons.map(l => {
+                    return `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="h-28 relative">${cat.image?`<img src="${cat.image}" class="w-full h-full object-cover" onerror="this.remove()">`:`<div class="w-full h-full bg-gradient-to-r from-slate-100 to-slate-200"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div><div class="absolute bottom-0 p-4 text-white"><h3 class="font-bold text-xl">${cat.name}</h3><p class="text-xs opacity-90">${cat.description}</p></div></div><div class="divide-y">${lessons.map(l => {
                         const progress = db.progress.find(p => String(p.userId) === String(currentUser.id) && String(p.lessonId) === String(l.id));
                         const isCompleted = progress?.completed;
                         const dueCount = getDueFlashcardsCount(l.id, currentUser?.id);
@@ -8988,38 +9121,13 @@ function renderGlossary() {
     });
     return `<div class="bg-white p-6 rounded-xl shadow-sm">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-chart-pie text-indigo-600"></i> Reportes de Progreso y Embudo Comercial</h3>
+            <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-chart-pie text-indigo-600"></i> Kardex de Capacitación</h3>
             <div class="flex items-center gap-3">
                 <div class="text-sm text-slate-500">${alumnos.length} alumnos · ${db.lessons.length} lecciones</div>
                 <!-- FASE 1 - PDF REAL -->
                 <button onclick="exportReportsPDF()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
             </div>
         </div>
-        ${(() => {
-            // #6 Gráfica visual de Embudo Comercial + SLA en Reportes
-            const sols = (db.solicitudes || []).length + (db.clientes || []).length;
-            const cots = typeof cotDB === 'function' ? cotDB() : (db.cotizaciones || []);
-            const enProceso = cots.filter(c => ['nueva','cotizando','enviada'].includes((c.estado||'').toLowerCase())).length;
-            const emitidas = cots.filter(c => ['emitida','pagada','cerrada'].includes((c.estado||'').toLowerCase())).length;
-            const maxVal = Math.max(1, sols, cots.length, enProceso, emitidas);
-            return `<div class="mb-6 p-4 rounded-xl border border-amber-200/80 bg-slate-50/70">
-                <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fas fa-filter text-amber-600"></i> Embudo de Conversión Comercial y SLA</h4>
-                <div class="space-y-2.5">
-                    ${[
-                        ['1. Prospectos y Solicitudes', sols, 'bg-slate-700'],
-                        ['2. Cotizaciones Solicitadas', cots.length, 'bg-amber-600'],
-                        ['3. En Cotización / Propuesta Enviada', enProceso, 'bg-indigo-600'],
-                        ['4. Pólizas / Ventas Emitidas', emitidas, 'bg-emerald-600']
-                    ].map(([lbl, val, cls]) => {
-                        const pct = Math.max(8, Math.round((val / maxVal) * 100));
-                        return `<div>
-                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1"><span>${lbl}</span><span>${val}</span></div>
-                            <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden"><div class="h-full ${cls} rounded-full transition-all" style="width:${pct}%"></div></div>
-                        </div>`;
-                    }).join('')}
-                </div>
-            </div>`;
-        })()}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div class="relative">
                 <select id="filter-alumno" onchange="filterReports()" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
@@ -9068,6 +9176,188 @@ function renderGlossary() {
         <p class="text-xs text-slate-400 mt-4">Visible para Admin y Maestros. Los alumnos solo ven su progreso personal.</p>
     </div>`;
 }
+/* PATCH 2026-10 rev.Embudo: 'reportes-progreso' (GM, bajo Dashboard) con filtro de fechas,
+ * comparación vs. periodo anterior y exportación CSV/PDF. La tabla de progreso/calificaciones
+ * vive en Academia como "Kardex de Capacitación" (renderReports). */
+function fechaEmbudoItem(o) {
+    if (!o) return null;
+    const claves = ['fecha','creado','creadoEn','fechaEmision','createdAt','fechaCreacion','fechaAlta'];
+    for (let i = 0; i < claves.length; i++) {
+        if (o[claves[i]]) { const t = new Date(o[claves[i]]).getTime(); if (!isNaN(t)) return t; }
+    }
+    return null;
+}
+function embudoYMD(d) {
+    const p = n => (n < 10 ? '0' : '') + n;
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function embudoPeriodoAct() {
+    const d1 = window._embudoDesde ? new Date(window._embudoDesde + 'T00:00:00') : null;
+    const d2 = window._embudoHasta ? new Date(window._embudoHasta + 'T23:59:59') : null;
+    const ini = (d1 && !isNaN(d1.getTime())) ? d1.getTime() : 0;
+    const fin = (d2 && !isNaN(d2.getTime())) ? d2.getTime() : Date.now();
+    return [ini, fin];
+}
+function embudoPeriodoPrev(r) {
+    const rango = r || embudoPeriodoAct();
+    if (rango[0] === 0) return null;
+    // Si el rango inicia el día 1 del mes, se compara contra el mes calendario completo anterior;
+    // en rangos arbitrarios se usa la ventana inmediata anterior de la misma duración.
+    const d1 = new Date(rango[0]);
+    if (d1.getDate() === 1) {
+        const ini = new Date(d1.getFullYear(), d1.getMonth() - 1, 1);
+        const fin = new Date(d1.getFullYear(), d1.getMonth(), 0, 23, 59, 59, 999);
+        return [ini.getTime(), fin.getTime()];
+    }
+    const len = Math.max(86400000, rango[1] - rango[0] + 1);
+    return [Math.max(0, rango[0] - len), rango[0] - 1];
+}
+function embudoEtapas(rango) {
+    const dentro = o => { if (!o) return false; if (!rango) return true; const t = fechaEmbudoItem(o); return t !== null && t >= rango[0] && t <= rango[1]; };
+    const cotsSrc = typeof cotDB === 'function' ? (function(){ try { return cotDB(); } catch(e) { return (db.cotizaciones || []); } })() : (db.cotizaciones || []);
+    const sols = (db.solicitudes || []).filter(dentro).length + (db.clientes || []).filter(dentro).length;
+    const cots = cotsSrc.filter(dentro);
+    const enProceso = cots.filter(c => ['nueva','cotizando','enviada'].includes((c.estado||'').toLowerCase())).length;
+    const emitidas = cots.filter(c => ['emitida','pagada','cerrada'].includes((c.estado||'').toLowerCase())).length;
+    return [
+        ['1. Prospectos y Solicitudes', sols, 'bg-slate-700'],
+        ['2. Cotizaciones Solicitadas', cots.length, 'bg-amber-600'],
+        ['3. En Cotización / Propuesta Enviada', enProceso, 'bg-indigo-600'],
+        ['4. Pólizas / Ventas Emitidas', emitidas, 'bg-emerald-600']
+    ];
+}
+function embudoDelta(val, prev) {
+    if (prev === null || prev === undefined) return '';
+    if (prev === 0) return val > 0 ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">nuevo</span>' : '';
+    const pct = Math.round(((val - prev) / prev) * 100);
+    if (pct === 0) return '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">= 0%</span>';
+    const sube = pct > 0;
+    return `<span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold ${sube ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${sube ? '▲' : '▼'} ${Math.abs(pct)}%</span>`;
+}
+function renderEmbudoComercial(rango) {
+    const etapas = embudoEtapas(rango);
+    const prevR = rango ? embudoPeriodoPrev(rango) : null;
+    const etapasPrev = prevR ? embudoEtapas(prevR) : null;
+    const maxVal = Math.max(1, ...etapas.map(e => e[1]));
+    return `<div class="p-4 rounded-xl border border-amber-200/80 bg-slate-50/70">
+        <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fas fa-filter text-amber-600"></i> Embudo de Conversión Comercial y SLA</h4>
+        <div class="space-y-2.5">
+            ${etapas.map(([lbl, val, cls], i) => {
+                const pct = Math.max(8, Math.round((val / maxVal) * 100));
+                return `<div>
+                    <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1"><span>${lbl}</span><span class="flex items-center gap-2">${val}${embudoDelta(val, etapasPrev ? etapasPrev[i][1] : null)}</span></div>
+                    <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden"><div class="h-full ${cls} rounded-full transition-all" style="width:${pct}%"></div></div>
+                </div>`;
+            }).join('')}
+        </div>
+    </div>`;
+}
+/* PATCH 2026-10: 'reportes-progreso' — sección AJAX autónoma para GM (abajo de Dashboard)
+ * con únicamente el Embudo de Conversión Comercial y SLA. La tabla de progreso/calificaciones
+ * vive en Academia como "Kardex de Capacitación" (renderReports). */
+function renderReportesProgreso() {
+    if (window._embudoDesde === undefined) {
+        const hoy = new Date();
+        window._embudoDesde = embudoYMD(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+        window._embudoHasta = embudoYMD(hoy);
+    }
+    const r = embudoPeriodoAct();
+    const etapasPrev = embudoPeriodoPrev(r);
+    const fmtP = t => new Date(t).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+    const labelPeriodo = (r[0] === 0 ? 'Periodo: histórico completo' : `Periodo: ${fmtP(r[0])} — ${fmtP(r[1])}`) + (etapasPrev ? ` · comparado con ${fmtP(etapasPrev[0])} — ${fmtP(etapasPrev[1])}` : '');
+    const vDesde = window._embudoDesde || '', vHasta = window._embudoHasta || '';
+    return `<div class="bg-white p-6 rounded-xl shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-funnel-dollar text-indigo-600"></i> Embudo de Conversión Comercial y SLA</h3>
+            <div class="flex items-center gap-2">
+                <button onclick="exportEmbudoCSV()" class="px-3 py-1.5 border border-emerald-200 text-emerald-700 text-sm rounded-lg hover:bg-emerald-50 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar CSV</button>
+                <button onclick="exportEmbudoPDF()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+            </div>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">${labelPeriodo}</p>
+        <div class="flex flex-wrap items-center gap-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <span class="text-xs font-semibold text-slate-600"><i class="fas fa-calendar-alt mr-1"></i>Fechas</span>
+            <input type="date" id="embudo-desde" value="${vDesde}" onchange="window._embudoDesde=this.value; navigateTo('reportes-progreso')" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+            <span class="text-xs text-slate-400">—</span>
+            <input type="date" id="embudo-hasta" value="${vHasta}" onchange="window._embudoHasta=this.value; navigateTo('reportes-progreso')" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+            <button onclick="setEmbudoPreset('mes')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Este mes</button>
+            <button onclick="setEmbudoPreset('prev')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Mes anterior</button>
+            <button onclick="setEmbudoPreset('anio')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Este año</button>
+            <button onclick="setEmbudoPreset('todo')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Todo</button>
+        </div>
+        ${renderEmbudoComercial(r)}
+    </div>`;
+}
+function setEmbudoPreset(p) {
+    const hoy = new Date();
+    const y = hoy.getFullYear(), m = hoy.getMonth();
+    if (p === 'mes') { window._embudoDesde = embudoYMD(new Date(y, m, 1)); window._embudoHasta = embudoYMD(hoy); }
+    else if (p === 'prev') { window._embudoDesde = embudoYMD(new Date(y, m - 1, 1)); window._embudoHasta = embudoYMD(new Date(y, m, 0)); }
+    else if (p === 'anio') { window._embudoDesde = y + '-01-01'; window._embudoHasta = embudoYMD(hoy); }
+    else { window._embudoDesde = ''; window._embudoHasta = ''; }
+    navigateTo('reportes-progreso');
+}
+function exportEmbudoCSV() {
+    try {
+        const r = embudoPeriodoAct();
+        const prev = embudoPeriodoPrev(r);
+        const etapas = embudoEtapas(r);
+        const etapasPrev = prev ? embudoEtapas(prev) : null;
+        const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+        const fmtP = t => new Date(t).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+        let csv = '\ufeffEtapa,Periodo actual,Periodo anterior,Variación\n';
+        etapas.forEach((e, i) => {
+            const p = etapasPrev ? etapasPrev[i][1] : null;
+            let delta = '';
+            if (p !== null) delta = p === 0 ? (e[1] > 0 ? 'nuevo' : '0%') : (Math.round(((e[1] - p) / p) * 100)) + '%';
+            csv += [esc(e[0]), e[1], p === null ? '' : p, delta].join(',') + '\n';
+        });
+        csv += [esc('Rango actual'), esc(fmtP(r[0]) + ' — ' + fmtP(r[1])), '', ''].join(',') + '\n';
+        if (prev) csv += [esc('Rango anterior (comparación)'), esc(fmtP(prev[0]) + ' — ' + fmtP(prev[1])), '', ''].join(',') + '\n';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = 'embudo_comercial_' + ((window._embudoDesde || 'historico') + '_' + (window._embudoHasta || new Date().toISOString().slice(0,10))).replace(/[^A-Za-z0-9_-]/g, '') + '.csv';
+        a.click(); URL.revokeObjectURL(url);
+        if (window.showToast) showToast('Embudo exportado en CSV', 'success');
+    } catch (e) { if (window.showToast) showToast('Error exportando CSV: ' + (e && e.message || e), 'error'); }
+}
+async function exportEmbudoPDF() {
+    if (!window.jspdf) { if (window.showToast) showToast('Cargando motor PDF, intenta en un segundo', 'info'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const s = db.settings || {};
+    const primary = s.primaryColor || '#0a2540';
+    const r = embudoPeriodoAct();
+    const prev = embudoPeriodoPrev(r);
+    const etapas = embudoEtapas(r);
+    const etapasPrev = prev ? embudoEtapas(prev) : null;
+    const fmtP = t => new Date(t).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary);
+    doc.text('Embudo de Conversión Comercial y SLA', 40, 50);
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+    doc.text('Periodo: ' + fmtP(r[0]) + ' — ' + fmtP(r[1]) + (prev ? '   |   Comparado con: ' + fmtP(prev[0]) + ' — ' + fmtP(prev[1]) : '   |   Histórico completo'), 40, 66);
+    doc.autoTable({
+        startY: 92,
+        head: [['Etapa', 'Periodo actual', 'Periodo anterior', 'Variación']],
+        body: etapas.map((e, i) => {
+            const p = etapasPrev ? etapasPrev[i][1] : null;
+            let delta = '';
+            if (p !== null) delta = p === 0 ? (e[1] > 0 ? 'nuevo' : '0%') : ((e[1] - p >= 0 ? '+' : '') + Math.round(((e[1] - p) / p) * 100) + '%');
+            return [e[0], String(e[1]), p === null ? '—' : String(p), delta];
+        }),
+        theme: 'grid', headStyles: { fillColor: primary, textColor: 255, fontSize: 10 },
+        bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 40, right: 40 }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
+    });
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text((s.footerText || 'Documento interno — uso ejecutivo'), 40, H - 24);
+    doc.text('Página 1', W - 40, H - 24, { align: 'right' });
+    doc.save('embudo_comercial_' + new Date().toISOString().slice(0,10) + '.pdf');
+    if (window.showToast) showToast('Embudo exportado en PDF', 'success');
+}
 function filterReports(){
     const fAlumno = document.getElementById('filter-alumno').value;
     const fCat = document.getElementById('filter-categoria').value;
@@ -9099,13 +9389,13 @@ function filterReports(){
             if(user && !canModifyUser(currentUser, user)){ alert('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
             const ubicActual = user ? (estadoDeUsuario(user) || user.ubicacion || '') : '';
             const estadosOpts = (typeof ESTADOS_MEX !== 'undefined' ? ESTADOS_MEX : []).map(e => `<option value="${escapeHTML(e.n)}" ${ubicActual===e.n?'selected':''}>${escapeHTML(e.n)}</option>`).join('');
-            showModal(`<form id="user-form" class="p-6"><h3 class="text-xl font-bold mb-4">${user?'Editar':'Nuevo'} Usuario</h3><div class="space-y-4">
-                <div><label class="text-sm font-medium">Nombre completo</label><input name="name" value="${escapeHTML(user?.name||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+            showModal(`<form id="user-form" autocomplete="off" class="p-6"><h3 class="text-xl font-bold mb-4">${user?'Editar':'Nuevo'} Usuario</h3><div class="space-y-4">
+                <div><label class="text-sm font-medium">Nombre completo</label><input name="name" autocomplete="off" data-1p-ignore data-lpignore="true" value="${escapeHTML(user?.name||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div><label class="text-sm font-medium">Usuario</label><input name="username" value="${escapeHTML(user?.username||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                    <div><label class="text-sm font-medium">Email</label><input type="email" name="email" value="${escapeHTML(user?.email||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                    <div><label class="text-sm font-medium">Usuario</label><input name="username" autocomplete="new-password" data-1p-ignore data-lpignore="true" value="${escapeHTML(user?.username||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                    <div><label class="text-sm font-medium">Email</label><input type="email" name="email" autocomplete="off" data-1p-ignore data-lpignore="true" value="${escapeHTML(user?.email||'')}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 </div>
-                <div><label class="text-sm font-medium">WhatsApp <span class="text-red-500">*</span></label><input type="tel" name="phone" value="${escapeHTML(user?.phone||'')}" required placeholder="521123456789" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><p class="text-xs text-slate-500 mt-1">Formato: código país + número (ej. 521 para México)</p></div>
+                <div><label class="text-sm font-medium">WhatsApp <span class="text-red-500">*</span></label><input type="tel" name="phone" autocomplete="off" data-1p-ignore data-lpignore="true" value="${escapeHTML(user?.phone||'')}" required placeholder="521123456789" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><p class="text-xs text-slate-500 mt-1">Formato: código país + número (ej. 521 para México)</p></div>
                 <div class="sm:col-span-2">
                     <label class="text-sm font-medium">Ubicación (estado)</label>
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
@@ -9124,7 +9414,7 @@ function filterReports(){
                         <button type="button" onclick="generarPasswordModalUsuario()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800"><i class="fas fa-wand-magic-sparkles mr-1"></i>Generar clave</button>
                     </div>
                     <div class="relative mt-1">
-                        <input id="user-modal-pass" type="password" name="password" value="" ${user ? '' : 'required'} placeholder="${user ? 'Dejar en blanco para conservar su contraseña actual' : 'Escribe o genera una contraseña'}" class="w-full pl-3 pr-20 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
+                        <input id="user-modal-pass" type="password" name="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" value="" ${user ? '' : 'required'} placeholder="${user ? 'Dejar en blanco para conservar su contraseña actual' : 'Escribe o genera una contraseña'}" class="w-full pl-3 pr-20 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
                         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                             <button type="button" onclick="const inp=document.getElementById('user-modal-pass');if(inp){inp.type=inp.type==='password'?'text':'password';this.querySelector('i').className=inp.type==='password'?'fas fa-eye':'fas fa-eye-slash';}" class="p-1.5 text-slate-400 hover:text-slate-700" title="Mostrar/Ocultar contraseña"><i class="fas fa-eye"></i></button>
                         </div>
@@ -9148,7 +9438,16 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 <p class="text-xs text-slate-500 mt-1">El agente aparecerá en "Mi Equipo" de esa agencia.</p></div><div id="color-field" style="display:none;"><label class="text-sm font-medium">Color para calendario <span class="text-slate-500">(maestros/instructores)</span></label>
 <input type="color" name="calendarColor" value="${user?.calendarColor||'#0a2540'}" class="w-full mt-1 h-10 px-1 py-1 border rounded-lg cursor-pointer bg-white text-slate-900 border-slate-300">
 <p class="text-xs text-slate-500 mt-1">Este color se usará en el calendario de clases en vivo</p></div><div><label class="text-sm font-medium">Foto de perfil</label><input type="file" name="avatarFile" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><div class="mt-2 flex items-center gap-2">${user?.avatar?`<img src="${user.avatar}" class="w-10 h-10 rounded-full object-cover"><span class="text-xs text-slate-500">Actual</span>`: '<span class="text-xs text-slate-500">Se usará avatar automático si no subes</span>'}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold">Guardar</button></div></form>`);
-            setTimeout(()=>{ const rs=document.querySelector('#user-form select[name=role]'); const af=document.getElementById('agencia-field'); const as=document.querySelector('#user-form select[name=agenciaId]'); if(as){ as.innerHTML='<option value="">Sin asignar</option>'+db.users.filter(u=>u.role==='agencia').map(a=>`<option value="${a.id}" ${String(user?.agenciaId||'')===String(a.id)?'selected':''}>${escapeHTML(a.name)}</option>`).join(''); } const tg=()=>{ if(af) af.style.display = rs && ['agente_agencia','agente_desarrollo','agente'].includes(rs.value) ? 'block':'none'; const cf=document.getElementById('color-field'); if(cf) cf.style.display = rs && ['maestro','capacitador','agencia','admin','gm'].includes(rs.value) ? 'block':'none'; }; if(rs){ rs.addEventListener('change',tg); tg(); } if(!isGM(currentUser) && user?.role!=='gm'){ const gmOpt=document.querySelector('#user-form option[value=gm]'); if(gmOpt) gmOpt.remove(); } },0);
+            setTimeout(()=>{ const rs=document.querySelector('#user-form select[name=role]'); const af=document.getElementById('agencia-field'); const as=document.querySelector('#user-form select[name=agenciaId]'); if(as){ as.innerHTML='<option value="">Sin asignar</option>'+db.users.filter(u=>u.role==='agencia').map(a=>`<option value="${a.id}" ${String(user?.agenciaId||'')===String(a.id)?'selected':''}>${escapeHTML(a.name)}</option>`).join(''); } const tg=()=>{ if(af) af.style.display = rs && ['agente_agencia','agente_desarrollo','agente'].includes(rs.value) ? 'block':'none'; const cf=document.getElementById('color-field'); if(cf) cf.style.display = rs && ['maestro','capacitador','agencia','admin','gm'].includes(rs.value) ? 'block':'none'; }; if(rs){ rs.addEventListener('change',tg); tg(); } if(!isGM(currentUser) && user?.role!=='gm'){ const gmOpt=document.querySelector('#user-form option[value=gm]'); if(gmOpt) gmOpt.remove(); }
+                // Refuerzo anti-autocompletado: algunos gestores/navegadores ignoran
+                // autocomplete y rellenan la sesión guardada; dejar las casillas en blanco.
+                if (!user) {
+                    const uInp = document.querySelector('#user-form input[name=username]');
+                    const pInp = document.getElementById('user-modal-pass');
+                    if (uInp) uInp.value = '';
+                    if (pInp) pInp.value = '';
+                }
+            },0);
             document.getElementById('user-form').onsubmit = e => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
@@ -9225,26 +9524,38 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
         function openCategoryModal(id=null){
             const cat = id ? db.categories.find(c=>c.id===id) : null;
-            showModal(`<form id="cat-form" class="p-6"><h3 class="text-xl font-bold mb-4">${cat?'Editar':'Nueva'} Categoría</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${cat?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Descripción</label><textarea name="description" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${cat?.description||''}</textarea></div><div><label class="text-sm">Formación Académica</label><select name="planId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${cat?.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div><div><label class="text-sm">Imagen de portada</label><input type="file" id="cat-image-input" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><div class="mt-2">${cat?.image?`<img id="cat-image-preview" src="${cat.image}" class="w-full h-32 object-cover rounded-lg border">`:`<img id="cat-image-preview" class="w-full h-32 object-cover rounded-lg border hidden">`}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
+            showModal(`<form id="cat-form" class="p-6"><h3 class="text-xl font-bold mb-4">${cat?'Editar':'Nueva'} Categoría</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${cat?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Descripción</label><textarea name="description" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${cat?.description||''}</textarea></div><div><label class="text-sm">Formación Académica</label><select name="planId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${cat?.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div><div><label class="text-sm">Imagen de portada</label><input type="file" id="cat-image-input" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="cat-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${cat?.image?`<img id="cat-image-preview" src="${cat.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img id="cat-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
             const imageInput = document.getElementById('cat-image-input');
             const preview = document.getElementById('cat-image-preview');
             let imageData = cat?.image || '';
+            /* FIX 2026-10 portada: evitar que Guardar pase antes de que termine la subida.
+             * Era la causa de portadas que no se veían (se guardaban sin imagen). */
+            const notaCat = document.getElementById('cat-image-status');
+            let catImgPendiente = false;
+            const catImgVal = v => typeof v === 'string' && (/^https?:\/\//.test(v) || /^data:image\/(png|jpeg|jpg|gif|webp)/i.test(v));
             if (imageInput) {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
-                    if (file) {
+                    if (!file) return;
+                    catImgPendiente = true; imageData = cat?.image || '';
+                    if (notaCat) { notaCat.textContent = 'Subiendo imagen de portada… espera unos segundos.'; notaCat.classList.remove('hidden'); }
+                    try {
                         if (window.Media && typeof window.Media.subirOUrl === 'function') {
                             imageData = await window.Media.subirOUrl(file, 'categories', { title: file.name });
-                            preview.src = imageData; preview.classList.remove('hidden');
                         } else {
-                            const reader = new FileReader();
-                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                            reader.readAsDataURL(file);
+                            imageData = await window.Media.comprimirImagen(file);
                         }
+                    } catch (errImg) {
+                        imageData = '';
+                        try { imageData = await window.Media.comprimirImagen(file); } catch (errC) { imageData = ''; }
                     }
+                    catImgPendiente = false;
+                    if (imageData && catImgVal(imageData)) { preview.src = imageData; preview.classList.remove('hidden'); if (notaCat) notaCat.textContent = 'Imagen lista ✓'; }
+                    else { imageData = cat?.image || ''; preview.src = imageData || ''; preview.classList.add('hidden'); if (notaCat) notaCat.textContent = '⚠ No se pudo cargar la imagen. Usa JPG o PNG.'; }
+                    if (window.showToast && !(imageData && catImgVal(imageData))) showToast('No se pudo cargar la imagen de portada. Intenta con JPG o PNG.', 'warning');
                 };
             }
-            document.getElementById('cat-form').onsubmit = e => { e.preventDefault(); const fd=new FormData(e.target); const data=Object.fromEntries(fd); data.image = imageData; data.planId = data.planId ? parseInt(data.planId) : null; if(cat){Object.assign(cat,data)}else{data.id=Date.now();data.assignedTo=[];db.categories.push(data)} saveDB(); closeModal(); navigateTo('categories'); };
+            document.getElementById('cat-form').onsubmit = e => { e.preventDefault(); if (catImgPendiente) { if (window.showToast) showToast('La imagen sigue subiendo, espera unos segundos e intenta de nuevo', 'warning'); return; } const fd=new FormData(e.target); const data=Object.fromEntries(fd); data.image = imageData; data.planId = data.planId ? parseInt(data.planId) : null; if(cat){Object.assign(cat,data)}else{data.id=Date.now();data.assignedTo=[];db.categories.push(data)} saveDB(); closeModal(); navigateTo('categories'); };
         }
 
         function openAssignModal(catId){
@@ -9853,7 +10164,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             ` : '';
             
             const viewedAlready = lesson.views && lesson.views.includes(currentUser.id);
-            showModal(`<div class="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
+            showModal(`<div class="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-3">${catCoverBox(lesson.categoryId,'w-16 h-16')}<div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
                 ${videoEmbedHtml}
                 <div class="prose max-w-none bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">${formattedContentHtml}</div>
                 ${actionsHtml}
@@ -10243,14 +10554,51 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             }, 1000);
         }
         // --- SISTEMA DE MENSAJES ---
-        
-function renderMessages() {
+        /* ===== COMUNICACIÓN: etiquetas de rol correctas, asignación de chats,
+         * ids únicos (evita doble-envío: 2 mensajes en el mismo ms compartían
+         * Date.now()+random y el segundo sobreescribía al primero). ===== */
+        function rolEtiqueta(u) {
+            const r = String((u && u.role) || '').toLowerCase();
+            const map = { gm:'GM', admin:'Admin', desarrollador:'Desarrollador', editor:'Editor', maestro:'Maestro', capacitador:'Capacitador', agencia:'Agencia', agente_agencia:'Agente de Agencia', agente_desarrollo:'Agente en Desarrollo', alumno:'Alumno', prospecto:'Prospecto' };
+            return map[r] || (u && u.role ? String(u.role).toUpperCase() : 'ASESOR');
+        }
+        function esStaffComunicacion(u) {
+            return ['gm','desarrollador','capacitador','admin'].includes(String((u && u.role) || '').toLowerCase());
+        }
+        function gruposDeUsuario(u) {
+            if (!u) return [];
+            const uid = String(u.id);
+            return (db.groups || []).filter(g => g && (String(g.tutorId) === uid || (g.students || []).map(String).includes(uid)));
+        }
+        /* Regla de asignación: staff (GM/Desarrollador/Capacitador/Admin) chatea
+         * con todos; los demás solo con contactos asignados: misma agencia o
+         * que compartan grupo (aula/cohortes). */
+        function puedeChatearCon(a, b) {
+            if (!a || !b) return false;
+            if (String(a.id) === String(b.id)) return false;
+            if (esStaffComunicacion(a) || esStaffComunicacion(b)) return true;
+            const aid = String((a && a.agenciaId) ?? ''), bid = String((b && b.agenciaId) ?? '');
+            if (aid && bid && aid === bid) return true;
+            const ga = gruposDeUsuario(a).map(g => String(g.id));
+            const gb = gruposDeUsuario(b).map(g => String(g.id));
+            return ga.some(id => gb.includes(id));
+        }
+        function idUnico() {
+            return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+        }
+
+        function renderMessages() {
             if (!db.messages) db.messages = [];
             if (!db.glossaryCategories) db.glossaryCategories = [{ id: 1, name: 'General' }];
             if (!db.glossaryConcepts) db.glossaryConcepts = [];
             // Permitir comunicación abierta entre miembros del portal (excepto prospectos aislados)
             let contacts = (db.users || []).filter(u => u && String(u.id) !== String(currentUser.id) && (u.role || '').toLowerCase() !== 'prospecto');
-            let title = 'Centro de Comunicación y Mensajes';
+            // Asignación: cada rol ve solo sus contactos asignados (staff ve todos).
+        // Los prospectos siguen aislados (ya se excluyen arriba).
+        if (!esStaffComunicacion(currentUser)) {
+            contacts = contacts.filter(c => puedeChatearCon(currentUser, c));
+        }
+        let title = 'Centro de Comunicación y Mensajes';
             let headerIcon = 'fa-comments';
 
             // Filtro de búsqueda y rol
@@ -10264,10 +10612,13 @@ function renderMessages() {
                     if (roleFilter === 'no-leidos') {
                         return db.messages.some(m => String(m.fromId) === String(c.id) && String(m.toId) === String(currentUser.id) && !m.read);
                     }
-                    if (roleFilter === 'admin') return isAdmin(c);
-                    if (roleFilter === 'maestro') return isTeacher(c);
-                    if (roleFilter === 'alumno') return isStudent(c);
-                    return (c.role || '').toLowerCase() === roleFilter;
+                    const rc = String(c.role || '').toLowerCase();
+                    if (roleFilter === 'gm') return ['gm','admin','desarrollador'].includes(rc);
+                    if (roleFilter === 'maestro') return ['maestro','capacitador'].includes(rc);
+                    if (roleFilter === 'agencia') return rc === 'agencia';
+                    if (roleFilter === 'agente') return ['agente_agencia','agente_desarrollo'].includes(rc);
+                    if (roleFilter === 'alumno') return rc === 'alumno';
+                    return rc === roleFilter;
                 });
             }
 
@@ -10317,48 +10668,28 @@ function renderMessages() {
                     <div class="flex flex-wrap gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                         ${[
                             ['todos','Todos'],
-                            ['no-leidos','No leídos ('+totalUnread+')'],
-                            ['admin','Admins'],
-                            ['maestro','Capacitadores'],
-                            ['alumno','Asesores']
+                            ['no-leidos','No leidos ('+totalUnread+')'],
+                            ['gm','GM / Admin'],
+                            ['maestro','Maestros'],
+                            ['agencia','Agencias'],
+                            ['agente','Agentes'],
+                            ['alumno','Alumnos']
                         ].map(([id,lbl]) => `<button onclick="window.msgRoleFilter='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition ${roleFilter===id ? 'bg-slate-900 text-amber-300 border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}">${lbl}</button>`).join('')}
                     </div>
                 </div>
 
-                <!-- FASE 2 (#1): Canales Grupales por Área y Ramo -->
-                <div class="mb-6">
-                    <div class="flex items-center justify-between mb-2.5">
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5"><i class="fas fa-hashtag text-amber-600"></i> Canales Grupales del Equipo (#1)</h4>
-                        <span class="text-[11px] text-slate-400 hidden sm:inline">Salas abiertas por ramo y especialidad</span>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                        ${[
-                            { id: 'canal:general', nombre: '#General-Promotoría', desc: 'Avisos, cierres y dudas generales', icon: 'fa-users' },
-                            { id: 'canal:seguros', nombre: '#Seguros-Vida-GMM', desc: 'Cotizaciones, aseguradoras y coberturas', icon: 'fa-shield-heart' },
-                            { id: 'canal:automotriz', nombre: '#Comercial-Automotriz', desc: 'Unidades, apartados y financieras', icon: 'fa-car-side' },
-                            { id: 'canal:inmobiliario', nombre: '#Bienes-Raíces', desc: 'Propiedades, preventas y créditos', icon: 'fa-building' }
-                        ].map(ch => {
-                            const chMsgs = (db.messages || []).filter(m => String(m.toId) === ch.id);
-                            const lastCh = chMsgs[chMsgs.length - 1];
-                            return `<div onclick="openChannelChat('${ch.id}', '${ch.nombre}')" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
-                                <div>
-                                    <div class="flex items-center justify-between gap-2 mb-1">
-                                        <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5"><i class="fas ${ch.icon} text-amber-600"></i> ${ch.nombre}</span>
-                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-800 font-semibold">${chMsgs.length}</span>
-                                    </div>
-                                    <p class="text-[11px] text-slate-500 line-clamp-1">${lastCh ? psEscape((lastCh.fromName || 'Equipo') + ': ' + lastCh.text) : ch.desc}</p>
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>
+                <!-- Grupos del equipo: creables, con miembros y admins -->
+                ${gruposChatHtml()}
+
+                <!-- Foro de la Comunidad (#6): todos los roles publican -->
+                ${foroComunidadHtml()}
 
                 <div class="grid gap-3 md:grid-cols-2">
                     ${contacts.map(contact => {
                         const lastMsg = conversations[contact.id];
                         const unread = db.messages.filter(m => String(m.fromId) === String(contact.id) && String(m.toId) === String(currentUser.id) && !m.read).length;
                         const totalMsgs = db.messages.filter(m => (String(m.fromId) === String(contact.id) && String(m.toId) === String(currentUser.id)) || (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(contact.id))).length;
-                        const roleBadge = isAdmin(contact) ? 'ADMIN' : isTeacher(contact) ? 'MAESTRO' : (contact.role || 'ASESOR').toUpperCase();
+                        const roleBadge = rolEtiqueta(contact);
                         const online = isOnline(contact);
                         const seenTick = lastMsg && String(lastMsg.fromId) === String(currentUser.id)
                             ? (lastMsg.read ? '<i class="fas fa-check-double text-sky-500 mr-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-400 mr-1" title="Enviado"></i>')
@@ -10418,9 +10749,10 @@ function renderMessages() {
                 if (modalOpen) return; // cuando el modal de chat está abierto, chatLiveTick se encarga
                 try {
                     if (window.BackendSync && window.BackendSync.pullCollections) {
-                        const prevSig = JSON.stringify((db.messages || []).map(m => m.id + ':' + (m.read ? 1 : 0)));
-                        await window.BackendSync.pullCollections(['messages']);
-                        const nextSig = JSON.stringify((db.messages || []).map(m => m.id + ':' + (m.read ? 1 : 0)));
+                        const sig = (arr) => JSON.stringify((arr || []).map(m => String(m.id) + ':' + (m.read ? 1 : 0)));
+                        const prevSig = sig(db.messages) + '|' + sig(db.forumPosts) + '|' + sig(db.chatGroups);
+                        await window.BackendSync.pullCollections(['messages', 'forumPosts', 'chatGroups']);
+                        const nextSig = sig(db.messages) + '|' + sig(db.forumPosts) + '|' + sig(db.chatGroups);
                         if (prevSig !== nextSig) {
                             const ae = document.activeElement;
                             const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
@@ -10477,6 +10809,302 @@ function renderMessages() {
             const attachmentDisplay = psEscape(m.attachmentName || 'Ver archivo adjunto');
             return `<div class="mt-2 pt-2 border-t ${mine ? 'border-amber-400/30' : 'border-slate-200'}"><a href="${safeUrl}" target="_blank" download="${safeName}" class="inline-flex items-center gap-1.5 text-xs underline font-semibold"><i class="fas fa-paperclip"></i> ${renderMentions(attachmentDisplay)}</a></div>`;
         }
+        /* ==== GRUPOS DEL EQUIPO (críados, con miembros y admins) ==== */
+        function toIdVal(v) { const s = String(v); return /^\\d+$/.test(s) ? Number(s) : s; }
+        function esGroupAdminPortal(grp) {
+            if (!grp || !currentUser) return false;
+            if (esStaffComunicacion(currentUser)) return true;
+            const uid = String(currentUser.id);
+            if (String(grp.creadoPorId) === uid) return true;
+            return (grp.adminIds || []).map(toIdVal).some(x => String(x) === uid);
+        }
+        function puedePostearEnGrupo(grp) {
+            if (!grp) return true;
+            if (esStaffComunicacion(currentUser)) return true;
+            const uid = String(currentUser.id);
+            const members = (grp.memberIds || []).map(toIdVal).map(String);
+            const admins = (grp.adminIds || []).map(toIdVal).map(String);
+            const esMiembro = members.length === 0 || members.includes(uid) || admins.includes(uid);
+            if (!esMiembro) return false;
+            if (grp.onlyAdminsPost && !admins.includes(uid)) return false;
+            return true;
+        }
+        function ensureChatGrupos() {
+            if (!Array.isArray(db.chatGroups)) db.chatGroups = [];
+            const seeds = [
+                { id: 'canal:general', nombre: '#General-Promotoría', desc: 'Avisos, cierres y dudas generales', icon: 'fa-people-group' },
+                { id: 'canal:seguros', nombre: '#Seguros-Vida-GMM', desc: 'Cotizaciones, aseguradoras y coberturas', icon: 'fa-umbrella' },
+                { id: 'canal:automotriz', nombre: '#Comercial-Automotriz', desc: 'Unidades, apartados y financieras', icon: 'fa-car-side' },
+                { id: 'canal:inmobiliario', nombre: '#Bienes-Raíces', desc: 'Propiedades, preventas y créditos', icon: 'fa-building' }
+            ];
+            let cambio = false;
+            seeds.forEach(s => {
+                if (!db.chatGroups.some(g => String(g.id) === s.id)) {
+                    db.chatGroups.push(Object.assign({}, s, { memberIds: [], adminIds: [], onlyAdminsPost: false, creadoPorId: null, creadoEn: new Date().toISOString() }));
+                    cambio = true;
+                }
+            });
+            if (cambio) {
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    window.BackendSync.pushCollectionsImmediate(['chatGroups']);
+                }
+            }
+            return db.chatGroups;
+        }
+        /* ==== FORO DE COMUNIDAD (#6): muro abierto para todos, con emojis ==== */
+        function ensureForumPosts() {
+            if (!Array.isArray(db.forumPosts)) db.forumPosts = [];
+            return db.forumPosts;
+        }
+        const FORO_EMOJIS = ['👍', '❤️', '🔥', '🎉', '💪', '😂', '🙏', '🚀'];
+        function foroReacciones(post) {
+            const r = post && post.reacciones ? post.reacciones : {};
+            return FORO_EMOJIS.map(e => { const v = Array.isArray(r[e]) ? r[e] : []; return { emoji: e, users: v.map(String) }; }).filter(x => x.users.length);
+        }
+        function foroComunidadHtml() {
+            const posts = ensureForumPosts().slice().sort((a, b) => new Date(b.creadoEn || 0) - new Date(a.creadoEn || 0)).slice(0, 30);
+            const lista = posts.map(p => {
+                const uid = String(currentUser.id);
+                const mias = String(p.fromId) === uid;
+                const aut = db.users.find(u => String(u.id) === String(p.fromId));
+                const iniciales = String(p.fromName || 'U').split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase();
+                const tiempo = p.createdAt ? new Date(p.createdAt) : null;
+                const hace = tiempo ? (Date.now() - tiempo.getTime() < 60000 ? 'ahora' : tiempo.toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : '';
+                const reacciones = foroReacciones(p);
+                const barra = reacciones.map(rr => `<button onclick="foroReaccionar('${String(p.id)}','${rr.emoji}')" class="text-[11px] px-1.5 py-0.5 rounded-full bg-white border ${rr.users.includes(uid) ? 'border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-500'} hover:border-indigo-400">${rr.emoji} ${rr.users.length}</button>`).join(' ');
+                const acciones = `<div class="flex items-center gap-1 mt-1.5 flex-wrap">${FORO_EMOJIS.slice(0, 6).map(e => `<button onclick="foroReaccionar('${String(p.id)}','${e}')" title="Reaccionar ${e}" class="w-6 h-6 rounded-full bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 text-xs leading-none">${e}</button>`).join('')}<span class="text-[10px] text-slate-300 ml-1">·</span>${barra}</div>`;
+                return `<div class="p-3 rounded-xl border ${mias ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'} hover:shadow-sm transition">
+                    <div class="flex items-center gap-2.5 mb-1.5">
+                        <div class="w-8 h-8 rounded-full bg-slate-900 text-amber-300 flex items-center justify-center text-[11px] font-bold shrink-0">${iniciales}</div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-bold text-slate-800 truncate">${psEscape(p.fromName || 'Usuario')} ${aut ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold">${rolEtiqueta(aut)}</span>` : ''}</p>
+                            <p class="text-[10px] text-slate-400">${hace}</p>
+                        </div>
+                        ${(mias || esStaffComunicacion(currentUser)) ? `<button aria-label="Eliminar" onclick="foroEliminar('${String(p.id)}')" class="w-7 h-7 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 shrink-0"><i class="fas fa-trash-can text-[10px]"></i></button>` : ''}
+                    </div>
+                    <p class="text-sm text-slate-700 whitespace-pre-wrap break-words">${p.text ? renderMentions(p.text) : ''}</p>
+                    ${acciones}
+                </div>`;
+            }).join('') || '<p class="text-center text-sm text-slate-400 py-6">El foro está en silencio… sé el primero en romper el hielo 👋</p>';
+            return `
+                <div class="mb-6">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5"><i class="fas fa-earth-americas text-indigo-600"></i> Foro de la Comunidad</h4>
+                        <span class="text-[11px] text-slate-400">Todo el equipo puede participar ${ensureForumPosts().length ? `· ${ensureForumPosts().length} participaciones` : ''}</span>
+                    </div>
+                    <div class="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-3">
+                        <form onsubmit="foroEnviar(); event.preventDefault()">
+                            <textarea id="foro-input" rows="2" maxlength="600" placeholder="Comparte con toda la comunidad: logros, tips, avisos… 😃" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                            <div class="flex items-center justify-between mt-1.5 flex-wrap gap-2">
+                                <div class="flex gap-1 flex-wrap">${FORO_EMOJIS.map(e => `<button type="button" onclick="foroAddEmoji('${e}')" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-sm leading-none">${e}</button>`).join('')}</div>
+                                <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-paper-plane"></i> Publicar en el foro</button>
+                            </div>
+                        </form>
+                        <div class="mt-3 space-y-2 max-h-[460px] overflow-y-auto pr-0.5">${lista}</div>
+                    </div>
+                </div>`;
+        }
+        window.foroAddEmoji = function (e) { const t = document.getElementById('foro-input'); if (t) { t.value = (t.value || '') + e; t.focus(); } };
+        window.foroEnviar = function () {
+            try {
+                const t = document.getElementById('foro-input');
+                const texto = t ? (t.value || '').trim() : '';
+                if (!texto) return showToast('Escribe algo para la comunidad 🙂', 'warning');
+                ensureForumPosts().push({
+                    id: idUnico(),
+                    fromId: currentUser.id,
+                    fromName: currentUser.name,
+                    fromRole: currentUser.role || '',
+                    text: texto,
+                    createdAt: new Date().toISOString(),
+                    reacciones: {}
+                });
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['forumPosts']);
+                showToast('Publicado en el foro 🗣️', 'success');
+                render();
+            } catch (e) { console.error('[foro]', e); showToast('No se pudo publicar', 'error'); }
+        };
+        window.foroReaccionar = function (postId, emoji) {
+            try {
+                const p = ensureForumPosts().find(x => String(x.id) === String(postId));
+                if (!p) return;
+                if (!p.reacciones || typeof p.reacciones !== 'object') p.reacciones = {};
+                const uid = String(currentUser.id);
+                const arr = Array.isArray(p.reacciones[emoji]) ? p.reacciones[emoji].map(String) : [];
+                const ix = arr.indexOf(uid);
+                if (ix >= 0) arr.splice(ix, 1); else arr.push(uid);
+                p.reacciones[emoji] = arr;
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['forumPosts']);
+                render();
+            } catch (e) { console.error('[foro reacción]', e); }
+        };
+        window.foroEliminar = function (postId) {
+            try {
+                const p = ensureForumPosts().find(x => String(x.id) === String(postId));
+                if (!p) return;
+                if (String(p.fromId) !== String(currentUser.id) && !esStaffComunicacion(currentUser)) return showToast('Solo tu propio post o staff puede eliminarlo', 'warning');
+                if (!confirm('¿Eliminar esta publicación del foro?')) return;
+                db.forumPosts = ensureForumPosts().filter(x => String(x.id) !== String(postId));
+                saveDB();
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['forumPosts']);
+                showToast('Publicación eliminada 🗑️', 'success');
+                render();
+            } catch (e) { console.error('[foro eliminar]', e); }
+        };
+        function gruposChatHtml() {
+            const grupos = ensureChatGrupos();
+            const cards = grupos.map(gr => {
+                const gm = (db.messages || []).filter(m => String(m.toId) === String(gr.id));
+                const last = gm[gm.length - 1];
+                const gear = (esGroupAdminPortal(gr)) ? `<button role="button" aria-label="Editar grupo" title="Editar grupo" onclick="event.stopPropagation();openGrupoModal('${String(gr.id)}')" class="shrink-0 w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center justify-center"><i class="fas fa-gear text-[10px]"></i></button>` : '';
+                return `<div onclick="openChannelChat('${String(gr.id)}')" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5"><i class="fas ${gr.icon || 'fa-users'} text-amber-600"></i> ${psEscape(gr.nombre || 'Grupo')}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-800 font-semibold">${gm.length}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 line-clamp-1">${last ? psEscape((last.fromName || 'Equipo') + ': ' + last.text) : psEscape(gr.desc || 'Grupo del equipo')}</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 mt-1">
+                        ${gr.onlyAdminsPost ? '<span class="text-[9px] px-1 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold"><i class="fas fa-lock mr-0.5"></i> solo admins</span>' : '<span class="text-[9px] text-slate-400">' + (gr.memberIds || []).length + ' miembros</span>'}
+                        <div>${gear}</div>
+                    </div>
+                </div>`;
+            }).join('');
+            return `
+                <div class="mb-6">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5"><i class="fas fa-hashtag text-amber-600"></i> Grupos del Equipo</h4>
+                        <button onclick="openGrupoModal('')" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-plus"></i> Nuevo grupo</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">${cards}</div>
+                </div>`;
+        }
+        window._grupoUsuariosSel = {};
+        window._grupoEditId = null;
+        function openGrupoModal(editId) {
+            try {
+                window._grupoEditId = editId ? String(editId) : null;
+                const edit = !!window._grupoEditId;
+                const grp = edit ? ensureChatGrupos().find(g => String(g.id) === window._grupoEditId) : null;
+                if (edit && !grp) { window.showToast && showToast('Ese grupo ya no existe', 'warning'); return; }
+                if (grp && !esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser && currentUser.id) && !(grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id))) { showToast('Solo el creador o admins del grupo pueden editarlo', 'warning'); return; }
+                const usuarios = (db.users || []).filter(u => u && String(u.id) !== String(currentUser.id));
+                const selIds = new Set(grp ? (grp.memberIds || []).map(toIdVal).map(String) : []);
+                window._grupoUsuariosSel = {};
+                usuarios.forEach(u => { window._grupoUsuariosSel[String(u.id)] = selIds.has(String(u.id)); });
+                const adminIds = grp ? (grp.adminIds || []).map(toIdVal).map(String) : [];
+                const html = `
+                <div id="grupo-modal" class="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm p-2 sm:p-4" onclick="if(event.target===this)closeGrupoModal()">
+                    <div class="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[88dvh] flex flex-col overflow-hidden shadow-2xl">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                            <h3 class="font-bold text-slate-900 text-base">${edit ? '<i class="fas fa-gear text-indigo-600 mr-2"></i>Editar grupo' : '<i class="fas fa-plus text-indigo-600 mr-2"></i>Nuevo grupo del equipo'}</h3>
+                            <button aria-label="Cerrar" onclick="closeGrupoModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                            <div>
+                                <p class="text-[11px] font-bold text-slate-500 uppercase mb-1.5">Nombre del grupo</p>
+                                <input id="grupo-nombre" type="text" maxlength="40" value="${grp ? psEscape(grp.nombre || '') : ''}" placeholder="Ej: Ventas Norte" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold text-slate-500 uppercase mb-1.5">Descripción corta</p>
+                                <input id="grupo-desc" type="text" maxlength="70" value="${grp ? psEscape(grp.desc || '') : ''}" placeholder="De qué trata el grupo" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <p class="text-[11px] font-bold text-slate-500 uppercase">Miembros y admins</p>
+                                    <span class="text-[11px] text-slate-400">Marca <b>👑</b> para quién administra</span>
+                                </div>
+                                <div id="grupo-miembros-box" class="max-h-56 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-50">${usuarios.map(u => {
+                                    const uid = String(u.id);
+                                    const marcado = window._grupoUsuariosSel[uid];
+                                    const esAdmin = adminIds.includes(uid);
+                                    return `<div class="flex items-center justify-between px-3 py-2">
+                                        <label class="flex items-center gap-2.5 flex-1 min-w-0">
+                                            <input type="checkbox" data-mid="${uid}" ${marcado ? 'checked' : ''} onchange="toggleGrupoMiembro('${uid}')" class="accent-indigo-600 w-4 h-4">
+                                            <span class="text-xs text-slate-700 truncate font-semibold">${psEscape(u.name)}</span>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">${rolEtiqueta(u)}</span>
+                                        </label>
+                                        <button data-admin-btn="${uid}" role="button" aria-label="Admin del grupo" title="Admin del grupo" onclick="toggleGrupoAdmin('${uid}')" class="ml-2 w-7 h-7 rounded-md text-[11px] flex items-center justify-center ${esAdmin ? 'bg-amber-100 text-amber-700' : 'bg-slate-50 text-slate-400'}">👑</button>
+                                    </div>`;
+                                }).join('')}</div>
+                            </div>
+                            <label class="flex items-center gap-2.5 cursor-pointer bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2.5">
+                                <input id="grupo-soloadmins" type="checkbox" ${grp && grp.onlyAdminsPost ? 'checked' : ''} class="accent-indigo-600 w-4 h-4">
+                                <span class="text-xs font-bold text-indigo-900">🔒 Solo los admins del grupo pueden compartir información</span>
+                            </label>
+                        </div>
+                        <div class="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
+                            ${grp && String(grp.creadoPorId) === String(currentUser.id) && esStaffComunicacion(currentUser) ? `<button onclick="eliminarGrupo('${String(grp.id)}')" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
+                            <button onclick="saveGrupoModal()" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-indigo-700 transition">${edit ? 'Guardar cambios' : 'Crear grupo'}</button>
+                        </div>
+                    </div>
+                </div>`;
+                const mc = document.getElementById('modal-container');
+                if (mc) mc.insertAdjacentHTML('beforeend', html);
+                else showModal(html);
+            } catch (e) { console.error('[openGrupoModal]', e); showToast('No se pudo abrir el editor de grupos', 'error'); }
+        }
+        window.toggleGrupoMiembro = function (uid) {
+            uid = String(uid);
+            const box = document.querySelector(`input[data-mid="${uid}"]`);
+            if (box) box.checked = !box.checked;
+        };
+        window.toggleGrupoAdmin = function (uid) {
+            uid = String(uid);
+            const box = document.querySelector(`input[data-mid="${uid}"]`);
+            if (box && !box.checked) { showToast('Primero marca al usuario como miembro 👇', 'warning'); return; }
+            const btn = document.querySelector(`button[data-admin-btn="${uid}"]`);
+            if (btn) { btn.classList.toggle('bg-amber-100'); btn.classList.toggle('text-amber-700'); btn.classList.toggle('bg-slate-50'); btn.classList.toggle('text-slate-400'); }
+        };
+        window.closeGrupoModal = function () { const m = document.getElementById('grupo-modal'); if (m) m.remove(); window._grupoEditId = null; };
+        window.saveGrupoModal = function () {
+            try {
+                const nombre = ((document.getElementById('grupo-nombre') || {}).value || '').trim();
+                const desc = ((document.getElementById('grupo-desc') || {}).value || '').trim() || 'Grupo del equipo';
+                const soloAdmins = !!(document.getElementById('grupo-soloadmins') || {}).checked;
+                if (!nombre) return showToast('Escribe un nombre para el grupo', 'warning');
+                const sel = Object.entries(window._grupoUsuariosSel || {}).filter(([, v]) => v).map(([k]) => toIdVal(k));
+                const adminUids = [...document.querySelectorAll('button[data-admin-btn]')].filter(b => String(b.className).includes('bg-amber-100') && String(b.className).includes('text-amber-700')).map(b => toIdVal(b.getAttribute('data-admin-btn')));
+                const editId = window._grupoEditId;
+                let grp = editId ? ensureChatGrupos().find(g => String(g.id) === editId) : null;
+                if (editId && !grp) return closeGrupoModal();
+                if (!editId) {
+                    grp = { id: idUnico(), nombre: '', desc: '', icon: 'fa-user-group', memberIds: [], adminIds: [], onlyAdminsPost: false, creadoPorId: currentUser.id, creadoEn: new Date().toISOString() };
+                    db.chatGroups.push(grp);
+                } else if (!esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser.id) && !(grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id))) {
+                    return showToast('Sin permiso para editar este grupo', 'warning');
+                }
+                grp.nombre = nombre;
+                grp.desc = desc;
+                grp.onlyAdminsPost = !!soloAdmins;
+                grp.memberIds = sel;
+                grp.adminIds = adminUids;
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['chatGroups']);
+                saveDB();
+                closeGrupoModal();
+                showToast(edit ? 'Grupo "' + nombre + '" actualizado ✅' : 'Grupo "' + nombre + '" creado 🎉', 'success');
+                render();
+            } catch (e) { console.error('[saveGrupoModal]', e); showToast('No se pudo guardar el grupo', 'error'); }
+        };
+        window.eliminarGrupo = function (gid) {
+            try {
+                const grp = ensureChatGrupos().find(g => String(g.id) === String(gid));
+                if (!grp) return closeGrupoModal();
+                if (!esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser.id)) return showToast('Solo el creador puede eliminar este grupo', 'warning');
+                if (!confirm('¿Eliminar el grupo "' + grp.nombre + '" y su chat grupal?')) return;
+                db.chatGroups = db.chatGroups.filter(g => String(g.id) !== String(gid));
+                db.messages = (db.messages || []).filter(m => String(m.toId) !== String(gid));
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['chatGroups', 'messages']);
+                saveDB();
+                closeGrupoModal();
+                showToast('Grupo eliminado 🗑️', 'success');
+                navigateTo('messages');
+            } catch (e) { console.error('[eliminarGrupo]', e); showToast('No se pudo eliminar', 'error'); }
+        };
         function renderChannelConversationBox(channelId, channelName) {
             const box = document.getElementById('chat-messages');
             if (!box) return false;
@@ -10494,8 +11122,9 @@ function renderMessages() {
             return true;
         }
         function renderConversationBox(userId) {
-            if (String(userId).startsWith('canal:')) {
-                return renderChannelConversationBox(userId, chatLiveChannelName || userId);
+            const esGrupo = String(userId).startsWith('canal:') || ensureChatGrupos().some(g => String(g.id) === String(userId));
+            if (esGrupo) {
+                return renderChannelConversationBox(userId, chatLiveChannelName || (ensureChatGrupos().find(g => String(g.id) === String(userId)) || {}).nombre || userId);
             }
             const box = document.getElementById('chat-messages');
             if (!box) return false;
@@ -10553,7 +11182,7 @@ function renderMessages() {
                 }
             }
             try { renderNav(); } catch(e){}
-            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300 shrink-0"><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500 truncate">${isAdmin(otherUser) ? 'Administrador' : isTeacher(otherUser) ? 'Maestro' : 'Asesor'} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="w-9 h-9 flex items-center justify-center text-green-600 hover:bg-green-50 rounded-xl shrink-0" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Copiloto IA (#7): Sugerir respuesta persuasiva"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe un mensaje..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300 shrink-0"><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500 truncate">${rolEtiqueta(otherUser)} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="w-9 h-9 flex items-center justify-center text-green-600 hover:bg-green-50 rounded-xl shrink-0" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo de esta conversación y sugiere la respuesta"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe un mensaje..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderConversationBox(userId);
             startChatLive(userId);
             bindChatPasteTarget(userId);
@@ -10561,7 +11190,7 @@ function renderMessages() {
                 e.preventDefault();
                 const text = document.getElementById('chat-input').value.trim();
                 if (!text) return;
-                db.messages.push({ id: Date.now() + Math.floor(Math.random()*1000), fromId: currentUser.id, fromName: currentUser.name, toId: otherUser.id, text: text, date: new Date().toISOString(), read: false });
+                db.messages.push({ id: idUnico(), fromId: currentUser.id, fromName: currentUser.name, toId: otherUser.id, text: text, date: new Date().toISOString(), read: false });
                 saveDB();
                 if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
                     window.BackendSync.pushCollectionsImmediate(['messages']);
@@ -10572,45 +11201,68 @@ function renderMessages() {
             setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
         }
 
-        // FASE 2 (#1): Chat de Canal Grupal
-        function openChannelChat(channelId, channelName) {
+        // Chat de Grupo (antes "canal"): respeta miembros, admins y "solo admins publican"
+        function openChannelChat(channelGroupId) {
             stopChatLive();
-            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas fa-hashtag"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(channelName)}</h3><p class="text-xs text-slate-500 truncate">Canal grupal abierto para todo el equipo</p></div><button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${channelId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${channelId}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Copiloto IA (#7)"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">IA</span></button><input id="chat-input" type="text" placeholder="Escribe al canal ${psEscape(channelName)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
-            renderChannelConversationBox(channelId, channelName);
-            startChatLive(channelId, channelName);
-            bindChatPasteTarget(channelId);
-            document.getElementById('chat-form').onsubmit = e => {
-                e.preventDefault();
-                const text = document.getElementById('chat-input').value.trim();
-                if (!text) return;
-                db.messages.push({ id: Date.now() + Math.floor(Math.random()*1000), fromId: currentUser.id, fromName: currentUser.name, toId: channelId, text, date: new Date().toISOString(), read: true });
-                saveDB();
-                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
-                    window.BackendSync.pushCollectionsImmediate(['messages']);
-                }
-                document.getElementById('chat-input').value = '';
-                renderChannelConversationBox(channelId, channelName);
-            };
-            setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; document.getElementById('chat-input')?.focus(); }, 100);
+            const grp = ensureChatGrupos().find(g => String(g.id) === String(channelGroupId)) || { id: channelGroupId, nombre: channelGroupId, desc: 'Grupo del equipo' };
+            const esStaffGrp = esStaffComunicacion(currentUser);
+            const uid = String(currentUser.id);
+            const members = (grp.memberIds || []).map(toIdVal).map(String);
+            const admins = (grp.adminIds || []).map(toIdVal).map(String);
+            const esAdminGrupo = esStaffGrp || String(grp.creadoPorId) === uid || admins.includes(uid);
+            const esMiembro = members.length === 0 || members.includes(uid) || admins.includes(uid) || esStaffGrp;
+            const subtitulo = !esMiembro ? 'No eres miembro de este grupo (vista de solo lectura)' : grp.onlyAdminsPost ? 'Solo los admins del grupo pueden compartir información' : 'Chat grupal del equipo Broker Booster';
+            const readonly = grp.onlyAdminsPost && !esAdminGrupo;
+            const esCanalLegacy = String(grp.id).startsWith('canal:');
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas ${grp.icon || 'fa-hashtag'}"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(grp.nombre)}</h3><p class="text-xs text-slate-500 truncate">${readonly ? '🔒 Solo lectura — los admins comparten la información' : psEscape(subtitulo)}${esAdminGrupo && grp.onlyAdminsPost ? ' · <span class="text-indigo-600 font-bold">Eres admin 👑</span>' : ''}</p></div>${!esCanalLegacy && esAdminGrupo ? `<button aria-label="Editar grupo" onclick="stopChatLive();closeModal();openGrupoModal('${String(grp.id)}')" class="w-9 h-9 flex items-center justify-center text-amber-700 hover:bg-amber-100 rounded-xl shrink-0" title="Editar grupo"><i class="fas fa-gear"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div>${readonly ? `<div class="p-3 sm:p-4 border-t bg-white rounded-b-2xl text-center text-xs text-slate-500 bg-slate-50"><i class="fas fa-lock text-indigo-500 mr-1"></i> Solo los admins de "${psEscape(grp.nombre)}" pueden publicar aquí</div>` : `<form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${String(grp.id)}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${String(grp.id)}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo en la conversación"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe al grupo ${psEscape(grp.nombre)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form>`}`);
+            renderChannelConversationBox(channelGroupId, grp.nombre);
+            startChatLive(channelGroupId, grp.nombre);
+            if (!readonly) {
+                bindChatPasteTarget(channelGroupId);
+                document.getElementById('chat-form').onsubmit = e => {
+                    e.preventDefault();
+                    const text = document.getElementById('chat-input') ? document.getElementById('chat-input').value.trim() : '';
+                    if (!text) return;
+                    if (grp.onlyAdminsPost && !esAdminGrupo && !esCanalLegacy) { showToast('🔒 Solo los admins del grupo pueden compartir información aquí', 'warning'); return; }
+                    db.messages.push({ id: idUnico(), fromId: currentUser.id, fromName: currentUser.name, toId: String(grp.id), text, date: new Date().toISOString(), read: true });
+                    saveDB();
+                    if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                        window.BackendSync.pushCollectionsImmediate(['messages']);
+                    }
+                    document.getElementById('chat-input').value = '';
+                    renderChannelConversationBox(channelGroupId, grp.nombre);
+                };
+            }
+            setTimeout(() => { const c = document.getElementById('chat-messages'); if (c) c.scrollTop = c.scrollHeight; const i = document.getElementById('chat-input'); if (i) i.focus(); }, 100);
         }
 
-        // FASE 2 (#7): Copiloto IA en el Chat y Centro de Mensajes
+        // #3: Copiloto IA pregrabado → Gu-IA real, abierta en la conversación.
         function sugerirRespuestaIAChat(targetId) {
-            const box = document.getElementById('chat-ai-suggestions');
-            const inp = document.getElementById('chat-input');
-            if (!box) return;
-            const borrador = (inp && inp.value.trim()) || '';
-            const sugerencias = [
-                borrador ? `✨ Versión Ejecutiva: "${borrador}. ¿Le parece bien si lo revisamos hoy en una llamada breve de 10 minutos a las 5:00 pm o prefiere mañana a las 11:00 am?"` : `🤝 Seguimiento ejecutivo: "Hola, quería darle seguimiento puntual a nuestra propuesta y confirmar si tienes alguna duda con las coberturas antes de emitir."`,
-                `💡 Manejo de objeción ('Lo voy a pensar'): "Entiendo totalmente. Para ayudarte a tomar la mejor decisión con calma, ¿qué punto en específico te gustaría que ajustemos en suma asegurada o aportación?"`,
-                `📅 Cierre con doble alternativa: "Ya quedó todo listo en mesa de control. ¿Agendamos la firma hoy jueves a las 6:00 pm o te acomoda mejor mañana viernes a las 10:00 am?"`
-            ];
-            box.classList.remove('hidden');
-            box.innerHTML = `<div class="flex items-center justify-between"><span class="text-[11px] font-bold uppercase text-amber-900"><i class="fas fa-wand-magic-sparkles mr-1"></i>Copiloto IA — Haz clic para usar una respuesta:</span><button type="button" onclick="document.getElementById('chat-ai-suggestions').classList.add('hidden')" class="text-xs text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div>` +
-                sugerencias.map(s => {
-                    const clean = s.replace(/^[^"]*"|"$/g, '');
-                    return `<div onclick="document.getElementById('chat-input').value=this.dataset.txt;document.getElementById('chat-ai-suggestions').classList.add('hidden');document.getElementById('chat-input').focus();" data-txt="${psEscape(clean)}" class="p-2 rounded-lg bg-white border border-amber-200 hover:border-amber-500 text-xs text-slate-700 cursor-pointer transition">${psEscape(s)}</div>`;
-                }).join('');
+            try {
+                const esGrupo = String(targetId).startsWith('canal:') || (db.chatGroups || []).some(g => String(g.id) === String(targetId));
+                let contextoPersona;
+                if (esGrupo) {
+                    const grp = (db.chatGroups || []).find(g => String(g.id) === String(targetId)) || {};
+                    contextoPersona = 'el grupo "' + (grp.nombre || targetId) + '"';
+                } else {
+                    const otro = db.users.find(u => String(u.id) === String(targetId));
+                    contextoPersona = 'mi conversación con ' + ((otro && otro.name) || 'un contacto') + ((otro && otro.role) ? ' (rol ' + otro.role + ')' : '');
+                }
+                const recientes = (db.messages || []).filter(m => esGrupo
+                    ? String(m.toId) === String(targetId)
+                    : (String(m.fromId) === String(targetId) && String(m.toId) === String(currentUser.id)) || (String(m.fromId) === String(currentUser.id) && String(m.toId) === String(targetId)))
+                    .sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-8);
+                const resumen = recientes.map(m => (m.fromName || '?') + ': ' + String(m.text || '(adjunto)').slice(0, 140)).join(' | ') || 'la conversación todavía está vacía';
+                const prefill = 'Estoy en el chat Broker Booster, en ' + contextoPersona + '. Últimos mensajes: ' + resumen + '. Ayúdame a entender la situación y dime la mejor respuesta: ';
+                if (typeof guiaShow === 'function' && document.getElementById('guia-panel')) {
+                    guiaShow();
+                    const gi = document.getElementById('guia-input');
+                    if (gi) { gi.value = prefill; gi.focus(); }
+                    window.showToast && showToast('Gu-IA abierta con el contexto de la conversación 🤖', 'info');
+                } else {
+                    window.showToast && showToast('Gu-IA no está disponible en esta vista', 'warning');
+                }
+            } catch (e) { console.error('[Gu-IA chat]', e); showToast('No se pudo abrir Gu-IA', 'error'); }
         }
         async function enviarArchivoAlChat(targetId, file, optionalCaption) {
             if (!file) return false;
@@ -10627,7 +11279,7 @@ function renderMessages() {
                 if (url) {
                     const caption = (optionalCaption || '').trim();
                     db.messages.push({
-                        id: Date.now() + Math.floor(Math.random()*1000),
+                        id: idUnico(),
                         fromId: currentUser.id,
                         fromName: currentUser.name,
                         toId: isChannel ? targetId : otherUser.id,
@@ -10683,18 +11335,48 @@ function renderMessages() {
                 inputEl.value = '';
             }
         }
-        function openWhatsApp(userId) {
-            const teacher = db.users.find(u => u.id === userId);
-            const phone = teacher.phone || '521000000000';
-            let defaultMsg = isStudent(currentUser) ? `Hola Prof. ${teacher.name.split(' ').pop()}, soy ${currentUser.name}, de la promotoría, me interesa una clase` : ``;
-            showModal(`<div class="p-6 max-w-md"><div class="text-center mb-5"><div class="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3"><i class="fab fa-whatsapp text-green-600 text-3xl"></i></div><h3 class="text-xl font-bold mb-1">Enviar WhatsApp</h3><p class="text-sm text-slate-600">a ${teacher.name}</p></div><div class="space-y-4"><div><label class="text-sm font-medium text-slate-700">Mensaje</label><textarea id="wa-message" rows="4" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white text-slate-900">${defaultMsg}</textarea><p class="text-xs text-slate-500 mt-1">Se abrirá WhatsApp con este mensaje</p></div><div class="bg-slate-50 rounded-lg p-3 text-xs"><p class="font-medium mb-1">Número: +${phone}</p><p class="text-slate-600">El maestro responderá en su horario</p></div></div><div class="flex gap-3 mt-6"><button aria-label="Cerrar" onclick="closeModal()" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cancelar</button><button onclick="sendWhatsApp('${phone}')" class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center justify-center gap-2"><i class="fab fa-whatsapp"></i> Abrir WhatsApp</button></div></div>`);
+        /* ===== WhatsApp (#2): normaliza el teléfono y abre wa.me con ancla
+         * real (los popups de window.open suelen bloquearse en móvil). ====== */
+        function normTelefono(p) {
+            let d = String(p || '').trim().replace(/\D/g, '');
+            if (!d) return '';
+            if (d.startsWith('00')) { d = d.slice(2); }
+            if (d.startsWith('0') && !d.startsWith('021')) { d = d.replace(/^0+/, ''); }
+            if (d.startsWith('52') && d.length >= 12) return d;                  // ya trae lada México
+            if (d.startsWith('1') && d.length === 11) return '52' + d;           // 1 + 10 dígitos
+            if (d.length === 10) return '52' + d;                                // nacional sin lada
+            if (d.length === 11 && d.startsWith('521')) return d;
+            return d;
         }
-        function sendWhatsApp(phone) {
-            const message = document.getElementById('wa-message').value;
-            const encoded = encodeURIComponent(message);
-            const url = `https://wa.me/${phone}?text=${encoded}`;
-            window.open(url, '_blank'); closeModal();
-            if (isStudent(currentUser)) { const teacher = db.users.find(u => u.phone === phone); if (teacher) { db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: teacher.id, text: `[WhatsApp] ${message.substring(0, 50)}...`, date: new Date().toISOString(), read: true, whatsapp: true }); saveDB(); } }
+        function openWhatsApp(userId) {
+            const person = db.users.find(u => String(u.id) === String(userId));
+            if (!person) { showToast('Usuario no disponible para WhatsApp', 'warning'); return; }
+            const phone = normTelefono(person.phone);
+            if (!phone || phone.replace(/0/g, '').length < 7) { showToast(person.name + ' no tiene un número de WhatsApp válido', 'warning'); return; }
+            const rolOtro = String(person.role || '').toLowerCase();
+            const defaultMsg = ['maestro', 'capacitador'].includes(rolOtro)
+                ? `Hola ${String(person.name || '').split(' ')[0]}, soy ${currentUser.name}, de la promotoría. Me interesa agendar una sesión.`
+                : `Hola, te contacto desde Broker Booster.`;
+            showModal(`<div class="p-6 max-w-md"><div class="text-center mb-5"><div class="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3"><i class="fab fa-whatsapp text-green-600 text-3xl"></i></div><h3 class="text-xl font-bold mb-1">Enviar WhatsApp</h3><p class="text-sm text-slate-600">a ${psEscape(person.name)}</p></div><div class="space-y-4"><div><label class="text-sm font-medium text-slate-700">Mensaje</label><textarea id="wa-message" rows="4" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white text-slate-900">${psEscape(defaultMsg)}</textarea><p class="text-xs text-slate-500 mt-1">Se abrirá WhatsApp con este mensaje</p></div><div class="bg-slate-50 rounded-lg p-3 text-xs"><p class="font-medium mb-1">Número: +${psEscape(phone)}</p><p class="text-slate-600">Se abre WhatsApp Web o la app con el chat listo para enviar</p></div></div><div class="flex gap-3 mt-6"><button aria-label="Cerrar" onclick="closeModal()" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cancelar</button><button onclick="sendWhatsApp('${phone}', '${String(person.id)}')" class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center justify-center gap-2"><i class="fab fa-whatsapp"></i> Abrir WhatsApp</button></div></div>`);
+        }
+        function sendWhatsApp(phone, userId) {
+            const message = ((document.getElementById('wa-message') || {}).value || '').trim();
+            const clean = normTelefono(phone);
+            const url = 'https://wa.me/' + clean + '?text=' + encodeURIComponent(message);
+            closeModal();
+            popUpWame(url);
+            try {
+                if (userId) {
+                    const toId = /^\d+$/.test(String(userId)) ? Number(userId) : String(userId);
+                    db.messages.push({ id: Date.now(), fromId: currentUser.id, toId: toId, text: '[WhatsApp] ' + message.substring(0, 120), date: new Date().toISOString(), read: true, whatsapp: true });
+                    saveDB();
+                }
+            } catch (e) { console.warn('[whatsapp] registro', e); }
+        }
+        function popUpWame(url) {
+            // Ancla real: funciona con bloqueador de popups y en móvil abre la app.
+            try { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+            catch (e) { window.open(url, '_blank', 'noopener') || (window.location.href = url); }
         }
 
 
@@ -10734,8 +11416,8 @@ function renderMessages() {
                     const studentsCount = db.enrollments.filter(e => e.generationId === g.id).length;
                     const plan = db.planes.find(p=>p.id===g.planId);
                     return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                        <div class="h-36 bg-slate-100 relative">
-                            ${g.image ? `<img src="${g.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-layer-group text-3xl text-slate-300"></i></div>`}
+                        <div class="h-48 bg-slate-100 relative">
+                            ${g.image ? `<img src="${g.image}" class="w-full h-full object-cover" onerror="this.closest('.relative').classList.add('bg-slate-100'); this.style.display='none'">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-layer-group text-3xl text-slate-300"></i></div>`}
                             <span class="absolute top-3 right-3 text-xs px-2 py-1 rounded-full backdrop-blur bg-white/80 ${g.status==='activa'?'text-emerald-700':'text-slate-600'}">${g.status||'planeada'}</span>
                         </div>
                         <div class="p-5">
@@ -10746,7 +11428,11 @@ function renderMessages() {
                             <span><i class="fas fa-users-rectangle mr-1"></i> ${groupsCount} grupos</span>
                             <span><i class="fas fa-user-graduate mr-1"></i> ${studentsCount} alumnos</span>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="openGenerationDetail(${g.id})" class="flex-1 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1.5" title="Ver grupos y alumnos de la generación"><i class="fas fa-eye"></i> Ver Grupos y Alumnos (${groupsCount + studentsCount > 0 ? groupsCount + ' / ' + studentsCount : ''})</button>
+                            <button onclick="exportGeneracionCSV(${g.id})" class="px-3 py-2 text-sm border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg" title="Exportar alumnos a CSV"><i class="fas fa-file-csv"></i></button>
+                        </div>
+                        <div class="flex gap-2 mt-2">
                             <button onclick="openGenerationModal(${g.id})" class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
                             <button onclick="deleteGeneration(${g.id})" class="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
                         </div>
@@ -10775,8 +11461,8 @@ function renderMessages() {
                 ${planesFiltrados.map(p => {
                     const gensCount = db.generations.filter(g=>g.planId===p.id).length;
                     return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                        <div class="h-36 bg-slate-100 relative">
-                            ${p.image ? `<img src="${p.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-graduation-cap text-3xl text-slate-300"></i></div>`}
+                        <div class="h-48 bg-slate-100 relative">
+                            ${p.image ? `<img src="${p.image}" class="w-full h-full object-cover" onerror="this.closest('.relative').classList.add('bg-slate-100'); this.style.display='none'">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-graduation-cap text-3xl text-slate-300"></i></div>`}
                             <span class="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full backdrop-blur bg-white/80 text-indigo-700 font-medium">${p.tipo}</span>
                         </div>
                         <div class="p-5">
@@ -10806,29 +11492,40 @@ function renderMessages() {
                 <div><label class="text-sm font-medium">Nombre</label><input id="plan-nombre" required value="${p?p.nombre:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div><label class="text-sm font-medium">Descripción</label><textarea id="plan-desc" rows="3" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${p?p.descripcion||'':''}</textarea></div>
                 <div><label class="text-sm font-medium">Duración</label><input id="plan-duracion" placeholder="ej. 2 años, 40 horas" value="${p?p.duracion||'':''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div><label class="text-sm font-medium">Imagen</label><input type="file" id="plan-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><div class="mt-2">${p?.image?`<img id="plan-image-preview" src="${p.image}" class="w-full h-32 object-cover rounded-lg border">`:`<img id="plan-image-preview" class="w-full h-32 object-cover rounded-lg border hidden">`}</div></div>
+                <div><label class="text-sm font-medium">Imagen</label><input type="file" id="plan-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="plan-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${p?.image?`<img id="plan-image-preview" src="${p.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img id="plan-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div>
                 <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const imageInput = document.getElementById('plan-image-input');
             const preview = document.getElementById('plan-image-preview');
             let imageData = p?.image || '';
+            /* FIX 2026-10 portada: bloquear Guardar mientras sube + toasts de error */
+            const notaPlan = document.getElementById('plan-image-status');
+            let planImgPendiente = false;
+            const planImgVal = v => typeof v === 'string' && (/^https?:\/\//.test(v) || /^data:image\/(png|jpeg|jpg|gif|webp)/i.test(v));
             if (imageInput) {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
-                    if (file) {
+                    if (!file) return;
+                    planImgPendiente = true; imageData = p?.image || '';
+                    if (notaPlan) { notaPlan.textContent = 'Subiendo imagen de portada… espera unos segundos.'; notaPlan.classList.remove('hidden'); }
+                    try {
                         if (window.Media && typeof window.Media.subirOUrl === 'function') {
                             imageData = await window.Media.subirOUrl(file, 'planes', { title: file.name });
-                            preview.src = imageData; preview.classList.remove('hidden');
                         } else {
-                            const reader = new FileReader();
-                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                            reader.readAsDataURL(file);
+                            imageData = await window.Media.comprimirImagen(file);
                         }
+                    } catch (errImg) {
+                        imageData = '';
+                        try { imageData = await window.Media.comprimirImagen(file); } catch (errC) { imageData = ''; }
                     }
+                    planImgPendiente = false;
+                    if (imageData && planImgVal(imageData)) { preview.src = imageData; preview.classList.remove('hidden'); if (notaPlan) notaPlan.textContent = 'Imagen lista ✓'; }
+                    else { imageData = p?.image || ''; preview.src = imageData || ''; preview.classList.add('hidden'); if (notaPlan) notaPlan.textContent = '⚠ No se pudo cargar la imagen. Usa JPG o PNG.'; if (window.showToast) showToast('No se pudo cargar la imagen de portada. Intenta con JPG o PNG.', 'warning'); }
                 };
             }
             document.getElementById('plan-form').onsubmit = e => {
                 e.preventDefault();
+                if (planImgPendiente) { if (window.showToast) showToast('La imagen sigue subiendo, espera unos segundos e intenta de nuevo', 'warning'); return; }
                 const data = {
                     tipo: document.getElementById('plan-tipo').value,
                     nombre: document.getElementById('plan-nombre').value.trim(),
@@ -10853,32 +11550,64 @@ function renderMessages() {
             showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-5">${g?'Editar':'Nueva'} Generación</h3><form id="gen-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Plan de Formación</label><select id="gen-plan" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${g&&g.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div>
                 <div><label class="text-sm font-medium">Nombre</label><input id="gen-name" required value="${g?g.name:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Inicio</label><input type="date" id="gen-start" required value="${g?g.startDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm font-medium">Fin</label><input type="date" id="gen-end" required value="${g?g.endDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div></div>
+                <div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Inicio</label><input type="date" id="gen-start" required value="${g?g.startDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm font-medium">Fin</label><input type="date" id="gen-end" required min="${g?g.startDate:''}" value="${g?g.endDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div></div>
                 <div><label class="text-sm font-medium">Estado</label><select id="gen-status" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="activa" ${g&&g.status==='activa'?'selected':''}>Activa</option><option value="finalizada" ${g&&g.status==='finalizada'?'selected':''}>Finalizada</option><option value="planeada" ${g&&g.status==='planeada'?'selected':''}>Planeada</option></select></div>
-                <div><label class="text-sm font-medium">Imagen de portada</label><input type="file" id="gen-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><div class="mt-2">${g?.image?`<img id="gen-image-preview" src="${g.image}" class="w-full h-32 object-cover rounded-lg border">`:`<img id="gen-image-preview" class="w-full h-32 object-cover rounded-lg border hidden">`}</div></div>
+                <div><label class="text-sm font-medium">Imagen de portada</label><input type="file" id="gen-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="gen-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${g?.image?`<img id="gen-image-preview" src="${g.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img id="gen-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div>
                 <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const imageInput = document.getElementById('gen-image-input');
             const preview = document.getElementById('gen-image-preview');
             let imageData = g?.image || '';
+            // PATCH 2026-10 Mejoras Generaciones: validación de fechas (fin >= inicio, siempre)
+            const startInput = document.getElementById('gen-start');
+            const endInput = document.getElementById('gen-end');
+            endInput.min = startInput.value;
+            startInput.addEventListener('change', () => { endInput.min = startInput.value; if (endInput.value && endInput.value < startInput.value) endInput.value = startInput.value; });
+            // Validación robusta AAAA-MM-DD sin regex: partes numéricas + fecha real
+            const fechaValida = v => {
+                if (typeof v !== 'string' || v.length !== 10) return false;
+                const p = v.split('-');
+                if (p.length !== 3 || p[0].length !== 4 || p[1].length !== 2 || p[2].length !== 2) return false;
+                const y = Number(p[0]), m = Number(p[1]), d = Number(p[2]);
+                if (!y || isNaN(m) || isNaN(d)) return false;
+                const dt = new Date(y, m - 1, d);
+                return !isNaN(dt.getTime()) && dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+            };
+            const notaGen = document.getElementById('gen-image-status');
+            let genImgPendiente = false;
+            const genImgVal = v => typeof v === 'string' && (/^https?:\/\//.test(v) || /^data:image\/(png|jpeg|jpg|gif|webp)/i.test(v));
             if (imageInput) {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
-                    if (file) {
+                    if (!file) return;
+                    genImgPendiente = true; imageData = g?.image || '';
+                    if (notaGen) { notaGen.textContent = 'Subiendo imagen de portada… espera unos segundos.'; notaGen.classList.remove('hidden'); }
+                    try {
                         if (window.Media && typeof window.Media.subirOUrl === 'function') {
                             imageData = await window.Media.subirOUrl(file, 'generations', { title: file.name });
-                            preview.src = imageData; preview.classList.remove('hidden');
                         } else {
-                            const reader = new FileReader();
-                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                            reader.readAsDataURL(file);
+                            imageData = await window.Media.comprimirImagen(file);
                         }
+                    } catch (errImg) {
+                        imageData = '';
+                        try { imageData = await window.Media.comprimirImagen(file); } catch (errC) { imageData = ''; }
                     }
+                    genImgPendiente = false;
+                    if (imageData && genImgVal(imageData)) { preview.src = imageData; preview.classList.remove('hidden'); if (notaGen) notaGen.textContent = 'Imagen lista ✓'; }
+                    else { imageData = g?.image || ''; preview.src = imageData || ''; preview.classList.add('hidden'); if (notaGen) notaGen.textContent = '⚠ No se pudo cargar la imagen. Usa JPG o PNG.'; if (window.showToast) showToast('No se pudo cargar la imagen de portada. Intenta con JPG o PNG.', 'warning'); }
                 };
             }
             document.getElementById('gen-form').onsubmit = e => {
                 e.preventDefault();
-                const data = { name: document.getElementById('gen-name').value.trim(), startDate: document.getElementById('gen-start').value, endDate: document.getElementById('gen-end').value, status: document.getElementById('gen-status').value, image: imageData, planId: parseInt(document.getElementById('gen-plan').value) || null };
+                if (genImgPendiente) { if (window.showToast) showToast('La imagen sigue subiendo, espera unos segundos e intenta de nuevo', 'warning'); return; }
+                const startDate = document.getElementById('gen-start').value;
+                const endDate = document.getElementById('gen-end').value;
+                if (!fechaValida(startDate)) { alert('Fecha de inicio inválida. Se espera el calendario (día y mes) AAAA-MM-DD.'); return; }
+                if (!fechaValida(endDate)) { alert('Fecha de fin inválida. Se espera AAAA-MM-DD.'); return; }
+                if (new Date(endDate + 'T00:00:00').getTime() < new Date(startDate + 'T00:00:00').getTime()) { alert('La fecha de fin no puede ser anterior a la de inicio.'); return; }
+                const dias = Math.round((new Date(endDate + 'T00:00:00') - new Date(startDate + 'T00:00:00')) / 86400000);
+                if (dias > 3650 && !confirm('La generación dura ' + dias + ' días (más de 10 años). ¿Continuar igual?')) return;
+                const data = { name: document.getElementById('gen-name').value.trim(), startDate: startDate, endDate: endDate, status: document.getElementById('gen-status').value, image: imageData, planId: parseInt(document.getElementById('gen-plan').value) || null };
                 if (g) Object.assign(g, data); else { db.generations.push({ id: Date.now(), ...data }); try{ const prospectos = db.users.filter(u=>u.role==='prospecto'); enviarAviso('generacion', prospectos, {nombreGen: data.name}); }catch(e){} }
                 saveDB(); closeModal(); navigateTo('generations');
             };
@@ -10892,8 +11621,65 @@ function renderMessages() {
             saveDB(); navigateTo('generations');
         }
 
+        /* PATCH 2026-10 Mejoras Generaciones: detalle en un clic (grupos + alumnos) */
+        function openGenerationDetail(genId) {
+            const gen = db.generations.find(g=>g.id===genId);
+            if (!gen) return;
+            const plan = db.planes.find(p=>p.id===gen.planId);
+            const grupos = db.groups.filter(gr=>gr.generationId===genId);
+            const insc = db.enrollments.filter(e=>e.generationId===genId);
+            const alumnos = insc.map(en=>({ en: en, u: db.users.find(x=>x.id===en.userId) })).filter(r=>r.u);
+            showModal(`<div class="p-6 max-w-2xl w-full">
+                <div class="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-layer-group text-indigo-600"></i> ${gen.name}</h3>
+                        <p class="text-sm text-slate-500 mt-1">${plan?plan.nombre+' · '+plan.tipo+' · ':''}${gen.startDate} → ${gen.endDate} · <span class="capitalize">${gen.status||'planeada'}</span></p>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700 font-semibold">${grupos.length} grupos · ${alumnos.length} alumnos</span>
+                </div>
+                <div class="max-h-[60vh] overflow-y-auto pr-1">
+                    <h4 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fas fa-users-rectangle text-slate-500"></i> Grupos de la generación</h4>
+                    ${grupos.length ? `<div class="rounded-xl border border-slate-200 overflow-hidden mb-5"><table class="w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-3 py-2 text-left">Grupo</th><th class="px-3 py-2 text-left">Tutor</th><th class="px-3 py-2 text-left">Horario</th><th class="px-3 py-2 text-left">Alumnos</th><th class="px-3 py-2"></th></tr></thead><tbody class="divide-y divide-slate-100">
+                        ${grupos.map(gr=>{ const tutor = db.users.find(u=>u.id===gr.tutorId); const cnt = db.enrollments.filter(e2=>e2.groupId===gr.id).length; return `<tr class="hover:bg-slate-50"><td class="px-3 py-2 font-medium">${gr.name}</td><td class="px-3 py-2">${tutor?tutor.name:'-'}</td><td class="px-3 py-2">${gr.schedule||'-'}</td><td class="px-3 py-2">${cnt}</td><td class="px-3 py-2 text-right"><button onclick="openGroupDetail(${gr.id})" class="text-indigo-600 text-xs font-medium hover:underline">Gestionar</button></td></tr>`; }).join('')}
+                    </tbody></table></div>` : `<p class="text-sm text-slate-500 mb-5 bg-slate-50 rounded-lg p-3">Sin grupos asignados todavía.</p>`}
+                    <h4 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fas fa-user-graduate text-slate-500"></i> Alumnos inscritos</h4>
+                    ${alumnos.length ? `<div class="space-y-2">${alumnos.map(r=>{ const gr = db.groups.find(x=>x.id===r.en.groupId); return `<div class="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2"><div class="flex items-center gap-3 min-w-0"><div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">${(r.u.name||'?').charAt(0).toUpperCase()}</div><div class="min-w-0"><p class="text-sm font-medium truncate">${r.u.name}</p><p class="text-xs text-slate-500 truncate">${r.u.email||''}</p></div></div><div class="text-right flex-shrink-0"><p class="text-xs text-slate-600">${gr?gr.name:'Sin grupo'}</p><p class="text-[10px] text-slate-400">${r.en.enrolledAt?new Date(r.en.enrolledAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'2-digit'}):''}</p></div></div>`; }).join('')}</div>` : `<p class="text-sm text-slate-500 bg-slate-50 rounded-lg p-3">Sin alumnos inscritos todavía.</p>`}
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button onclick="exportGeneracionCSV(${genId})" class="px-3 py-2.5 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar alumnos CSV</button>
+                    <button onclick="closeModal(); window.filtroGrupoGen='${genId}'; navigateTo('groups')" class="px-3 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm">Gestionar en Grupos</button>
+                    <button onclick="closeModal()" class="ml-auto px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm">Cerrar</button>
+                </div>
+            </div>`);
+        }
+
+        /* PATCH 2026-10 Mejoras Generaciones: exportar alumnos de una generación a CSV */
+        function exportGeneracionCSV(genId) {
+            try {
+                const gen = db.generations.find(g=>g.id===genId);
+                if (!gen) return;
+                const insc = db.enrollments.filter(e=>e.generationId===genId);
+                const alumnos = insc.map(en=>({ en: en, u: db.users.find(x=>x.id===en.userId) })).filter(r=>r.u);
+                if (!alumnos.length) { alert('Esta generación aún no tiene alumnos inscritos.'); return; }
+                const esc = v => '"' + String(v==null?'':v).replace(/"/g,'""') + '"';
+                let csv = '\ufeffNombre,Email,WhatsApp,Grupo,Tutor,Fecha de inscripción\n';
+                alumnos.forEach(r => {
+                    const gr = db.groups.find(x=>x.id===r.en.groupId);
+                    const tutor = gr ? db.users.find(x=>x.id===gr.tutorId) : null;
+                    csv += [esc(r.u.name), esc(r.u.email||''), esc(r.u.phone||''), esc(gr?gr.name:'Sin grupo'), esc(tutor?tutor.name:''), esc(r.en.enrolledAt?new Date(r.en.enrolledAt).toLocaleDateString('es-MX'):'')].join(',') + '\n';
+                });
+                const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href=url;
+                a.download = 'alumnos_' + (gen.name||'generacion').replace(/\s+/g,'_').replace(/[^A-Za-z0-9_-]/g,'') + '.csv';
+                a.click(); URL.revokeObjectURL(url);
+                if (window.showToast) showToast('CSV exportado (' + alumnos.length + ' alumnos)','success');
+            } catch (e) { if (window.showToast) showToast('Error exportando: ' + (e && e.message || e), 'error'); }
+        }
+
         function renderGroups() {
-            const canEdit = ['admin', 'maestro'].includes(currentUser.role);
+            // PATCH GM 2026-10: GM tiene acceso total a Academia (mismos permisos que maestro/capacitador)
+            const canEdit = hasRole(currentUser, ['admin', 'maestro', 'gm', 'capacitador']);
             const filtroGen = window.filtroGrupoGen ? parseInt(window.filtroGrupoGen) : null;
             const filtroTutor = window.filtroGrupoTutor ? parseInt(window.filtroGrupoTutor) : null;
             let grupos = db.groups;
@@ -10943,14 +11729,16 @@ function renderMessages() {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
                     if (file) {
-                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
-                            imageData = await window.Media.subirOUrl(file, 'groups', { title: file.name });
-                            preview.src = imageData; preview.classList.remove('hidden');
-                        } else {
-                            const reader = new FileReader();
-                            reader.onload = ev => { imageData = ev.target.result; preview.src = imageData; preview.classList.remove('hidden'); };
-                            reader.readAsDataURL(file);
+                        try {
+                            if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                                imageData = await window.Media.subirOUrl(file, 'groups', { title: file.name });
+                            } else {
+                                imageData = await window.Media.comprimirImagen(file);
+                            }
+                        } catch (errImg) {
+                            imageData = await window.Media.comprimirImagen(file);
                         }
+                        if (imageData) { preview.src = imageData; preview.classList.remove('hidden'); }
                     }
                 };
             }
@@ -11046,35 +11834,21 @@ function renderMessages() {
 function renderLiveClasses() {
             if (!db.liveClasses) db.liveClasses = [];
             const isTeacher = ['admin','gm','desarrollador','maestro','capacitador','agencia'].includes(currentUser.role);
-            // v6.6 FIX ROLES: alumno y todos los roles con permiso live-classes ven sesiones EN VIVO nuevas
-            let myClasses = isTeacher ? db.liveClasses : db.liveClasses.filter(c => c.assignedTo && c.assignedTo.includes(currentUser.id));
+            // v6.9 FIX: las clases asignadas a un grupo (assignedToGroup) también son visibles para los alumnos de ese grupo
+            const misGrupos = new Set((db.enrollments||[]).filter(e=>String(e.userId)===String(currentUser.id)).map(e=>String(e.groupId)));
+            let myClasses = isTeacher ? [...db.liveClasses] : (db.liveClasses||[]).filter(c => (c.assignedTo && c.assignedTo.includes(currentUser.id)) || (c.assignedToGroup && misGrupos.has(String(c.assignedToGroup))));
             // FIX: Incluir sesiones EN VIVO activas (con participantesReales) para todos los roles con acceso a live-classes
             const enVivoActivas = (db.liveClasses||[]).filter(c => c.participantesReales && c.participantesReales.length > 0);
             const enVivoNuevas = (db.liveClasses||[]).filter(c => c.esEnVivoNuevo || c.tipo === 'en_vivo_studio');
             // Combinar y deduplicar
             const todasVisibles = [...myClasses, ...enVivoActivas, ...enVivoNuevas];
             myClasses = [...new Map(todasVisibles.map(c=>[String(c.id), c])).values()];
-            // Si es alumno y no tiene clases asignadas pero hay EN VIVO activo, mostrarlo igual
-            if (!isTeacher && myClasses.length === 0 && enVivoActivas.length === 0) {
-                // Crear sesión demo EN VIVO para que alumno vea el formato nuevo
-                const demoEnVivo = {
-                    id: 'demo-en-vivo-001',
-                    title: '🔴 Sesión EN VIVO - Demo formato nuevo',
-                    start: new Date().toISOString(),
-                    end: new Date(Date.now()+3600000).toISOString(),
-                    zoomUrl: '',
-                    assignedTo: [currentUser.id],
-                    createdBy: 1,
-                    instructorId: 1,
-                    esEnVivoNuevo: true,
-                    tipo: 'en_vivo_studio',
-                    participantesReales: [{id:1, name:'Instructor Demo', fecha: new Date().toLocaleDateString('es-MX'), entradaTs: Date.now(), entrada: new Date().toLocaleTimeString('es-MX'), role:'maestro'}]
-                };
-                if (!db.liveClasses.find(c=>c.id==='demo-en-vivo-001')) {
-                    db.liveClasses.push(demoEnVivo);
-                    myClasses = [demoEnVivo];
-                }
+            // v6.9 FIX: ya NO se crea sesión demo; además se limpian las demo que quedaron guardadas en la BD (contaminaban datos reales)
+            if ((db.liveClasses||[]).some(c=>String(c.id).startsWith('demo-en-vivo'))) {
+                db.liveClasses = db.liveClasses.filter(c=>!String(c.id).startsWith('demo-en-vivo'));
+                saveDB();
             }
+            window.__lcClasesVisibles = myClasses;
             
             // Marcar notificaciones como leídas al entrar
             if (isStudent(currentUser)) {
@@ -11116,7 +11890,7 @@ function renderLiveClasses() {
                         const color = instructor?.calendarColor || '#0a2540';
                         return {
                             id: String(c.id),
-                            title: c.title + ' - ' + (instructor?.name || ''),
+                            title: c.title + (instructor?.name ? ' - ' + instructor.name : ''),
                             start: c.start,
                             end: c.end,
                             backgroundColor: color,
@@ -11141,6 +11915,8 @@ function renderLiveClasses() {
                         </div>
                         ${isTeacher ? `<button onclick="openNewLiveClassModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
                     </div>
+                    ${renderBannerEnVivo()}
+                    ${(!isTeacher && myClasses.length) ? renderMisClasesCards(myClasses) : ''}
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <div id="live-calendar"></div>
                     </div>
@@ -11149,12 +11925,18 @@ function renderLiveClasses() {
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200">
                         <div class="p-4 border-b flex items-center justify-between flex-wrap gap-3">
                             <h3 class="font-semibold text-slate-800 flex items-center gap-2"><i class="fas fa-history text-indigo-600"></i> Historial de Clases Impartidas</h3>
-                            <div class="flex gap-2">
-                                <select id="hist-filter-instructor" onchange="document.getElementById('live-classes').innerHTML = renderLiveClasses() /* v6.5: sanitizado con escapeHTML dentro de render */" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
-                                    <option value="">Todos los instructores</option>
-                                    ${db.users.filter(u=>['desarrollador','admin','gm','capacitador'].includes(u.role)).map(u=>`<option value="${u.id}">${u.name} (${u.role.toUpperCase()})</option>`).join('')}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <select id="hist-periodo" onchange="lcHistSet('periodo', this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                    <option value="prox">Próximas</option>
+                                    <option value="pasadas">Pasadas</option>
+                                    <option value="todas">Todas</option>
                                 </select>
-                                <input type="text" id="hist-search" placeholder="Buscar clase..." oninput="window.debouncedRenderLiveClasses()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-40 bg-white text-slate-900">
+                                <select id="hist-filter-instructor" onchange="lcHistSet('inst', this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                    <option value="">Todos los instructores</option>
+                                    ${db.users.filter(u=>['desarrollador','admin','gm','capacitador','maestro','agencia'].includes(u.role)).map(u=>`<option value="${u.id}">${u.name} (${u.role.toUpperCase()})</option>`).join('')}
+                                </select>
+                                <input type="text" id="hist-search" placeholder="Buscar clase..." oninput="lcHistSet('search', this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-40 bg-white text-slate-900">
+                                <button onclick="exportarHistorialClasesCSV()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> CSV</button>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
@@ -11164,37 +11946,172 @@ function renderLiveClasses() {
                                         <th class="px-4 py-2">Fecha</th>
                                         <th class="px-4 py-2">Clase</th>
                                         <th class="px-4 py-2">Instructor</th>
+                                        <th class="px-4 py-2">Estado</th>
                                         <th class="px-4 py-2">Participantes convocados</th>
                                         <th class="px-4 py-2">Registrado por</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    ${(() => {
-                                        const filterInst = document.getElementById('hist-filter-instructor')?.value;
-                                        const search = document.getElementById('hist-search')?.value?.toLowerCase() || '';
-                                        let clases = [...myClasses].sort((a,b)=> new Date(b.start)-new Date(a.start));
-                                        if(filterInst) clases = clases.filter(c => String(c.instructorId||c.createdBy) === filterInst);
-                                        if(search) clases = clases.filter(c => c.title.toLowerCase().includes(search));
-                                        return clases.map(c => {
-                                            const inst = db.users.find(u => u.id === (c.instructorId || c.createdBy));
-                                            const creator = db.users.find(u => u.id === c.createdBy);
-                                            const participantes = c.assignedTo.map(id => db.users.find(u=>u.id===id)?.name).filter(Boolean).join(', ');
-                                            const fecha = new Date(c.start);
-                                            return `<tr class="border-t hover:bg-slate-50">
-                                                <td class="px-4 py-2">${fecha.toLocaleDateString('es-MX')} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
-                                                <td class="px-4 py-2 font-medium">${c.title}</td>
-                                                <td class="px-4 py-2"><span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">${inst?inst.name:'-'} (${inst?inst.role.toUpperCase():''})</span></td>
-                                                <td class="px-4 py-2 text-xs max-w-xs truncate" title="${participantes}">${c.assignedTo.length} alumnos</td>
-                                                <td class="px-4 py-2 text-xs text-slate-600">${creator?creator.name:'Sistema'}</td>
-                                            </tr>`;
-                                        }).join('');
-                                    })()}
+                                <tbody id="hist-tbody">
+                                    ${buildLiveHistRowsHtml()}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             `;
+        }
+
+        // --- v6.9 HELPERS CLASES EN VIVO (compartidos por render, historial y sala) ---
+        function uniqueDBId() { if (typeof db === 'undefined' || !db) { /* silencio */ } else { db._uid = (db._uid || Date.now()) + 1; return db._uid; } return Date.now(); }
+
+        function lcEstadoClase(cls) {
+            const now = Date.now();
+            const s = new Date(cls.start).getTime(), e = new Date(cls.end).getTime();
+            if (now < s) return { key: 'prox', label: 'Programada', className: 'bg-blue-100 text-blue-800' };
+            if (now <= e) return { key: 'activa', label: 'En vivo', className: 'bg-red-100 text-red-700' };
+            return { key: 'pasada', label: 'Finalizada', className: 'bg-slate-100 text-slate-500' };
+        }
+
+        function lcHistSet(key, value) {
+            window.lcHistorialState = window.lcHistorialState || { periodo: 'prox', inst: '', search: '' };
+            window.lcHistorialState[key] = value;
+            const tb = document.getElementById('hist-tbody');
+            if (tb) tb.innerHTML = buildLiveHistRowsHtml();
+        }
+
+        function buildLiveHistRowsHtml() {
+            const st = window.lcHistorialState || { periodo: 'prox', inst: '', search: '' };
+            let clases = [...(window.__lcClasesVisibles || [])].sort((a,b)=> new Date(b.start) - new Date(a.start));
+            if (st.periodo === 'prox') clases = clases.filter(c => new Date(c.end).getTime() >= Date.now());
+            if (st.periodo === 'pasadas') clases = clases.filter(c => new Date(c.end).getTime() < Date.now());
+            if (st.inst) clases = clases.filter(c => String(c.instructorId||c.createdBy) === String(st.inst));
+            if (st.search) clases = clases.filter(c => String(c.title||'').toLowerCase().includes(String(st.search).toLowerCase()));
+            if (!clases.length) return `<tr><td colspan="6" class="px-4 py-6 text-center text-slate-400 text-sm">Sin clases con estos filtros</td></tr>`;
+            return clases.map(c => {
+                const inst = db.users.find(u => String(u.id) === String(c.instructorId || c.createdBy));
+                const creator = db.users.find(u => String(u.id) === String(c.createdBy));
+                const participantes = (c.assignedTo||[]).map(id => db.users.find(u=>String(u.id)===String(id))?.name).filter(Boolean).join(', ');
+                const fecha = new Date(c.start);
+                const est = lcEstadoClase(c);
+                return `<tr class="border-t hover:bg-slate-50">
+                    <td class="px-4 py-2">${fecha.toLocaleDateString('es-MX')} ${fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td>
+                    <td class="px-4 py-2 font-medium">${c.title}</td>
+                    <td class="px-4 py-2"><span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">${inst?inst.name:'-'} (${inst?inst.role.toUpperCase():''})</span></td>
+                    <td class="px-4 py-2"><span class="px-2 py-1 rounded text-xs font-medium ${est.className}">${est.label}</span></td>
+                    <td class="px-4 py-2 text-xs max-w-xs truncate" title="${participantes}">${(c.assignedTo||[]).length} alumnos</td>
+                    <td class="px-4 py-2 text-xs text-slate-600">${creator?creator.name:'Sistema'}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function exportarHistorialClasesCSV() {
+            try {
+                const st = window.lcHistorialState || { periodo: 'prox', inst: '', search: '' };
+                let clases = [...(window.__lcClasesVisibles || [])].sort((a,b)=> new Date(b.start) - new Date(a.start));
+                if (st.periodo === 'prox') clases = clases.filter(c => new Date(c.end).getTime() >= Date.now());
+                if (st.periodo === 'pasadas') clases = clases.filter(c => new Date(c.end).getTime() < Date.now());
+                if (st.inst) clases = clases.filter(c => String(c.instructorId||c.createdBy) === String(st.inst));
+                if (st.search) clases = clases.filter(c => String(c.title||'').toLowerCase().includes(String(st.search).toLowerCase()));
+                if (!clases.length) { if (window.showToast) showToast('No hay clases para exportar con estos filtros', 'info'); return; }
+                const q = (v) => '"' + String(v==null?'':v).replace(/"/g,'""') + '"';
+                const rows = clases.map(c => {
+                    const inst = db.users.find(u => String(u.id) === String(c.instructorId || c.createdBy));
+                    const creator = db.users.find(u => String(u.id) === String(c.createdBy));
+                    return [new Date(c.start).toLocaleString('es-MX'), c.title, inst?inst.name:'-', lcEstadoClase(c).label, (c.assignedTo||[]).length, creator?creator.name:'Sistema', c.zoomUrl||''].map(q).join(',');
+                });
+                const csv = '\ufeff' + 'Fecha,Titulo,Instructor,Estado,Alumnos convocados,Registrado por,Link\n' + rows.join('\n');
+                const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'clases-en-vivo-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(url);
+                if (window.showToast) showToast('Historial exportado ('+clases.length+' clases)', 'success');
+            } catch (e) { console.error(e); }
+        }
+
+        function renderBannerEnVivo() {
+            const now = Date.now();
+            const activas = (window.__lcClasesVisibles || []).filter(c => {
+                const s = new Date(c.start).getTime(), e = new Date(c.end).getTime();
+                const esEstudio = c.tipo === 'en_vivo_studio' || c.esEnVivoNuevo;
+                return now >= s && now <= e && (esEstudio || (c.participantesReales && c.participantesReales.length > 0));
+            });
+            if (!activas.length) return '';
+            const c = activas[0];
+            return `<button onclick="unirseClaseEnVivo('${String(c.id)}')" class="w-full text-left p-4 rounded-xl bg-red-600 text-white shadow-md hover:bg-red-700 flex items-center justify-between gap-3 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+                    <div><div class="text-[11px] font-semibold uppercase tracking-wide opacity-80">Clase en vivo ahora</div><div class="font-semibold">${c.title}</div></div>
+                </div>
+                <span class="px-3 py-1.5 rounded-lg bg-white text-red-600 text-sm font-semibold flex items-center gap-2 shrink-0"><i class="fas fa-video"></i> Entrar a la sala</span>
+            </button>`;
+        }
+
+        function renderMisClasesCards(myClasses) {
+            const now = Date.now();
+            const proximas = (myClasses||[]).filter(c => new Date(c.start).getTime() >= now).sort((a,b)=> new Date(a.start) - new Date(b.start)).slice(0,6);
+            if (!proximas.length) return '';
+            return `<div>
+                <h3 class="font-semibold text-slate-800 flex items-center gap-2 mb-3"><i class="fas fa-chalkboard-user text-indigo-600"></i> Mis próximas clases</h3>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${proximas.map(c => {
+                    const inst = db.users.find(u => String(u.id) === String(c.instructorId || c.createdBy));
+                    const f = new Date(c.start);
+                    const dias = Math.ceil((f - now) / 86400000);
+                    const esHoy = new Date().toDateString() === f.toDateString();
+                    return `<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col gap-2">
+                        <div class="text-xs text-slate-500 flex items-center gap-1.5"><i class="fas fa-calendar"></i> ${f.toLocaleDateString('es-MX',{weekday:'short', day:'numeric', month:'short'})} • ${f.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</div>
+                        <div class="font-semibold text-slate-800">${c.title}</div>
+                        <div class="text-xs text-slate-500">Instructor: ${inst?inst.name:'-'}</div>
+                        <div class="flex items-center justify-between mt-auto pt-2">
+                            <span class="text-[11px] font-semibold px-2 py-1 rounded-full ${dias<=1?'bg-red-50 text-red-600':'bg-indigo-50 text-indigo-700'}">${esHoy?'¡Hoy!':(dias<=0?'En curso':'Faltan '+dias+' día'+(dias===1?'':'s'))}</span>
+                            <button onclick="unirseClaseEnVivo('${String(c.id)}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-video"></i> Unirme</button>
+                        </div>
+                    </div>`;
+                }).join('')}</div>
+            </div>`;
+        }
+
+        function unirseClaseEnVivo(classId) {
+            const cls = (db.liveClasses||[]).find(c => String(c.id) === String(classId));
+            if (!cls) return;
+            const est = lcEstadoClase(cls);
+            if (est.key === 'pasada') { if (window.showToast) showToast('La clase ya finalizó', 'info'); return; }
+            // v6.9 FIX XP: la asistencia y el XP se registran UNA sola vez por clase
+            try {
+                const u = db.users.find(x => String(x.id) === String(currentUser.id));
+                if (u && !['admin','gm','desarrollador','maestro','capacitador','agencia'].includes(u.role)) {
+                    u.attendance = u.attendance || [];
+                    if (!u.attendance.includes(cls.id)) {
+                        u.attendance.push(cls.id);
+                        u.xp = (u.xp || 0) + 10;
+                        saveDB();
+                        if (window.showToast) showToast('Asistencia registrada (+10 XP)', 'success');
+                    }
+                }
+            } catch (e) { console.error(e); }
+            const esEstudio = cls.tipo === 'en_vivo_studio' || !cls.zoomUrl;
+            if (esEstudio && typeof window.initEnVivoStudio === 'function') {
+                if (typeof closeModal === 'function') closeModal();
+                window.initEnVivoStudio(String(cls.id));
+                return;
+            }
+            if (cls.zoomUrl) window.open(cls.zoomUrl, '_blank', 'noopener');
+        }
+
+        function recordarClase(classId) {
+            const cls = (db.liveClasses||[]).find(c => String(c.id) === String(classId));
+            if (!cls) return;
+            const fecha = new Date(cls.start).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'});
+            if (!db.notifications) db.notifications = [];
+            (cls.assignedTo||[]).forEach(uid => {
+                db.notifications.push({ id: uniqueDBId(), userId: uid, type: 'live-class', title: 'Recordatorio de clase', message: `${cls.title} - ${fecha}${cls.zoomUrl ? ' - Únete: '+cls.zoomUrl : ''}`, lessonId: null, liveClassId: cls.id, read: false, date: new Date().toISOString() });
+                const al = db.users.find(u => String(u.id) === String(uid));
+                if (al && al.phone) {
+                    if (!db.messages) db.messages = [];
+                    db.messages.push({ id: uniqueDBId(), fromId: currentUser.id, toId: uid, text: `Recordatorio: ${cls.title} - ${fecha} - Únete: ${cls.zoomUrl || 'sala EN VIVO'}`, date: new Date().toISOString(), read: false, whatsapp: true });
+                }
+            });
+            try { enviarAviso('recordatorio_clase', (cls.assignedTo||[]).map(uid => db.users.find(u => String(u.id) === String(uid))).filter(Boolean), { titulo: cls.title, fecha: fecha }); } catch (e) {}
+            saveDB();
+            if (window.showToast) showToast('Recordatorio enviado a los asignados', 'success');
         }
 
         // Función para generar link de Google Calendar con color por instructor
@@ -11244,7 +12161,7 @@ END:VCALENDAR`;
             if (currentUser?.role !== 'gm') return `<div class="p-12 text-center"><h3 class="text-lg font-bold">Acceso restringido</h3><p class="text-slate-500">Solo GM puede gestionar accesos</p></div>`;
             const categoriasAccesos = [
                 { titulo: 'General', icon: 'fa-house', secciones: [
-                    {id:'dashboard', label:'Dashboard'}, {id:'leaderboard', label:'Ranking'},
+                    {id:'dashboard', label:'Dashboard'}, {id:'reportes-progreso', label:'Embudo Comercial y SLA (GM)'}, {id:'leaderboard', label:'Ranking'},
                     {id:'carrusel-circulares', label:'Reunión y Capacitación Semanal'}, {id:'mi-agenda', label:'Mi Agenda'},
                     {id:'users', label:'Usuarios'}, {id:'centro-mensajes', label:'Centro de Mensajes'},
                     {id:'personalizar', label:'Personalización'}, {id:'editor', label:'Editor Portal'},
@@ -11277,7 +12194,7 @@ END:VCALENDAR`;
                     {id:'groups', label:'Grupos'}, {id:'categories', label:'Categorías'},
                     {id:'lessons', label:'Lecciones'}, {id:'tareas', label:'Tareas'},
                     {id:'biblioteca', label:'Biblioteca'}, {id:'exams', label:'Exámenes'},
-                    {id:'messages', label:'Mensajes'}, {id:'reports', label:'Reportes'},
+                    {id:'messages', label:'Mensajes'}, {id:'reports', label:'Kardex de Capacitación'},
                     {id:'glossary', label:'Glosario'}, {id:'my-groups', label:'Mis Grupos'},
                     {id:'my-aula', label:'Mi Aula'}, {id:'my-courses', label:'Mis Cursos'},
                     {id:'my-progress', label:'Mi Progreso'}, {id:'mi-experiencia', label:'Mi experiencia'},
@@ -11359,12 +12276,32 @@ END:VCALENDAR`;
             location.reload();
         }
 
-        function openNewLiveClassModal(preselectGroupId=null) {
+        // v6.9: fecha ISO -> valor admitido por <input type="datetime-local"> (local, sin TZ suffix)
+        function toDatetimeLocalInput(iso) {
+            const d = new Date(iso);
+            const p = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+        }
+
+        // v6.9: validación compartida entre alta y edición de clases
+        function validarDatosClase(title, startVal, duration, zoomUrl, assignedTo, allowPast) {
+            if (!title) return 'El título es obligatorio';
+            const d = new Date(startVal);
+            if (!startVal || isNaN(d.getTime())) return 'Fecha inválida';
+            if (!allowPast && d <= new Date()) return 'La fecha y hora debe ser futura';
+            if (isNaN(duration) || duration < 15) return 'La duración mínima es 15 minutos';
+            if (!zoomUrl || !zoomUrl.startsWith('https://') || !(zoomUrl.includes('zoom.us') || zoomUrl.includes('meet.google') || zoomUrl.includes('teams.microsoft'))) return 'El link debe empezar con https:// y ser de Zoom, Google Meet o Teams';
+            if (!assignedTo || assignedTo.length === 0) return 'Debes seleccionar al menos 1 alumno';
+            return null;
+        }
+
+        function openNewLiveClassModal(preselectGroupId=null, preselectInstructorId=null) {
             const alumnos = db.users.filter(u => isStudent(u));
             const groups = isTeacher(currentUser) ? db.groups.filter(g=>g.tutorId===currentUser.id) : db.groups;
-            const instructors = db.users.filter(u => ['desarrollador','admin','gm','capacitador'].includes(u.role));
+            const instructors = db.users.filter(u => ['desarrollador','admin','gm','capacitador','maestro','agencia'].includes(u.role));
             showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-5">Nueva Clase En Vivo</h3><form id="live-class-form" class="space-y-4"><div><label class="text-sm font-medium">Título</label><input type="text" id="lc-title" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div><div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Fecha y hora inicio</label><input type="datetime-local" id="lc-start" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div><div><label class="text-sm font-medium">Duración (min)</label><input type="number" id="lc-duration" value="60" min="15" step="15" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div></div><div><label class="text-sm font-medium">Link de Zoom</label><input type="url" id="lc-zoom" required placeholder="https://zoom.us/j/..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div>
-            <div><label class="text-sm font-medium">Instructor que imparte</label><select id="lc-instructor" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">${instructors.map(i=>`<option value="${i.id}" ${i.id===currentUser.id?"selected":""}>${i.name} - ${i.role.toUpperCase()}</option>`).join('')}</select></div>
+            <div><label class="text-sm font-medium">Instructor que imparte</label><select id="lc-instructor" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">${instructors.map(i=>`<option value="${i.id}" ${i.id===preselectInstructorId?"selected":(i.id===currentUser.id?"selected":"")}>${i.name} - ${i.role.toUpperCase()}</option>`).join('')}</select></div>
+            <div><label class="text-sm font-medium">Repetir semanalmente (opcional)</label><div class="flex items-center gap-2 mt-1 flex-wrap"><input type="checkbox" id="lc-recurr" onchange="document.getElementById('lc-recurr-n').classList.toggle('hidden', !this.checked)" class="w-4 h-4 bg-white text-slate-900 border-slate-300 rounded"><select id="lc-recurr-n" class="hidden px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm">${[2,3,4,5,6,8,12].map(n=>`<option value="${n}">${n} semanas</option>`).join('')}</select><span class="text-xs text-slate-400">Crea una clase por semana con el mismo horario</span></div></div>
             <div><label class="text-sm font-medium mb-2 block">Asignar por</label><div class="flex gap-2 mb-3"><button type="button" id="tab-group" onclick="switchAssignTab('group')" class="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white">Grupo</button><button type="button" id="tab-individual" onclick="switchAssignTab('individual')" class="px-3 py-1.5 text-sm rounded-lg border">Individual</button></div>
             <div id="assign-group" class=""><select id="lc-group" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900"><option value="">Selecciona grupo</option>${groups.map(g=>`<option value="${g.id}" ${preselectGroupId===g.id?'selected':''}>${g.name} (${db.generations.find(gen=>gen.id===g.generationId)?.name||''})</option>`).join('')}</select></div>
             <div id="assign-individual" class="hidden max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2">${alumnos.map(a => `<label class="flex items-center gap-2"><input type="checkbox" value="${a.id}" class="lc-student bg-white text-slate-900 border border-slate-300"> <span class="text-sm">${a.name}</span></label>`).join('')}</div></div>
@@ -11394,24 +12331,36 @@ END:VCALENDAR`;
                 const assignedTo = Array.from(document.querySelectorAll('.lc-student:checked')).map(cb => parseInt(cb.value));
                 const startDate = new Date(start);
                 const endDate = new Date(startDate.getTime() + duration * 60000);
-                if (!title) { alert('El título es obligatorio'); return; }
-                if (!start || isNaN(startDate.getTime()) || startDate <= new Date()) { alert('La fecha y hora debe ser futura'); return; }
-                if (isNaN(duration) || duration < 15) { alert('La duración mínima es 15 minutos'); return; }
-                if (!zoomUrl.startsWith('https://') || !(zoomUrl.includes('zoom.us') || zoomUrl.includes('meet.google') || zoomUrl.includes('teams.microsoft'))) { alert('El link debe empezar con https:// y ser de Zoom, Google Meet o Teams'); return; }
-                if (assignedTo.length === 0) { alert('Debes seleccionar al menos 1 alumno'); return; }
+                const err = validarDatosClase(title, start, duration, zoomUrl, assignedTo, false);
+                if (err) { alert(err); return; }
                 const instructorId = parseInt(document.getElementById('lc-instructor').value);
-                const newClass = { id: Date.now(), title, start: startDate.toISOString(), end: endDate.toISOString(), zoomUrl, assignedTo, createdBy: currentUser.id, instructorId };
-                db.liveClasses.push(newClass);
-                // --- EMAIL AUTOMÁTICO ---
+                const groupId = lcGroup && lcGroup.value ? parseInt(lcGroup.value) : null;
+                const recurrN = document.getElementById('lc-recurr').checked ? parseInt(document.getElementById('lc-recurr-n').value) : 1;
+                // v6.9: sesiones (1 o recurrentes) con IDs únicos que no colisionan
+                const sesiones = [];
+                for (let i=0; i<recurrN; i++) {
+                    sesiones.push({
+                        id: uniqueDBId(),
+                        title: recurrN > 1 ? `${title} (Sesión ${i+1}/${recurrN})` : title,
+                        start: new Date(startDate.getTime() + 7*24*60*60000*i).toISOString(),
+                        end: new Date(endDate.getTime() + 7*24*60*60000*i).toISOString(),
+                        zoomUrl, assignedTo, assignedToGroup: groupId, createdBy: currentUser.id, instructorId
+                    });
+                }
+                sesiones.forEach(s => db.liveClasses.push(s));
+                // --- EMAIL AUTOMÁTICO (una sola vez por serie) ---
                 try{ enviarAviso('nueva_clase', assignedTo.map(uid=>db.users.find(u=>u.id===uid)).filter(Boolean), {titulo: title, fecha: startDate.toLocaleString('es-MX')}); }catch(e){console.error(e)}
-                // Notificaciones
-                assignedTo.forEach(uid => {
-                    db.notifications.push({ id: Date.now() + uid, userId: uid, type: 'live-class', title: 'Nueva clase en vivo', message: `${title} - ${startDate.toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})}`, lessonId: null, liveClassId: newClass.id, read: false, date: new Date().toISOString() });
+                // Notificaciones por cada sesión creída
+                sesiones.forEach(s => {
+                    assignedTo.forEach(uid => {
+                        db.notifications.push({ id: uniqueDBId(), userId: uid, type: 'live-class', title: 'Nueva clase en vivo', message: `${s.title} - ${new Date(s.start).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})}`, lessonId: null, liveClassId: s.id, read: false, date: new Date().toISOString() });
+                    });
                 });
+                // WhatsApp solo de la primera sesión para no saturar
                 assignedTo.forEach(uid => {
                     const alumno = db.users.find(u => u.id === uid);
                     if (alumno && alumno.phone) {
-                        db.messages.push({ id: Date.now()+uid, fromId: currentUser.id, toId: uid, text: `Nueva clase en vivo: ${title} - ${startDate.toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})} - Únete: ${zoomUrl}`, date: new Date().toISOString(), read: false, whatsapp: true });
+                        db.messages.push({ id: uniqueDBId(), fromId: currentUser.id, toId: uid, text: `Nueva clase en vivo: ${title} - ${startDate.toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})} - Únete: ${zoomUrl}`, date: new Date().toISOString(), read: false, whatsapp: true });
                     }
                 });
                 saveDB();
@@ -11423,9 +12372,10 @@ END:VCALENDAR`;
 
 
         function editLiveClass(id) {
-            const ev = db.liveClasses.find(c => c.id === id);
+            const ev = db.liveClasses.find(c => String(c.id) === String(id));
             if (!ev) return;
-            openNewLiveClassModal();
+            // v6.9: respeta el instructor elegido al editar
+            openNewLiveClassModal(ev.assignedToGroup || null, ev.instructorId || ev.createdBy);
             document.getElementById('live-class-form').onsubmit = e => {
                     e.preventDefault();
                     const title = document.getElementById('lc-title').value.trim();
@@ -11435,16 +12385,41 @@ END:VCALENDAR`;
                     const assignedTo = Array.from(document.querySelectorAll('.lc-student:checked')).map(cb => parseInt(cb.value));
                     const startDate = new Date(start);
                     const endDate = new Date(startDate.getTime() + duration * 60000);
+                    // v6.9: misma validación que el alta (una clase ya impartida conserva su fecha pasada)
+                    const err = validarDatosClase(title, start, duration, zoomUrl, assignedTo, true);
+                    if (err) { alert(err); return; }
+                    // v6.9: detectar cambios reales para avisar solo cuando aplica
+                    const cambios = [];
+                    if (ev.title !== title) cambios.push('título');
+                    if (ev.start !== startDate.toISOString()) cambios.push('horario');
+                    if (ev.zoomUrl !== zoomUrl) cambios.push('link');
+                    if ((ev.assignedTo||[]).join(',') !== assignedTo.join(',')) cambios.push('alumnos');
+                    if (String(ev.instructorId || '') !== String(parseInt(document.getElementById('lc-instructor').value))) cambios.push('instructor');
                     ev.title = title; ev.start = startDate.toISOString(); ev.end = endDate.toISOString(); ev.zoomUrl = zoomUrl; ev.assignedTo = assignedTo;
+                    ev.instructorId = parseInt(document.getElementById('lc-instructor').value);
+                    if (cambios.length) {
+                        const fecha = startDate.toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'});
+                        if (!db.notifications) db.notifications = [];
+                        assignedTo.forEach(uid => {
+                            db.notifications.push({ id: uniqueDBId(), userId: uid, type: 'live-class', title: 'Clase actualizada', message: `${title} - ${fecha} (cambiaron: ${cambios.join(', ')}) - Únete: ${zoomUrl}`, lessonId: null, liveClassId: ev.id, read: false, date: new Date().toISOString() });
+                            const al = db.users.find(u => u.id === uid);
+                            if (al && al.phone) {
+                                if (!db.messages) db.messages = [];
+                                db.messages.push({ id: uniqueDBId(), fromId: currentUser.id, toId: uid, text: `Clase actualizada: ${title} - ${fecha} - Únete: ${zoomUrl}`, date: new Date().toISOString(), read: false, whatsapp: true });
+                            }
+                        });
+                        if (window.showToast) showToast('Clase actualizada y avisada a los asignados', 'success');
+                    }
                     saveDB(); closeModal(); navigateTo('live-classes'); renderNav();
                 };
             setTimeout(() => {
                 document.getElementById('lc-title').value = ev.title;
-                document.getElementById('lc-start').value = new Date(ev.start - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+                document.getElementById('lc-start').value = toDatetimeLocalInput(ev.start);
                 document.getElementById('lc-duration').value = Math.round((new Date(ev.end)-new Date(ev.start))/60000);
                 document.getElementById('lc-zoom').value = ev.zoomUrl;
                 document.querySelectorAll('.lc-student').forEach(cb => { cb.checked = ev.assignedTo.includes(parseInt(cb.value)); });
-                // replace submit to update
+                const grp = document.getElementById('lc-group');
+                if (grp && ev.assignedToGroup) grp.value = String(ev.assignedToGroup);
             }, 50);
         }
         function deleteLiveClass(id) {
@@ -11906,12 +12881,16 @@ END:VCALENDAR`;
             const instructor = db.users.find(u => u.id === (ev.instructorId || ev.createdBy));
             const start = new Date(ev.start);
             const end = new Date(ev.end);
-            showModal(`<div class="p-6 max-w-md w-full"><div class="flex items-start gap-4 mb-6"><div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0"><i class="fas fa-video text-indigo-600 text-xl" aria-hidden="true"></i></div><div class="flex-1"><div class="text-xs uppercase tracking-wide text-slate-500 font-medium">${start.toLocaleString('es-MX',{weekday:'short', day:'numeric', month:'short'})}</div><h3 class="text-xl font-semibold mt-1 leading-tight">${ev.title}</h3><p class="text-sm text-slate-500 mt-1">con ${creator ? creator.name : 'Maestro'} • ${start.toLocaleString('es-MX',{hour:'2-digit', minute:'2-digit'})}</p></div></div><div class="grid grid-cols-3 gap-3 mb-6 text-center"><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Duración</div><div class="font-medium mt-1">${Math.round((end-start)/60000)}m</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Alumnos</div><div class="font-medium mt-1">${ev.assignedTo.length}</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Estado</div><div class="font-medium mt-1 text-emerald-600">Activa</div></div></div><div class="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200"><div class="flex items-center justify-between"><div><div class="text-xs font-medium text-blue-900 mb-1">Agregar a tu calendario</div><div class="text-[11px] text-blue-700">Guarda esta clase con el color de ${instructor?.name || 'instructor'}</div></div><div class="flex gap-2"><a href="${generateGoogleCalendarLink(ev)}" target="_blank" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-1.5"><i class="fab fa-google"></i> Google Calendar</a><button onclick="downloadICS(db.liveClasses.find(x=>x.id===${ev.id}))" class="px-3 py-1.5 border border-blue-300 bg-white text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 flex items-center gap-1.5"><i class="fas fa-download"></i> .ICS</button></div></div></div><div class="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-slate-100">${(currentUser.id===ev.createdBy || isAdmin(currentUser)) ? `<button onclick="editLiveClass(${ev.id});" class="px-3 py-2 text-sm text-slate-600 rounded-lg font-medium hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-pen" aria-hidden="true"></i> Editar</button>` : ''}${(isAdmin(currentUser) || isTeacher(currentUser)) ? `<button onclick="deleteLiveClass(${ev.id});" class="px-3 py-2 text-sm text-red-600 rounded-lg font-medium hover:bg-red-50 flex items-center gap-1.5"><i class="fas fa-trash" aria-hidden="true"></i> Eliminar</button>` : ''}<button aria-label="Cerrar" onclick="closeModal()" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cerrar</button><a href="${ev.zoomUrl}" target="_blank" onclick="markAttendance(this.dataset.lesson||0)" onclick="const u=db.users.find(x=>x.id===currentUser.id);if(u){u.xp=(u.xp||0)+10;if(!u.attendance)u.attendance=[];if(!u.attendance.includes(ev.id)){u.attendance.push(ev.id);}saveDB();}" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm"><i class="fas fa-external-link-alt" aria-hidden="true"></i> Unirse a Zoom</a></div></div>`);
+            const est = lcEstadoClase(ev);
+            const puedeUnirse = est.key !== 'pasada';
+            showModal(`<div class="p-6 max-w-md w-full"><div class="flex items-start gap-4 mb-6"><div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0"><i class="fas fa-video text-indigo-600 text-xl" aria-hidden="true"></i></div><div class="flex-1"><div class="text-xs uppercase tracking-wide text-slate-500 font-medium">${start.toLocaleString('es-MX',{weekday:'short', day:'numeric', month:'short'})}</div><h3 class="text-xl font-semibold mt-1 leading-tight">${ev.title}</h3><p class="text-sm text-slate-500 mt-1">con ${creator ? creator.name : 'Maestro'} • ${start.toLocaleString('es-MX',{hour:'2-digit', minute:'2-digit'})}</p></div></div><div class="grid grid-cols-3 gap-3 mb-6 text-center"><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Duración</div><div class="font-medium mt-1">${Math.round((end-start)/60000)}m</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Alumnos</div><div class="font-medium mt-1">${ev.assignedTo.length}</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Estado</div><div class="font-medium mt-1 ${est.className.replace('bg-','text-').replace('-100','-600')}">${est.label}</div></div></div><div class="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200"><div class="flex items-center justify-between"><div><div class="text-xs font-medium text-blue-900 mb-1">Agregar a tu calendario</div><div class="text-[11px] text-blue-700">Guarda esta clase con el color de ${instructor?.name || 'instructor'}</div></div><div class="flex gap-2"><a href="${generateGoogleCalendarLink(ev)}" target="_blank" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-1.5"><i class="fab fa-google"></i> Google Calendar</a><button onclick="downloadICS(db.liveClasses.find(x=>x.id===${ev.id}))" class="px-3 py-1.5 border border-blue-300 bg-white text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 flex items-center gap-1.5"><i class="fas fa-download"></i> .ICS</button></div></div></div><div class="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-slate-100">${(currentUser.id===ev.createdBy || isAdmin(currentUser)) ? `<button onclick="editLiveClass(${ev.id});" class="px-3 py-2 text-sm text-slate-600 rounded-lg font-medium hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-pen" aria-hidden="true"></i> Editar</button>` : `${(String(currentUser.id)===String(ev.createdBy) || isAdmin(currentUser)) ? `<button onclick="recordarClase(${ev.id});" title="Volver a notificar a los asignados" class="px-3 py-2 text-sm text-indigo-600 rounded-lg font-medium hover:bg-indigo-50 flex items-center gap-1.5"><i class="fas fa-bell" aria-hidden="true"></i> Recordar</button>` : ''}`}${(isAdmin(currentUser) || isTeacher(currentUser)) ? `<button onclick="deleteLiveClass(${ev.id});" class="px-3 py-2 text-sm text-red-600 rounded-lg font-medium hover:bg-red-50 flex items-center gap-1.5"><i class="fas fa-trash" aria-hidden="true"></i> Eliminar</button>` : ''}${puedeUnirse ? `<a href="javascript:void(0)" onclick="unirseClaseEnVivo(${ev.id}); return false;" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm"><i class="fas fa-external-link-alt" aria-hidden="true"></i> Unirse</a>` : `<span class="px-4 py-2.5 bg-slate-200 text-slate-400 rounded-lg font-medium flex items-center gap-2 cursor-not-allowed" title="La clase ya finalizó"><i class="fas fa-ban" aria-hidden="true"></i> Finalizada</span>`}</div></div>`);
         }
 
 
         // --- EVENT LISTENERS ---
-        document.getElementById('login-form').addEventListener('submit', e => { e.preventDefault(); const u=document.getElementById('username').value; const p=document.getElementById('password').value; if(!login(u,p)){ document.getElementById('login-error').textContent='Credenciales incorrectas'; document.getElementById('login-error').classList.remove('hidden'); } });
+        // El login real es el del servidor (backend-shim.js). Sin servidor no se
+        // valida nada en el navegador: se avisa y no se guardan contraseñas.
+        document.getElementById('login-form').addEventListener('submit', e => { e.preventDefault(); document.getElementById('login-error').textContent='No hay conexión con el servidor de acceso. Intenta de nuevo.'; document.getElementById('login-error').classList.remove('hidden'); });
         document.getElementById('menu-toggle').addEventListener('click', toggleSidebar);
         function toggleSidebar(){
             const s=document.getElementById('sidebar');

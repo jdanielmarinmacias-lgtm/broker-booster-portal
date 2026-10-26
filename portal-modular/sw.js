@@ -4,7 +4,7 @@
  * - Navegación HTML: network-first con fallback a index.html en caché
  * - App Shell (CSS, JS, manifest, iconos): stale-while-revalidate
  * ========================================================================== */
-const CACHE_NAME = 'broker-booster-shell-v20261023b';
+const CACHE_NAME = 'broker-booster-shell-v20261024b';
 const CDN_HOSTS = [
   'cdnjs.cloudflare.com',
   'cdn.jsdelivr.net',
@@ -21,6 +21,7 @@ const APP_SHELL = [
   './img/apple-touch-icon.png',
   './img/logo-icon-192.png',
   './img/logo-icon-512.png',
+  './img/splash-source.webp',
   './css/styles.css',
   './js/core/store.js',
   './js/core/backend.js',
@@ -118,10 +119,15 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
-  // 2) Recursos del mismo origen (CSS, JS, manifest, imágenes locales): Stale-While-Revalidate
+  // 2) Recursos del mismo origen (CSS, JS, manifest, imágenes locales)
+  /* FIX 2026-10: antes se hacía match con ignoreSearch, lo que servía el body de
+   * una versión ?v= anterior aunque la página pidiera la nueva. Ahora si el
+   * body cacheado NO es exactamente de la URL pedida (otra ?v=) se prefiere la
+   * red, con fallback al caché viejo solo si estás sin conexión. */
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(req, { ignoreSearch: true }).then(function (cached) {
+        var exacto = !!(cached && cached.url === req.url);
         var fetchPromise = fetch(req)
           .then(function (networkRes) {
             if (networkRes && networkRes.ok) {
@@ -135,7 +141,10 @@ self.addEventListener('fetch', function (event) {
           .catch(function () {
             return cached;
           });
-        return cached || fetchPromise;
+        // Misma versión cacheada: stale-while-revalidate clásico.
+        if (exacto && cached) return cached || fetchPromise;
+        // Versión distinta (?v= nueva) o sin caché: network-first.
+        return fetchPromise;
       })
     );
     return;

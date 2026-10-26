@@ -18,7 +18,8 @@ let enVivoState = {
   stream: null,
   mediaRecorder: null,
   recordedChunks: [],
-  rafId: null
+  rafId: null,
+  tickInterval: null
 };
 
 const EN_VIVO_FILTERS = {
@@ -131,8 +132,9 @@ function initEnVivoStudio(liveClassId) {
     }, 100);
   }
   
-  // Interval para duración
-  setInterval(()=>{ 
+  // Interval para duración (v6.9 FIX: reutilizable y limpiable en closeEnVivoModal)
+  if (enVivoState.tickInterval) { try { clearInterval(enVivoState.tickInterval); } catch(e) {} }
+  enVivoState.tickInterval = setInterval(()=>{ 
     enVivoState.nowTick = Date.now();
     updateDuraciones();
   }, 1000);
@@ -290,6 +292,7 @@ function showEnVivoModal(liveClassId) {
 function closeEnVivoModal() {
   const modal = document.getElementById('en-vivo-modal');
   if (modal) modal.remove();
+  if (enVivoState.tickInterval) { try { clearInterval(enVivoState.tickInterval); } catch(e) {} enVivoState.tickInterval = null; }
   if (enVivoState.stream) {
     enVivoState.stream.getTracks().forEach(t=>t.stop());
   }

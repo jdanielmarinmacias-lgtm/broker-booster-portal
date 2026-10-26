@@ -5,6 +5,7 @@
  * y RLS le permite leer únicamente `public_feed`.
  * Tablas (ver supabase/schema.sql): documents, app_users, app_sessions, public_feed. */
 const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
 
 const toUserRow = (u) => ({
   id: String(u.id),
@@ -57,6 +58,41 @@ const MEDIA_BUCKET = 'portal-media';
 function createSupabaseAdapter({ url, serviceKey }) {
   const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
 
+  /* Huella de la última versión persistida por (collection,doc_id): evita
+   * re-subir filas sin cambios en cada guardado (el legacy persiste la
+   * colección COMPLETA en cada mensaje nuevo; con mensajes viejos empotrados
+   * con imágenes base64 eso re-subía MBs por chat y provocaba el
+   * statement_timeout del Postgres). */
+  const savedHash = new Map(); // 'collection∅doc_id' -> sha1(JSON(data))
+  const h1 = (v) => crypto.createHash('sha1').update(JSON.stringify(v)).digest('hex');
+
+  /* Resiliencia: la instancia de Postgres (free tier) sufre picos de latencia
+   * y corta statements largos con "statement timeout". Reintentamos las
+   * operaciones de escritura 2 veces más antes de fallar la petición: un
+   * mensaje del chat que tocó un pico no se pierde. */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function isTransient(e) {
+    const msg = String((e && (e.message || e.error_description)) || e);
+    return /timeout|temporarily|deadlock|connection|network|fetch failed|failed to fetch|ECONN|undici|5[0-9]{2}/i.test(msg);
+  }
+  async function withRetry(fn, tries = 3) {
+    let lastErr;
+    for (let i = 0; i < tries; i++) {
+      try {
+        return await fn();
+      } catch (e) {
+        lastErr = e;
+        if (i === tries - 1 || !isTransient(e)) break;
+        await sleep(400 * (i + 1));
+      }
+    }
+    throw lastErr;
+  }
+  /* Auditoría es append-only: los doc_id ya persistidos no se re-suben ni
+   * participan del borrado de ausentes. Cada escritura sube 1 fila nueva en
+   * vez de re-escribir todas las entradas históricas (500+). */
+  const auditSavedIds = new Set();
+
   async function loadDocuments() {
     const out = {};
     const objects = {}; // colecciones-objeto (doc_id __object__)
@@ -65,16 +101,17 @@ function createSupabaseAdapter({ url, serviceKey }) {
     const usersPromise = sb.from('app_users').select('*');
     for (;;) {
       const { data, error } = await sb.from('documents').select('collection,doc_id,data').range(from, from + PAGE - 1);
-      if (error) throw new Error('Supabase documents: ' + error.message);
-      for (const row of data) {
-        if (row.doc_id === '__object__') {
-          // Colección-objeto (settings/autoHub/inmPublica/…): data IS el objeto.
-          objects[row.collection] = row.data || {};
-        } else {
-          out[row.collection] = out[row.collection] || [];
-          out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+      if (error) throw new Error('Supabase documents: ' + error.message);        for (const row of data) {
+          if (row.doc_id === '__object__') {
+            // Colección-objeto (settings/autoHub/inmPublica/…): data IS el objeto.
+            objects[row.collection] = row.data || {};
+            savedHash.set(row.collection + '∅__object__', h1(row.data || {}));
+          } else {
+            savedHash.set(row.collection + '∅' + row.doc_id, h1(row.data || {}));
+            out[row.collection] = out[row.collection] || [];
+            out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
+          }
         }
-      }
       if (data.length < PAGE) break;
       from += PAGE;
     }
@@ -105,7 +142,9 @@ function createSupabaseAdapter({ url, serviceKey }) {
         for (const row of data) {
           if (row.doc_id === '__object__') {
             objects[row.collection] = row.data || {};
+            savedHash.set(row.collection + '∅__object__', h1(row.data || {}));
           } else {
+            savedHash.set(row.collection + '∅' + row.doc_id, h1(row.data || {}));
             out[row.collection] = out[row.collection] || [];
             out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
           }
@@ -154,40 +193,72 @@ function createSupabaseAdapter({ url, serviceKey }) {
         seenRows.set(collection + '∅__object__', { collection, doc_id: '__object__', updated_at: new Date().toISOString(), data: items });
       }
     }
-    const rows = [...seenRows.values()];
     const seen = new Set();
-    for (let i = 0; i < rows.length; i += 500) {
-      const chunk = rows.slice(i, i + 500);
-      if (!chunk.length || !chunk[0].collection) continue;
-      const { error } = await sb.from('documents').upsert(chunk, { onConflict: 'collection,doc_id' });
-      if (error) throw new Error('Supabase upsert: ' + error.message);
-      chunk.forEach((r) => seen.add(r.collection + '∅' + r.doc_id));
+    const pendingHash = new Map();
+    let rows = [...seenRows.values()];
+    // Filtro "sin cambios": si la huella coincide con lo ya persistido, la
+    // fila no se re-suben pero cuenta como presente (no se borra del lote ausente).
+    rows = rows.filter((r) => {
+      const key = r.collection + '∅' + r.doc_id;
+      const h = h1(r.data);
+      if (savedHash.get(key) === h) { seen.add(key); return false; }
+      pendingHash.set(key, h);
+      return true;
+    });
+    // Auditoría incremental: filtra las entradas ya persistidas (siguen
+    // "vistas" para que el borrado de ausentes no las toque).
+    if (rows.some((r) => r.collection === 'auditoria')) {
+      rows = rows.filter((r) => {
+        if (r.collection !== 'auditoria') return true;
+        return !auditSavedIds.has(r.collection + '∅' + r.doc_id);
+      });
     }
-    // (Comentarios) El bucle siguiente limpia filas huérfanas en AMBOS
-    // sentidos: si la colección pasó de array a objeto, borra sus filas-array
-    // viejas; si volvió a array, borra la fila __object__ vieja.
-    // Borra ausentes SOLO dentro de las colecciones tocadas.
-    const touched = [...wanted].filter((c) => c !== 'users');
+    for (let i = 0; i < rows.length; i += 200) {
+      const chunk = rows.slice(i, i + 200);
+      if (!chunk.length || !chunk[0].collection) continue;
+      await withRetry(() => sb.from('documents').upsert(chunk, { onConflict: 'collection,doc_id' }), 3)
+        .then(({ error }) => { if (error) throw new Error('Supabase upsert: ' + error.message); });
+      chunk.forEach((r) => {
+        const key = r.collection + '∅' + r.doc_id;
+        seen.add(key);
+        if (pendingHash.has(key)) savedHash.set(key, pendingHash.get(key));
+        if (r.collection === 'auditoria') auditSavedIds.add(key);
+      });
+    }
+    // La auditoría ya guardada nunca se considera "borrable": sus claves
+    // cuentan como presentes aunque no se hayan re-subido en este lote.
+    auditSavedIds.forEach((k) => seen.add(k));
+    // Nota: el stale-delete solo corre para colecciones array/objeto normales;
+    // auditoría (append-only) queda fuera.
+    const touched = [...wanted].filter((c) => c !== 'users' && c !== 'auditoria');
     if (touched.length) {
-      const { data: existing } = await sb.from('documents').select('collection,doc_id').in('collection', touched);
-      const stale = (existing || []).filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
-      for (const r of stale) {
-        await sb.from('documents').delete().eq('collection', r.collection).eq('doc_id', r.doc_id);
-      }
+      try {
+        const { data: existing } = await withRetry(
+          () => sb.from('documents').select('collection,doc_id').in('collection', touched), 2);
+        const stale = (existing || []).filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
+        for (const r of stale) {
+          try {
+            await sb.from('documents').delete().eq('collection', r.collection).eq('doc_id', r.doc_id);
+            savedHash.delete(r.collection + '∅' + r.doc_id);
+          } catch (eDel) { /* no bloquea: el upsert nuevo ya está guardado */ }
+        }
+      } catch (eStale) { /* si el select de control falla, no revierte lo ya guardado */ }
     }
     // Usuarios: solo si se tocó 'users' (ruta /api/users). Upsert + borrado
     // de ausentes contra la lista completa (el caller hizo refresh antes).
     if (wanted.has('users')) {
       const users = Array.isArray(obj.users) ? obj.users : [];
       if (users.length) {
-        const { error } = await sb.from('app_users').upsert(users.map(toUserRow), { onConflict: 'id' });
+        const { error } = await withRetry(() => sb.from('app_users').upsert(users.map(toUserRow), { onConflict: 'id' }))
+          .then((r) => r);
         if (error) throw new Error('Supabase users upsert: ' + error.message);
       }
-      const { data: eu } = await sb.from('app_users').select('id');
+      const { data: eu, error: eSel } = await withRetry(() => sb.from('app_users').select('id'));
+      if (eSel) throw new Error('Supabase users select: ' + eSel.message);
       const keep = new Set(users.map((u) => String(u.id)));
       const gone = (eu || []).map((r) => r.id).filter((id) => !keep.has(String(id)));
       if (gone.length) {
-        const { error } = await sb.from('app_users').delete().in('id', gone);
+        const { error } = await withRetry(() => sb.from('app_users').delete().in('id', gone));
         if (error) throw new Error('Supabase users delete: ' + error.message);
       }
     }
@@ -203,11 +274,12 @@ function createSupabaseAdapter({ url, serviceKey }) {
     async pushAudit(entry) {
       const rec = entry || {};
       const doc_id = String(rec.id ?? Date.now());
-      const { error } = await sb.from('documents').upsert(
+      const key = 'auditoria∅' + doc_id;
+      await withRetry(() => sb.from('documents').upsert(
         [{ collection: 'auditoria', doc_id, updated_at: new Date().toISOString(), data: { ...rec, id: undefined } }],
         { onConflict: 'collection,doc_id' }
-      );
-      if (error) throw new Error('Supabase audit: ' + error.message);
+      )).then(({ error }) => { if (error) throw new Error('Supabase audit: ' + error.message); });
+      auditSavedIds.add(key);
       return rec;
     },
     async getUserByUsername(username) {

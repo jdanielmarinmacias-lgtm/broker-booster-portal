@@ -65,29 +65,66 @@ const requireRole = (...allowed) => (req, res, next) => {
 const attempts = new Map();
 const LOGIN_RATE_MAX = Number(process.env.LOGIN_RATE_MAX || 10);
 const LOGIN_RATE_MIN = Number(process.env.LOGIN_RATE_MIN || 2);
-function loginRateLimit(req, res, next) {
-  const ip = req.ip || req.socket.remoteAddress || '?';
+const WINDOW_MS = LOGIN_RATE_MIN * 60 * 1000;
+
+/* Almacén compartido (en producción: tabla documents, colección `loginAttempts`).
+ * Sin store compartido (local/tests) se usa el Map en memoria. El estado vive
+ * en el store para que varias instancias serverless vean los mismos fallos. */
+let sharedStore = null;
+function bindLoginStore(store) { sharedStore = store; }
+
+const recentFails = (list, now) => (list || []).filter((t) => now - t < WINDOW_MS);
+
+async function readFails(ip) {
   const now = Date.now();
-  const list = (attempts.get(ip) || []).filter((t) => now - t < LOGIN_RATE_MIN * 60 * 1000);
-  attempts.set(ip, list);
-  req._rlIp = ip;
-  if (list.length >= LOGIN_RATE_MAX) {
-    return res.status(429).json({ ok: false, error: `Demasiados intentos. Espera ${LOGIN_RATE_MIN} minutos.` });
+  if (sharedStore && sharedStore.adapter && typeof sharedStore.adapter.loadCollections === 'function') {
+    try {
+      const data = await sharedStore.adapter.loadCollections(['loginAttempts']);
+      const obj = (data && data.loginAttempts) || {};
+      return recentFails(obj[ip], now);
+    } catch (e) { /* cae a memoria */ }
   }
+  return recentFails(attempts.get(ip), now);
+}
+
+async function writeFails(ip, list) {
+  attempts.set(ip, list);
+  if (sharedStore && sharedStore.adapter && typeof sharedStore.adapter.saveCollections === 'function') {
+    try {
+      const cur = sharedStore.get();
+      const obj = (cur.loginAttempts && typeof cur.loginAttempts === 'object') ? cur.loginAttempts : {};
+      obj[ip] = list;
+      cur.loginAttempts = obj;
+      await sharedStore.adapter.saveCollections(cur, ['loginAttempts']);
+    } catch (e) { /* la memoria local sigue protegiendo */ }
+  }
+}
+
+async function loginRateLimit(req, res, next) {
+  const ip = req.ip || req.socket.remoteAddress || '?';
+  req._rlIp = ip;
+  try {
+    const list = await readFails(ip);
+    if (list.length >= LOGIN_RATE_MAX) {
+      return res.status(429).json({ ok: false, error: `Demasiados intentos. Espera ${LOGIN_RATE_MIN} minutos.` });
+    }
+  } catch (e) { /* nunca bloquear por fallo del contador */ }
   next();
 }
-function noteFailedLogin(req) {
+
+async function noteFailedLogin(req) {
   try {
-    const list = attempts.get(req._rlIp) || [];
+    const list = await readFails(req._rlIp);
     list.push(Date.now());
-    attempts.set(req._rlIp, list);
+    await writeFails(req._rlIp, list);
   } catch (e) { /* nunca romper el login */ }
 }
-function forgiveLogin(req) {
+
+async function forgiveLogin(req) {
   try {
-    const list = attempts.get(req._rlIp) || [];
+    const list = await readFails(req._rlIp);
     list.shift();
-    attempts.set(req._rlIp, list);
+    await writeFails(req._rlIp, list);
   } catch (e) { /* nunca romper el login */ }
 }
 
@@ -97,4 +134,4 @@ function errorHandler(err, req, res, next) {
   res.status(500).json({ ok: false, error: 'Error interno' });
 }
 
-module.exports = { securityHeaders, noStorePrivate, loadSession, refreshCache, requireAuth, requireRole, loginRateLimit, noteFailedLogin, forgiveLogin, errorHandler };
+module.exports = { securityHeaders, noStorePrivate, loadSession, refreshCache, requireAuth, requireRole, loginRateLimit, noteFailedLogin, forgiveLogin, errorHandler, bindLoginStore };

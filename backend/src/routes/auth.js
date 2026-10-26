@@ -21,7 +21,7 @@ module.exports = (store) => {
         ? passwords.verify(password, stored)
         : String(stored) === String(password));
       if (!valid) {
-        mw.noteFailedLogin(req);
+        await mw.noteFailedLogin(req);
         try {
           const entry = db.audit(store.get(), 'login_fallido', null, { username: String(username) });
           if (typeof store.adapter.pushAudit === 'function') {
@@ -34,7 +34,7 @@ module.exports = (store) => {
         } catch (e) { /* la auditoría nunca rompe el login */ }
         return res.status(401).json({ ok: false, error: 'Credenciales incorrectas' });
       }
-      mw.forgiveLogin(req);
+      await mw.forgiveLogin(req);
       try {
         const entry = db.audit(store.get(), 'login', db.safeUser(u), {});
         if (typeof store.adapter.pushAudit === 'function') {
