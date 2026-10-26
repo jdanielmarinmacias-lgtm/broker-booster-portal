@@ -249,6 +249,14 @@ body.theme-obsidian #main-app input, body.theme-obsidian #main-app select, body.
     overflow: hidden;
 }
 
+/* En pantallas anchas (ordenador) la imagen vertical se muestra completa y centrada,
+   sin ampliarse hasta recortarse. En móvil se mantiene el recorte a pantalla completa. */
+@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
+    #splash-screen {
+        background: var(--bb-marble) url('../img/splash-source.webp') center / contain no-repeat;
+    }
+}
+
 .splash-hide {
     opacity: 0;
     pointer-events: none;
