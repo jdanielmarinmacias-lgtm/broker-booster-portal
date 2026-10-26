@@ -1935,9 +1935,9 @@ function renderPublicPortal() {
                         {nombre:'Chubb', logo:''},
                         {nombre:'BX+', logo:''}
                     ]},
-                    {key:'compAutomotriz', titulo:'Trabajamos con las mejores aseguradoras automotrices', def:[]},
-                    {key:'compBancaria', titulo:'Trabajamos con las mejores aseguradoras bancarias y financieras', def:[]},
-                    {key:'compEmpresarial', titulo:'Trabajamos con las mejores aseguradoras empresariales', def:[]}
+                    {key:'compAutomotriz', titulo:'Trabajamos con las mejores compañías automotrices', def:[]},
+                    {key:'compBancaria', titulo:'Trabajamos con las mejores compañías bancarias y financieras', def:[]},
+                    {key:'compEmpresarial', titulo:'Trabajamos con las mejores compañías empresariales', def:[]}
                 ].map(function(band){
                     const lista = band.key==='aseguradoras' ? (db.settings.aseguradoras || band.def) : (db.settings[band.key] || band.def);
                     if(!lista.length) return '';

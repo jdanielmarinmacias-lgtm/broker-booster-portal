@@ -491,22 +491,26 @@
     const failed = [];
     // Aislado por colección: una que falle no bloquea a las demás. La sombra
     // solo avanza en las que sí se sincronizaron (si no, se volverían invisibles).
-    for (const n of names) {        try { await pushCollection(n, db[n] || [], shadow[n] || []);
+    for (const n of names) {
+      try { await pushCollection(n, db[n] || [], shadow[n] || []);
         shadow[n] = clone(db[n] || []);
-      } catch (e) { failed.push(n); }
+      } catch (e) { failed.push(n + ' (' + motivoFallo(e) + ')'); }
     }
     if (Array.isArray(db.users)) {
       try {
         await pushUsers(db.users, shadow.users || []);
         shadow.users = clone(db.users);
-      } catch (e) { failed.push('users'); }
+      } catch (e) { failed.push('users (' + motivoFallo(e) + ')'); }
     }
     if (failed.length && window.showToast) {
-      const hint = failed.map(function (n) {
-        return n;
-      }).join(', ');
-      window.showToast('Sin sincronizar (' + hint + '): revisa tu sesión o el tamaño de fotos', 'warning');
+      window.showToast('Sin sincronizar: ' + failed.join(', '), 'warning');
     }
+  }
+
+  /* Motivo concreto de un fallo de sincronización, para mostrarlo en el aviso. */
+  function motivoFallo(e) {
+    if (e && e.status) return 'HTTP ' + e.status + (e.message ? ': ' + e.message : '');
+    return (e && e.message) || 'error de red';
   }
 
   function pushSoon() {
