@@ -1922,12 +1922,32 @@ function renderPublicPortal() {
 
                 
                 <!-- Aseguradoras con logos deslizables -->
+                ${[
+                    {key:'aseguradoras', titulo:'Trabajamos con las mejores', def:[
+                        {nombre:'AXA', logo:'https://upload.wikimedia.org/wikipedia/commons/9/93/AXA_Logo.svg'},
+                        {nombre:'Plan Seguro', logo:'https://planseguro.com.mx/wp-content/uploads/2021/06/logo-planseguro.svg'},
+                        {nombre:'MAPFRE', logo:'https://upload.wikimedia.org/wikipedia/commons/7/7e/Mapfre_logo.svg'},
+                        {nombre:'HDI', logo:'https://upload.wikimedia.org/wikipedia/commons/3/3e/HDI_logo.svg'},
+                        {nombre:'Qualitas', logo:'https://www.qualitas.com.mx/images/logo.svg'},
+                        {nombre:'GNP', logo:'https://upload.wikimedia.org/wikipedia/commons/1/1a/GNP_Seguros_logo.svg'},
+                        {nombre:'Skandia', logo:''},
+                        {nombre:'MetLife', logo:''},
+                        {nombre:'Chubb', logo:''},
+                        {nombre:'BX+', logo:''}
+                    ]},
+                    {key:'compAutomotriz', titulo:'Trabajamos con las mejores aseguradoras automotrices', def:[]},
+                    {key:'compBancaria', titulo:'Trabajamos con las mejores aseguradoras bancarias y financieras', def:[]},
+                    {key:'compEmpresarial', titulo:'Trabajamos con las mejores aseguradoras empresariales', def:[]}
+                ].map(function(band){
+                    const lista = band.key==='aseguradoras' ? (db.settings.aseguradoras || band.def) : (db.settings[band.key] || band.def);
+                    if(!lista.length) return '';
+                    return `
                 <section class="py-16 bg-white border-y border-slate-200 overflow-hidden">
                     <div class="max-w-6xl mx-auto px-4">
-                        <p class="text-center text-xs uppercase tracking-widest text-slate-500 mb-8">Trabajamos con las mejores</p>
+                        <p class="text-center text-xs uppercase tracking-widest text-slate-500 mb-8">${band.titulo}</p>
                         <div class="relative">
                             <div class="flex gap-16 animate-marquee whitespace-nowrap">
-                                ${(db.settings.aseguradoras || [
+                                ${(lista || [
                                     {nombre:'AXA', logo:'https://upload.wikimedia.org/wikipedia/commons/9/93/AXA_Logo.svg'},
                                     {nombre:'Plan Seguro', logo:'https://planseguro.com.mx/wp-content/uploads/2021/06/logo-planseguro.svg'},
                                     {nombre:'MAPFRE', logo:'https://upload.wikimedia.org/wikipedia/commons/7/7e/Mapfre_logo.svg'},
@@ -1949,11 +1969,12 @@ function renderPublicPortal() {
                             </div>
                         </div>
                     </div>
-                    <style>
-                        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-                        .animate-marquee { animation: marquee 30s linear infinite; }
-                    </style>
-                </section>
+                </section>`;
+                }).join('')}
+                <style>
+                    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+                    .animate-marquee { animation: marquee 30s linear infinite; }
+                </style>
 
                 <!-- Accesos directos: Autos y Propiedades -->
                 <section id="disponible" class="py-20 bg-slate-50 border-t border-slate-200">

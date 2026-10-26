@@ -251,7 +251,7 @@ body.theme-obsidian #main-app input, body.theme-obsidian #main-app select, body.
 
 /* En pantallas anchas (ordenador) la imagen vertical se muestra completa y centrada,
    sin ampliarse hasta recortarse. En móvil se mantiene el recorte a pantalla completa. */
-@media (min-width: 900px) and (min-aspect-ratio: 1/1) {
+@media (min-width: 1100px) and (min-aspect-ratio: 1/1) and (hover: hover) and (pointer: fine) {
     #splash-screen {
         background: var(--bb-marble) url('../img/splash-source.webp') center / contain no-repeat;
     }

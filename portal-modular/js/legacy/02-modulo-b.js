@@ -334,6 +334,15 @@
                 reader.readAsDataURL(file);
             };
 
+            window.agregarCompania = function(key) {
+                const cont = document.getElementById('lista-'+key);
+                const idx = cont.children.length;
+                const div = document.createElement('div');
+                div.className = 'aseguradora-item p-3 border rounded-lg bg-slate-50';
+                div.innerHTML = '<div class="flex gap-2 items-start"><div class="flex-1 space-y-2"><input placeholder="Nombre compañía" class="aseg-nombre w-full px-2 py-1.5 border rounded text-sm bg-white text-slate-900 border-slate-300"><div class="flex items-center gap-2"><input type="file" accept="image/*" onchange="uploadImageBase64(this, \''+key+'-prev-'+idx+'\', \''+key+'-logo-'+idx+'\')" class="text-xs flex-1 bg-white text-slate-900 border border-slate-300"><img id="'+key+'-prev-'+idx+'" src="" class="h-8 w-12 object-contain border rounded bg-white hidden"></div><input type="hidden" id="'+key+'-logo-'+idx+'" class="aseg-logo bg-white text-slate-900 border border-slate-300"></div><button type="button" onclick="this.closest(\'.aseguradora-item\').remove()" class="text-red-500 hover:text-red-700 p-1"><i class="fas fa-trash text-xs"></i></button></div>';
+                cont.appendChild(div);
+            };
+
             window.agregarAseguradora = function() {
                 const cont = document.getElementById('lista-aseguradoras');
                 const idx = cont.children.length;
@@ -396,12 +405,19 @@
                         });
                     });
                     
-                    // ASEGURADORAS
-                    db.settings.aseguradoras = [];
+                    // ASEGURADORAS                        db.settings.aseguradoras = [];
                     document.querySelectorAll('#lista-aseguradoras .aseguradora-item').forEach(function(item) {
                         const nombre = item.querySelector('.aseg-nombre').value.trim();
                         const logo = item.querySelector('.aseg-logo').value;
                         if (nombre) db.settings.aseguradoras.push({nombre:nombre, logo:logo});
+                    });
+                    ['compAutomotriz','compBancaria','compEmpresarial'].forEach(function(key){
+                        db.settings[key] = [];
+                        document.querySelectorAll('#lista-'+key+' .aseguradora-item').forEach(function(item){
+                            const nombre = item.querySelector('.aseg-nombre').value.trim();
+                            const logo = item.querySelector('.aseg-logo').value;
+                            if (nombre) db.settings[key].push({nombre:nombre, logo:logo});
+                        });
                     });
                     
                     if(!db.inmPublica) db.inmPublica = { props: [] };
@@ -564,6 +580,19 @@
             html += '</div>';
             html += '<p class="text-xs text-slate-500 mt-3">Sube logos en PNG con fondo transparente para mejor resultado.</p>';
             html += '</div>';
+            // COMPAÑÍAS por ramo (bandas adicionales de la página principal)
+            [['compAutomotriz','Automotriz','fa-car','text-red-600','bg-red-50','text-red-600'],['compBancaria','Bancario - Financiero','fa-building-columns','text-indigo-600','bg-indigo-50','text-indigo-600'],['compEmpresarial','Empresarial','fa-briefcase','text-teal-600','bg-teal-50','text-teal-600']].forEach(function(sec){
+                const key=sec[0], label=sec[1], lista=(db.settings[key]||[]);
+                html += '<div class="bg-white p-6 rounded-2xl border border-slate-200 mt-6">';
+                html += '<div class="flex justify-between items-center mb-4"><h3 class="font-semibold flex items-center gap-2"><i class="fas '+sec[2]+' '+sec[3]+'"></i>COMPAÑÍAS · '+label.toUpperCase()+'</h3><button type="button" onclick="agregarCompania(\''+key+'\')" class="px-3 py-1.5 '+sec[4]+' '+sec[5]+' rounded-lg text-xs font-medium"><i class="fas fa-plus mr-1"></i>Agregar</button></div>';
+                html += '<div id="lista-'+key+'" class="grid md:grid-cols-2 gap-3">';
+                for (let j=0; j<lista.length; j++) {
+                    var a = lista[j];
+                    html += '<div class="aseguradora-item p-3 border rounded-lg bg-slate-50" data-key="'+key+'"><div class="flex gap-2 items-start"><div class="flex-1 space-y-2"><input placeholder="Nombre compañía" value="'+escapeHTML(a.nombre)+'" class="aseg-nombre w-full px-2 py-1.5 border rounded text-sm bg-white text-slate-900 border-slate-300"><div class="flex items-center gap-2"><input type="file" accept="image/*" onchange="uploadImageBase64(this, \''+key+'-prev-'+j+'\', \''+key+'-logo-'+j+'\')" class="text-xs flex-1 bg-white text-slate-900 border border-slate-300"><img id="'+key+'-prev-'+j+'" src="'+(a.logo||'')+'" class="h-8 w-12 object-contain border rounded bg-white '+(a.logo?'':'hidden')+'"></div><input type="hidden" id="'+key+'-logo-'+j+'" value="'+escapeHTML(a.logo||'')+'" class="aseg-logo bg-white text-slate-900 border border-slate-300"></div><button type="button" onclick="this.closest(\'.aseguradora-item\').remove()" class="text-red-500 hover:text-red-700 p-1"><i class="fas fa-trash text-xs"></i></button></div></div>';
+                }
+                html += '</div>';
+                html += '</div>';
+            });
                         html += '<div class="bg-white p-6 rounded-2xl border border-slate-200 mt-6">';
                         html += '<div class="flex justify-between items-center mb-4"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-house text-sky-600"></i>PROPIEDADES EN PORTADA (sección Propiedades)</h3><div class="flex gap-2"><button type="button" onclick="addPropPortada()" class="px-3 py-1.5 bg-sky-50 text-sky-600 rounded-lg hover:bg-sky-100 text-xs font-medium"><i class="fas fa-plus mr-1"></i>Agregar</button></div></div>';
                         html += '<p class="text-xs text-slate-500 mb-3">Publica casas y departamentos en la sub-página Propiedades de la página principal (venta, renta o preventa). Guarda con "Guardar todo".</p>';
