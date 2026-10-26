@@ -201,7 +201,9 @@ module.exports = (store, config) => {
    * servidor aún no las tiene, el GET devuelve [] y no se pierde nada). */
   const KNOWN_EMPTY = ['ventas', 'metas', 'solicitudes', 'cotizaciones', 'siniestros',
     'lessons', 'liveClasses', 'exams', 'library', 'messages', 'groupMessages',
-    'notifications', 'posts', 'auditoria', 'chatGroups', 'forumPosts', 'invitaciones'];
+    'notifications', 'posts', 'auditoria', 'chatGroups', 'forumPosts', 'invitaciones',
+    'convenciones', 'clientes', 'progress', 'enrollments', 'taskSubmissions', 'examAttempts',
+    'guiaAgenda', 'concursos', 'cierresComunidad', 'agendas'];
   api.get('/', async (req, res, next) => {
     try {
       await store.refreshIfStale(); // lectura: el TTL basta
