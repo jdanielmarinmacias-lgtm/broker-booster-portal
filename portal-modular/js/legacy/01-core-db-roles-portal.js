@@ -1475,7 +1475,719 @@ function pubMostrarPestana(){
 }
 window.addEventListener('hashchange', function(){ if(document.getElementById('public-portal') && !document.getElementById('public-portal').classList.contains('hidden')) pubMostrarPestana(); });
 
-2
+function renderPublicPortal() {
+            const hh0=String(location.hash||"");
+            if(hh0.indexOf("#auto-")===0 && typeof auVerAuto==="function"){ auVerAuto(hh0.slice(6)); return; }
+            if(hh0.indexOf("#prop-")===0 && typeof inmVerProp==="function"){ inmVerProp(hh0.slice(6)); return; }
+            if(window.pubView==="autos"){ document.getElementById("public-portal").innerHTML = pubAutosPagina(); return; }
+            if(window.pubView==="props"){ document.getElementById("public-portal").innerHTML = pubPropsPagina(); return; }
+            const portal = document.getElementById('public-portal');
+            const js = joinData();
+            const content = db.settings.portalContent;
+            const s = db.settings;
+            const agentesActivos = db.users.filter(u => (u.role||'').toLowerCase().includes('agente') || ['alumno','agente_desarrollo','agente_agencia'].includes((u.role||'').toLowerCase())).length;
+            
+            portal.innerHTML = `
+            <div class="bg-white">
+                <!-- Header reclutamiento -->
+                <header class="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="flex justify-between items-center h-16">
+                            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-8 sm:h-11 w-auto shrink-0">
+                                <span class="hidden sm:inline text-xl font-bold text-slate-800 truncate">${s.institutionName}</span>
+                            </div>
+                            <nav class="hidden lg:flex items-center gap-5">
+                                <a href="#servicios" data-pub-tab="servicios" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Servicios</a>
+                                <a href="#unirse" data-pub-tab="unirse" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Cómo ganarías</a>
+                                <a href="#ingresos" data-pub-tab="ingresos" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Simulador</a>
+                                <a href="#historias" data-pub-tab="historias" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Historias</a>
+                                <a href="#blog" data-pub-tab="blog" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Blog</a>
+                                <a href="#proceso" data-pub-tab="proceso" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Proceso</a>
+                                <div class="relative" id="nav-subs">
+                                    <button onclick="var m=document.getElementById('nav-subs-menu'); m.classList.toggle('hidden');" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition flex items-center gap-1">Disponible <i class="fas fa-chevron-down text-[10px]"></i></button>
+                                    <div id="nav-subs-menu" class="hidden absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 z-50">
+                                        <button onclick="pubSetView('autos')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition">
+                                            <span class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center"><i class="fas fa-car-side text-emerald-700"></i></span>
+                                            <span><span class="block text-sm font-semibold text-slate-900">Autos en venta</span><span class="block text-[11px] text-slate-500">Inventario de la agencia</span></span>
+                                        </button>
+                                        <button onclick="pubSetView('props')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition">
+                                            <span class="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center"><i class="fas fa-house text-sky-700"></i></span>
+                                            <span><span class="block text-sm font-semibold text-slate-900">Propiedades</span><span class="block text-[11px] text-slate-500">Venta, renta y preventa</span></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </nav>
+                            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                                <button onclick="showCampusLogin()" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-[var(--bb-gold-deep)]"></i><span>Campus</span></button>
+                                <button onclick="openSolicitudModal('aplicar')" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-[var(--bb-forest)] text-white font-semibold rounded-xl hover:bg-[var(--bb-emerald)] transition border border-[var(--bb-gold)]"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
+                                <button onclick="showAdminLogin()" title="Acceso administrativo" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg"><i class="fas fa-lock text-[11px]"></i><span class="lg:hidden">Admin</span><span class="hidden lg:inline">Acceso administrativo</span></button>
+                            </div>
+                        </div>
+                    </div>
+                    <nav class="lg:hidden flex gap-2 overflow-x-auto px-4 pb-3 bg-white" aria-label="Secciones de la portada">
+                        <a href="#servicios" data-pub-tab="servicios" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Servicios</a>
+                        <a href="#unirse" data-pub-tab="unirse" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Cómo ganarías</a>
+                        <a href="#ingresos" data-pub-tab="ingresos" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Simulador</a>
+                        <a href="#historias" data-pub-tab="historias" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Historias</a>
+                        <a href="#blog" data-pub-tab="blog" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Blog</a>
+                        <a href="#proceso" data-pub-tab="proceso" class="shrink-0 px-3 py-2 rounded-full border border-slate-300 text-xs font-medium text-slate-700">Proceso</a>
+                    </nav>
+                </header>
+
+                <!-- Hero reclutamiento (formal, blanco/verde/negro) -->
+                <section class="pt-16 relative overflow-hidden min-h-[85vh] flex items-center bg-[var(--bb-marble)]">
+                    <div class="absolute inset-0">
+                    <img src="${db.settings.hero?.imagenFondo || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2000'}" class="w-full h-full object-cover opacity-25" alt="" onerror="this.style.display='none'">
+                        <div class="absolute inset-0 bg-gradient-to-br from-[var(--bb-marble)] via-[var(--bb-marble)]/95 to-[#e9efe9]/80"></div>
+                        <div class="absolute inset-0 bg-[radial-gradient(circle_at_85%_40%,rgba(201,168,106,0.22),transparent_45%)]"></div>
+                    </div>
+                    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+                        <div class="max-w-2xl">
+                            <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium mb-6">
+                                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                ${db.settings.hero?.cinta || 'Grupo financiero multi-sector · San Pedro Garza García, NL'}
+                            </div>
+                            <h1 class="text-4xl lg:text-5xl font-black text-slate-900 mb-6 leading-[1.12] tracking-tight">
+                                ${db.settings.hero?.titulo1 || 'Tu patrimonio, tu empresa y tu bienestar en un solo grupo'}
+                            </h1>
+                            <p class="text-xl text-slate-600 mb-4 leading-relaxed">${db.settings.hero?.subtitulo || 'Seguros e inversiones, banca, autos, inmuebles, contabilidad, salud y educación: 13 divisiones especializadas para resolver todo lo que tu vida y tu negocio necesitan.'}</p>
+                            <p class="text-sm text-slate-500 mb-8 flex flex-wrap items-center gap-x-5 gap-y-2">
+                                <span class="flex items-center gap-1.5"><i class="fas fa-check-circle text-emerald-600"></i> 13 divisiones de servicio</span>
+                                <span class="flex items-center gap-1.5"><i class="fas fa-check-circle text-emerald-600"></i> Certificación y supervisión CNSF</span>
+                            </p>
+                            <div class="flex flex-col sm:flex-row gap-4">
+                                <a href="#servicios" class="group px-8 py-4 bg-[var(--bb-gold)] text-[var(--bb-ink)] font-bold rounded-2xl hover:bg-[var(--bb-gold-deep)] hover:text-white transition text-center shadow-xl flex items-center justify-center gap-2">
+                                    ${db.settings.hero?.textoBoton1 || "Conoce nuestros servicios"}
+                                    <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                                </a>
+                                <a href="https://wa.me/526643640670?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20los%20servicios%20de%20Broker%20Booster" target="_blank" class="px-8 py-4 bg-white text-slate-900 font-semibold rounded-2xl hover:bg-slate-100 transition border-2 border-slate-200 shadow-lg flex items-center justify-center gap-2">
+                                    <i class="fab fa-whatsapp text-emerald-600"></i>
+                                    ${db.settings.hero?.textoBoton2 || "Habla con un asesor"}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Floating stats -->
+                    </div></div></section>
+
+                <!-- Stats bar corregida -->
+                <section class="relative -mt-12 z-20">
+                    <div class="max-w-7xl mx-auto px-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
+                                    <div class="text-2xl font-bold text-slate-900">${agentesActivos}+</div>
+                                    <div class="text-xs text-slate-600">Agentes activos</div>
+                                </div>
+                                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
+                                    <div class="text-2xl font-bold text-slate-900">14</div>
+                                    <div class="text-xs text-slate-600">Aseguradoras aliadas</div>
+                                </div>
+                                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
+                                    <div class="text-2xl font-bold text-slate-900">13</div>
+                                    <div class="text-xs text-slate-600">Divisiones de servicio</div>
+                                </div>
+                                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
+                                    <div class="text-2xl font-bold text-slate-900">100%</div>
+                                    <div class="text-xs text-slate-600">Independientes</div>
+                    </div>
+                </section>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Servicios multi-sector (13 divisiones, estilo AENN) -->
+                <section id="servicios" class="py-20 bg-white border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-10">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Grupo multi-sector</p>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">${psEscape(servData().titulo)}</h2>
+                            <p class="text-slate-600 text-lg max-w-3xl mx-auto">${psEscape(servData().subtitulo)}</p>
+                        </div>
+                        <div class="flex flex-wrap justify-center gap-2 mb-10">
+                            ${servData().grupos.map(g=>`<button data-serv-tab="${g.id}" onclick="servTab('${g.id}')" class="px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${g.id==='fin'?'bg-slate-900 text-white shadow-lg':'bg-slate-100 text-slate-700 hover:bg-slate-200'}"><i class="fas ${g.ico} mr-2"></i>${psEscape(g.n)}</button>`).join('')}
+                        </div>
+                        ${servData().grupos.map((g,gi)=>`
+                        <div data-serv-grupo="${g.id}" class="${gi===0?'':'hidden'}">
+                            <p class="text-center text-sm text-slate-500 mb-6">${psEscape(g.d)}</p>
+                            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                ${servData().servicios.filter(x=>x.g===g.id).map(x=>`
+                                    <div class="group bg-slate-50/70 rounded-2xl border border-slate-200 p-6 hover:border-[var(--bb-gold)] hover:shadow-xl transition-all">
+                                        <div class="flex items-start justify-between mb-4">
+                                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--bb-gold)] to-[var(--bb-gold-deep)] flex items-center justify-center shadow-md"><i class="fas ${x.ico} text-xl text-white"></i></div>
+                                            ${x.tag?`<span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-[11px] font-bold rounded-full">${psEscape(x.tag)}</span>`:''}
+                                        </div>
+                                        <h3 class="text-lg font-bold text-slate-900 mb-2">${psEscape(x.n)}</h3>
+                                        <p class="text-sm text-slate-600 leading-relaxed">${psEscape(x.d)}</p>
+                                        <a href="https://wa.me/526643640670?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20${encodeURIComponent(x.n)}" target="_blank" class="mt-4 inline-flex items-center gap-1.5 min-h-[44px] py-2 text-sm font-semibold text-[var(--bb-forest)] hover:text-[var(--bb-emerald)]">Cotizar / agendar <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></a>
+                                    </div>`).join('')}
+                            </div>
+                        </div>`).join('')}
+                    </div>
+                </section>
+
+                <section id="blog" class="py-20 bg-white border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-12">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Blog</p>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">${psEscape(blogData().titulo)}</h2>
+                            <p class="text-slate-600 text-lg max-w-3xl mx-auto">${psEscape(blogData().subtitulo)}</p>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            ${blogData().posts.map(p=>`
+                            <article class="group flex flex-col bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-[var(--bb-gold)] transition-all cursor-pointer" onclick="blogPost('${psEscape(String(p.id))}')">
+                                <div class="h-2 bg-gradient-to-r from-[var(--bb-gold)] to-[var(--bb-gold-deep)]"></div>
+                                <div class="p-6 flex flex-col flex-1">
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--bb-gold)] to-[var(--bb-gold-deep)] flex items-center justify-center"><i class="fas ${p.ico||'fa-newspaper'} text-sm text-white"></i></div>
+                                        <span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-[11px] font-bold rounded-full">${psEscape(p.tag||'General')}</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-slate-900 mb-2 leading-snug group-hover:text-[var(--bb-gold-deep)] transition">${psEscape(p.titulo)}</h3>
+                                    <p class="text-sm text-slate-600 flex-1">${psEscape(p.resumen||'')}</p>
+                                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                                        <span class="text-xs text-slate-400">${psEscape(p.fecha||'')}</span>
+                                        <span class="text-sm font-semibold text-emerald-700 inline-flex items-center gap-1">Leer <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></span>
+                                    </div>
+                                </div>
+                            </article>`).join('')}
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Por qué elegir Broker Booster (diferencial) -->
+                <section id="diferencia" class="py-20 bg-slate-50 border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-12">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Nuestra diferencia</p>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">¿Por qué elegir Broker Booster?</h2>
+                            <p class="text-slate-600 text-lg max-w-3xl mx-auto">No dependemos de una sola aseguradora ni de un solo rubro: comparamos, integramos y acompañamos.</p>
+                        </div>
+                        <div class="grid lg:grid-cols-3 gap-6">
+                            <div class="lg:col-span-2 grid sm:grid-cols-2 gap-5">
+                                <div class="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl transition-all">
+                                    <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center mb-4"><i class="fas fa-scale-balanced text-amber-700"></i></div>
+                                    <h3 class="text-lg font-bold text-slate-900 mb-2">Independencia total</h3>
+                                    <p class="text-sm text-slate-600">Comparamos entre 14 aseguradoras y aliados para darte la mejor opción, no la que nos conviene.</p>
+                                </div>
+                                <div class="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl transition-all">
+                                    <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center mb-4"><i class="fas fa-puzzle-piece text-amber-700"></i></div>
+                                    <h3 class="text-lg font-bold text-slate-900 mb-2">Arquitectura integral</h3>
+                                    <p class="text-sm text-slate-600">Integramos seguros, inversión, inmuebles, autos, salud y educación en una sola estrategia.</p>
+                                </div>
+                                <div class="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl transition-all">
+                                    <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center mb-4"><i class="fas fa-clipboard-check text-amber-700"></i></div>
+                                    <h3 class="text-lg font-bold text-slate-900 mb-2">Auditoría de lo que ya tienes</h3>
+                                    <p class="text-sm text-slate-600">Revisamos tus pólizas y contratos para detectar vacíos, sobrecostos o mejores opciones.</p>
+                                </div>
+                                <div class="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl transition-all">
+                                    <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center mb-4"><i class="fas fa-handshake-angle text-amber-700"></i></div>
+                                    <h3 class="text-lg font-bold text-slate-900 mb-2">Acompañamiento continuo</h3>
+                                    <p class="text-sm text-slate-600">Renovaciones, reclamaciones y nuevas necesidades: seguimos contigo después de la venta.</p>
+                                </div>
+                            </div>
+                            <div class="bg-slate-950 text-white rounded-3xl p-8 flex flex-col justify-center">
+                                <h3 class="text-xl font-bold mb-5">Siempre incluido</h3>
+                                <ul class="space-y-3 text-sm">
+                                    <li class="flex items-start gap-2.5"><i class="fas fa-circle-check text-[#c9a86a] mt-0.5"></i> Consultoría sin costo inicial</li>
+                                    <li class="flex items-start gap-2.5"><i class="fas fa-circle-check text-[#c9a86a] mt-0.5"></i> Cotizaciones comparativas multi-aseguradora</li>
+                                    <li class="flex items-start gap-2.5"><i class="fas fa-circle-check text-[#c9a86a] mt-0.5"></i> Cumplimiento y supervisión CNSF · CONDUSEF</li>
+                                    <li class="flex items-start gap-2.5"><i class="fas fa-circle-check text-[#c9a86a] mt-0.5"></i> Acompañamiento en reclamaciones</li>
+                                    <li class="flex items-start gap-2.5"><i class="fas fa-circle-check text-[#c9a86a] mt-0.5"></i> Atención por WhatsApp y presencial en ${ciudadBB()}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Proceso 4 pasos (estilo AENN) -->
+                <section id="proceso" class="py-20 bg-white border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-12">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Simple y claro</p>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">¿Cómo trabajamos?</h2>
+                            <p class="text-slate-600 text-lg">Un proceso transparente de 4 pasos para encontrar la solución exacta que necesitas.</p>
+                        </div>
+                        <div class="grid md:grid-cols-4 gap-5">
+                            <div class="relative bg-slate-50/70 rounded-2xl border border-slate-200 p-6">
+                                <div class="text-4xl font-black text-[var(--bb-gold)]/60 mb-3">1</div>
+                                <h3 class="font-bold text-slate-900 mb-2">Consulta gratuita</h3>
+                                <p class="text-sm text-slate-600">Agendamos una reunión presencial o por videollamada para entender tu situación, tu familia, tu empresa y tus metas.</p>
+                            </div>
+                            <div class="relative bg-slate-50/70 rounded-2xl border border-slate-200 p-6">
+                                <div class="text-4xl font-black text-[var(--bb-gold)]/60 mb-3">2</div>
+                                <h3 class="font-bold text-slate-900 mb-2">Diagnóstico y comparativo</h3>
+                                <p class="text-sm text-slate-600">Analizamos tu perfil y cotizamos con las mejores aseguradoras y aliados; si ya tienes pólizas, las auditamos.</p>
+                            </div>
+                            <div class="relative bg-slate-50/70 rounded-2xl border border-slate-200 p-6">
+                                <div class="text-4xl font-black text-[var(--bb-gold)]/60 mb-3">3</div>
+                                <h3 class="font-bold text-slate-900 mb-2">Diseño de tu estrategia</h3>
+                                <p class="text-sm text-slate-600">Te presentamos una propuesta que integra protección, ahorro, inversión y bienestar en un plan coherente.</p>
+                            </div>
+                            <div class="relative bg-slate-950 text-white rounded-2xl p-6">
+                                <div class="text-4xl font-black text-[#c9a86a]/50 mb-3">4</div>
+                                <h3 class="font-bold mb-2">Servicio continuo</h3>
+                                <p class="text-sm text-slate-300">No desaparecemos después de la venta: renovaciones, reclamaciones, ajustes y nuevas necesidades.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Seccion Quiero aplicar (3 caminos) -->
+                <section id="unirse" class="py-20 bg-white border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-6">
+                            <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium mb-4"><i class="fas fa-hand-holding-heart"></i> ${js.cinta}</div>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">${js.titulo}</h2>
+                            <p class="text-slate-600 text-lg max-w-3xl mx-auto">${js.subtitulo}</p>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            ${js.secciones.map(sec=>{
+                                const destacado=!!sec.destacado;
+                                return `<div class="relative rounded-3xl p-8 ${destacado?'bg-slate-950 text-white border-2 border-slate-950 shadow-2xl scale-[1.03]':'bg-slate-50/60 border-2 border-slate-200 hover:border-emerald-600 hover:shadow-xl transition-all'}">
+                                    ${destacado?'<div class="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-emerald-600 text-white text-xs font-bold rounded-full whitespace-nowrap">MÁS ELEGIDO</div>':''}
+                                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${destacado?'bg-emerald-600':'bg-emerald-100'}"><i class="fas ${sec.ico} text-xl ${destacado?'text-white':'text-emerald-700'}"></i></div>
+                                    <h3 class="text-2xl font-bold mb-2">${psEscape(sec.titulo)}</h3>
+                                    <p class="${destacado?'text-slate-300':'text-slate-600'} text-sm mb-5">${psEscape(sec.desc)}</p>
+                                    <ul class="space-y-2.5 text-sm mb-7">${(sec.puntos||[]).map(p=>`<li class="flex items-start gap-2"><i class="fas fa-check text-emerald-500 mt-0.5"></i><span>${psEscape(p)}</span></li>`).join('')}</ul>
+                                    <button onclick="openSolicitudModal('${psEscape(sec.origen||'general')}')" class="w-full py-3 font-semibold rounded-xl ${destacado?'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg':'border-2 border-slate-900 hover:bg-slate-900 hover:text-white transition'}">${psEscape(sec.cta)}</button>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Calculadora protagonista -->
+                <section id="ingresos" class="py-20 bg-slate-50">
+                    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-12">
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">¿Cuánto puedes ganar?</h2>
+                            <p class="text-slate-600 text-lg">Simulación real con nuestras comisiones promedio</p>
+                        </div>
+                        
+                        <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                            <div class="grid lg:grid-cols-5 gap-0">
+                                <div class="lg:col-span-3 p-8 lg:p-10">
+                                    <div id="primaSliderWrapV2">
+                                        <div class="flex items-center justify-between mb-6">
+                                            <label class="text-sm font-semibold text-slate-700 uppercase tracking-wide" id="primaLabelV2">Primas mensuales</label>
+                                            <div class="text-3xl font-black text-slate-900" id="primaDisplayV2">$150,000</div>
+                                        </div>
+                                        <input type="range" id="primaRangeV2" min="20000" max="500000" step="10000" value="150000" class="w-full h-3 bg-slate-200 rounded-full appearance-none cursor-pointer accent-emerald-600 bg-white text-slate-900 border border-slate-300">
+                                        <div class="flex justify-between text-xs text-slate-500 mt-2">
+                                            <span>$20k</span><span>$500k</span>
+                                        </div>
+                                        
+                                        <div class="flex gap-2 mt-6">
+                                            <button onclick="setPrima(50000)" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg">Principiante</button>
+                                            <button onclick="setPrima(150000)" class="px-3 py-1.5 text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg">Intermedio</button>
+                                            <button onclick="setPrima(400000)" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg">Top</button>
+                                        </div>
+                                    </div>
+
+                                    <div id="skandiaInputsV2" class="hidden">
+                                        <div class="flex items-center justify-between mb-6">
+                                            <label class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Skandia Inversión</label>
+                                            <div class="text-xs px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full font-medium">2.7% por año</div>
+                                        </div>
+                                        <div class="grid sm:grid-cols-2 gap-5">
+                                            <div>
+                                                <label class="text-xs font-medium text-slate-600 mb-1.5 block">Pago mensual (mín $2,000)</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                                    <input type="number" id="skandiaMensualV2" min="2000" step="500" value="2000" class="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none">
+                                                </div>
+                                                <input type="range" id="skandiaMensualRangeV2" min="2000" max="30000" step="500" value="2000" class="w-full mt-2.5 h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-amber-500">
+                                                <div class="flex justify-between text-[11px] text-slate-500 mt-1"><span>$2k</span><span>$30k</span></div>
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-medium text-slate-600 mb-1.5 block">Plazo (años)</label>
+                                                <input type="number" id="skandiaAnosV2" min="1" max="30" value="10" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none">
+                                                <input type="range" id="skandiaAnosRangeV2" min="1" max="30" step="1" value="10" class="w-full mt-2.5 h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-amber-500">
+                                                <div class="flex justify-between text-[11px] text-slate-500 mt-1"><span>1 año</span><span>30 años</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 text-[11px] text-slate-600 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+                                            <i class="fas fa-lightbulb text-amber-500 mr-1"></i>
+                                            <strong>Ejemplo real:</strong> $2k/mes x 10 años = 27% de $24k = <strong>$6,480</strong> · 17 años = 45.9% = <strong>$11,016</strong> · Fórmula: pago anual × (2.7% × años)
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-8">
+                                        <label class="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3 block">Tu enfoque</label>
+                                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            <label class="relative cursor-pointer">
+                                                <input type="radio" name="ramoV2" value="skandia" checked class="sr-only peer bg-white text-slate-900 border border-slate-300">
+                                                <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-amber-500 peer-checked:bg-amber-50 text-center transition">
+                                                    <i class="fas fa-chart-line text-2xl mb-1 text-slate-600"></i>
+                                                    <div class="text-sm font-semibold">Skandia</div>
+                                                    <div class="text-xs text-slate-500" id="pct-skandia">2.7%/año</div>
+                                                </div>
+                                            </label>
+                                            <label class="relative cursor-pointer">
+                                                <input type="radio" name="ramoV2" value="vida" class="sr-only peer bg-white text-slate-900 border border-slate-300">
+                                                <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-emerald-500 peer-checked:bg-emerald-50 text-center transition">
+                                                    <i class="fas fa-heart text-2xl mb-1 text-slate-600"></i>
+                                                    <div class="text-sm font-semibold">Vida</div>
+                                                    <div class="text-xs text-slate-500" id="pct-vida">25% com.</div>
+                                                </div>
+                                            </label>
+                                            <label class="relative cursor-pointer">
+                                                <input type="radio" name="ramoV2" value="gmm" class="sr-only peer bg-white text-slate-900 border border-slate-300">
+                                                <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-emerald-500 peer-checked:bg-emerald-50 text-center transition">
+                                                    <i class="fas fa-hospital text-2xl mb-1 text-slate-600"></i>
+                                                    <div class="text-sm font-semibold">GMM</div>
+                                                    <div class="text-xs text-slate-500" id="pct-gmm">20% com.</div>
+                                                </div>
+                                            </label>
+                                            <label class="relative cursor-pointer">
+                                                <input type="radio" name="ramoV2" value="autos" class="sr-only peer bg-white text-slate-900 border border-slate-300">
+                                                <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-emerald-500 peer-checked:bg-emerald-50 text-center transition">
+                                                    <i class="fas fa-car text-2xl mb-1 text-slate-600"></i>
+                                                    <div class="text-sm font-semibold">Venta de autos</div>
+                                                    <div class="text-xs text-slate-500" id="pct-autos">3% + 30% fin.</div>
+                                                </div>
+                                            </label>
+                                            <label class="relative cursor-pointer">
+                                                <input type="radio" name="ramoV2" value="propiedades" class="sr-only peer bg-white text-slate-900 border border-slate-300">
+                                                <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-sky-500 peer-checked:bg-sky-50 text-center transition">
+                                                    <i class="fas fa-house text-2xl mb-1 text-slate-600"></i>
+                                                    <div class="text-sm font-semibold">Propiedades</div>
+                                                    <div class="text-xs text-slate-500" id="pct-prop">3% valor</div>
+                                                </div>
+                                            </label>
+                                            <label class="relative cursor-pointer">
+                                                <input type="radio" name="ramoV2" value="danos" class="sr-only peer bg-white text-slate-900 border border-slate-300">
+                                                <div class="p-4 border-2 border-slate-200 rounded-xl peer-checked:border-emerald-500 peer-checked:bg-emerald-50 text-center transition">
+                                                    <i class="fas fa-shield-halved text-2xl mb-1 text-slate-600"></i>
+                                                    <div class="text-sm font-semibold">Daños</div>
+                                                    <div class="text-xs text-slate-500" id="pct-danos">12% com.</div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="lg:col-span-2 bg-slate-950 p-8 lg:p-10 text-white flex flex-col justify-center">
+                                    <div class="text-sm uppercase tracking-widest opacity-80 mb-2" id="commissionLabelV2">Tu comisión estimada</div>
+                                    <div class="text-5xl font-black mb-2" id="commissionAmountV2">$18,000</div>
+                                    <div class="text-lg opacity-90 mb-6" id="commissionSubV2">por mes</div>
+                                    
+                                    <div class="space-y-2 text-sm bg-white/10 backdrop-blur rounded-xl p-4 mb-6">
+                                        <div class="flex justify-between"><span class="opacity-80" id="breakPrimaLabelV2">Prima:</span> <span id="breakPrima">$150,000</span></div>
+                                        <div class="flex justify-between"><span class="opacity-80">Comisión:</span> <span id="breakPorc">12%</span></div>
+                                        <div class="flex justify-between font-semibold border-t border-white/20 pt-2 mt-2"><span id="breakAnualLabelV2">Anual:</span> <span id="breakAnual">$216,000</span></div>
+                                    </div>
+                                    
+                                    <button onclick="openSolicitudModal('calculadora')" class="w-full py-3.5 bg-white text-emerald-700 font-bold rounded-xl hover:bg-slate-100 transition shadow-lg">
+                                        Quiero ganar esto
+                                    </button>
+                                    <p class="text-xs text-center mt-3 opacity-70">Te contactamos en menos de 2 horas</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3 caminos -->
+                <!-- Seccion Quiero aplicar (3 caminos) -->
+                <section id="historias" class="py-20 bg-slate-900 text-white relative overflow-hidden">
+                    <div class="absolute inset-0 opacity-5"><div class="absolute inset-0" style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 40px 40px;"></div></div>
+                    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-14">
+                            <h2 class="text-4xl font-black mb-3">${db.settings.caminos?.tituloHistorias || 'Historias de Éxito'}</h2>
+                            <p class="text-slate-400 text-lg">No es teoría, son depósitos reales</p>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-8">
+                            ${(db.settings.historias || []).map(h => `
+                            <div class="bg-white/5 backdrop-blur border border-white/10 rounded-3xl p-6 hover:bg-white/10 transition">
+                                <div class="flex items-center gap-4 mb-4">
+                                    <img src="${h.foto || 'https://i.pravatar.cc/80'}" class="w-14 h-14 rounded-2xl object-cover bg-white/10">
+                                    <div>
+                                        <div class="font-bold">${h.nombre}</div>
+                                        <div class="text-xs text-slate-400">${h.tiempo}</div>
+                                    </div>
+                                </div>
+                                <p class="text-slate-300 mb-4">"${h.testimonio}"</p>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-1 text-amber-400">
+                                        ${'<i class="fas fa-star"></i>'.repeat(5)}
+                                    </div>
+                                    <div class="text-emerald-400 font-bold">${h.monto}</div>
+                                </div>
+                            </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </section>
+
+                
+                <!-- Aseguradoras con logos deslizables -->
+                <section class="py-16 bg-white border-y border-slate-200 overflow-hidden">
+                    <div class="max-w-6xl mx-auto px-4">
+                        <p class="text-center text-xs uppercase tracking-widest text-slate-500 mb-8">Trabajamos con las mejores</p>
+                        <div class="relative">
+                            <div class="flex gap-16 animate-marquee whitespace-nowrap">
+                                ${(db.settings.aseguradoras || [
+                                    {nombre:'AXA', logo:'https://upload.wikimedia.org/wikipedia/commons/9/93/AXA_Logo.svg'},
+                                    {nombre:'Plan Seguro', logo:'https://planseguro.com.mx/wp-content/uploads/2021/06/logo-planseguro.svg'},
+                                    {nombre:'MAPFRE', logo:'https://upload.wikimedia.org/wikipedia/commons/7/7e/Mapfre_logo.svg'},
+                                    {nombre:'HDI', logo:'https://upload.wikimedia.org/wikipedia/commons/3/3e/HDI_logo.svg'},
+                                    {nombre:'Qualitas', logo:'https://www.qualitas.com.mx/images/logo.svg'},
+                                    {nombre:'GNP', logo:'https://upload.wikimedia.org/wikipedia/commons/1/1a/GNP_Seguros_logo.svg'},
+                                    {nombre:'Skandia', logo:''},
+                                    {nombre:'MetLife', logo:''},
+                                    {nombre:'Chubb', logo:''},
+                                    {nombre:'BX+', logo:''}
+                                ]).map(a => a.logo ? `
+                                    <div class="flex items-center justify-center h-20 grayscale hover:grayscale-0 transition opacity-70 hover:opacity-100">
+                                        <img src="${a.logo}" alt="${a.nombre}" class="h-14 w-auto object-contain max-w-[160px]" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                                        <span style="display:none" class="text-2xl font-bold text-slate-700">${a.nombre}</span>
+                                    </div>` : `
+                                    <div class="flex items-center justify-center h-20 transition opacity-80 hover:opacity-100">
+                                        <span class="text-2xl font-bold text-slate-700">${a.nombre}</span>
+                                    </div>`).join('').repeat(2)}
+                            </div>
+                        </div>
+                    </div>
+                    <style>
+                        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+                        .animate-marquee { animation: marquee 30s linear infinite; }
+                    </style>
+                </section>
+
+                <!-- Accesos directos: Autos y Propiedades -->
+                <section id="disponible" class="py-20 bg-slate-50 border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-10">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Disponible para ti</p>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">Compra con nosotros</h2>
+                            <p class="text-slate-600 text-lg max-w-2xl mx-auto">Además de tu desarrollo profesional, puedes comprar tu auto o tu casa con el respaldo y la asesoría de nuestro equipo.</p>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <button onclick="pubSetView('autos')" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-emerald-600 hover:shadow-2xl transition-all">
+                                <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mb-5"><i class="fas fa-car-side text-2xl text-emerald-700"></i></div>
+                                <h3 class="text-2xl font-bold text-slate-900 mb-2">Autos en venta <i class="fas fa-arrow-right text-sm text-emerald-600 group-hover:translate-x-1 transition-transform"></i></h3>
+                                <p class="text-slate-600 text-sm mb-4">Inventario de la agencia: origen claro (mexicano, americano o legalizado), precios transparentes y crédito precalificado en minutos.</p>
+                                <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium">${auPublicas().length} unidad(es) disponibles hoy</span>
+                            </button>
+                            <button onclick="pubSetView('props')" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-sky-600 hover:shadow-2xl transition-all">
+                                <div class="w-14 h-14 rounded-2xl bg-sky-100 flex items-center justify-center mb-5"><i class="fas fa-house text-2xl text-sky-700"></i></div>
+                                <h3 class="text-2xl font-bold text-slate-900 mb-2">Propiedades <i class="fas fa-arrow-right text-sm text-sky-600 group-hover:translate-x-1 transition-transform"></i></h3>
+                                <p class="text-slate-600 text-sm mb-4">Casas y departamentos en venta, renta y preventa, con acompañamiento completo: crédito, escrituración y firma.</p>
+                                <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-sky-50 border border-sky-200 rounded-full text-sky-800 text-xs font-medium">${inmPubLista().length} propiedad(es) publicadas</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CTA final -->
+                <section class="py-20 bg-slate-950 text-white">
+                    <div class="max-w-4xl mx-auto px-4 text-center">
+                        <h2 class="text-4xl md:text-5xl font-black mb-4">${db.settings.ctaFinal?.titulo || 'Da el siguiente paso en tu carrera'}</h2>
+                        <p class="text-xl opacity-90 mb-8">${db.settings.ctaFinal?.subtitulo || 'Agenda una llamada de 15 minutos. Sin compromiso, con información concreta.'}</p>
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button onclick="openSolicitudModal('final')" class="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition shadow-xl">${db.settings.ctaFinal?.boton || 'Agendar ahora'}</button>
+                            <a href="https://wa.me/526643640670?text=Hola,%20quiero%20informaci%C3%B3n%20para%20ser%20agente" target="_blank" class="px-8 py-4 bg-white/10 backdrop-blur border-2 border-white/30 font-semibold rounded-2xl hover:bg-white/20 transition">WhatsApp directo</a>
+                        </div>
+                    </div>
+                </section>
+
+<!-- Footer -->
+                <footer class="py-10 bg-slate-950 text-slate-500 text-sm">
+                    <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div class="flex items-center gap-4">
+                            <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-14 w-auto">
+                            <div>
+                                <div class="text-slate-200 font-bold">${s.institutionName}</div>
+                                <div class="text-xs">© 2026 ${s.institutionName} · Todos los derechos reservados · ${ciudadBB()}</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-6">
+                            <a href="#" onclick="showAdminLogin(); return false;" class="hover:text-white">Acceso administrativo</a>
+                            <a href="#" onclick="abrirPrivacidad(); return false;" class="hover:text-white">Aviso de privacidad</a>
+                            <a href="#blog" class="hover:text-white">Blog</a>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+
+            <!-- WhatsApp flotante -->
+            <a href="https://wa.me/526643640670?text=Hola,%20quiero%20información%20para%20ser%20agente" target="_blank" class="fixed bottom-6 right-6 w-14 h-14 bg-[#25D366] rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition z-40">
+                <i class="fab fa-whatsapp text-white text-2xl"></i>
+            </a>
+
+            <!-- CTA móvil sticky -->
+            <div class="md:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur border-t border-slate-200 z-30">
+                <a href="#ingresos" class="block w-full py-3 text-center bg-[var(--bb-forest)] text-white font-bold rounded-xl">Calcular mi ingreso</a>
+            </div>
+            `;
+            
+            // Pestañas de la portada: cada sección se muestra sola según el hash.
+            setTimeout(() => { pubMostrarPestana(); }, 0);
+            // Inicializar calculadora v2
+            setTimeout(() => {
+                const range = document.getElementById('primaRangeV2');
+                const display = document.getElementById('primaDisplayV2');
+                const amount = document.getElementById('commissionAmountV2');
+                const breakPrima = document.getElementById('breakPrima');
+                const breakPorc = document.getElementById('breakPorc');
+                const breakAnual = document.getElementById('breakAnual');
+                
+                function updateCalc() {
+                    const ramo = document.querySelector('input[name="ramoV2"]:checked').value;
+                    const primaLabel = document.getElementById("primaLabelV2");
+                    if (primaLabel) primaLabel.textContent = ramo==="autos" ? "Precio del auto" : (ramo==="propiedades" ? "Valor de la propiedad" : (ramo==="skandia" ? "Pago mensual Skandia" : "Primas mensuales"));
+                    const primaWrap = document.getElementById('primaSliderWrapV2');
+                    const skandiaWrap = document.getElementById('skandiaInputsV2');
+                    const commissionLabel = document.getElementById('commissionLabelV2');
+                    const commissionSub = document.getElementById('commissionSubV2');
+                    const breakPrimaLabel = document.getElementById('breakPrimaLabelV2');
+                    const breakAnualLabel = document.getElementById('breakAnualLabelV2');
+
+                    // Toggle UI según ramo
+                    if (ramo === 'skandia') {
+                        if (primaWrap) primaWrap.classList.add('hidden');
+                        if (skandiaWrap) skandiaWrap.classList.remove('hidden');
+                        if (commissionLabel) commissionLabel.textContent = 'Tu comisión Skandia';
+                        if (commissionSub) commissionSub.textContent = 'por venta (única)';
+                        if (breakPrimaLabel) breakPrimaLabel.textContent = 'Prima anual:';
+                        if (breakAnualLabel) breakAnualLabel.textContent = 'Ahorro total cliente:';
+                    } else {
+                        if (primaWrap) primaWrap.classList.remove('hidden');
+                        if (skandiaWrap) skandiaWrap.classList.add('hidden');
+                        if (commissionLabel) commissionLabel.textContent = ramo === 'autos' ? 'Tu comisión por auto' : 'Tu comisión estimada';
+                        if (commissionSub) commissionSub.textContent = 'por mes';
+                        if (breakPrimaLabel) breakPrimaLabel.textContent = 'Prima:';
+                        if (breakAnualLabel) breakAnualLabel.textContent = 'Anual:';
+                    }
+
+                    if (ramo === 'skandia') {
+                        // Skandia: 2.7% por año
+                        let mensual = parseInt(document.getElementById('skandiaMensualV2')?.value) || 2000;
+                        let anos = parseInt(document.getElementById('skandiaAnosV2')?.value) || 10;
+                        // Validación mínima
+                        if (mensual < 2000) mensual = 2000;
+                        if (anos < 1) anos = 1;
+                        if (anos > 30) anos = 30;
+                        const primaAnual = mensual * 12;
+                        const pctTotal = 0.027 * anos; // 2.7% * años
+                        const comision = Math.round(primaAnual * pctTotal);
+                        const ahorroTotal = mensual * 12 * anos;
+
+                        if (display) display.textContent = '$' + mensual.toLocaleString('es-MX') + '/mes';
+                        amount.textContent = '$' + comision.toLocaleString('es-MX');
+                        breakPrima.textContent = '$' + primaAnual.toLocaleString('es-MX');
+                        breakPorc.textContent = (pctTotal*100).toFixed(1) + '% (2.7% x ' + anos + 'a)';
+                        breakAnual.textContent = '$' + ahorroTotal.toLocaleString('es-MX');
+
+                        // Sincronizar sliders si existen
+                        const mRange = document.getElementById('skandiaMensualRangeV2');
+                        const aRange = document.getElementById('skandiaAnosRangeV2');
+                        if (mRange && parseInt(mRange.value) !== mensual) mRange.value = mensual;
+                        if (aRange && parseInt(aRange.value) !== anos) aRange.value = anos;
+
+                        localStorage.setItem('skandia_mensual', mensual);
+                        localStorage.setItem('skandia_anos', anos);
+                    } else if (ramo === 'autos') {
+                        const precio = parseInt(range.value);
+                        const c = comisionesPortal();
+                        const pU = c.autosUnidad != null ? c.autosUnidad : 0.03;
+                        const pF = c.autosFin != null ? c.autosFin : 0.30;
+                        const enganche = Math.round(precio * 0.20);
+                        const montoFin = precio - enganche;
+                        const comUnidad = Math.round(precio * pU);
+                        const comFin = Math.round(montoFin * pF);
+                        display.textContent = '$' + precio.toLocaleString('es-MX');
+                        amount.textContent = '$' + (comUnidad + comFin).toLocaleString('es-MX');
+                        breakPrima.textContent = '$' + precio.toLocaleString('es-MX');
+                        breakPorc.textContent = Math.round(pU*100) + '% unidad + ' + Math.round(pF*100) + '% fin.';
+                        breakAnual.textContent = '2 autos/mes = $' + ((comUnidad + comFin) * 2).toLocaleString('es-MX');
+                        localStorage.setItem('guia_prima', precio);
+                    } else if (ramo === 'propiedades') {
+                        const valor = parseInt(range.value);
+                        const c = comisionesPortal();
+                        const pP = c.propValor != null ? c.propValor : 0.03;
+                        const comProp = Math.round(valor * pP);
+                        display.textContent = '$' + valor.toLocaleString('es-MX');
+                        amount.textContent = '$' + comProp.toLocaleString('es-MX');
+                        breakPrima.textContent = '$' + valor.toLocaleString('es-MX');
+                        breakPorc.textContent = Math.round(pP*100) + '% del valor';
+                        breakAnual.textContent = '2 ventas/año = $' + (comProp * 2).toLocaleString('es-MX');
+                        localStorage.setItem('guia_prima', valor);
+                    } else {
+                        const prima = parseInt(range.value);
+                        const comisiones = db.settings.comisiones || {autos: 0.10, vida: 0.20, gmm: 0.15, danos: 0.12};
+                        const porcentajes = comisiones;
+                        const comision = Math.round(prima * (porcentajes[ramo] || 0.10));
+                        
+                        display.textContent = '$' + prima.toLocaleString('es-MX');
+                        amount.textContent = '$' + comision.toLocaleString('es-MX');
+                        breakPrima.textContent = '$' + prima.toLocaleString('es-MX');
+                        breakPorc.textContent = ((porcentajes[ramo]||0)*100).toFixed(0) + '%';
+                        breakAnual.textContent = '$' + (comision*12).toLocaleString('es-MX');
+                        localStorage.setItem('guia_prima', prima);
+                    }
+                }
+                
+                if(range) {
+                    range.addEventListener('input', updateCalc);
+                    document.querySelectorAll('input[name="ramoV2"]').forEach(r => r.addEventListener('change', updateCalc));
+                    const com = comisionesPortal();
+                    const pctAutosEl = document.getElementById('pct-autos');
+                    const pctVidaEl = document.getElementById('pct-vida');
+                    const pctGmmEl = document.getElementById('pct-gmm');
+                    const pctSkandiaEl = document.getElementById('pct-skandia');
+                    const pctPropEl = document.getElementById('pct-prop');
+                    const pctDanosEl = document.getElementById('pct-danos');
+                    if(pctAutosEl) pctAutosEl.textContent = Math.round(com.autosUnidad*100) + '% + ' + Math.round(com.autosFin*100) + '% fin.';
+                    if(pctVidaEl) pctVidaEl.textContent = Math.round(com.vida*100) + '% com.';
+                    if(pctGmmEl) pctGmmEl.textContent = Math.round(com.gmm*100) + '% com.';
+                    if(pctSkandiaEl) pctSkandiaEl.textContent = '2.7%/año';
+                    if(pctPropEl) pctPropEl.textContent = Math.round(com.propValor*100) + '% valor';
+                    if(pctDanosEl) pctDanosEl.textContent = '12% com.';
+
+                    // Listeners Skandia
+                    const skMensual = document.getElementById('skandiaMensualV2');
+                    const skMensualRange = document.getElementById('skandiaMensualRangeV2');
+                    const skAnos = document.getElementById('skandiaAnosV2');
+                    const skAnosRange = document.getElementById('skandiaAnosRangeV2');
+
+                    function syncSkandiaMensual(e) {
+                        const v = parseInt(e.target.value) || 2000;
+                        if(skMensual) skMensual.value = v;
+                        if(skMensualRange) skMensualRange.value = v;
+                        updateCalc();
+                    }
+                    function syncSkandiaAnos(e) {
+                        const v = parseInt(e.target.value) || 10;
+                        if(skAnos) skAnos.value = v;
+                        if(skAnosRange) skAnosRange.value = v;
+                        updateCalc();
+                    }
+
+                    if(skMensual) { skMensual.addEventListener('input', syncSkandiaMensual); skMensual.addEventListener('change', syncSkandiaMensual); }
+                    if(skMensualRange) skMensualRange.addEventListener('input', syncSkandiaMensual);
+                    if(skAnos) { skAnos.addEventListener('input', syncSkandiaAnos); skAnos.addEventListener('change', syncSkandiaAnos); }
+                    if(skAnosRange) skAnosRange.addEventListener('input', syncSkandiaAnos);
+
+                    // Restaurar valores guardados
+                    const savedMensual = parseInt(localStorage.getItem('skandia_mensual'));
+                    const savedAnos = parseInt(localStorage.getItem('skandia_anos'));
+                    if(savedMensual && savedMensual >= 2000) {
+                        if(skMensual) skMensual.value = savedMensual;
+                        if(skMensualRange) skMensualRange.value = savedMensual;
+                    }
+                    if(savedAnos && savedAnos >=1) {
+                        if(skAnos) skAnos.value = savedAnos;
+                        if(skAnosRange) skAnosRange.value = savedAnos;
+                    }
+
+                    updateCalc();
+                    window.setPrima = (val) => { range.value = val; updateCalc(); };
+                }
+            }, 100);
+        }
+
 function auOrigenBadge(o){
     if(o==='Americano') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700">Americano</span>';
     if(o==='Legalizado') return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-700">Legalizado</span>';
