@@ -11729,16 +11729,14 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
                     if (file) {
+                        let url = '';
                         try {
-                            if (window.Media && typeof window.Media.subirOUrl === 'function') {
-                                imageData = await window.Media.subirOUrl(file, 'groups', { title: file.name });
-                            } else {
-                                imageData = await window.Media.comprimirImagen(file);
-                            }
+                            url = await window.Media.subir(file, { scope: 'groups', title: file.name }).then(it => it && it.url || '');
                         } catch (errImg) {
-                            imageData = await window.Media.comprimirImagen(file);
+                            showToast('No se pudo subir la imagen: ' + (errImg.message || 'error'), 'error');
                         }
-                        if (imageData) { preview.src = imageData; preview.classList.remove('hidden'); }
+                        if (url) { imageData = url; preview.src = url; preview.classList.remove('hidden'); }
+                        else { imageData = ''; e.target.value = ''; preview.classList.add('hidden'); }
                     }
                 };
             }
@@ -11747,6 +11745,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const data = { name: document.getElementById('gr-name').value.trim(), generationId: parseInt(document.getElementById('gr-gen').value), tutorId: parseInt(document.getElementById('gr-tutor').value), schedule: document.getElementById('gr-schedule').value.trim(), image: imageData };
                 if (gr) Object.assign(gr, data); else db.groups.push({ id: Date.now(), ...data });
                 saveDB(); closeModal(); navigateTo('groups');
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['groups']);
             };
         }
 

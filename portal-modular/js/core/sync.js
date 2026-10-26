@@ -460,10 +460,10 @@
         if (!prev) await send('POST', '/api/data/' + encodeURIComponent(name), rec);
         else await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(rec.id), rec);
       } catch (e) {
-        if (e.status === 403 || e.status === 404) {
-          await pullNames([name]);
-          if (window.showToast) window.showToast(pushErrorMsg(e, name), 'warning');
-          return;
+        // Registro no aceptado: se conserva local y se avisa; no se descarta.
+        if (e.status === 403 || e.status === 404 || e.status === 413) {
+          if (window.showToast) window.showToast(pushErrorMsg(e, name), 'error');
+          throw e;
         }
         throw e;
       }
@@ -655,7 +655,10 @@
   }
 
   async function pushCollectionsImmediate(names) {
-    if (!active || !shadow) return false;
+    if (!active || !shadow) {
+      if (window.showToast) window.showToast('Sin sesión: los cambios se guardaron solo en este navegador', 'warning');
+      return false;
+    }
     const db = legDb();
     if (!db) return false;
     for (const n of (names || [])) {
@@ -663,7 +666,9 @@
       try {
         await pushCollection(n, db[n] || [], shadow[n] || []);
         shadow[n] = clone(db[n] || []);
-      } catch (e) { /* pushSoon general reintentará */ }
+      } catch (e) {
+        if (window.showToast) window.showToast(pushErrorMsg(e, n) + ' — reintentando', 'warning');
+      }
     }
     return true;
   }
