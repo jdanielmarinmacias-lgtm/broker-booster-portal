@@ -70,34 +70,19 @@ const WINDOW_MS = LOGIN_RATE_MIN * 60 * 1000;
 /* Almacén compartido (en producción: tabla documents, colección `loginAttempts`).
  * Sin store compartido (local/tests) se usa el Map en memoria. El estado vive
  * en el store para que varias instancias serverless vean los mismos fallos. */
-let sharedStore = null;
-function bindLoginStore(store) { sharedStore = store; }
+function bindLoginStore(store) { void store; }
 
 const recentFails = (list, now) => (list || []).filter((t) => now - t < WINDOW_MS);
 
+/* Contador en memoria por instancia: no toca Supabase en cada login. Guardar
+ * en la base compartida (saveCollections de todo el documento) tardaba 20-40 s
+ * y dejaba el inicio de sesión sin respuesta. */
 async function readFails(ip) {
-  const now = Date.now();
-  if (sharedStore && sharedStore.adapter && typeof sharedStore.adapter.loadCollections === 'function') {
-    try {
-      const data = await sharedStore.adapter.loadCollections(['loginAttempts']);
-      const obj = (data && data.loginAttempts) || {};
-      return recentFails(obj[ip], now);
-    } catch (e) { /* cae a memoria */ }
-  }
-  return recentFails(attempts.get(ip), now);
+  return recentFails(attempts.get(ip), Date.now());
 }
 
 async function writeFails(ip, list) {
   attempts.set(ip, list);
-  if (sharedStore && sharedStore.adapter && typeof sharedStore.adapter.saveCollections === 'function') {
-    try {
-      const cur = sharedStore.get();
-      const obj = (cur.loginAttempts && typeof cur.loginAttempts === 'object') ? cur.loginAttempts : {};
-      obj[ip] = list;
-      cur.loginAttempts = obj;
-      await sharedStore.adapter.saveCollections(cur, ['loginAttempts']);
-    } catch (e) { /* la memoria local sigue protegiendo */ }
-  }
 }
 
 async function loginRateLimit(req, res, next) {
