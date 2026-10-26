@@ -33,7 +33,8 @@
 #public-portal h1, #public-portal h2 { color: var(--bb-ink); }
 
 /* Modo oscuro (Obsidiana): verde bosque profundo con detalles dorados y texto claro. */
-body.theme-obsidian {
+/* El tema solo afecta al portal interno y al login; la portada pública (#public-portal) no hereda estas reglas. */
+body.theme-obsidian #main-app, body.theme-obsidian #login-screen {
   --primary: #d4b47a;
   --primary-dark: #e8cc96;
   --accent: #d4b47a;
@@ -42,13 +43,13 @@ body.theme-obsidian {
   background-color: #0c1a15;
   color: #e9efe9;
 }
-body.theme-obsidian .bg-white { background-color: #132821 !important; color: #e9efe9 !important; }
-body.theme-obsidian .bg-slate-50, body.theme-obsidian .bg-slate-100 { background-color: #0c1a15 !important; }
-body.theme-obsidian .text-slate-900, body.theme-obsidian .text-slate-800, body.theme-obsidian .text-slate-700 { color: #e9efe9 !important; }
-body.theme-obsidian .text-slate-600, body.theme-obsidian .text-slate-500 { color: #a9bbb1 !important; }
-body.theme-obsidian .border-slate-200, body.theme-obsidian .border-slate-300 { border-color: #24402f !important; }
+body.theme-obsidian #main-app .bg-white, body.theme-obsidian #login-screen .bg-white { background-color: #132821 !important; color: #e9efe9 !important; }
+body.theme-obsidian #main-app .bg-slate-50, body.theme-obsidian #main-app .bg-slate-100, body.theme-obsidian #login-screen .bg-slate-100 { background-color: #0c1a15 !important; }
+body.theme-obsidian #main-app .text-slate-900, body.theme-obsidian #main-app .text-slate-800, body.theme-obsidian #main-app .text-slate-700 { color: #e9efe9 !important; }
+body.theme-obsidian #main-app .text-slate-600, body.theme-obsidian #main-app .text-slate-500 { color: #a9bbb1 !important; }
+body.theme-obsidian #main-app .border-slate-200, body.theme-obsidian #main-app .border-slate-300 { border-color: #24402f !important; }
 body.theme-obsidian #sidebar { background: #10241c; }
-body.theme-obsidian input, body.theme-obsidian select, body.theme-obsidian textarea { background-color: #0c1a15 !important; color: #e9efe9 !important; border-color: #2c4a3a !important; }
+body.theme-obsidian #main-app input, body.theme-obsidian #main-app select, body.theme-obsidian #main-app textarea, body.theme-obsidian #login-screen input { background-color: #0c1a15 !important; color: #e9efe9 !important; border-color: #2c4a3a !important; }
         body { font-family: 'Inter', 'Poppins', sans-serif; background-color: #f6f7f9; letter-spacing: -0.01em; }
         .sidebar { transition: transform 0.3s ease-in-out; }
         .modal-backdrop { background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
