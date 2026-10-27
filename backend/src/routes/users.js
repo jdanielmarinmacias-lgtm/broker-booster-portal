@@ -49,7 +49,7 @@ module.exports = (store) => {
   r.post('/', mw.requireRole(...MANAGERS), async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de leer/duplicar/mutar (ver collections.js).
-    await store.refreshForWrite(['users', 'auditoria']);
+    await store.refreshForWrite(['users']);
     if (!canCreate(req.user, roleAlias((req.body || {}).role))) {
       return res.status(403).json({ ok: false, error: 'Sin permiso para crear ese rol' });
     }
@@ -78,6 +78,10 @@ module.exports = (store) => {
     const rec = {
       id: useId,
       username, role: normRole,
+      /* Quién lo dio de alta: agencia/maestro puede editar a su equipo incluso
+       * si aún no tiene agenciaId/parentId. Antes esto se deducía leyendo la
+       * colección `auditoria` completa (26 MB) en cada PUT. */
+      createdBy: req.user.id,
       name: name || username, email: email || '', phone: phone || '',
       avatar: avatar || `https://i.pravatar.cc/40?u=${encodeURIComponent(username)}`,
       xp: 0, students: [],
@@ -100,14 +104,24 @@ module.exports = (store) => {
   r.put('/:id', mw.requireAuth, async (req, res, next) => {
     try {
     const bodyKeys = Object.keys(req.body || {}).filter((k) => req.body[k] !== undefined);
-    const isSelfProgressOnly = String(req.params.id) === String(req.user.id)
-      && bodyKeys.length > 0
-      && bodyKeys.every((k) => SELF_FIELDS.has(k));
-    if (!isSelfProgressOnly && !roles.hasRole(req.user, MANAGERS)) {
+    /* Un usuario sin rol de gestión sí puede editar SU perfil (nombre, correo,
+     * teléfono, avatar, ubicación) y su progreso. Antes cualquier cambio propio
+     * fuera del heartbeat devolvía 403: el portal mostraba "Sin permiso en
+     * servidor para usuarios" y el perfil nunca llegaba a la base. */
+    const SELF_PROFILE = new Set(['name', 'email', 'phone', 'avatar', 'ubicacion',
+      'ciudad', 'ubicacionCiudad', 'calendarColor', 'password']);
+    // Campos que jamás puede tocarse uno mismo (escalada de privilegios / equipo).
+    const SELF_FORBIDDEN = new Set(['role', 'students', 'agenciaId', 'agencia', 'parentId', 'assignedTo']);
+    const isSelf = String(req.params.id) === String(req.user.id);
+    const isSelfProgressOnly = isSelf && bodyKeys.length > 0 && bodyKeys.every((k) => SELF_FIELDS.has(k));
+    const isSelfProfileOnly = isSelf && bodyKeys.length > 0
+      && bodyKeys.every((k) => SELF_FIELDS.has(k) || SELF_PROFILE.has(k))
+      && !bodyKeys.some((k) => SELF_FORBIDDEN.has(k));
+    if (!isSelfProgressOnly && !isSelfProfileOnly && !roles.hasRole(req.user, MANAGERS)) {
       return res.status(403).json({ ok: false, error: 'Permisos insuficientes' });
     }
     // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
-    await store.refreshForWrite(['users', 'auditoria']);
+    await store.refreshForWrite(['users']);
     const users = db.collection(store.get(), 'users');
     const target = db.byId(users, req.params.id);
     if (!target) return res.status(404).json({ ok: false, error: 'No encontrado' });
@@ -121,12 +135,7 @@ module.exports = (store) => {
       const teamless = !target.agenciaId && !target.parentId && !target.assignedTo;
       let createdByMe = false;
       if (teamless) {
-        try {
-          const aud = db.collection(store.get(), 'auditoria') || [];
-          createdByMe = aud.some((a) => a.tipo === 'creacion_usuario'
-            && String(a.usuarioId) === String(req.user.id)
-            && a.usuarioCreadoId !== undefined && String(a.usuarioCreadoId) === String(target.id));
-        } catch (e) { /* sin auditoría: denegar */ }
+        createdByMe = String(target.createdBy || '') === String(req.user.id);
       }
       const mine = String(target.agenciaId || target.parentId || target.assignedTo || '') === String(req.user.id)
         || String(target.id) === String(req.user.id) || createdByMe;
@@ -141,6 +150,7 @@ module.exports = (store) => {
     const HEARTBEAT_FIELDS = new Set(['lastActive', 'lastConnection', 'solicitudesVistasHasta', 'attendance', 'lastStudy', 'xp', 'streak']);
     const isHeartbeatOnly = bodyKeys.length > 0 && bodyKeys.every((k) => HEARTBEAT_FIELDS.has(k));
     const antes = { ...target };
+    const previo = { ...target }; // foto previa compacta (solo para el diff)
     if (username !== undefined && String(username).trim() !== '' && String(username) !== String(target.username)) {
       const nextU = String(username).trim();
       if (users.some((x) => String(x.id) !== String(target.id) && String(x.username).toLowerCase() === nextU.toLowerCase())) {
@@ -176,9 +186,28 @@ module.exports = (store) => {
       target.role = normRole;
     }
     if (isHeartbeatOnly) {
-      await store.persistCollections(['users']);
+      /* Latido (lastActive/streak): escribe SOLO este usuario y no avisa al
+       * ticker realtime. Antes re-escribía toda la tabla de usuarios y
+       * despertaba un pull en todos los equipos cada minuto.
+       * OJO: hay que conservar el hash — `req.user` viene sin él y el upsert
+       * lo dejaría en null (el usuario ya no podría entrar). */
+      if (typeof store.adapter.upsertUser === 'function') {
+        const full = await store.adapter.getUserById(target.id);
+        if (full && full.passwordHash) target.passwordHash = full.passwordHash;
+        await store.adapter.upsertUser(target);
+      } else {
+        await store.persistCollections(['users']);
+      }
     } else {
-      db.audit(store.get(), 'edicion_usuario', req.user, { usuarioId: target.id, antes: db.safeUser(antes) });
+      /* Solo el resumen del cambio: antes se guardaba el usuario COMPLETO
+       * (con su avatar en base64). Con cientos de ediciones eso inflaba la
+       * colección de auditoría a MBs y cada carga de la base arrastraba ese
+       * peso: el guardado hacía timeout y el portal quedaba en local. */
+      const ahora = { ...target };
+    const cambiados = bodyKeys.filter((k) => JSON.stringify(ahora[k]) !== JSON.stringify(previo[k]));
+      db.audit(store.get(), 'edicion_usuario', req.user, {
+        usuarioId: target.id, username: target.username, campos: cambiados,
+      });
       await store.persistCollections(['users', 'auditoria']);
     }
     res.json({ ok: true, user: db.safeUser(target) });
@@ -188,7 +217,7 @@ module.exports = (store) => {
   r.delete('/:id', mw.requireRole(...MANAGERS), async (req, res, next) => {
     try {
     // ORDEN CRÍTICO: refrescar ANTES de resolver (ver collections.js).
-    await store.refreshForWrite(['users', 'auditoria']);
+    await store.refreshForWrite(['users']);
     const data = store.get();
     const users = db.collection(data, 'users');
     const target = db.byId(users, req.params.id);

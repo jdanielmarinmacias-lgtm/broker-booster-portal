@@ -32,7 +32,14 @@ function loadSession(store) {
           else await sessions.destroy(token);
         }
       }
-    } catch (e) { /* sin sesión válida: ruta pública o 401 */ }
+    } catch (e) {
+      /* La consulta de sesión falló (Supabase lento/caído), NO que la sesión
+       * sea inválida. Marcarlo evita el 401 engañoso: el portal mostraba
+       * "loginAttempts/settings (HTTP 401: No autenticado)" y dejaba de
+       * sincronizar por una caída pasajera de la base. */
+      req.sessionLookupFailed = true;
+      console.error('[backend] sesión no verificable:', e.message);
+    }
     next();
   };
 }
@@ -46,12 +53,24 @@ function refreshCache(store) {
 }
 
 function requireAuth(req, res, next) {
-  if (!req.user) return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
+  if (!req.user) {
+    if (req.sessionLookupFailed) {
+      res.setHeader('Retry-After', '5');
+      return res.status(503).json({ ok: false, backend: true, retryable: true, error: 'Base de datos ocupada: reintenta en unos segundos' });
+    }
+    return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
+  }
   next();
 }
 
 const requireRole = (...allowed) => (req, res, next) => {
-  if (!req.user) return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
+  if (!req.user) {
+    if (req.sessionLookupFailed) {
+      res.setHeader('Retry-After', '5');
+      return res.status(503).json({ ok: false, backend: true, retryable: true, error: 'Base de datos ocupada: reintenta en unos segundos' });
+    }
+    return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
+  }
   if (!roles.hasRole(req.user, allowed)) {
     return res.status(403).json({ ok: false, error: 'Sin permiso para este recurso' });
   }
@@ -116,6 +135,14 @@ async function forgiveLogin(req) {
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   console.error('[backend]', err);
+  /* Errores con status propio (413 por documento gigante, 409, etc.) llegan
+   * con su código y su mensaje accionable. Antes TODO se volvía un 500
+   * "Error interno" opaco: el portal no sabía qué arreglar. */
+  const status = Number(err && (err.status || err.statusCode));
+  if (status >= 400 && status < 500 && status !== 401 && err && err.message) {
+    if (status === 503) res.setHeader('Retry-After', '5');
+    return res.status(status).json({ ok: false, retryable: status === 503, error: err.message });
+  }
   res.status(500).json({ ok: false, error: 'Error interno' });
 }
 

@@ -63,6 +63,30 @@
     } catch (e) { /* toast incompatible: ignorar */ }
   }
 
+  /* Ticker de versiones por colección (tabla pública collection_versions):
+   * el backend la actualiza en cada guardado. Cada cambio dispara
+   * CustomEvent('collection-version') para que sync.js haga pull quirúrgico
+   * solo de esa colección. Funciona para TODAS (no solo las del feed) y
+   * para ediciones/borrados (que no generan fila de feed). */
+  var lastVersions = {}; // collection -> updated_at (marca ya vista)
+  var versionsPrimed = false; // la primera carga solo calibra, no avisa
+  function onVersion(collection) {
+    if (!collection) return;
+    try {
+      document.dispatchEvent(new CustomEvent('collection-version', { detail: { collection: collection } }));
+    } catch (e) { /* portada en otro estado: ignorar */ }
+  }
+  function trackVersions(rows) {
+    (rows || []).forEach(function (r) {
+      if (!r || !r.collection) return;
+      if (lastVersions[r.collection] !== r.updated_at) {
+        lastVersions[r.collection] = r.updated_at;
+        if (versionsPrimed) onVersion(r.collection);
+      }
+    });
+    versionsPrimed = true;
+  }
+
   function bump(row) {
     document.querySelectorAll('[data-feed-count]').forEach(function (el) {
       if (!row.kind || el.getAttribute('data-feed-count') === row.kind) {
@@ -95,10 +119,67 @@
       const sb = mod.createClient(cfg.supabaseUrl, cfg.anonKey);
       sb.channel('public-feed')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'public_feed' }, function (payload) {
-          onItem(payload.new || {});
+          var row = payload.new || {};
+          /* Marca del ticker por colección (kind 'version:<colección>'): es el
+           * aviso que usa el backend cuando la tabla collection_versions aún
+           * no está creada. No es una publicación: solo dispara el pull
+           * quirúrgico de esa colección en los demás equipos. */
+          var kind = String(row.kind || '');
+          if (kind.indexOf('version:') === 0) {
+            versionsPrimed = true;
+            onVersion(kind.slice('version:'.length));
+            return;
+          }
+          onItem(row);
+        })
+        .subscribe();
+      // Ticker entre PCs: cualquier INSERT/UPDATE en collection_versions.
+      sb.channel('collection-versions')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_versions' }, function (payload) {
+          var row = payload.new || {};
+          if (row.collection && lastVersions[row.collection] !== row.updated_at) {
+            lastVersions[row.collection] = row.updated_at;
+            versionsPrimed = true;
+            onVersion(row.collection);
+          }
         })
         .subscribe();
       window.SupabaseFeed = sb;
+      // Calibra marcas iniciales (sin avisar) y deja sondeo ligero de
+      // respaldo: si el WebSocket se cae, los cambios llegan igual (45s).
+      // Solo lee la tabla de marcas (KBs), jamás los datos.
+      /* Sondeo de respaldo cada 45s. Si la tabla collection_versions no existe
+       * (migración sin ejecutar) se sondean las marcas 'version:<col>' de
+       * public_feed: mismo efecto y sin 404 repetidos en consola. */
+      var versionsSource = 'table';
+      (function pollVersions() {
+        var q = versionsSource === 'table'
+          ? sb.from('collection_versions').select('collection,updated_at')
+          : sb.from('public_feed').select('kind,created_at').like('kind', 'version:%')
+            .order('created_at', { ascending: false }).limit(200);
+        try {
+          q.then(function (res) {
+            if (!res) return;
+            if (res.error) {
+              if (versionsSource === 'table') versionsSource = 'feed';
+              return;
+            }
+            if (versionsSource === 'table') {
+              trackVersions(res.data);
+            } else {
+              trackVersions((res.data || []).map(function (r) {
+                return {
+                  collection: String(r.kind || '').slice('version:'.length),
+                  updated_at: r.created_at,
+                };
+              }));
+            }
+          }, function () {
+            if (versionsSource === 'table') versionsSource = 'feed';
+          });
+        } catch (e) {}
+        setTimeout(pollVersions, 45000);
+      })();
     } catch (e) { /* CDN bloqueado: modo sin realtime */ }
   }
 

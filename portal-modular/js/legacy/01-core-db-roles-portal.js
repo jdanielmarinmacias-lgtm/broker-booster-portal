@@ -4481,7 +4481,7 @@ function renderPublicidad(){
   </div>`;
 }
 /* ¿El material subido es una imagen? (data URL image/*) */
-function pubEsImagen(p){ return /^data:image\//.test(String((p&&p.fileData)||'')); }
+function pubEsImagen(p){ const f=String((p&&p.fileData)||''); return /^data:image\//.test(f) || /^https?:\/\/[^\s]+\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(f); }
 /* Vista ampliada de la imagen publicitaria (modal ligero) */
 function pubVerImagen(id){
   const p=(db.settings&&db.settings.publicidad||[]).find(x=>String(x.id)===String(id));
@@ -4546,7 +4546,20 @@ function guardarPublicidad(idStr){
       else { db.settings.publicidad.push({ id:Date.now(), ...item, fileData:fileData||'', archivoNombre:archivoNombre||'', fecha:Date.now() }); cmLog('Publicidad','Agregó contenido',titulo); }
       saveDB(); closeModal(); showToast('Contenido guardado','success'); render();
     };
-    if(window._pbFileSel){ const reader=new FileReader(); reader.onload=ev=>finalizar(ev.target.result, window._pbFileName); reader.readAsDataURL(window._pbFileSel); }
+    /* El archivo va al Storage y se guarda su URL. Antes se guardaba el
+     * dataURL base64 dentro de db.settings: un solo documento de MBs que
+     * hacía timeout el guardado (HTTP 500) y tardaba en cargar la sección. */
+    const file=window._pbFileSel;
+    if(file){
+      if(window.Media && typeof window.Media.subirOUrl==='function'){
+        showToast('Subiendo archivo...','info');
+        window.Media.subirOUrl(file,'publicidad',{ title: window._pbFileName||file.name })
+          .then(url=>finalizar(url||'', window._pbFileName))
+          .catch(err=>{ showToast('No se pudo subir: '+(err.message||err),'error'); finalizar('',''); });
+      } else {
+        const reader=new FileReader(); reader.onload=ev=>finalizar(ev.target.result, window._pbFileName); reader.readAsDataURL(file);
+      }
+    }
     else finalizar('','');
   }catch(e){ alert('Error: '+e.message); }
 }
@@ -8555,7 +8568,10 @@ function renderMyProgress() {
         
         
         function renderBranding(){
-            if(!['god','admin','editor','gm'].includes(currentUser.role)) return '<div class="p-8 text-center text-slate-500">Acceso denegado</div>';
+            /* 'god' no existe en la matriz de roles: el desarrollador (que SÍ
+             * puede escribir settings en el servidor) quedaba fuera de su
+             * propia pantalla de marca. */
+            if(!['admin','editor','gm','desarrollador'].includes((currentUser.role||'').toLowerCase())) return '<div class="p-8 text-center text-slate-500">Acceso denegado</div>';
             const s = db.settings;
             return `
                 <div class="max-w-3xl mx-auto space-y-6">
@@ -11530,14 +11546,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     planImgPendiente = true; imageData = p?.image || '';
                     if (notaPlan) { notaPlan.textContent = 'Subiendo imagen de portada… espera unos segundos.'; notaPlan.classList.remove('hidden'); }
                     try {
-                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
-                            imageData = await window.Media.subirOUrl(file, 'planes', { title: file.name });
-                        } else {
-                            imageData = await window.Media.comprimirImagen(file);
-                        }
+                        const item = await window.Media.subir(file, { scope: 'planes', title: file.name });
+                        imageData = item && item.url ? item.url : '';
                     } catch (errImg) {
                         imageData = '';
-                        try { imageData = await window.Media.comprimirImagen(file); } catch (errC) { imageData = ''; }
                     }
                     planImgPendiente = false;
                     if (imageData && planImgVal(imageData)) { preview.src = imageData; preview.classList.remove('hidden'); if (notaPlan) notaPlan.textContent = 'Imagen lista ✓'; }
@@ -11727,7 +11739,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const plan = db.planes.find(p=>p.id===gen?.planId);
                     const tutor = db.users.find(u=>u.id===gr.tutorId);
                     const count = db.enrollments.filter(e=>e.groupId===gr.id).length;
-                    return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium"><div class="flex items-center gap-3">${gr.image?`<img src="${gr.image}" class="w-10 h-10 rounded-lg object-cover border">`:`<div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center"><i class="fas fa-users text-slate-400 text-xs"></i></div>`}<div><span>${gr.name}</span>${plan?`<div class="text-[10px] text-indigo-600">${plan.nombre}</div>`:''}</div></div></td><td class="px-4 py-3 text-sm">${gen?gen.name:'-'}</td><td class="px-4 py-3 text-sm">${tutor?tutor.name:'-'}</td><td class="px-4 py-3 text-sm">${count}</td><td class="px-4 py-3 text-sm">${gr.schedule||'-'}</td><td class="px-4 py-3 text-right"><div class="flex items-center justify-end gap-3"><button onclick="openGroupDetail(${gr.id})" class="text-indigo-600 text-sm font-medium hover:underline">Gestionar</button>${canEdit?`<button onclick="openGroupModal(${gr.id})" class="text-slate-400 hover:text-indigo-600" title="Editar"><i class="fas fa-pen text-xs"></i></button>`:''}${canEdit?`<button onclick="deleteGroup(${gr.id})" class="text-slate-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div></td></tr>`;
+                    return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium"><div class="flex items-center gap-3">${gr.image?`<img src="${gr.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0" onerror="this.style.display='none'">`:`<div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-users text-slate-400 text-xs"></i></div>`}<div><span>${gr.name}</span>${plan?`<div class="text-[10px] text-indigo-600">${plan.nombre}</div>`:''}</div></div></td><td class="px-4 py-3 text-sm">${gen?gen.name:'-'}</td><td class="px-4 py-3 text-sm">${tutor?tutor.name:'-'}</td><td class="px-4 py-3 text-sm">${count}</td><td class="px-4 py-3 text-sm">${gr.schedule||'-'}</td><td class="px-4 py-3 text-right"><div class="flex items-center justify-end gap-3"><button onclick="openGroupDetail(${gr.id})" class="text-indigo-600 text-sm font-medium hover:underline">Gestionar</button>${canEdit?`<button onclick="openGroupModal(${gr.id})" class="text-slate-400 hover:text-indigo-600" title="Editar"><i class="fas fa-pen text-xs"></i></button>`:''}${canEdit?`<button onclick="deleteGroup(${gr.id})" class="text-slate-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div></td></tr>`;
                 }).join('')}</tbody></table>
                 ${grupos.length===0?'<div class="p-8 text-center text-slate-500">No hay grupos con ese filtro</div>':''}
             </div>`;
@@ -11735,34 +11747,140 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
         function openGroupModal(id=null) {
             const gr = id ? db.groups.find(x=>x.id===id) : null;
-            showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-5">${gr?'Editar':'Nuevo'} Grupo</h3><form id="group-form" class="space-y-4">
-                <div><label class="text-sm font-medium">Nombre</label><input id="gr-name" required value="${gr?gr.name:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div><label class="text-sm font-medium">Generación</label><select id="gr-gen" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${db.generations.map(g=>`<option value="${g.id}" ${gr&&gr.generationId===g.id?'selected':''}>${g.name}</option>`).join('')}</select></div>
-                <div><label class="text-sm font-medium">Tutor</label><select id="gr-tutor" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${db.users.filter(u=>isTeacher(u)).map(m=>`<option value="${m.id}" ${gr&&gr.tutorId===m.id?'selected':''}>${m.name}</option>`).join('')}</select></div>
-                <div><label class="text-sm font-medium">Horario</label><input id="gr-schedule" value="${gr?gr.schedule||'':''}" placeholder="Lun-Vie 9:00-13:00" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div><label class="text-sm font-medium">Imagen de portada</label><input type="file" id="gr-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><div class="mt-2">${gr?.image?`<img id="gr-image-preview" src="${gr.image}" class="w-full h-24 object-cover rounded-lg border">`:`<img id="gr-image-preview" class="w-full h-24 object-cover rounded-lg border hidden">`}</div></div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+            const imgInicial = (gr && gr.image) ? gr.image : '';
+            showModal(`<div class="p-6 w-full max-w-3xl modal-large"><h3 class="text-xl font-bold mb-5">${gr?'Editar':'Nuevo'} Grupo</h3><form id="group-form" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-[220px_minmax(0,1fr)] gap-5 items-start">
+                    <div>
+                        <label class="text-sm font-medium">Imagen de portada</label>
+                        <div id="gr-image-box" role="button" tabindex="0" aria-label="Subir o cambiar la imagen del grupo" title="Clic para elegir la imagen del grupo" class="group relative mt-1 w-full h-44 sm:h-48 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 overflow-hidden cursor-pointer transition hover:border-indigo-400 hover:bg-indigo-50/60 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <img id="gr-image-preview" src="${imgInicial}" class="absolute inset-0 w-full h-full object-cover ${imgInicial?'':'hidden'}">
+                            <div id="gr-image-empty" class="absolute inset-0 flex flex-col items-center justify-center text-center px-3 ${imgInicial?'hidden':''}">
+                                <i class="fas fa-image text-3xl text-slate-300 mb-2"></i>
+                                <p class="text-xs font-bold text-slate-500">Subir imagen</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">JPG o PNG</p>
+                            </div>
+                            <div id="gr-image-overlay" class="pointer-events-none absolute inset-0 bg-slate-900/45 text-white text-xs font-bold flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition"><i class="fas fa-arrows-rotate"></i><span>Cambiar imagen</span></div>
+                            <div id="gr-image-loading" class="hidden absolute inset-0 bg-slate-900/60 text-white text-xs font-bold flex items-center justify-center gap-2"><i class="fas fa-spinner fa-spin"></i><span>Subiendo…</span></div>
+                        </div>
+                        <input type="file" id="gr-image-input" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden">
+                        <p id="gr-image-status" class="hidden mt-1.5 text-[11px] font-medium text-indigo-600"></p>
+                        <button type="button" id="gr-image-clear" class="hidden mt-1 text-[11px] text-rose-600 font-semibold hover:underline">Quitar imagen</button>
+                    </div>
+                    <div class="space-y-3">
+                        <div><label class="text-sm font-medium">Nombre</label><input id="gr-name" required value="${gr?gr.name:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                        <div><label class="text-sm font-medium">Generación</label><select id="gr-gen" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${db.generations.map(g=>`<option value="${g.id}" ${gr&&gr.generationId===g.id?'selected':''}>${g.name}</option>`).join('')}</select></div>
+                        <div><label class="text-sm font-medium">Tutor</label><select id="gr-tutor" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${db.users.filter(u=>isTeacher(u)).map(m=>`<option value="${m.id}" ${gr&&gr.tutorId===m.id?'selected':''}>${m.name}</option>`).join('')}</select></div>
+                        <div><label class="text-sm font-medium">Horario</label><input id="gr-schedule" value="${gr?gr.schedule||'':''}" placeholder="Lun-Vie 9:00-13:00" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button id="gr-save-btn" type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">Guardar</button></div>
             </form></div>`);
+            /* La portada se ve al instante (blob local) y se guarda cuando termina
+             * la subida a Storage. Antes no había ni vista previa inmediata ni
+             * bloqueo del botón Guardar: con una foto grande, Supabase tardaba y
+             * el grupo se guardaba sin imagen (la miniatura de la tabla quedaba
+             * vacía). Mismo patrón que la portada de categorías. */
             const imageInput = document.getElementById('gr-image-input');
             const preview = document.getElementById('gr-image-preview');
-            let imageData = gr?.image || '';
+            const emptyBox = document.getElementById('gr-image-empty');
+            const box = document.getElementById('gr-image-box');
+            const loading = document.getElementById('gr-image-loading');
+            const status = document.getElementById('gr-image-status');
+            const clearBtn = document.getElementById('gr-image-clear');
+            const saveBtn = document.getElementById('gr-save-btn');
+            let imageData = imgInicial;
+            let subiendoImagen = false;
+            const imgVal = v => typeof v === 'string' && v.length > 0 && (/^https?:\/\//.test(v) || /^\/uploads\//.test(v) || /^data:image\//i.test(v));
+            const pintarImg = src => {
+                if (src) {
+                    preview.src = src; preview.classList.remove('hidden');
+                    if (emptyBox) emptyBox.classList.add('hidden');
+                    if (clearBtn) clearBtn.classList.remove('hidden');
+                } else {
+                    preview.removeAttribute('src'); preview.classList.add('hidden');
+                    if (emptyBox) emptyBox.classList.remove('hidden');
+                    if (clearBtn) clearBtn.classList.add('hidden');
+                }
+            };
+            const leerComoDataUrl = file => new Promise((res) => {
+                try {
+                    const r = new FileReader();
+                    r.onload = () => res(String(r.result || ''));
+                    r.onerror = () => res('');
+                    r.readAsDataURL(file);
+                } catch (e) { res(''); }
+            });
+            pintarImg(imageData);
+            const abrirSelector = () => { if (imageInput) imageInput.click(); };
+            if (box) {
+                box.onclick = abrirSelector;
+                box.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrirSelector(); } };
+            }
+            if (clearBtn) {
+                clearBtn.onclick = ev => {
+                    ev.stopPropagation();
+                    imageData = '';
+                    if (imageInput) imageInput.value = '';
+                    pintarImg('');
+                    if (status) { status.textContent = 'Imagen quitada. Se guardará el grupo sin portada.'; status.classList.remove('hidden'); }
+                };
+            }
             if (imageInput) {
                 imageInput.onchange = async e => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        let url = '';
-                        try {
-                            url = await window.Media.subirOUrl(file, 'groups', { title: file.name });
-                        } catch (errImg) {
-                            showToast('No se pudo subir la imagen: ' + (errImg.message || 'error'), 'error');
+                    const file = (e.target.files && e.target.files[0]) || null;
+                    if (!file) return;
+                    const previa = imageData;
+                    subiendoImagen = true;
+                    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Subiendo imagen…'; }
+                    if (loading) loading.classList.remove('hidden');
+                    if (status) { status.textContent = 'Subiendo imagen… puedes seguir llenando los datos.'; status.classList.remove('hidden'); }
+                    let localUrl = '';
+                    try { localUrl = URL.createObjectURL(file); pintarImg(localUrl); } catch (errLocal) { /* sin blob: se pinta al terminar */ }
+                    let url = '';
+                    try {
+                        /* Si la foto es pesada se reescala antes de subirla: una foto de
+                         * móvil de 5 MB tarda muchísimo aunque haya fibra. */
+                        let aSubir = file;
+                        if (window.Media && typeof window.Media.comprimirImagen === 'function' && /^image\//.test(file.type || '') && file.size > 500 * 1024) {
+                            try {
+                                const compacta = await window.Media.comprimirImagen(file, 1600, 0.85);
+                                if (compacta && /^data:image\//.test(String(compacta))) {
+                                    const blob = await (await fetch(compacta)).blob();
+                                    aSubir = new File([blob], (file.name || 'imagen').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+                                }
+                            } catch (errC) { /* se sube el original */ }
                         }
-                        if (url) { imageData = url; preview.src = url; preview.classList.remove('hidden'); }
-                        else { imageData = ''; e.target.value = ''; preview.classList.add('hidden'); }
+                        if (window.Media && typeof window.Media.subirOUrl === 'function') {
+                            url = await window.Media.subirOUrl(aSubir, 'groups', { title: file.name });
+                        } else if (window.Media && typeof window.Media.comprimirImagen === 'function') {
+                            url = await window.Media.comprimirImagen(file, 1600, 0.85);
+                        } else {
+                            url = await leerComoDataUrl(file);
+                        }
+                    } catch (errImg) {
+                        console.warn('[grupos] subida falló, se usa copia local:', errImg && errImg.message);
+                        url = await leerComoDataUrl(file);
+                    }
+                    if (localUrl && localUrl !== url) { try { URL.revokeObjectURL(localUrl); } catch (errRev) {} }
+                    subiendoImagen = false;
+                    if (loading) loading.classList.add('hidden');
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+                    if (url && imgVal(url)) {
+                        imageData = url; pintarImg(url);
+                        if (status) { status.textContent = 'Imagen lista ✓'; status.classList.remove('hidden'); }
+                    } else {
+                        imageData = previa; pintarImg(previa);
+                        if (status) { status.textContent = '⚠ No se pudo cargar la imagen. Usa JPG o PNG.'; status.classList.remove('hidden'); }
+                        if (window.showToast) showToast('No se pudo cargar la imagen del grupo. Intenta con JPG o PNG.', 'warning');
                     }
                 };
             }
             document.getElementById('group-form').onsubmit = e => {
                 e.preventDefault();
+                if (subiendoImagen) {
+                    if (window.showToast) showToast('La imagen sigue subiendo, espera unos segundos e intenta de nuevo', 'warning');
+                    return;
+                }
                 const data = { name: document.getElementById('gr-name').value.trim(), generationId: parseInt(document.getElementById('gr-gen').value), tutorId: parseInt(document.getElementById('gr-tutor').value), schedule: document.getElementById('gr-schedule').value.trim(), image: imageData };
                 if (gr) Object.assign(gr, data); else db.groups.push({ id: Date.now(), ...data });
                 saveDB(); closeModal(); navigateTo('groups');

@@ -147,3 +147,41 @@ Frontend: [`js/core/media.js`](../portal-modular/js/core/media.js) (`Media.subir
 propiedades (`propsFoto`), aseguradoras/logos (`uploadImageBase64`) y autos
 (`auGuardarUnidad`, `auPautaGuardar`) suben al servidor primero y caen a base64
 si falla. Permisos: un `alumno` recibe 403 al subir (matriz de roles del servidor).
+
+---
+
+# Mantenimiento de la base (scripts)
+
+Dos scripts idempotentes para dejar Supabase sana. Ambos aceptan `--dry`
+(simulación) y escriben sólo lo necesario.
+
+```bash
+cd backend
+node scripts/audit-data.js          # informe de integridad (solo lectura)
+node scripts/compact-db.js          # auditoría: compacta y deja las 300 últimas
+node scripts/externalize-media.js   # base64 (avatares, logo, publicidad) → Storage
+```
+
+**Por qué existen:** `auditoria` guardaba el usuario completo (con avatar en
+base64) y llegó a **26 MB de 26.7 MB** en `documents`. Cada lectura y cada
+guardado la descargaba completa → `statement_timeout` (HTTP 500 en
+`carruselCirculares`), sesión "no verificable" (401 en cascada en
+`settings`/`loginAttempts`) y el portal quedándose en localStorage. Después de
+compactar, la base completa pesa **0.13 MB** y el bundle de arranque ~150 KB.
+
+Reglas que mantienen el problema resuelto (ya en el código):
+- `auditoria` **nunca** se recarga ni se re-escribe completa: cada entrada
+  nueva va sola por `adapter.pushAudit` (ver `store.appendAudit` /
+  `store.persistCollections`). Las rutas ya no piden `refreshForWrite(['…','auditoria'])`.
+- El adaptador recorta textos/archivos de la auditoría al guardarla
+  (`compactAudit`) y lee como máximo `AUDIT_KEEP` (300) filas.
+- Los archivos viven en Storage: `Media.desbase64` los mueve antes de cada push.
+
+## Ticker realtime entre equipos (`collection_versions`)
+
+El backend avisa en cada guardado qué colección cambió para que los demás
+equipos hagan un pull quirúrgico. Si la tabla `collection_versions` **no**
+existe, usa `public_feed` con filas `kind = 'version:<colección>'` (ya está en
+la publicación realtime y es de lectura pública): el tiempo real funciona sin
+ejecutar SQL. Si prefieres la tabla dedicada, ejecuta
+[`supabase/migration_realtime_hardening.sql`](supabase/migration_realtime_hardening.sql).

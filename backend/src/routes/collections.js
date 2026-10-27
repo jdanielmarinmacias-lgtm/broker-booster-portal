@@ -10,7 +10,9 @@ const db = require('../db');
 const roles = require('../roles');
 const mw = require('../middleware');
 
-const FORBIDDEN = new Set(['users', 'sessions']);
+/* loginAttempts es estado interno del servidor (rate-limit de login): no debe
+ * salir en el bundle ni volver por la API desde el navegador. */
+const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts']);
 /* Escaparate (portada) + promotoría (encargados) + escuela/chat: todo lo nuevo
  * avisa en vivo por public_feed. El frontend re-hace pull de estas + toast. */
 const FEED_COLLECTIONS = new Set([
@@ -83,6 +85,54 @@ function puedeContactarDirecto(root, a, b) {
   return (Array.isArray(root.groups) ? root.groups : []).some((g) => g && enGrupo(g, a) && enGrupo(g, b));
 }
 
+/* ===== LECTURA: filtro por propietario ===== 
+ * Antes, cualquier sesión leía ventas/cotizaciones/siniestros/mensajes de todos
+ * (y bundle las devolvía enteras). Ahora el personal con visión completa ve
+ * todo; el resto solo ve lo suyo. */
+const FULL_READ_ROLES = ['admin', 'gm', 'desarrollador', 'agencia', 'maestro', 'capacitador', 'editor'];
+const OWNED_COLLECTIONS = new Set(['ventas', 'cotizaciones', 'siniestros']);
+const RESTRICTED_OBJECTS = new Set(['prospectos', 'expedientesProspectos']);
+const canReadAll = (user) => FULL_READ_ROLES.includes(String((user && user.role) || '').toLowerCase());
+
+/* Objetos privados por usuario (prospectos/expedientesProspectos se guardan
+ * como { [userId]: datos }). Antes, a quien no era staff se le devolvía 403 en
+ * la LECTURA: su propio expediente quedaba en el servidor pero nunca volvía
+ * (en otra computadora aparecía vacío). Ahora recibe SOLO su clave. */
+function filtrarObjetoPrivado(user, obj) {
+  const uid = String(user && user.id);
+  if (!obj || typeof obj !== 'object') return {};
+  return obj[uid] !== undefined ? { [uid]: obj[uid] } : {};
+}
+const soloSuyaLaClave = (user, clave) => canReadAll(user) || String(clave) === String(user && user.id);
+
+function filtrarLectura(user, collection, items, root) {
+  if (canReadAll(user)) return items;
+  const uid = String(user.id);
+  if (OWNED_COLLECTIONS.has(collection)) {
+    /* cotizaciones guarda al solicitante en `creadoPor.id` (no en agenteId):
+     * sin leer esa ruta, un agente que pedía una cotización no la volvía a ver
+     * al entrar desde otra computadora (el servidor filtraba su propio
+     * registro). */
+    return items.filter((x) => x && (
+      String(x.agenteId ?? x.agente ?? x.usuarioId ?? '') === uid
+      || String((x.creadoPor && x.creadoPor.id) ?? '') === uid
+    ));
+  }
+  if (collection === 'messages' || collection === 'groupMessages') {
+    return items.filter((m) => {
+      if (!m) return false;
+      if (String(m.fromId ?? '') === uid || String(m.toId ?? '') === uid) return true;
+      const gid = String(m.toId ?? '');
+      if (gid.startsWith('grupo:')) {
+        const g = chatGroupById(root, gid.slice('grupo:'.length));
+        return !!g && isGroupMember(g, user);
+      }
+      return false;
+    });
+  }
+  return items;
+}
+
 /* Detección de duplicado de post: mismo contenido + autor + grupo. Devuelve
  * índice en el array o -1. Normaliza espacio y comparación por String para
  * tolerar tipos int/Autor mezclados entre versiones del frontend. */
@@ -114,6 +164,11 @@ const KNOWN_OBJECTS = new Set([
   'guiaChats', // {[userId]: [...]} — historial de conversaciones Gu-IA por usuario
   'practicaConfig', // configuración del simulador de práctica con cliente
   'oferta_valor', // configuración de slides y video de Oferta de Valor
+  /* Objetos por usuario que el cliente guarda como { [userId]: … } y el
+   * servidor trataba como ARRAY: cada clave respondía 404 y el dato se
+   * quedaba en el equipo. */
+  'agendas', // Mi Agenda: notas por usuario
+  'guiaAgenda', // agenda del prospecto (Gu-IA)
 ]);
 const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -203,7 +258,7 @@ module.exports = (store, config) => {
     'lessons', 'liveClasses', 'exams', 'library', 'messages', 'groupMessages',
     'notifications', 'posts', 'auditoria', 'chatGroups', 'forumPosts', 'invitaciones',
     'convenciones', 'clientes', 'progress', 'enrollments', 'taskSubmissions', 'examAttempts',
-    'guiaAgenda', 'concursos', 'cierresComunidad', 'agendas'];
+    'concursos', 'cierresComunidad'];
   api.get('/', async (req, res, next) => {
     try {
       await store.refreshIfStale(); // lectura: el TTL basta
@@ -233,11 +288,16 @@ module.exports = (store, config) => {
       for (const col of set) {
         if (!roles.canRead(req.user, col)) continue;
         if (isPlain(data[col])) {
-          bundle[col] = { shape: 'object', value: data[col] };
+          bundle[col] = {
+            shape: 'object',
+            value: RESTRICTED_OBJECTS.has(col) && !canReadAll(req.user)
+              ? filtrarObjetoPrivado(req.user, data[col])
+              : data[col],
+          };
         } else if (!data[col] && KNOWN_OBJECTS.has(col)) {
           bundle[col] = { shape: 'object', value: {} };
         } else {
-          bundle[col] = { shape: 'array', items: Array.isArray(data[col]) ? data[col] : [] };
+          bundle[col] = { shape: 'array', items: filtrarLectura(req.user, col, Array.isArray(data[col]) ? data[col] : [], data) };
         }
       }
       // Todos los usuarios autenticados reciben el directorio de usuarios seguros
@@ -259,9 +319,19 @@ module.exports = (store, config) => {
       if (LIVE_FRESH_COLLECTIONS.has(collection)) {
         await store.refreshForWrite([collection]); // revalida esa colección en caché
       }
-      await store.refreshIfStale(); // lectura: el TTL basta
+      /* Refresco SOLO de lo que esta respuesta necesita. Antes se recargaba la
+       * tabla documents completa (~27 MB) en cada GET: latencia alta, timeouts
+       * y los 500/401 en cascada que dejaban los cambios sin subir. */
+      const deps = (collection === 'messages' || collection === 'groupMessages')
+        ? [collection, 'chatGroups', 'groups']
+        : [collection];
+      if (typeof store.refreshCollections === 'function') await store.refreshCollections(deps);
+      else await store.refreshIfStale();
       const root = store.get();
       // Objeto: NUNCA pasar por db.collection (coaccionaría a []).
+      if (RESTRICTED_OBJECTS.has(collection) && !canReadAll(req.user)) {
+        return res.json({ ok: true, object: filtrarObjetoPrivado(req.user, root[collection]) });
+      }
       if (isPlain(root[collection])) {
         return res.json({ ok: true, object: root[collection] });
       }
@@ -270,6 +340,7 @@ module.exports = (store, config) => {
         return res.json({ ok: true, object: {} });
       }
       let items = Array.isArray(root[collection]) ? root[collection].slice() : [];
+      items = filtrarLectura(req.user, collection, items, root);
       if (req.query.q) {
         const q = String(req.query.q).toLowerCase();
         items = items.filter((x) => JSON.stringify(x).toLowerCase().includes(q));
@@ -282,11 +353,20 @@ module.exports = (store, config) => {
     try {
       const { collection } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
-      if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
+      /* settings: el equipo de contenido puede escribir SUS claves aunque no
+       * tenga permiso sobre el objeto completo (ver roles.canWriteSettingsKey). */
+      const clavesPermitidas = collection === 'settings'
+        ? Object.keys(req.body || {}).filter((k) => roles.canWriteSettingsKey(req.user, k))
+        : [];
+      if (!roles.canWrite(req.user, collection) && !clavesPermitidas.length) {
+        return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
+      }
       // ORDEN CRÍTICO: refrescar ANTES de resolver la colección. Si se resuelve
       // antes, `col` apunta a la caché vieja y el push muta un objeto que el
       // persist ya no guarda (respuesta 201 pero dato perdido en producción).
-      await store.refreshForWrite([collection, 'auditoria']);
+      /* Sin 'auditoria': es append-only y pesaba 26 MB. Se escribe por
+       * entrada con adapter.pushAudit (ver store.persistCollections). */
+      await store.refreshForWrite([collection]);
       const root = store.get();
       const body = req.body || {};
       /* Guardas de comunidad Mensajes (chatGroups + mensajes a grupos). */
@@ -330,7 +410,16 @@ module.exports = (store, config) => {
         root[collection] = root[collection] || {};
         let merged = 0;
         for (const [k, v] of Object.entries(body)) {
+          // Objetos privados: cada usuario solo escribe su propia clave.
+          if (RESTRICTED_OBJECTS.has(collection) && !soloSuyaLaClave(req.user, k)) {
+            return res.status(403).json({ ok: false, error: 'Solo puedes editar tu propio expediente' });
+          }
+          // settings: cada rol solo puede tocar las claves que le corresponden.
+          if (collection === 'settings' && !roles.canWriteSettingsKey(req.user, k)) continue;
           if (v !== undefined) { root[collection][k] = v; merged++; }
+        }
+        if (collection === 'settings' && !merged) {
+          return res.status(403).json({ ok: false, error: 'Sin permiso sobre esa sección de configuración' });
         }
         db.audit(store.get(), `edicion_${collection}`, req.user, { claves: Object.keys(body) });
         await store.persistCollections([collection, 'auditoria']);
@@ -385,14 +474,24 @@ module.exports = (store, config) => {
     try {
       const { collection, id } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
-      if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      await store.refreshForWrite([collection, 'auditoria']);
+      /* settings: escribir una CLAVE concreta basta con permiso de contenido
+       * (publicidad, casos de éxito, comparador…), sin ser admin de marca. */
+      const claveSettings = collection === 'settings' && roles.canWriteSettingsKey(req.user, id);
+      if (!roles.canWrite(req.user, collection) && !claveSettings) {
+        return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
+      }
+      /* Sin 'auditoria': es append-only y pesaba 26 MB. Se escribe por
+       * entrada con adapter.pushAudit (ver store.persistCollections). */
+      await store.refreshForWrite([collection]);
       const root = store.get();
       // Objeto: :id es la CLAVE top-level a escribir/crear. { value }
       if (isPlain(root[collection]) || (!root[collection] && KNOWN_OBJECTS.has(collection))) {
         root[collection] = root[collection] || {};
         if (!('value' in (req.body || {}))) {
           return res.status(400).json({ ok: false, error: 'Se espera { value }' });
+        }
+        if (RESTRICTED_OBJECTS.has(collection) && !soloSuyaLaClave(req.user, id)) {
+          return res.status(403).json({ ok: false, error: 'Solo puedes editar tu propio expediente' });
         }
         root[collection][id] = req.body.value === null ? null : req.body.value;
         db.audit(store.get(), `edicion_${collection}`, req.user, { clave: id });
@@ -419,6 +518,11 @@ module.exports = (store, config) => {
       Object.assign(rec, req.body || {}, { id: rec.id });
       db.audit(store.get(), `edicion_${collection}`, req.user, { id: rec.id });
       await store.persistCollections([collection, 'auditoria']);
+      // PUT en arrays también avisa en vivo (antes solo POST/objetos). El
+      // ticker de versiones ya cubre todo, esto mantiene el toast del feed.
+      if (FEED_COLLECTIONS.has(collection)) {
+        store.pushFeed({ kind: collection, title: `Actualización en ${collection}` }).catch(() => {});
+      }
       res.json({ ok: true, item: rec });
     } catch (e) { next(e); }
   });
@@ -427,11 +531,22 @@ module.exports = (store, config) => {
     try {
       const { collection, id } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
-      if (!roles.canWrite(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
-      await store.refreshForWrite([collection, 'auditoria']);
+      const claveSettingsDel = collection === 'settings' && roles.canWriteSettingsKey(req.user, id);
+      if (!roles.canWrite(req.user, collection) && !claveSettingsDel) {
+        return res.status(403).json({ ok: false, error: 'Sin permiso de escritura' });
+      }
+      /* Sin 'auditoria': es append-only y pesaba 26 MB. Se escribe por
+       * entrada con adapter.pushAudit (ver store.persistCollections). */
+      await store.refreshForWrite([collection]);
       const data = store.get();
       // Objeto: borra la CLAVE top-level (diff del frontend baja borrados).
       if (isPlain(data[collection])) {
+        if (RESTRICTED_OBJECTS.has(collection) && !soloSuyaLaClave(req.user, id)) {
+          return res.status(403).json({ ok: false, error: 'Solo puedes editar tu propio expediente' });
+        }
+        if (collection === 'settings' && !roles.canWriteSettingsKey(req.user, id)) {
+          return res.status(403).json({ ok: false, error: 'Sin permiso sobre esa sección de configuración' });
+        }
         if (!(id in data[collection])) return res.status(404).json({ ok: false, error: 'Clave no encontrada' });
         delete data[collection][id];
         db.audit(data, `borrado_${collection}`, req.user, { clave: id });
@@ -450,6 +565,9 @@ module.exports = (store, config) => {
       if (data[collection].length === before) return res.status(404).json({ ok: false, error: 'No encontrado' });
       db.audit(data, `borrado_${collection}`, req.user, { id });
       await store.persistCollections([collection, 'auditoria']);
+      if (FEED_COLLECTIONS.has(collection)) {
+        store.pushFeed({ kind: collection, title: `Actualización en ${collection}` }).catch(() => {});
+      }
       res.json({ ok: true });
     } catch (e) { next(e); }
   });

@@ -43,13 +43,21 @@ function safeUser(u) {
 
 function audit(db, tipo, actor, detalle) {
   const col = collection(db, 'auditoria');
+  /* El detalle NUNCA puede pisar la identidad de la entrada: antes `{ id }`
+   * del registro auditado reemplazaba el id de la auditoría, y dos entradas
+   * con el mismo id en colecciones distintas se sobreescribían (filas
+   * perdidas en Supabase, que usa doc_id como clave). Se conserva como refId. */
+  const extra = { ...(detalle || {}) };
+  const ref = extra.id;
+  delete extra.id;
   const entry = {
+    ...extra,
     id: newId(),
     tipo,
     fecha: new Date().toISOString(),
     usuarioId: actor ? actor.id : null,
     usuarioNombre: actor ? (actor.name || actor.username) : 'sistema',
-    ...(detalle || {}),
+    ...(ref !== undefined ? { refId: ref } : {}),
   };
   col.push(entry);
   // #1 Refuerzo: cota de auditoría a los últimos 500 registros para evitar crecimiento infinito

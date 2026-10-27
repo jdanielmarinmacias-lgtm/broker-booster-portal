@@ -75,13 +75,31 @@ function createSupabaseAdapter({ url, serviceKey }) {
     const msg = String((e && (e.message || e.error_description)) || e);
     return /timeout|temporarily|deadlock|connection|network|fetch failed|failed to fetch|ECONN|undici|5[0-9]{2}/i.test(msg);
   }
+  /* Tiempos: el fetch de Supabase no tiene timeout propio; una consulta
+   * colgada dejaba la petición (y el sync del portal) congelada. Cada
+   * intento se acota; el timeout cuenta como transitorio y reintenta. */
+  const QUERY_TIMEOUT_MS = Number(process.env.SUPABASE_TIMEOUT_MS || 10000);
+  /* Guarda de payload: una imagen/documento en base64 dentro de un documento
+   * JSON puede pesar MBs; antes eso colgaba el upsert 20-40 s y rompía el sync. */
+  const MAX_DOC_BYTES = Number(process.env.SUPABASE_MAX_DOC_BYTES || 6 * 1024 * 1024);
+  function withTimeout(promise, what, ms) {
+    let timer = null;
+    const gate = new Promise((_, reject) => {
+      const err = new Error('Supabase timeout (' + what + ', ' + (ms || QUERY_TIMEOUT_MS) + 'ms)');
+      err.status = 503; // reintentable: la base está ocupada, el dato es válido
+      timer = setTimeout(() => reject(err), ms || QUERY_TIMEOUT_MS);
+    });
+    return Promise.race([promise, gate]).finally(() => { if (timer) clearTimeout(timer); });
+  }
   async function withRetry(fn, tries = 3) {
     let lastErr;
     for (let i = 0; i < tries; i++) {
       try {
-        return await fn();
+        return await withTimeout(fn(), 'query');
       } catch (e) {
         lastErr = e;
+        // 413 (documento enorme) no es transitorio: reintentarlo solo alarga la espera.
+        if (e && e.status === 413) break;
         if (i === tries - 1 || !isTransient(e)) break;
         await sleep(400 * (i + 1));
       }
@@ -92,6 +110,39 @@ function createSupabaseAdapter({ url, serviceKey }) {
    * participan del borrado de ausentes. Cada escritura sube 1 fila nueva en
    * vez de re-escribir todas las entradas históricas (500+). */
   const auditSavedIds = new Set();
+  let bucketReady = false; // el boot la llama por instancia serverless; basta 1 vez
+  /* Cuántas entradas de auditoría se mantienen en caché y se leen por petición.
+   * El histórico completo no se necesita para operar y era el 99% del peso de
+   * la base (26 MB de 26.7 MB). */
+  const AUDIT_KEEP = Number(process.env.AUDIT_KEEP || 300);
+
+  /* Compacta cualquier valor para la auditoría: las entradas guardaban fotos
+   * de usuario completas en base64 (una sola fila llegó a 1.65 MB). El
+   * histórico se conserva como resumen legible, sin archivos. */
+  const MAX_AUDIT_STR = 400;
+  function compactAudit(v, depth) {
+    depth = depth || 0;
+    if (v === null || v === undefined) return v;
+    if (typeof v === 'string') {
+      if (/^data:/i.test(v)) return '[archivo]';
+      return v.length > MAX_AUDIT_STR ? v.slice(0, MAX_AUDIT_STR) + '…' : v;
+    }
+    if (typeof v !== 'object') return v;
+    if (depth >= 3) return Array.isArray(v) ? '[…]' : '{…}';
+    if (Array.isArray(v)) return v.slice(0, 25).map((x) => compactAudit(x, depth + 1));
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = compactAudit(v[k], depth + 1);
+    return out;
+  }
+  function compactAuditRow(data) {
+    if (!data || typeof data !== 'object') return data;
+    const out = { ...data };
+    for (const k of Object.keys(out)) {
+      if (k === 'id' || k === 'tipo' || k === 'fecha' || k === 'usuarioId' || k === 'usuarioNombre') continue;
+      out[k] = compactAudit(out[k]);
+    }
+    return out;
+  }
 
   async function loadDocuments() {
     const out = {};
@@ -102,6 +153,7 @@ function createSupabaseAdapter({ url, serviceKey }) {
     for (;;) {
       const { data, error } = await sb.from('documents').select('collection,doc_id,data').range(from, from + PAGE - 1);
       if (error) throw new Error('Supabase documents: ' + error.message);        for (const row of data) {
+          if (row.collection === 'auditoria') auditSavedIds.add('auditoria∅' + row.doc_id);
           if (row.doc_id === '__object__') {
             // Colección-objeto (settings/autoHub/inmPublica/…): data IS el objeto.
             objects[row.collection] = row.data || {};
@@ -117,6 +169,10 @@ function createSupabaseAdapter({ url, serviceKey }) {
     }
     // El objeto gana si hubiera filas mixtas (colección migrada de array→objeto).
     for (const [c, v] of Object.entries(objects)) out[c] = v;
+    // Auditoría: solo las últimas AUDIT_KEEP (la app también la cota a 500).
+    if (Array.isArray(out.auditoria) && out.auditoria.length > AUDIT_KEEP) {
+      out.auditoria = out.auditoria.slice(-AUDIT_KEEP);
+    }
     const { data: users, error: uerr } = await usersPromise;
     if (uerr) throw new Error('Supabase users: ' + uerr.message);
     out.users = (users || []).map(fromUserRow);
@@ -129,14 +185,31 @@ function createSupabaseAdapter({ url, serviceKey }) {
     const list = names || [];
     const wanted = list.filter((n) => n && n !== 'users');
     const out = {};
-    if (wanted.length) {
+    const auditWanted = wanted.includes('auditoria');
+    const rest = wanted.filter((n) => n !== 'auditoria');
+    if (auditWanted) {
+      /* Auditoría: NUNCA se pagina entera. Son cientos de filas históricas que
+       * no cambian; descargarlas en cada escritura era el 26 MB que tumbaba el
+       * guardado. Solo las últimas AUDIT_KEEP, por fecha. */
+      const { data, error } = await sb.from('documents')
+        .select('collection,doc_id,data')
+        .eq('collection', 'auditoria')
+        .order('updated_at', { ascending: false })
+        .limit(AUDIT_KEEP);
+      if (error) throw new Error('Supabase auditoria: ' + error.message);
+      out.auditoria = (data || []).map((row) => {
+        auditSavedIds.add('auditoria∅' + row.doc_id);
+        return { id: row.doc_id, ...(row.data || {}) };
+      }).reverse();
+    }
+    if (rest.length) {
       let from = 0;
       const PAGE = 1000;
       const objects = {};
       for (;;) {
         const { data, error } = await sb.from('documents')
           .select('collection,doc_id,data')
-          .in('collection', wanted)
+          .in('collection', rest)
           .range(from, from + PAGE - 1);
         if (error) throw new Error('Supabase loadCollections: ' + error.message);
         for (const row of data) {
@@ -160,6 +233,99 @@ function createSupabaseAdapter({ url, serviceKey }) {
       out.users = (users || []).map(fromUserRow);
     }
     return out;
+  }
+
+  /* ---- Archivos embebidos: garantía del lado del servidor ----
+   * El frontend legacy a veces guarda el archivo como dataURL dentro del JSON
+   * (settings.publicidad, convenciones, avatares…). Aunque el cliente intenta
+   * moverlo a Storage antes de subir, un navegador con JS viejo o un upload
+   * fallido lo reinyecta y el documento vuelve a pesar MBs (el problema que
+   * tumbaba el guardado). Aquí, en el ÚLTIMO punto antes de escribir, todo
+   * dataURL se sube al bucket y se reemplaza por su URL pública. */
+  const DATAURL_RE = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
+  const MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'application/pdf': 'pdf' };
+  const MAX_INLINE_BYTES = 30 * 1024 * 1024;
+  const MAX_INLINE_POR_GUARDADO = 10;
+
+  async function subirInline(dataUrl, tag) {
+    const m = String(dataUrl).match(DATAURL_RE);
+    if (!m) return null;
+    let buf;
+    try { buf = Buffer.from(m[2].replace(/\s/g, ''), 'base64'); } catch (e) { return null; }
+    if (!buf || !buf.length || buf.length > MAX_INLINE_BYTES) return null;
+    const hash = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 20);
+    const ruta = 'inline/' + String(tag).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 60)
+      + '-' + hash + '.' + (MIME_EXT[m[1]] || 'bin');
+    try {
+      const { error } = await withTimeout(sb.storage.from(MEDIA_BUCKET).upload(ruta, buf, { contentType: m[1], upsert: true }), 'storage:inline', 15000);
+      if (error && !/exists|duplicate|already/i.test(error.message)) throw new Error(error.message);
+      return sb.storage.from(MEDIA_BUCKET).getPublicUrl(ruta).data.publicUrl;
+    } catch (e) {
+      console.warn('[backend] no se pudo externalizar archivo embebido:', e.message);
+      return null;
+    }
+  }
+
+  /* Recorre el valor y reemplaza dataURLs por URLs de Storage. Muta `value`. */
+  async function externalizarInline(value, tag) {
+    let hechos = 0;
+    const nodos = [];
+    (function walk(node, depth) {
+      if (!node || typeof node !== 'object' || depth > 6) return;
+      for (const k of Object.keys(node)) {
+        const v = node[k];
+        if (typeof v === 'string') {
+          if (v.length > 64 && v.startsWith('data:')) nodos.push({ node, k, v });
+        } else if (v && typeof v === 'object') walk(v, depth + 1);
+      }
+    })(value, 0);
+    for (const n of nodos) {
+      if (hechos >= MAX_INLINE_POR_GUARDADO) break;
+      const url = await subirInline(n.v, tag);
+      if (url) { n.node[n.k] = url; hechos++; }
+    }
+    return hechos;
+  }
+
+  /* Ticker de versiones por colección (tabla pública collection_versions):
+   * cada guardado avisa QUÉ cambió para que los otros PCs hagan pull
+   * quirúrgico en tiempo real, sin exponer datos. Best-effort con timeout
+   * corto: jamás rompe el guardado. */
+  let versionsReady = null; // null = sin probar · true = tabla ok · false = usar public_feed
+
+  /* Sin la tabla (migración no ejecutada) el ticker viaja por public_feed, que
+   * YA está en la publicación realtime y es de lectura pública. Así el
+   * "subo contenido y aparece en los otros equipos" funciona sin pedirle al
+   * usuario que corra SQL a mano. */
+  async function touchViaFeed(list) {
+    const rows = list.map((c) => ({ kind: 'version:' + c, title: 'sync', body: '' }));
+    const { error } = await withTimeout(sb.from('public_feed').insert(rows), 'touchFeed', 8000);
+    if (error) throw new Error('Supabase version feed: ' + error.message);
+    // Poda best-effort de las marcas viejas (el feed visible no las incluye).
+    sb.from('public_feed').delete().like('kind', 'version:%')
+      .lt('created_at', new Date(Date.now() - 12 * 3600 * 1000).toISOString())
+      .then(() => {}, () => {});
+  }
+  async function touchVersions(cols) {
+    const list = (cols || []).filter(Boolean);
+    if (!list.length) return;
+    if (versionsReady === false) return touchViaFeed(list);
+    const ts = new Date().toISOString();
+    try {
+      const { error } = await withTimeout(
+        sb.from('collection_versions').upsert(
+          list.map((c) => ({ collection: c, updated_at: ts })), { onConflict: 'collection' }),
+        'touchVersions', 8000);
+      if (error) throw new Error(error.message);
+      versionsReady = true;
+      return;
+    } catch (e) {
+      if (versionsReady === null) {
+        console.warn('[backend] collection_versions ausente: ticker por public_feed —', e.message);
+      }
+      versionsReady = false;
+      return touchViaFeed(list);
+    }
   }
 
   async function saveDocuments(obj) {
@@ -193,6 +359,19 @@ function createSupabaseAdapter({ url, serviceKey }) {
         seenRows.set(collection + '∅__object__', { collection, doc_id: '__object__', updated_at: new Date().toISOString(), data: items });
       }
     }
+    // Auditoría: se compacta antes de hashear/subir (nunca fotos completas).
+    for (const [key, row] of seenRows) {
+      if (row.collection === 'auditoria') seenRows.set(key, { ...row, data: compactAuditRow(row.data) });
+    }
+    /* Garantía: ningún documento se guarda con archivos dentro. Se hace antes
+     * de la huella para que el hash describa lo que realmente se persiste. */
+    for (const [key, row] of seenRows) {
+      let json = '';
+      try { json = JSON.stringify(row.data); } catch (e) { continue; }
+      if (json.indexOf('data:') === -1) continue;
+      const n = await externalizarInline(row.data, row.collection + '-' + row.doc_id);
+      if (n) seenRows.set(key, { ...row, data: row.data });
+    }
     const seen = new Set();
     const pendingHash = new Map();
     let rows = [...seenRows.values()];
@@ -212,6 +391,19 @@ function createSupabaseAdapter({ url, serviceKey }) {
         if (r.collection !== 'auditoria') return true;
         return !auditSavedIds.has(r.collection + '∅' + r.doc_id);
       });
+    }
+    // Guarda anti-cuelgue: un documento con base64 embebido de MBs colgaba el
+    // upsert (statement timeout) y rompía el sync. Los archivos van por /api/media.
+    for (const r of rows) {
+      let bytes = 0;
+      try { bytes = Buffer.byteLength(JSON.stringify(r.data), 'utf8'); } catch (e) { /* no medible: pasa */ }
+      if (bytes > MAX_DOC_BYTES) {
+        const err = new Error('Documento ' + r.collection + '/' + r.doc_id + ' demasiado grande (' +
+          (bytes / 1048576).toFixed(1) + ' MB, límite ' + (MAX_DOC_BYTES / 1048576).toFixed(0) +
+          ' MB). Sube el archivo por /api/media en vez de foto embebida.');
+        err.status = 413;
+        throw err;
+      }
     }
     for (let i = 0; i < rows.length; i += 200) {
       const chunk = rows.slice(i, i + 200);
@@ -248,6 +440,13 @@ function createSupabaseAdapter({ url, serviceKey }) {
     // de ausentes contra la lista completa (el caller hizo refresh antes).
     if (wanted.has('users')) {
       const users = Array.isArray(obj.users) ? obj.users : [];
+      // Avatares en base64 → Storage (mismo motivo que los documentos).
+      for (const u of users) {
+        if (u && typeof u.avatar === 'string' && u.avatar.startsWith('data:') && u.avatar.length > 64) {
+          const url = await subirInline(u.avatar, 'avatar-u' + u.id);
+          if (url) u.avatar = url;
+        }
+      }
       if (users.length) {
         const { error } = await withRetry(() => sb.from('app_users').upsert(users.map(toUserRow), { onConflict: 'id' }))
           .then((r) => r);
@@ -257,10 +456,21 @@ function createSupabaseAdapter({ url, serviceKey }) {
       if (eSel) throw new Error('Supabase users select: ' + eSel.message);
       const keep = new Set(users.map((u) => String(u.id)));
       const gone = (eu || []).map((r) => r.id).filter((id) => !keep.has(String(id)));
+      /* Guarda: una lista vacía o que de golpe pierde casi todos los usuarios
+       * casi siempre es una lectura fallida, no un borrado real. Se niega el
+       * borrado masivo; el borrado puntual de DELETE /api/users/:id sí pasa
+       * (deja solo un id ausente). */
+      const masivo = gone.length > 1 && (users.length === 0 || gone.length > (eu || []).length / 2);
+      if (masivo) throw new Error('Sync de usuarios bloqueado: borrado masivo sospechoso (' + gone.length + ' de ' + (eu || []).length + ')');
       if (gone.length) {
         const { error } = await withRetry(() => sb.from('app_users').delete().in('id', gone));
         if (error) throw new Error('Supabase users delete: ' + error.message);
       }
+    }
+    // Ticker realtime entre PCs (ver touchVersions): avisa qué cambió.
+    const bump = [...wanted].filter((c) => c && c !== 'auditoria');
+    if (bump.length) {
+      try { await touchVersions(bump); } catch (e) { /* solo aviso */ }
     }
   }
 
@@ -271,6 +481,7 @@ function createSupabaseAdapter({ url, serviceKey }) {
     loadCollections,
     saveDocuments,
     saveCollections,
+    touchVersions,
     async pushAudit(entry) {
       const rec = entry || {};
       const doc_id = String(rec.id ?? Date.now());
@@ -325,26 +536,35 @@ function createSupabaseAdapter({ url, serviceKey }) {
       const full = { ...base };
       if (item.image_url) full.image_url = item.image_url;
       if (item.media_kind) full.media_kind = item.media_kind;
-      let { data, error } = await sb.from('public_feed').insert(full).select().single();
+      let { data, error } = await withTimeout(sb.from('public_feed').insert(full).select().single(), 'pushFeed');
       if (error && /image_url|media_kind|column/i.test(error.message)) {
         // Pre-migración (sin migration_media.sql): reintenta sin columnas nuevas.
         ({ data, error } = await sb.from('public_feed').insert(base).select().single());
       }
       if (error) throw new Error('Supabase feed: ' + error.message);
+      /* Poda best-effort: el feed crecía sin cota (llegó a 5.000 filas).
+       * Se conservan 7 días; las marcas del ticker ya se podan a las 12h. */
+      sb.from('public_feed').delete()
+        .lt('created_at', new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString())
+        .then(() => {}, () => {});
       return data;
     },
     async listFeed(limit) {
+      // Fuera las marcas internas del ticker (kind 'version:…').
       const { data, error } = await sb.from('public_feed').select('*')
+        .not('kind', 'like', 'version:%')
         .order('created_at', { ascending: false }).limit(Math.min(Number(limit) || 20, 50));
       if (error) throw new Error('Supabase feed list: ' + error.message);
       return data || [];
     },
     /* ---- Storage de archivos (bucket público; subidas firmadas) ---- */
     async ensureMediaBucket() {
-      const { error } = await sb.storage.createBucket(MEDIA_BUCKET, { public: true });
+      if (bucketReady) return;
+      const { error } = await withTimeout(sb.storage.createBucket(MEDIA_BUCKET, { public: true }), 'storage:createBucket');
       if (error && !/exists|duplicate|already/i.test(error.message)) {
         throw new Error('Supabase bucket: ' + error.message);
       }
+      bucketReady = true;
     },
     async signUpload(storagePath) {
       const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUploadUrl(storagePath);

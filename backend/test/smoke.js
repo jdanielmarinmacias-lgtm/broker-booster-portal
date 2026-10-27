@@ -542,15 +542,17 @@ describe('colecciones-objeto: settings/autoHub (publicidad, capacitaciones, clie
     assert.ok(g.json.object.comparadorProductos, 'clave de otra instancia sobrevive');
     assert.equal(g.json.object.publicidad[0].titulo, 'Re-editada');
   });
-  it('alumno puede chatear (messages: matriz abierta) y settings APENAS… (roles DEFAULT)', async () => {
+  it('alumno NO puede escribir settings ni rolePermissions (403); admin sí', async () => {
     jar.cookie = null;
     await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
     const w = await api('PUT', '/api/data/settings/publicidad', { value: [] });
-    // DEFAULT_RULE: todos los autenticados escriben (el legacy limita por UI).
-    assert.equal(w.status, 200);
+    assert.equal(w.status, 403);
+    const p = await api('PUT', '/api/data/rolePermissions/alumno', { value: {} });
+    assert.equal(p.status, 403);
     jar.cookie = null;
     await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
-    await api('PUT', '/api/data/settings/publicidad', { value: [] });
+    const a = await api('PUT', '/api/data/settings/publicidad', { value: [] });
+    assert.equal(a.status, 200);
   });
 });
 

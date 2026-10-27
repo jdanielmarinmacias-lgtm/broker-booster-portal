@@ -110,6 +110,58 @@
     });
   }
 
+  /* Cura automática de base64 embebido en documentos.
+   * Los modales legacy guardaban el archivo como dataURL dentro del JSON
+   * (settings.publicidad, carruselCirculares, avatares…). Eso hacía documentos
+   * de MBs: el upsert a Supabase entraba en statement timeout (HTTP 500), los
+   * 401 en cascada del resto de la sincronización y la portada tardaba en
+   * cargar porque cada tarjeta traía la imagen entera dentro del JSON.
+   * Aquí se sube cada dataURL a Storage y se reemplaza por su URL.
+   * Devuelve cuántos reemplazó. Sin backend o sin sesión no toca nada. */
+  const DATAURL_RE = /^data:([\w.+-]+\/[\w.+-]+);base64,/;
+  const MAX_INLINE = 24 * 1024; // ~24 KB de dataURL: por encima, a Storage
+  const MAX_HEAL = 40; // tope por llamada (no bloquear el push)
+
+  function base64ABlob(dataUrl) {
+    const coma = dataUrl.indexOf(',');
+    const bin = atob(dataUrl.slice(coma + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: dataUrl.slice(5, dataUrl.indexOf(';')) || 'application/octet-stream' });
+  }
+
+  /* Recorre el valor y devuelve {obj, cambios}. Muta el objeto recibido (es la
+   * referencia viva del `db` legacy: así el local también deja de cargar MBs). */
+  async function desbase64(value, scope) {
+    if (!value || typeof value !== 'object') return 0;
+    if (!(window.Backend && window.Backend.available)) return 0;
+    const nodos = [];
+    (function walk(node) {
+      if (!node || typeof node !== 'object') return;
+      for (const k of Object.keys(node)) {
+        const v = node[k];
+        if (typeof v === 'string') {
+          if (v.length > MAX_INLINE && DATAURL_RE.test(v)) nodos.push({ node, k, v });
+        } else if (v && typeof v === 'object') walk(v);
+      }
+    })(value);
+    let cambios = 0;
+    for (const n of nodos.slice(0, MAX_HEAL)) {
+      try {
+        const mime = n.v.match(DATAURL_RE)[1];
+        const ext = (mime.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'bin';
+        const blob = base64ABlob(n.v);
+        const file = new File([blob], 'inline-' + Date.now() + '-' + cambios + '.' + ext, { type: mime });
+        const item = await subir(file, { scope: scope || 'media', title: 'inline' });
+        if (item && item.url && !/^data:/.test(item.url)) {
+          n.node[n.k] = item.url;
+          cambios++;
+        }
+      } catch (e) { /* se conserva el base64: el push fallará con mensaje claro */ }
+    }
+    return cambios;
+  }
+
   async function subirMuchos(files, scope) {
     const list = Array.from(files || []).slice(0, 10);
     const out = [];
@@ -128,5 +180,5 @@
     return (await comprimirImagen(file, 1280, 0.82)) || '';
   }
 
-  window.Media = { subir, subirMuchos, comprimirImagen, subirOUrl };
+  window.Media = { subir, subirMuchos, comprimirImagen, subirOUrl, desbase64 };
 })();

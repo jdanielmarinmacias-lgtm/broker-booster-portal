@@ -83,11 +83,15 @@ async function boot(adapter) {
 if (require.main === module) {
   (async () => {
     const { store, app } = await boot();
-    const db = require('./db');
-    if (!Array.isArray(store.get().users) || store.get().users.length === 0) {
-      const { seed } = require('./seed');
-      await seed(store, config.seedPassword);
-      console.log(`[backend] DB inicial creada (store: ${store.adapter.kind}).`);
+    /* Solo el arranque local con store vacío siembra. Con Supabase la caché
+     * arranca vacía a propósito (serverless): sembrar aquí escribiría usuarios
+     * demo en la base real. seed() sí comprueba antes, pero ni se invoca. */
+    if (store.adapter.kind !== 'supabase') {
+      if (!Array.isArray(store.get().users) || store.get().users.length === 0) {
+        const { seed } = require('./seed');
+        const r = await seed(store, config.seedPassword);
+        if (r.created) console.log(`[backend] DB inicial creada (store: ${store.adapter.kind}).`);
+      }
     }
     app.listen(config.port, () => console.log(`[backend] http://localhost:${config.port} (store: ${store.adapter.kind})`));
   })().catch((e) => { console.error(e); process.exit(1); });

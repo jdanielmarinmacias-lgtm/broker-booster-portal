@@ -15,7 +15,10 @@
 (function () {
   'use strict';
 
-  var SKIP = { users: 1, sessions: 1, auditoria: 1 };
+  /* loginAttempts: colección interna del servidor (rate-limit de login). El
+   * frontend la recibía en el bundle y la devolvía en cada push, donde el
+   * servidor respondía 401/404. Nunca debe viajar desde el navegador. */
+  var SKIP = { users: 1, sessions: 1, auditoria: 1, loginAttempts: 1 };
   var SHOWCASE = ['inmPublica', 'autoHub', 'posts', 'carruselCirculares', 'media'];
   /* Promotoría + escuela + chat: si otro equipo publica, el encargado lo ve
    * en vivo (el backend espeja estas al public_feed). */
@@ -44,6 +47,7 @@
     chatGroups: '👥 Grupos actualizados'
   };
   var pushTimer = null;
+  var lastNoSessToast = 0; // limita el aviso de sesión vencida (1/min)
   var shadow = null; // {col: [{...}]} última foto DEL SERVIDOR (solo lo traído por pull)
   var pulled = {}; // colecciones confirmadas desde el servidor en el último pull
   var usersPulled = false;
@@ -179,7 +183,21 @@
         if (hayPendienteLocal) pushSoon();
         if (Array.isArray(r.users)) {
           if (!Array.isArray(db.users)) db.users = [];
+          /* Conservar altas locales aún no subidas: reemplazar la lista entera
+           * borraba al usuario recién creado en este equipo antes de su push. */
+          const prevLocalUsers = db.users.slice();
+          const prevShadowUsers = (shadow && Array.isArray(shadow.users)) ? shadow.users : [];
+          const wasOnServer = {};
+          prevShadowUsers.forEach(function (u) { if (u && u.id !== undefined) wasOnServer[String(u.id)] = true; });
           replaceArray(db.users, normIds(r.users));
+          const haveU = {};
+          db.users.forEach(function (u) { if (u && u.id !== undefined) haveU[String(u.id)] = true; });
+          prevLocalUsers.forEach(function (u) {
+            if (u && u.id !== undefined && !haveU[String(u.id)] && !wasOnServer[String(u.id)] && u.password) {
+              db.users.push(u);
+              hayPendienteLocal = true;
+            }
+          });
           usersPulled = true;
         }
         return true;
@@ -328,7 +346,39 @@
     // no encuentra nada que hacer en lo ya sincronizado.
     try { if (typeof window.flushSaveDB === 'function') window.flushSaveDB(); } catch (e1) {}
     if (merged) pushSoon();
+    /* Cura única por sesión: los documentos ya guardados con imágenes en
+     * base64 (publicidad, carrusel, academia…) se envían al Storage y se
+     * reemplazan por su URL. Sin esto, el documento seguiría pesando MBs, el
+     * guardado seguiría dando HTTP 500 y la portada tardaría en cargar.
+     * Solo se hace una vez por sesión y no bloquea el render. */
+    if (!healedOnce) {
+      healedOnce = true;
+      sanearBase64().catch(function () {});
+    }
     return true;
+  }
+
+  var healedOnce = false;
+  /* Colecciones donde el legacy guardó archivos embebidos. El escaparate y la
+   * academia son las que más pesaban (tarjetas con la imagen dentro del JSON). */
+  var HEAVY = ['settings', 'carruselCirculares', 'autoHub', 'inmPublica',
+    'lessons', 'library', 'posts', 'media', 'categories'];
+  async function sanearBase64() {
+    if (!(window.Media && typeof window.Media.desbase64 === 'function')) return 0;
+    const db = legDb();
+    if (!db) return 0;
+    let total = 0;
+    for (const n of HEAVY) {
+      if (!db[n] || typeof db[n] !== 'object') continue;
+      try { total += await window.Media.desbase64(db[n], n); } catch (e) { /* siguiente */ }
+    }
+    if (total) {
+      if (window.showToast) {
+        window.showToast(total + (total === 1 ? ' archivo movido' : ' archivos movidos') + ' al Storage: la próxima carga será más rápida', 'success');
+      }
+      pushSoon();
+    }
+    return total;
   }
 
   function byIdMap(arr) {
@@ -345,6 +395,10 @@
   }
 
   async function pushUsers(local, old) {
+    /* Avatares subidos desde el portal llegan como dataURL: a Storage. */
+    if (window.Media && typeof window.Media.desbase64 === 'function') {
+      try { await window.Media.desbase64(local, 'avatars'); } catch (e) {}
+    }
     const oldMap = byIdMap(old);
     const seen = {};
     // Reintento: usuarios que nacieron sin id (form legacy sin guardar) reciben
@@ -372,12 +426,24 @@
           JSON.stringify(stripUser(u)) !== JSON.stringify(stripUser(prev))
           || (typeof u.password === 'string' && u.password.trim() !== '')
         ) {
-          const body = stripUser(u);
-          delete body.id;
+          /* Solo los CAMPOS que cambiaron. Antes se enviaba el usuario completo:
+           * el servidor veía un cuerpo con role/students/agencia y respondía 403
+           * "Permisos insuficientes" a cualquier no-admin que solo editó su
+           * perfil ("Sin permiso en servidor para usuarios"), y ese usuario se
+           * quedaba sin guardar en la base. */
+          const ahora = stripUser(u);
+          const antes = stripUser(prev);
+          const body = {};
+          Object.keys(ahora).forEach(function (k) {
+            if (k === 'id') return;
+            if (JSON.stringify(ahora[k]) !== JSON.stringify(antes[k])) body[k] = ahora[k];
+          });
           // Si se desasignó agencia/equipo en local, enviar null explícito para que el servidor limpie la clave
           ['agenciaId', 'agencia', 'parentId', 'assignedTo'].forEach(function (fk) {
             if (prev[fk] !== undefined && u[fk] === undefined) body[fk] = null;
           });
+          // Sin cambios reales (solo el hash de la clave): no molestar al servidor.
+          if (!Object.keys(body).length && !(typeof u.password === 'string' && u.password.trim() !== '')) continue;
           if (typeof u.password === 'string' && u.password.trim() !== '') {
             body.password = u.password.trim();
           }
@@ -408,6 +474,18 @@
   }
 
   async function pushCollection(name, local, old) {
+    /* Cura de base64 antes de subir: si el documento trae dataURLs grandes
+     * (imágenes de publicidad/academia guardadas por el legacy), se suben al
+     * Storage y se reemplazan por su URL. Es lo que evita el HTTP 500 por
+     * documento gigante y los 401 en cascada que dejaban todo en local. */
+    if (window.Media && typeof window.Media.desbase64 === 'function') {
+      try {
+        const n = await window.Media.desbase64(local, name);
+        if (n && window.showToast) {
+          window.showToast(n + (n === 1 ? ' imagen movida' : ' imágenes movidas') + ' al Storage', 'success');
+        }
+      } catch (e) { /* se intenta el guardado igual */ }
+    }
     // Notifications siempre debe ser Array; si una versión previa la dejó como {} vacío, ignorar o normalizar
     if (name === 'notifications' && !Array.isArray(local)) {
       return;
@@ -458,7 +536,19 @@
       if (same) continue;
       try {
         if (!prev) await send('POST', '/api/data/' + encodeURIComponent(name), rec);
-        else await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(rec.id), rec);
+        else {
+          try {
+            await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(rec.id), rec);
+          } catch (ePut) {
+            /* El registro está en la sombra local pero ya no en el servidor
+             * (se borró en otro equipo, o su POST falló una vez y quedó como
+             * "existente"): se vuelve a crear. Antes el PUT respondía 404,
+             * se abortaba la colección y el registro quedaba bloqueado
+             * para siempre. */
+            if (!ePut || ePut.status !== 404) throw ePut;
+            await send('POST', '/api/data/' + encodeURIComponent(name), rec);
+          }
+        }
       } catch (e) {
         // Registro no aceptado: se conserva local y se avisa; no se descarta.
         if (e.status === 403 || e.status === 404 || e.status === 413) {
@@ -476,7 +566,24 @@
   }
 
   async function pushNow() {
-    if (!active || !shadow) return;
+    if (!window.Backend || !window.Backend.available) return;
+    if (!active || !shadow) {
+      // Backend sí, sesión no (expiró): intenta recuperarla una vez; si no,
+      // avisa (limitado) en vez de guardar solo-local en silencio.
+      let me = null;
+      try { me = await window.Backend.me(true); } catch (e) { me = null; }
+      if (me && me.user) {
+        active = true;
+        if (!(await pullAll())) return;
+      } else {
+        const now = Date.now();
+        if (now - lastNoSessToast > 60000) {
+          lastNoSessToast = now;
+          if (window.showToast) window.showToast('Sesión vencida: reingresa para sincronizar (guardado solo en este equipo)', 'warning');
+        }
+        return;
+      }
+    }
     const db = legDb();
     if (!db) return;
     // Unión sombra+local: las colecciones solo-locales (nunca en servidor) también suben.
@@ -494,7 +601,26 @@
     for (const n of names) {
       try { await pushCollection(n, db[n] || [], shadow[n] || []);
         shadow[n] = clone(db[n] || []);
-      } catch (e) { failed.push(n + ' (' + motivoFallo(e) + ')'); }
+      } catch (e) {
+        failed.push(n + ' (' + motivoFallo(e) + ')');
+        /* 401: puede ser la sesión vencida de verdad O una consulta de sesión
+         * que falló por lentitud de la base. Antes se apagaba el sync para
+         * siempre y TODO quedaba en localStorage hasta reingresar a mano.
+         * Ahora se confirma con /api/auth/me: si la sesión sigue viva, es un
+         * fallo pasajero y se reintenta; si no, se avisa una vez. */
+        if (e && e.status === 401) {
+          let viva = false;
+          try {
+            const me = await window.Backend.me(true);
+            viva = !!(me && me.user);
+          } catch (e2) { viva = false; }
+          if (!viva) { active = false; break; }
+          retrySoon(12000);
+          continue;
+        }
+        // 500/503/red: la base estaba lenta u ocupada; reintenta con espera.
+        if (!e || !e.status || e.status >= 500) retrySoon();
+      }
     }
     if (Array.isArray(db.users)) {
       try {
@@ -509,8 +635,18 @@
 
   /* Motivo concreto de un fallo de sincronización, para mostrarlo en el aviso. */
   function motivoFallo(e) {
+    if (e && e.status === 401) return 'sesión vencida, reingresa';
+    if (e && e.status === 503) return 'base de datos ocupada, reintentando';
+    if (e && e.status === 500) return 'servidor ocupado, reintentando';
     if (e && e.status) return 'HTTP ' + e.status + (e.message ? ': ' + e.message : '');
     return (e && e.message) || 'error de red';
+  }
+
+  /* Reintento con espera ante sobrecarga de la base (no por error del dato). */
+  function retrySoon(ms) {
+    if (!active) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, ms || 8000);
   }
 
   function pushSoon() {
@@ -522,6 +658,7 @@
   /* Envuelve el saveDB final del legacy (respeta sus wrappers previos). */
   /* Traduce fallos de red a mensajes accionables (no "Sin conexión" genérico). */
   function pushErrorMsg(e, what) {
+    if (e && /demasiado grande/i.test(e.message || '')) return e.message;
     if (e && e.status === 413) return what + ' demasiado grande: usa Subir archivo en vez de foto embebida';
     if (e && e.status === 403) return 'Sin permiso en servidor para ' + what + ' (se conserva local)';
     if (e && e.status === 401) return 'Sesión vencida: reingresa para sincronizar ' + what;
@@ -575,9 +712,13 @@
     } catch (e) { return false; }
   }
 
+  var bootDone = false;
   async function boot() {
-    try { if (!(window.Backend && await window.Backend.detect())) return; }
-    catch (e) { return; }
+    if (bootDone) return;
+    let ok = false;
+    try { ok = !!(window.Backend && await window.Backend.detect()); } catch (e) { ok = false; }
+    if (!ok) return; // backend caído/desplegando: el intervalo de abajo reintenta
+    bootDone = true;
     hookSave();
     // Revisar si hay sesión activa primero: si hay sesión, pullAll() ya trae
     // autoHub, inmPublica y settings en un solo viaje (/api/data/bundle),
@@ -610,10 +751,39 @@
         }
       } catch (e) {}
     }
+    /* Re-render prudente tras un pull en vivo (compartido por feed y ticker). */
+    function liveRender(kind) {
+      // Evitar re-render completo si el menú desplegable está abierto o el usuario escribe en un campo o tiene un modal abierto
+      var sbEl = document.getElementById('sidebar');
+      var sbOpen = sbEl && !sbEl.classList.contains('-translate-x-full');
+      var mcEl = document.getElementById('modal-container');
+      var modalOpen = mcEl && mcEl.innerHTML.trim() !== '';
+      var ae = document.activeElement;
+      var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable);
+      if (!sbOpen && !modalOpen && !typing) {
+        try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
+      } else {
+        try { if (typeof window.renderNav === 'function') window.renderNav(); } catch (e2) {}
+      }
+      const pp = document.getElementById('public-portal');
+      if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+        try { window.renderPublicPortal(); } catch (e5) {}
+      }
+      // Chat abierto + mensaje nuevo → refresca la conversación al instante
+      // (además del polling de 2.5s que cubre el caso sin realtime).
+      if (kind === 'messages' || kind === 'groupMessages') {
+        try { if (typeof window.chatLiveRefresh === 'function') window.chatLiveRefresh(); } catch (e4) {}
+      }
+      if (kind && KIND_TOAST[kind] && window.showToast) {
+        try { window.showToast(KIND_TOAST[kind], 'info'); } catch (e3) {}
+      }
+    }
     // Novedades de otros usuarios → re-pull escaparate + trabajo + re-render.
     // Ej: agente carga solicitud → el cotizador la ve en ese momento + toast.
     document.addEventListener('public-feed', function (e) {
       var kind = e && e.detail && e.detail.kind;
+      // Marca del ticker por colección: se atiende en 'collection-version'.
+      if (kind && String(kind).indexOf('version:') === 0) return;
       if (!active) {
         if (kind === 'autoHub' || kind === 'inmPublica' || kind === 'settings') {
           pullPublicShowcase().then(function (ok) {
@@ -629,32 +799,30 @@
       // Pull quirúrgico en Realtime: si sabemos qué colección cambió, solo
       // descargamos esa colección en vez de volver a bajar las 5 de SHOWCASE.
       var cols = target ? [target] : SHOWCASE.concat(LIVE_WORK.filter(function (c) { return SHOWCASE.indexOf(c) === -1; }));
-      pullNames(cols).then(function () {
-        // Evitar re-render completo si el menú desplegable está abierto o el usuario escribe en un campo o tiene un modal abierto
-        var sbEl = document.getElementById('sidebar');
-        var sbOpen = sbEl && !sbEl.classList.contains('-translate-x-full');
-        var mcEl = document.getElementById('modal-container');
-        var modalOpen = mcEl && mcEl.innerHTML.trim() !== '';
-        var ae = document.activeElement;
-        var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable);
-        if (!sbOpen && !modalOpen && !typing) {
-          try { if (typeof window.render === 'function') window.render(); } catch (e2) {}
-        } else {
-          try { if (typeof window.renderNav === 'function') window.renderNav(); } catch (e2) {}
+      pullNames(cols).then(function () { liveRender(kind); }).catch(function () {});
+    });
+    // Ticker de versiones (TODAS las colecciones, ediciones y borrados
+    // incluidos): pull quirúrgico de lo que cambió en otro equipo.
+    document.addEventListener('collection-version', function (e) {
+      var col = e && e.detail && e.detail.collection;
+      if (!col) return;
+      if (!active) {
+        // Visitante sin sesión: solo refresca el escaparate público.
+        if (col === 'autoHub' || col === 'inmPublica' || col === 'settings') {
+          pullPublicShowcase().then(function (ok) {
+            const pp = document.getElementById('public-portal');
+            if (ok && pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
+              try { window.renderPublicPortal(); } catch (e0) {}
+            }
+          });
         }
-        const pp = document.getElementById('public-portal');
-        if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
-          try { window.renderPublicPortal(); } catch (e5) {}
-        }
-        // Chat abierto + mensaje nuevo → refresca la conversación al instante
-        // (además del polling de 2.5s que cubre el caso sin realtime).
-        if (kind === 'messages' || kind === 'groupMessages') {
-          try { if (typeof window.chatLiveRefresh === 'function') window.chatLiveRefresh(); } catch (e4) {}
-        }
-        if (kind && KIND_TOAST[kind] && window.showToast) {
-          try { window.showToast(KIND_TOAST[kind], 'info'); } catch (e3) {}
-        }
-      }).catch(function () {});
+        return;
+      }
+      if (col === 'users') {
+        pullUsers().then(function () { liveRender(col); }).catch(function () {});
+        return;
+      }
+      pullNames([col]).then(function () { liveRender(col); }).catch(function () {});
     });
   }
 
@@ -691,6 +859,16 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
-  // El legacy puede redefinir saveDB después: re-engancha con retraso.
+  // El legacy puede redefinir saveDB después: re-engancha con retraso y cada
+  // 5s (si el hook se pierde, el push muere en silencio y todo queda local).
   setTimeout(hookSave, 3000);
+  setInterval(function () { if (bootDone) hookSave(); }, 5000);
+  // Si el backend no estaba al cargar (caído/desplegando), reintenta cada
+  // 30s y engancha el sync en cuanto aparezca, sin recargar la página.
+  setInterval(function () {
+    if (bootDone || !window.Backend || !window.Backend.redetect) return;
+    try {
+      window.Backend.redetect().then(function (ok) { if (ok) boot(); }).catch(function () {});
+    } catch (e) {}
+  }, 30000);
 })();

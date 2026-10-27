@@ -30,7 +30,7 @@ async function seed(store, seedPassword) {
     passwordHash: passwords.hash(seedPassword),
     mustChangePassword: true,
   }));
-  if (!Array.isArray(data.rolePermissions)) data.rolePermissions = [];
+  if (!data.rolePermissions || Array.isArray(data.rolePermissions)) data.rolePermissions = {};
   if (!Array.isArray(data.auditoria)) data.auditoria = [];
   db.audit(data, 'seed_inicial', null, { usuarios: data.users.length });
   await store.persist();

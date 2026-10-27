@@ -50,7 +50,47 @@ const COLLECTION_RULES = {
   exams:        { read: null, write: TEACHERS },
   auditoria:    { read: ['admin', 'gm', 'desarrollador'], write: [] }, // solo el servidor escribe
 };
+/* Colecciones de configuración del portal (lo que ve el público y la matriz de
+ * permisos): solo staff puede escribirlas. Antes caían en DEFAULT_RULE y
+ * cualquier alumno podía reescribirlas por la API genérica. */
+const CONTENT_WRITE = ['admin', 'gm', 'desarrollador', 'editor', 'capacitador', 'maestro', 'agencia'];
+const CONFIG_WRITE = ['admin', 'gm', 'desarrollador', 'editor'];
+const CONFIG_RULES = {
+  rolePermissions: { read: null, write: ['admin', 'gm', 'desarrollador'] },
+  settings:        { read: null, write: CONFIG_WRITE },
+  autoHub:         { read: null, write: CONTENT_WRITE },
+  inmPublica:      { read: null, write: CONTENT_WRITE },
+  carruselCirculares: { read: null, write: CONFIG_WRITE },
+  guiaBase:        { read: null, write: CONFIG_WRITE },
+  practicaConfig:  { read: null, write: CONFIG_WRITE },
+  oferta_valor:    { read: null, write: CONFIG_WRITE },
+  guiaChats:       { read: null, write: ALL_ROLES }, // cada usuario guarda su historial
+  prospectos:      { read: null, write: [...CONTENT_WRITE, 'agente_agencia', 'agente_desarrollo'] },
+  expedientesProspectos: { read: null, write: [...CONTENT_WRITE, 'agente_agencia', 'agente_desarrollo'] },
+  posts:           { read: null, write: ALL_ROLES },
+  media:           { read: null, write: ALL_ROLES },
+  library:         { read: null, write: TEACHERS },
+  liveClasses:     { read: null, write: TEACHERS },
+  notifications:   { read: null, write: ALL_ROLES },
+};
+Object.assign(COLLECTION_RULES, CONFIG_RULES);
 const DEFAULT_RULE = { read: null, write: ALL_ROLES };
+
+/* Claves de `settings` que edita el equipo de contenido — exactamente las
+ * secciones que el portal muestra a esos roles (Publicidad, Casos de Éxito,
+ * Comparador, Convenios, Historias…). El resto (marca, logo, hero, privacidad)
+ * sigue en CONFIG_WRITE. Antes, maestro/capacitador/agencia editaban su
+ * sección y el servidor respondía 403: el cambio se quedaba local. */
+const CONTENT_SETTINGS_KEYS = new Set([
+  'publicidad', 'casosExito', 'comparadorProductos', 'convencionCompanias',
+  'capacitaciones', 'blog', 'servicios', 'historias', 'comisiones',
+  'aseguradoras', 'caminos', 'ctaFinal', 'empresa', 'hero',
+  'portalContent', 'auditoriaContenido',
+]);
+function canWriteSettingsKey(actor, key) {
+  if (hasRole(actor, CONFIG_WRITE)) return true;
+  return CONTENT_SETTINGS_KEYS.has(String(key)) && hasRole(actor, CONTENT_WRITE);
+}
 
 function canRead(actor, collection) {
   const rule = COLLECTION_RULES[collection] || DEFAULT_RULE;
@@ -62,4 +102,4 @@ function canWrite(actor, collection) {
   return hasRole(actor, rule.write);
 }
 
-module.exports = { ROLES, norm, hasRole, isGM, isAdmin, isTeacher, isStudent, isAgencia, canModifyUser, canRead, canWrite };
+module.exports = { ROLES, norm, hasRole, isGM, isAdmin, isTeacher, isStudent, isAgencia, canModifyUser, canRead, canWrite, canWriteSettingsKey, CONTENT_SETTINGS_KEYS };

@@ -3127,7 +3127,11 @@ const VC_CONFIG = {
 };
 function vcCfg(id){ return VC_CONFIG[id]; }
 function vcCartera(id){ const t=vcCfg(id).tabla; if(!Array.isArray(db[t])) db[t]=[]; return db[t]; }
-function vcSave(id){ const t=vcCfg(id).tabla; localStorage.setItem('pepes_v3_db', JSON.stringify(db)); }
+/* Antes escribía SÓLO en localStorage, así que la Cartera (Auto/Financiera/
+ * Inmobiliaria) nunca llegaba al servidor: el registro vivía en este equipo y
+ * desaparecía al cambiar de máquina. Ahora pasa por saveDB, que persiste local
+ * Y dispara la sincronización con Supabase. */
+function vcSave(id){ void id; saveDB(); }
 // Visibilidad: mismo modelo que Siniestros — gm/dev/admin todo; agencia lo de sus agentes; agente lo suyo
 function vcVisible(r){
     if(sinPuedeTodo()) return true;

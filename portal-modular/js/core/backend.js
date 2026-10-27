@@ -51,6 +51,12 @@
       return detectPromise;
     },
 
+    /** Reintenta la detección (detect() cachea el primer resultado). */
+    async redetect() {
+      detectPromise = null;
+      return this.detect();
+    },
+
     api: call,
     async me(force) {
       if (!force && cachedMe !== undefined && (Date.now() - cachedMeAt < 3000)) {
