@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "portal-modular",
   "rewrites": [
-    { "source": "^/media/(.+)$", "destination": "/api/media-file?p=$1" },
+    { "source": "/media/:path*", "destination": "/api/media-file?p=:path*" },
     { "source": "/api/(.*)", "destination": "/api/index" }
   ],
   "crons": [
