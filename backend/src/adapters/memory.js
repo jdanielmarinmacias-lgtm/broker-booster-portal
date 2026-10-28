@@ -36,6 +36,14 @@ function createMemoryAdapter(initial) {
     async getSession(token) { return sessions.get(token) || null; },
     async setSession(token, s) { sessions.set(token, s); },
     async deleteSession(token) { sessions.delete(token); },
+    async pruneSessions(beforeMs) {
+      const limit = Number(beforeMs) || Date.now();
+      let removed = 0;
+      for (const [token, s] of sessions) {
+        if (!s || !(s.expiresAt >= limit)) { sessions.delete(token); removed++; }
+      }
+      return removed;
+    },
     async pushFeed(item) {
       feed.push({ id: Date.now(), created_at: new Date().toISOString(), ...item });
       return feed[feed.length - 1];

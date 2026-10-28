@@ -8,7 +8,10 @@ function securityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'same-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  /* Cámara y micrófono SÍ se usan (grabación de la práctica y reconocimiento
+   * de voz); bloquearlos aquí rompería esas funciones. Geolocalización, pagos
+   * y USB no se usan: se desactivan. */
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()');
   next();
 }
 

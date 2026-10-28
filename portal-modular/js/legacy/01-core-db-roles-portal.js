@@ -702,6 +702,12 @@ function pubToggleCompare(tipo, id){
     }
     renderPublicPortal();
 }
+/* Columnas del comparador público. Clases LITERALES: con Tailwind compilado,
+ * `grid-cols-${n}` construido en runtime no existe en el CSS generado. */
+function gridCols3(n){
+    const c = Math.min(3, Math.max(1, Number(n) || 1));
+    return c === 3 ? 'grid-cols-3' : c === 2 ? 'grid-cols-2' : 'grid-cols-1';
+}
 function pubAbrirComparador(tipo){
     if(tipo === 'auto'){
         const ids = window._pubCompAutos || [];
@@ -709,7 +715,7 @@ function pubAbrirComparador(tipo){
         if(!items.length) return;
         showModal(`<div class="p-6 max-w-4xl w-full">
             <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Unidades Automotrices (#10)</h3><button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
-            <div class="grid grid-cols-${Math.min(3, items.length)} gap-4">
+            <div class="grid ${gridCols3(items.length)} gap-4">
                 ${items.map(u => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
                     ${(u.fotos||[])[0]?`<img src="${u.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
                     <h4 class="font-bold text-slate-900">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h4>
@@ -730,7 +736,7 @@ function pubAbrirComparador(tipo){
         if(!items.length) return;
         showModal(`<div class="p-6 max-w-4xl w-full">
             <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Propiedades (#10)</h3><button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
-            <div class="grid grid-cols-${Math.min(3, items.length)} gap-4">
+            <div class="grid ${gridCols3(items.length)} gap-4">
                 ${items.map(p => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
                     ${(p.fotos||[])[0]?`<img src="${p.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
                     <h4 class="font-bold text-slate-900">${psEscape(p.titulo||'Propiedad')}</h4>
@@ -6421,11 +6427,16 @@ function cpSetResult(html){
   el.innerHTML=html; el.classList.remove('hidden');
   try{ el.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){}
 }
+/* Clases literales (no `bg-${color}-50`): con Tailwind compilado el escáner
+ * solo ve clases escritas completas en el fuente; una construida en runtime
+ * no existiría en el CSS. */
 function cpSeccionLista(c,lado){
   const arr=lado==='A'?(c.ventajasA||[]):(c.ventajasB||[]); if(!arr.length) return '';
-  const color=lado==='A'?'emerald':'blue';
+  const cls=lado==='A'
+    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 text-emerald-800'
+    : 'bg-blue-50 border-blue-200 text-blue-700 text-blue-800';
   const comp=lado==='A'?c.ladoA.compania:c.ladoB.compania;
-  return `<div class="mt-3 bg-${color}-50 border border-${color}-200 rounded-xl p-3"><p class="text-[10px] uppercase font-bold text-${color}-700 mb-1">Ventajas de ${psEscape(comp)}</p><ul class="text-sm text-${color}-800 list-disc pl-5 space-y-0.5">${arr.map(v=>`<li>${psEscape(v)}</li>`).join('')}</ul></div>`;
+  return `<div class="mt-3 border rounded-xl p-3 ${cls}"><p class="text-[10px] uppercase font-bold mb-1">Ventajas de ${psEscape(comp)}</p><ul class="text-sm list-disc pl-5 space-y-0.5">${arr.map(v=>`<li>${psEscape(v)}</li>`).join('')}</ul></div>`;
 }
 function cpRenderGuardada(c){
   const puede=comparadorPuedeEditar();
@@ -12876,9 +12887,9 @@ END:VCALENDAR`;
                     const sub = db.taskSubmissions.find(s=>s.taskId===t.id && s.studentId===currentUser.id);
                     const lesson = db.lessons.find(l=>l.id===t.lessonId);
                     const status = !sub ? 'pendiente' : sub.status;
-                    const color = status==='revisado' ? 'emerald' : status==='entregado' ? 'amber' : 'slate';
+                    const chip = status==='revisado' ? 'bg-emerald-100 text-emerald-700' : status==='entregado' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600';
                     return `<div class="bg-white rounded-2xl border border-slate-200 p-5">
-                        <div class="flex items-start justify-between"><div><h3 class="font-semibold">${t.title}</h3><p class="text-xs text-slate-500">${lesson?lesson.title:''} • Vence: ${t.dueDate?new Date(t.dueDate).toLocaleDateString('es-MX'):'Sin fecha'}</p></div><span class="px-2.5 py-1 text-xs rounded-full bg-${color}-100 text-${color}-700 capitalize">${status}</span></div>
+                        <div class="flex items-start justify-between"><div><h3 class="font-semibold">${t.title}</h3><p class="text-xs text-slate-500">${lesson?lesson.title:''} • Vence: ${t.dueDate?new Date(t.dueDate).toLocaleDateString('es-MX'):'Sin fecha'}</p></div><span class="px-2.5 py-1 text-xs rounded-full capitalize ${chip}">${status}</span></div>
                         <p class="text-sm text-slate-600 mt-3 line-clamp-2">${t.description||''}</p>
                         <div class="mt-4 flex items-center justify-between">${sub && sub.grade!=null?`<span class="text-sm font-medium text-emerald-600">Calificación: ${sub.grade}/100</span>`:'<span></span>'}<button onclick="openTaskSubmit(${t.id})" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">${sub?'Ver entrega':'Entregar'}</button></div>
                     </div>`;

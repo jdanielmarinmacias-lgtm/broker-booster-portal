@@ -695,3 +695,60 @@ describe('invitaciones de Mi Agenda (colección sincronizada)', () => {
     assert.ok(adminJar.cookie);
   });
 });
+
+describe('notificaciones: privacidad por destinatario', () => {
+  it('se crean avisos personales, generales y por rol', async () => {
+    // La suite llega aquí con sesión de admin (id 1).
+    for (const n of [
+      { id: 'notif-priv-alumno', userId: 3, msg: 'Solo para Ana', readBy: [] },
+      { id: 'notif-priv-admin', userId: 1, msg: 'Solo para Admin', readBy: [] },
+      { id: 'notif-general', msg: 'Para todo el portal', readBy: [] },
+      { id: 'notif-solo-gm', paraRoles: ['gm'], msg: 'Solo GM', readBy: [] },
+    ]) {
+      const r = await api('POST', '/api/data/notifications', n);
+      assert.ok(r.status === 200 || r.status === 201, 'POST ' + n.id + ': ' + r.status);
+    }
+  });
+  it('el alumno recibe la suya y la general, nunca la de otro usuario ni la de otro rol', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'alumno', password: 'Test1234*' }, false);
+    const g = await api('GET', '/api/data/notifications');
+    assert.equal(g.status, 200);
+    const ids = g.json.items.map((n) => n.id);
+    assert.ok(ids.includes('notif-priv-alumno'), 've su notificación personal');
+    assert.ok(ids.includes('notif-general'), 've el aviso general');
+    assert.ok(!ids.includes('notif-priv-admin'), 'NO ve la notificación personal del admin');
+    assert.ok(!ids.includes('notif-solo-gm'), 'NO ve la notificación de rol gm');
+
+    const b = await api('GET', '/api/data/bundle');
+    assert.equal(b.status, 200);
+    const bids = b.json.bundle.notifications.items.map((n) => n.id);
+    assert.ok(bids.includes('notif-priv-alumno'));
+    assert.ok(!bids.includes('notif-priv-admin'));
+    assert.ok(!bids.includes('notif-solo-gm'));
+  });
+  it('el admin ve la suya y el aviso general, pero NO la personal del alumno', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const g = await api('GET', '/api/data/notifications');
+    assert.equal(g.status, 200);
+    const ids = g.json.items.map((n) => n.id);
+    assert.ok(ids.includes('notif-priv-admin'));
+    assert.ok(ids.includes('notif-general'));
+    assert.ok(!ids.includes('notif-priv-alumno'), 'ser admin no da acceso al aviso privado de otro');
+  });
+});
+
+describe('poda de sesiones vencidas', () => {
+  it('al crear sesión se borran las filas vencidas y se conservan las vigentes', async () => {
+    const adapter = store.adapter;
+    await adapter.setSession('tok-vencido', { userId: '3', expiresAt: Date.now() - 60 * 60 * 1000 });
+    await adapter.setSession('tok-vigente', { userId: '3', expiresAt: Date.now() + 60 * 60 * 1000 });
+    sessions.resetSweepForTests(); // quita el throttle de 1h del proceso de pruebas
+    await sessions.create(3);
+    assert.equal(await adapter.getSession('tok-vencido'), null, 'la vencida se poda');
+    assert.ok(await adapter.getSession('tok-vigente'), 'la vigente sobrevive');
+    // El token vencido tampoco se acepta si llega por cookie.
+    assert.equal(await sessions.get('tok-vencido'), null);
+  });
+});

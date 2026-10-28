@@ -105,7 +105,63 @@ function filtrarObjetoPrivado(user, obj) {
 }
 const soloSuyaLaClave = (user, clave) => canReadAll(user) || String(clave) === String(user && user.id);
 
+/* ===== NOTIFICACIONES: privacidad por destinatario =====
+ * Antes, `notifications` se entregaba completa a cualquier sesión: un alumno
+ * recibía también las notificaciones personales de los demás (userId/agente),
+ * incluidas las de invitaciones y cotizaciones. Ahora el servidor decide:
+ *   · destinatario explícito (userId/paraId/agente/…) → solo ese usuario;
+ *   · paraRoles/roles → solo los roles indicados;
+ *   · aviso general (readBy/leidoPor, sin destinatario) → todos, como antes;
+ *   · forma desconocida → solo staff (no se filtra nada personal por error).
+ * Se aplica ANTES del atajo de staff: ser admin no da derecho a leer el aviso
+ * privado de otra persona. */
+const NOTIF_DESTINO_CAMPOS = ['userId', 'paraId', 'destinoId', 'usuarioId', 'toId', 'agente'];
+const NOTIF_ROLES_CAMPOS = ['paraRoles', 'roles'];
+function idDeDestino(v) {
+  if (v === undefined || v === null || v === '') return null;
+  if (Array.isArray(v)) return null;
+  if (typeof v === 'object') return v.id === undefined || v.id === null ? null : String(v.id);
+  return String(v);
+}
+function notificacionVisible(user, n) {
+  if (!n || typeof n !== 'object') return false;
+  const uid = String(user && user.id);
+  const role = String((user && user.role) || '').toLowerCase();
+  let tieneDestino = false;
+  for (const campo of NOTIF_DESTINO_CAMPOS) {
+    const valor = n[campo];
+    if (Array.isArray(valor)) {
+      if (!valor.length) continue;
+      tieneDestino = true;
+      if (valor.map(String).includes(uid)) return true;
+      continue;
+    }
+    const id = idDeDestino(valor);
+    if (id === null) continue;
+    /* `agente` a veces guarda el NOMBRE del agente (legacy ventas): un nombre
+     * no puede ser destinatario, así que no debe ocultar el aviso al resto. */
+    if (campo === 'agente' && !/^\d+$/.test(id)) continue;
+    tieneDestino = true;
+    if (id === uid) return true;
+  }
+  for (const campo of NOTIF_ROLES_CAMPOS) {
+    const valor = n[campo];
+    if (valor === undefined || valor === null) continue;
+    const lista = [].concat(valor).map((x) => String(x).toLowerCase());
+    if (!lista.length) continue;
+    tieneDestino = true;
+    if (lista.includes(role)) return true;
+  }
+  if (tieneDestino) return false;
+  // Aviso general del portal (la app lo marca con readBy/leidoPor).
+  if (Array.isArray(n.readBy) || Array.isArray(n.leidoPor)) return true;
+  return canReadAll(user);
+}
+
 function filtrarLectura(user, collection, items, root) {
+  if (collection === 'notifications') {
+    return items.filter((n) => notificacionVisible(user, n));
+  }
   if (canReadAll(user)) return items;
   const uid = String(user.id);
   if (OWNED_COLLECTIONS.has(collection)) {

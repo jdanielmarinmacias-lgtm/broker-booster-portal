@@ -52,6 +52,16 @@ function createJsonFileAdapter(dataDir) {
       delete all[token];
       writeAtomic(SES_FILE, all);
     },
+    async pruneSessions(beforeMs) {
+      const limit = Number(beforeMs) || Date.now();
+      const all = read(SES_FILE, {});
+      let removed = 0;
+      for (const token of Object.keys(all)) {
+        if (!all[token] || !(all[token].expiresAt >= limit)) { delete all[token]; removed++; }
+      }
+      if (removed) writeAtomic(SES_FILE, all);
+      return removed;
+    },
     async listFeed(limit) {
       const data = read(DB_FILE, {});
       return (data.publicFeed || []).slice(-Math.min(Number(limit) || 20, 50)).reverse();

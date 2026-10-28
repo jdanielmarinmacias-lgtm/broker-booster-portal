@@ -531,6 +531,18 @@ function createSupabaseAdapter({ url, serviceKey }) {
     async deleteSession(token) {
       await sb.from('app_sessions').delete().eq('token', token);
     },
+    /* Poda de sesiones vencidas (una vez por hora y por instancia, ver
+     * sessions.sweep). Devuelve cuántas filas borró; el conteo es best-effort
+     * (`select('token')` da el número exacto sin descargar el resto). */
+    async pruneSessions(beforeMs) {
+      const iso = new Date(Number(beforeMs) || Date.now()).toISOString();
+      const { data, error } = await sb.from('app_sessions')
+        .delete()
+        .lt('expires_at', iso)
+        .select('token');
+      if (error) throw new Error('Supabase session prune: ' + error.message);
+      return Array.isArray(data) ? data.length : 0;
+    },
     async pushFeed(item) {
       const base = { kind: item.kind || 'aviso', title: item.title || '', body: item.body || '' };
       const full = { ...base };

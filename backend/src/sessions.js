@@ -8,10 +8,28 @@ const config = require('./config');
 let adapter = null;
 function bind(a) { adapter = a; }
 
-async function sweep() { /* expiración perezosa: se filtra en get() */ }
+/* Poda de sesiones vencidas: las filas de app_sessions crecían sin límite (12h
+ * de TTL, pero nadie las borraba: cada login dejaba una fila para siempre).
+ * Se purgan como máximo 1 vez por hora y por instancia, al crear sesión, para
+ * no añadir una consulta de escritura a cada petición. La expiración sigue
+ * siendo perezosa en get() (un token vencido nunca se acepta). */
+const SWEEP_EVERY_MS = 60 * 60 * 1000;
+let lastSweep = 0;
+async function sweep() {
+  if (!adapter || typeof adapter.pruneSessions !== 'function') return;
+  const now = Date.now();
+  if (now - lastSweep < SWEEP_EVERY_MS) return;
+  lastSweep = now;
+  try {
+    await adapter.pruneSessions(now);
+  } catch (e) {
+    /* Sin poda no se puede bloquear el login: se reintenta en la próxima hora. */
+    console.warn('[sessions] poda de vencidas falló:', e.message);
+  }
+}
 
 async function create(userId) {
-  await sweep();
+  await sweep(); // 1 vez/hora: borra filas vencidas sin penalizar cada petición
   const token = crypto.randomBytes(32).toString('hex');
   await adapter.setSession(token, { userId: String(userId), expiresAt: Date.now() + config.sessionTtlMs });
   return token;
@@ -19,7 +37,6 @@ async function create(userId) {
 
 async function get(token) {
   if (!token || !adapter) return null;
-  await sweep();
   const s = await adapter.getSession(token);
   if (!s || s.expiresAt < Date.now()) {
     if (s) await adapter.deleteSession(token).catch(() => {});
@@ -60,4 +77,7 @@ function readCookie(req) {
   return pair ? decodeURIComponent(pair.slice(config.cookieName.length + 1)) : null;
 }
 
-module.exports = { bind, create, get, destroy, cookieHeader, clearCookieHeader, readCookie };
+/* Solo tests: fuerza que el próximo create pode aunque el throttle esté activo. */
+function resetSweepForTests() { lastSweep = 0; }
+
+module.exports = { bind, create, get, destroy, cookieHeader, clearCookieHeader, readCookie, resetSweepForTests };

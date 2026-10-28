@@ -3,12 +3,20 @@
   "version": "0.3.0",
   "private": true,
   "description": "Portal Broker Booster: frontend modular + backend propio, desplegable en Vercel con Supabase.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "express": "^4.21.2",
     "@supabase/supabase-js": "^2.48.1",
+    "express": "^4.21.2",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i portal-modular/css/tailwind.src.css -o portal-modular/css/tailwind.min.css --minify"
   }
 }

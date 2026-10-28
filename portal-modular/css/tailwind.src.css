@@ -1,0 +1,5 @@
+/* Entrada de Tailwind compilado. NO se sirve: genera tailwind.min.css.
+ * Recompilar con `npm run build:css` desde la raíz del repo. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

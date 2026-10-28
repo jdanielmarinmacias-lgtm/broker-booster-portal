@@ -32,9 +32,12 @@ const STYLE_RANGES = [
 const inRanges = (n, rs) => rs.some(([a, b]) => n >= a && n <= b);
 const isRemoved = (n) => inRanges(n, SCRIPT_RANGES) || inRanges(n, STYLE_RANGES);
 
+// Tailwind ya NO viene del CDN: se compila a css/tailwind.min.css
+// (`npm run build:css`). El rebuild inserta ese <link> antes de styles.css.
+const TAILWIND_LINK = '    <link rel="stylesheet" href="css/tailwind.min.css">';
+
 // CDN en orden original
 const CDN = [
-  'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/chart.js',
   'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
@@ -54,6 +57,7 @@ const headKept = [];
 for (let n = 1; n <= 298; n++) if (!isRemoved(n)) headKept.push(L[n - 1]);
 let head = headKept.join('\n');
 head = head.replace('</head>',
+  TAILWIND_LINK + '\n' +
   '    <link rel="stylesheet" href="css/styles.css">\n' +
   CDN.map((u) => `    <script src="${u}"><\/script>`).join('\n') + '\n</head>');
 
@@ -85,7 +89,8 @@ fs.writeFileSync(path.join(ROOT, 'index.html'), html);
 
 // 5) verificaciones automáticas
 const checks = [];
-checks.push(['tailwind presente', html.includes('cdn.tailwindcss.com')]);
+checks.push(['tailwind compilado presente', html.includes('css/tailwind.min.css')]);
+checks.push(['sin Tailwind CDN', !html.includes('cdn.tailwindcss.com')]);
 checks.push(['sin JS filtrado (saveDB original)', !html.includes('function saveDB() { localStorage')]);
 checks.push(['sin document.write filtrado', !html.includes('w.document.write')]);
 checks.push(['sin <style> inline restante', !/<style[^>]*>/i.test(html.replace('<link rel="stylesheet" href="css/styles.css">', ''))]);
