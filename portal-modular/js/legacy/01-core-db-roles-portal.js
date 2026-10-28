@@ -354,11 +354,13 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                 db.carruselCirculares.carrusel = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
             }
             if (db.carruselCirculares) {
-                if (db.carruselCirculares.circulares && (!db.carruselCirculares.circulares.titulo || /circular/i.test(db.carruselCirculares.circulares.titulo))) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
+                // Solo renombra el título heredado exacto; antes reescribía cualquier
+                // título que contuviera "circular" y borraba lo que el usuario escribió.
+                if (db.carruselCirculares.circulares && (!db.carruselCirculares.circulares.titulo || /^circulares?$/i.test(String(db.carruselCirculares.circulares.titulo).trim()))) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
                 if (!db.carruselCirculares.circulares.dia) db.carruselCirculares.circulares.dia = 'Martes';
                 if (!db.carruselCirculares.circulares.horario) db.carruselCirculares.circulares.horario = '19:00';
                 if (!db.carruselCirculares.circulares.imagen) db.carruselCirculares.circulares.imagen = 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200';
-                if (db.carruselCirculares.carrusel && (!db.carruselCirculares.carrusel.titulo || /carrusel/i.test(db.carruselCirculares.carrusel.titulo))) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
+                if (db.carruselCirculares.carrusel && (!db.carruselCirculares.carrusel.titulo || /^carrusel$/i.test(String(db.carruselCirculares.carrusel.titulo).trim()))) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
                 if (!db.carruselCirculares.carrusel.dia) db.carruselCirculares.carrusel.dia = 'Miércoles';
                 if (!db.carruselCirculares.carrusel.horario) db.carruselCirculares.carrusel.horario = '19:00';
                 if (!db.carruselCirculares.carrusel.imagen) db.carruselCirculares.carrusel.imagen = 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200';
@@ -6613,29 +6615,38 @@ function cpBorrarGuardada(id){
   saveDB(); render();
 }
 
+/* Racha diaria: se evalúa contra la copia del SERVIDOR, no contra la de sesión.
+ * Escribe una sola vez al día; el resto de cargas no tocan la base. */
+function checkDailyStreak() {
+    try {
+        if (typeof currentUser === 'undefined' || !currentUser || !Array.isArray(db.users)) return;
+        const u = db.users.find(x => String(x.id) === String(currentUser.id));
+        if (!u) return;
+        const today = new Date().toDateString();
+        const last = u.lastStudy ? new Date(u.lastStudy).toDateString() : null;
+        if (last === today) {
+            currentUser.streak = u.streak || 0;
+            currentUser.lastStudy = u.lastStudy;
+            return;
+        }
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        u.streak = (last === yesterday) ? ((u.streak || 0) + 1) : 1;
+        u.lastStudy = new Date().toISOString();
+        currentUser.streak = u.streak;
+        currentUser.lastStudy = u.lastStudy;
+        try { sessionStorage.setItem('pepes_user', JSON.stringify(currentUser)); } catch (e) {}
+        saveDB();
+    } catch (e) { /* la racha nunca rompe el arranque */ }
+}
+window.checkDailyStreak = checkDailyStreak;
+
 function initializeApp() {
             setTimeout(()=>{ try{ guiaMountForUser(); }catch(e){ console.warn('GUIA mount:',e); } }, 300);
-            // Actualizar racha diaria
-            const today = new Date().toDateString();
-            const last = currentUser.lastStudy ? new Date(currentUser.lastStudy).toDateString() : null;
-            const yesterday = new Date(Date.now() - 86400000).toDateString();
-            const userInDb = db.users.find(u => u.id === currentUser.id);
-            if (userInDb) {
-                if (last === today) {
-                    // ya contó hoy
-                } else if (last === yesterday) {
-                    userInDb.streak = (userInDb.streak || 0) + 1;
-                } else if (!last) {
-                    userInDb.streak = 1;
-                } else {
-                    userInDb.streak = 1;
-                }
-                userInDb.lastStudy = new Date().toISOString();
-                currentUser.streak = userInDb.streak;
-                currentUser.lastStudy = userInDb.lastStudy;
-                sessionStorage.setItem('pepes_user', JSON.stringify(currentUser));
-                saveDB();
-            }
+            /* La racha se calcula en checkDailyStreak(), que corre DESPUÉS de
+             * traer los datos del servidor (ver sync.js). Antes se calculaba
+             * aquí, antes del pull: el servidor la sobrescribía y además cada
+             * carga reescribía lastStudy, lo que despertaba a todos los equipos. */
+            if (typeof checkDailyStreak === 'function') checkDailyStreak();
             document.getElementById('user-name').textContent = currentUser.name;
             document.getElementById('user-role').textContent = currentUser.role;
             document.getElementById('user-avatar').src = currentUser.avatar;
@@ -7252,8 +7263,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const defCarr = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
             db.carruselCirculares.circulares = Object.assign({}, defCirc, db.carruselCirculares.circulares || {});
             db.carruselCirculares.carrusel = Object.assign({}, defCarr, db.carruselCirculares.carrusel || {});
-            if (/circular/i.test(db.carruselCirculares.circulares.titulo || '')) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
-            if (/carrusel/i.test(db.carruselCirculares.carrusel.titulo || '')) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
+            if (/^circulares?$/i.test(String(db.carruselCirculares.circulares.titulo || '').trim())) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
+            if (/^carrusel$/i.test(String(db.carruselCirculares.carrusel.titulo || '').trim())) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
             return db.carruselCirculares;
         }
         function canEditCarrusel(){ return hasRole(currentUser, ['admin','gm','desarrollador','editor']); }

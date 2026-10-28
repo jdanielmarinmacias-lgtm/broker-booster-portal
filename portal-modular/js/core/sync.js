@@ -205,11 +205,28 @@
     } catch (e) { /* fallback individual */ }
     return pullNames(fallbackNames || []);
   }
+  /* Un solo viaje por colección aunque varias pantallas la pidan a la vez.
+   * El carrusel se descargaba 4 veces al abrir el portal por esto. */
+  var pullInFlight = {};
+  function pullCollectionOnce(name) {
+    const key = String(name);
+    if (!pullInFlight[key]) {
+      pullInFlight[key] = pullCollection(key).then(function (v) {
+        delete pullInFlight[key];
+        return v;
+      }, function (e) {
+        delete pullInFlight[key];
+        throw e;
+      });
+    }
+    return pullInFlight[key];
+  }
+
   async function pullNames(names) {
     const db = legDb();
     if (!db) return false;
     const jobs = names.map(function (n) {
-      return pullCollection(n).then(function (v) { return { n, v }; });
+      return pullCollectionOnce(n).then(function (v) { return { n, v }; });
     });
     const results = await Promise.all(jobs);
     let changed = false;
@@ -317,6 +334,10 @@
     }
     try { if (typeof window.ensureDbDefaults === 'function') window.ensureDbDefaults(); } catch (e0) {}
     snapshot(); // foto del servidor ANTES de fusionar lo local
+    /* Racha diaria: ahora que db.users tiene la verdad del servidor (y la
+     * sombra ya está alineada), se evalúa aquí. Si es otro día, esto sí es un
+     * cambio real y se sube; el resto de cargas no escriben nada. */
+    try { if (typeof window.checkDailyStreak === 'function') window.checkDailyStreak(); } catch (e0) {}
     let merged = 0;
     Object.keys(pre).forEach(function (n) {
       if (Array.isArray(db[n])) {
@@ -387,6 +408,44 @@
     return m;
   }
 
+  /* ── Comparación tolerante ─────────────────────────────────────────────────
+   * El legacy normaliza el `db` al cargar (ids numéricos, `streak: 0`,
+   * `lastStudy: null`…). Comparar con JSON.stringify marcaba eso como cambio:
+   * cada carga "veía" 10 usuarios editados y escribía en la base sin que nadie
+   * hubiera tocado nada, y ese PUT despertaba a todos los equipos por realtime.
+   * Aquí null y ausente son lo mismo, y 5 y "5" también. */
+  function mismoValor(a, b) {
+    const na = (a === undefined) ? null : a;
+    const nb = (b === undefined) ? null : b;
+    if (na === nb) return true;
+    if (na === null || nb === null) return false;
+    if (typeof na === 'object' || typeof nb === 'object') {
+      try { return JSON.stringify(na) === JSON.stringify(nb); } catch (e) { return false; }
+    }
+    if (typeof na === 'number' || typeof nb === 'number') return String(na) === String(nb);
+    return na === nb;
+  }
+
+  function registrosIguales(a, b) {
+    if (!a || !b) return false;
+    if (typeof a !== 'object' || typeof b !== 'object') return mismoValor(a, b);
+    const keys = new Set(Object.keys(a).concat(Object.keys(b)));
+    for (const k of keys) { if (!mismoValor(a[k], b[k])) return false; }
+    return true;
+  }
+
+  /* Default que el servidor todavía no guardó (0, null, '', [], false) no es
+   * una edición del usuario: se queda en memoria y no se escribe. */
+  function esValorPorDefecto(v) {
+    if (v === null || v === undefined) return true;
+    if (v === '' || v === 0 || v === false) return true;
+    return Array.isArray(v) && v.length === 0;
+  }
+
+  /* Presencia: se envía como mucho cada 10 min, no en cada carga. */
+  const CAMPOS_LATIDO = ['lastActive', 'lastConnection'];
+  const LATIDO_MIN_MS = 10 * 60 * 1000;
+
   function stripUser(u) {
     const c = Object.assign({}, u);
     delete c.password; delete c.passwordHash; delete c.password_hash;
@@ -423,7 +482,7 @@
           Object.keys(u).forEach(function (k) { delete u[k]; });
           Object.assign(u, canon); // récord canónico (sin hash) + mismo id numérico
         } else if (
-          JSON.stringify(stripUser(u)) !== JSON.stringify(stripUser(prev))
+          !registrosIguales(stripUser(u), stripUser(prev))
           || (typeof u.password === 'string' && u.password.trim() !== '')
         ) {
           /* Solo los CAMPOS que cambiaron. Antes se enviaba el usuario completo:
@@ -436,7 +495,9 @@
           const body = {};
           Object.keys(ahora).forEach(function (k) {
             if (k === 'id') return;
-            if (JSON.stringify(ahora[k]) !== JSON.stringify(antes[k])) body[k] = ahora[k];
+            if (mismoValor(ahora[k], antes[k])) return;
+            if (!(k in antes) && esValorPorDefecto(ahora[k])) return;
+            body[k] = ahora[k];
           });
           // Si se desasignó agencia/equipo en local, enviar null explícito para que el servidor limpie la clave
           ['agenciaId', 'agencia', 'parentId', 'assignedTo'].forEach(function (fk) {
@@ -444,6 +505,14 @@
           });
           // Sin cambios reales (solo el hash de la clave): no molestar al servidor.
           if (!Object.keys(body).length && !(typeof u.password === 'string' && u.password.trim() !== '')) continue;
+          /* Si lo único que cambió es la presencia (lastActive/lastConnection),
+           * no se escribe hasta que el latido guardado tenga 10 minutos. Antes
+           * cada carga reescribía el usuario y avisaba a todos los equipos. */
+          const soloLatido = Object.keys(body).every(function (k) { return CAMPOS_LATIDO.indexOf(k) !== -1; });
+          if (soloLatido) {
+            const ultimoLatido = Number(prev && prev.lastActive) || 0;
+            if (Date.now() - ultimoLatido < LATIDO_MIN_MS) continue;
+          }
           if (typeof u.password === 'string' && u.password.trim() !== '') {
             body.password = u.password.trim();
           }
@@ -496,7 +565,9 @@
     if (isPlain(local)) {
       const oldObj = (old && isPlain(old)) ? old : {};
       for (const k of Object.keys(local)) {
-        if (JSON.stringify(local[k]) === JSON.stringify(oldObj[k])) continue;
+        if (mismoValor(local[k], oldObj[k])) continue;
+        // Clave nueva que solo trae el valor por defecto del panel: no se escribe.
+        if (!(k in oldObj) && esValorPorDefecto(local[k])) continue;
         try {
           await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k), { value: local[k] });
         } catch (e) {
@@ -532,7 +603,7 @@
       const id = String(rec.id);
       seen[id] = true;
       const prev = oldMap[id];
-      const same = prev && JSON.stringify(rec) === JSON.stringify(prev);
+      const same = prev && registrosIguales(rec, prev);
       if (same) continue;
       try {
         if (!prev) await send('POST', '/api/data/' + encodeURIComponent(name), rec);

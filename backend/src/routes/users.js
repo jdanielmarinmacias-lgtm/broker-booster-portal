@@ -145,7 +145,7 @@ module.exports = (store) => {
       username, password, name, email, phone, role, avatar,
       ubicacion, ciudad, ubicacionCiudad, calendarColor,
       agenciaId, agencia, parentId, assignedTo, xp, students,
-      lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy,
+      lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy, streak,
     } = req.body || {};
     const HEARTBEAT_FIELDS = new Set(['lastActive', 'lastConnection', 'solicitudesVistasHasta', 'attendance', 'lastStudy', 'xp', 'streak']);
     const isHeartbeatOnly = bodyKeys.length > 0 && bodyKeys.every((k) => HEARTBEAT_FIELDS.has(k));
@@ -168,6 +168,12 @@ module.exports = (store) => {
       ubicacion, ciudad, ubicacionCiudad, calendarColor,
       agenciaId, agencia, parentId, assignedTo, xp, students,
       lastActive, lastConnection, solicitudesVistasHasta, attendance, lastStudy,
+      /* La racha viajaba en el cuerpo pero NO se copiaba al usuario: el servidor
+       * la descartaba y cada inicio de sesión volvía a 0. Se normaliza a entero
+       * ≥ 0 para no guardar basura si llega un string o un NaN. */
+      streak: (streak === undefined)
+        ? undefined
+        : (Number.isFinite(Number(streak)) ? Math.max(0, Math.min(Math.round(Number(streak)), 100000)) : undefined),
     };
     for (const [k, v] of Object.entries(extraFields)) {
       if (v === null) delete target[k];
@@ -191,11 +197,14 @@ module.exports = (store) => {
        * despertaba un pull en todos los equipos cada minuto.
        * OJO: hay que conservar el hash — `req.user` viene sin él y el upsert
        * lo dejaría en null (el usuario ya no podría entrar). */
-      if (typeof store.adapter.upsertUser === 'function') {
+      if (typeof store.adapter.upsertUser === 'function' && store.adapter.kind !== 'json') {
         const full = await store.adapter.getUserById(target.id);
         if (full && full.passwordHash) target.passwordHash = full.passwordHash;
         await store.adapter.upsertUser(target);
       } else {
+        /* json/memory: sus upsertUser no escriben el archivo (el adaptador JSON
+         * delega en el write-through de documents), así que aquí sí hay que
+         * persistir; si no, el latido y la racha se perdían al reiniciar. */
         await store.persistCollections(['users']);
       }
     } else {
