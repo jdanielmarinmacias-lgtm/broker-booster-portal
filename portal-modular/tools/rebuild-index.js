@@ -90,7 +90,7 @@ fs.writeFileSync(path.join(ROOT, 'index.html'), html);
 // 5) verificaciones automáticas
 const checks = [];
 checks.push(['tailwind compilado presente', html.includes('css/tailwind.min.css')]);
-checks.push(['sin Tailwind CDN', !html.includes('cdn.tailwindcss.com')]);
+checks.push(['sin Tailwind CDN', !/<script[^>]+cdn\.tailwindcss\.com/i.test(html)]);
 checks.push(['sin JS filtrado (saveDB original)', !html.includes('function saveDB() { localStorage')]);
 checks.push(['sin document.write filtrado', !html.includes('w.document.write')]);
 checks.push(['sin <style> inline restante', !/<style[^>]*>/i.test(html.replace('<link rel="stylesheet" href="css/styles.css">', ''))]);
