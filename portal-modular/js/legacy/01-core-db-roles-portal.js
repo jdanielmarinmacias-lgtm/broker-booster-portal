@@ -10255,7 +10255,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             ` : '';
             
             const viewedAlready = lesson.views && lesson.views.includes(currentUser.id);
-            showModal(`<div class="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-3">${catCoverBox(lesson.categoryId,'w-16 h-16')}<div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
+            /* `modal-large` + max-w-5xl: showModal pone al contenedor el ancho que
+             * declare el contenido. Sin esa marca el lector quedaba en max-w-lg
+             * (512 px); ahora abre al doble (1024 px) para leer cómodo. */
+            showModal(`<div class="p-6 modal-large max-w-5xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-3">${catCoverBox(lesson.categoryId,'w-16 h-16')}<div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
                 ${videoEmbedHtml}
                 <div class="prose max-w-none bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">${formattedContentHtml}</div>
                 ${actionsHtml}
@@ -12871,38 +12874,44 @@ END:VCALENDAR`;
             a.click();
         }
 
+        /* Convierte un enlace externo en una URL incrustable.
+         * Solo YouTube, Drive, Docs y Vimeo permiten iframe: el resto manda
+         * X-Frame-Options/CSP y el navegador pinta "Este contenido está
+         * bloqueado". Para esos se muestra un botón de abrir fuera, en vez de
+         * un marco vacío. La CSP del portal también debe permitir el host
+         * (ver vercel.json: frame-src). */
+        function resolverEmbedExterno(url) {
+            const u = String(url || '').trim();
+            if (!u) return { src: '', embebible: false };
+            const yt = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+            if (yt) return { src: 'https://www.youtube.com/embed/' + yt[1], embebible: true };
+            if (/drive\.google\.com/.test(u)) {
+                const m = u.match(/\/d\/([A-Za-z0-9_-]+)/) || u.match(/[?&]id=([A-Za-z0-9_-]+)/);
+                return m ? { src: 'https://drive.google.com/file/d/' + m[1] + '/preview', embebible: true } : { src: u, embebible: false };
+            }
+            if (/docs\.google\.com/.test(u)) return { src: u.replace(/\/edit(?:[?#].*)?$/, '/preview'), embebible: true };
+            const vm = u.match(/vimeo\.com\/(\d+)/);
+            if (vm) return { src: 'https://player.vimeo.com/video/' + vm[1], embebible: true };
+            return { src: u, embebible: false };
+        }
+
         function openLibraryPreview(id) {
             const m = db.library.find(x=>x.id===id);
             if (!m) return;
             let embedUrl = '';
+            let embebible = false;
             let title = m.title;
             const fileSrc = m.url || m.fileData || '';
             if (m.type === 'link' && m.url) {
-                const url = m.url;
-                // YouTube
-                if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
-                    const vid = url.includes('youtu.be/') ? url.split('youtu.be/')[1].split('?')[0] : new URL(url).searchParams.get('v');
-                    embedUrl = `https://www.youtube.com/embed/${vid}`;
-                }
-                // Google Drive
-                else if (url.includes('drive.google.com')) {
-                    let fileId = '';
-                    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-                    if (match) fileId = match[1];
-                    embedUrl = fileId ? `https://drive.google.com/file/d/${fileId}/preview` : url;
-                }
-                // Google Docs/Sheets/Slides
-                else if (url.includes('docs.google.com')) {
-                    embedUrl = url.replace('/edit', '/preview');
-                } else {
-                    embedUrl = url;
-                }
+                const info = resolverEmbedExterno(m.url);
+                embedUrl = info.src;
+                embebible = info.embebible;
             }
             const lowerName = String(m.fileName || fileSrc || '').toLowerCase();
             const isPdfFile = m.type==='file' && fileSrc && (lowerName.endsWith('.pdf') || /^data:application\/pdf/i.test(fileSrc));
             const isImageFile = m.type==='file' && fileSrc && (/\.(png|jpe?g|gif|webp|svg)$/i.test(lowerName) || /^data:image\//i.test(fileSrc));
             const isVideoFile = m.type==='file' && fileSrc && (/\.(mp4|webm|mov)$/i.test(lowerName) || /^data:video\//i.test(fileSrc));
-            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" data-bx-click="a376" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen></iframe>` : isPdfFile ? `<iframe src="${escapeHTML(fileSrc)}" class="w-full h-full" frameborder="0"></iframe>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button data-bx-click="a395" data-p0="${bxE(function(){return m.id})}" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
+            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" data-bx-click="a376" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' && embebible ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>` : m.type==='link' ? `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-globe text-4xl mb-4 opacity-50"></i><p class="mb-4 max-w-md">Este sitio no permite mostrarse dentro del portal porque bloquea su incrustación. Ábrelo en una pestaña nueva.</p><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-emerald-600 rounded-lg font-semibold">Abrir en nueva pestaña</a></div>` : isPdfFile ? `<iframe src="${escapeHTML(fileSrc)}" class="w-full h-full" frameborder="0"></iframe>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button data-bx-click="a395" data-p0="${bxE(function(){return m.id})}" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
         }
 
         // --- TAREAS ---
