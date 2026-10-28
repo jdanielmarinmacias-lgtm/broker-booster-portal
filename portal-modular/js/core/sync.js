@@ -181,7 +181,10 @@
           pulled[n] = true;
         });
         if (hayPendienteLocal) pushSoon();
-        if (Array.isArray(r.users)) {
+        /* Solo se reemplaza el directorio si el servidor manda algo: una
+         * respuesta vacía (instancia con caché fría) borraba la lista local y
+         * hacía que el portal volviera a subir usuarios que ya existían. */
+        if (Array.isArray(r.users) && r.users.length) {
           if (!Array.isArray(db.users)) db.users = [];
           /* Conservar altas locales aún no subidas: reemplazar la lista entera
            * borraba al usuario recién creado en este equipo antes de su push. */
@@ -280,7 +283,7 @@
     if (!db) return false;
     try {
       const users = await window.Backend.listUsers();
-      if (!Array.isArray(users)) return false;
+      if (!Array.isArray(users) || !users.length) return false;
       if (!Array.isArray(db.users)) db.users = [];
       replaceArray(db.users, normIds(users));
       usersPulled = true;

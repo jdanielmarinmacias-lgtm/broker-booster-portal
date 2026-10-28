@@ -303,8 +303,20 @@ module.exports = (store, config) => {
       // Todos los usuarios autenticados reciben el directorio de usuarios seguros
       // (sin passwordHash) para poder ver contactos reales en Mensajes/Chat y Ranking
       // sin disparar GET /api/users (403 para alumnos/agentes).
-      const users = db.collection(data, 'users').map(db.safeUser);
-      res.json({ ok: true, bundle, users });
+      let users = db.collection(data, 'users').map(db.safeUser);
+      if (!users.length) {
+        /* Una instancia serverless puede tener la caché de usuarios vacía (se
+         * hidrató solo una colección). Mandar `users: []` hacía que el cliente
+         * borrara su directorio y volviera a empujar usuarios que ya existían:
+         * de ahí el PUT al usuario en cada carga. Si la caché no tiene
+         * usuarios, se leen frescos; si tampoco, se omite la clave y el cliente
+         * conserva el directorio que ya tenía. */
+        try {
+          const fresh = await store.adapter.listUsers();
+          if (Array.isArray(fresh) && fresh.length) users = fresh.map(db.safeUser);
+        } catch (e) { /* se omite la clave */ }
+      }
+      res.json(users.length ? { ok: true, bundle, users } : { ok: true, bundle });
     } catch (e) { next(e); }
   });
 
