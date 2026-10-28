@@ -9,7 +9,9 @@
     "dev": "node --watch src/server.js",
     "seed": "node src/seed.js",
     "import": "node src/import.js",
-    "test": "node --test test/smoke.js"
+    "test": "node --test test/smoke.js",
+    "storage:inventario": "node tools/storage-inventory.js",
+    "storage:optimizar": "node tools/optimize-storage.js"
   },
   "engines": {
     "node": ">=20"
@@ -20,5 +22,8 @@
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
   }
 }

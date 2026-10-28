@@ -29,11 +29,88 @@
     return data;
   }
 
+  /* Igual que un archivo, pero más pequeño: se sube y se sirve menos peso.
+   * Una foto de móvil de 6 MB se pinta después en tarjetas de 300 px. Se
+   * redimensiona a 1600 px de ancho y se recomprime; PNG/WebP van a WebP para
+   * no perder transparencia y JPEG a JPEG. Si el resultado no es menor, se
+   * conserva el original (nunca empeorar). */
+  const MAX_ANCHO_SUBIDA = 1600;
+  const CALIDAD_SUBIDA = 0.82;
+  const UMBRAL_OPTIMIZAR = 350 * 1024;
+
+  function aBlob(canvas, tipo, calidad) {
+    return new Promise(function (resolve) {
+      try { canvas.toBlob(function (b) { resolve(b); }, tipo, calidad); }
+      catch (e) { resolve(null); }
+    });
+  }
+
+  async function optimizar(file) {
+    try {
+      if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || '')) return file;
+      if (file.size <= UMBRAL_OPTIMIZAR) return file;
+      let imagen;
+      if (window.createImageBitmap) {
+        imagen = await createImageBitmap(file);
+      } else {
+        imagen = await new Promise(function (resolve, reject) {
+          const img = new Image();
+          img.onload = function () { resolve(img); };
+          img.onerror = reject;
+          img.src = URL.createObjectURL(file);
+        });
+      }
+      const ancho = imagen.width || imagen.naturalWidth;
+      const alto = imagen.height || imagen.naturalHeight;
+      if (!ancho || !alto) return file;
+      const escala = Math.min(1, MAX_ANCHO_SUBIDA / ancho);
+      if (escala === 1 && file.size <= 900 * 1024) return file;
+      const w = Math.max(1, Math.round(ancho * escala));
+      const h = Math.max(1, Math.round(alto * escala));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(imagen, 0, 0, w, h);
+      const tipo = /png|webp/i.test(file.type) ? 'image/webp' : 'image/jpeg';
+      const blob = await aBlob(canvas, tipo, CALIDAD_SUBIDA);
+      if (!blob || blob.size >= file.size) return file;
+      const nombre = (file.name || 'imagen').replace(/\.[^.]+$/, '') + (tipo === 'image/webp' ? '.webp' : '.jpg');
+      return new File([blob], nombre, { type: tipo });
+    } catch (e) { return file; }
+  }
+
+  /* Huella SHA-256 del archivo: sirve para no volver a subir (ni a guardar) el
+   * mismo contenido dos veces. En este portal el mismo JPEG llegó a estar 10
+   * veces en el Storage con nombres distintos. */
+  const MAX_HUELLA = 12 * 1024 * 1024; // no leer en RAM videos de 50 MB
+
+  async function huella(file) {
+    try {
+      if (!window.crypto || !window.crypto.subtle || !file || !file.arrayBuffer) return null;
+      if (file.size > MAX_HUELLA) return null;
+      const buf = await file.arrayBuffer();
+      const dig = await window.crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(dig)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    } catch (e) { return null; }
+  }
+
   async function subir(file, opts) {
     opts = opts || {};
     if (!file) throw new Error('Sin archivo');
     const scope = opts.scope || 'media';
     if (!(window.Backend && window.Backend.available)) throw new Error('Sin backend');
+
+    // 0) Optimización + huella ANTES de pedir la firma (el tamaño firmado debe
+    //    ser el real). Si ya existe ese mismo archivo, se reutiliza su URL.
+    file = await optimizar(file);
+    const hash = await huella(file);
+    if (hash) {
+      try {
+        const dup = await json('/api/media/check', { hash, scope });
+        if (dup && dup.item && dup.item.url) return dup.item;
+      } catch (e) { /* sin endpoint o sin red: se sube normal */ }
+    }
 
     // 1) Intento firmado (Supabase). 501 => modo local.
     let signed = null;
@@ -54,7 +131,7 @@
       });
       if (!up.ok) throw new Error('No se pudo subir al Storage (HTTP ' + up.status + ')');
       const done = await json('/api/media/confirm', {
-        path: signed.path, mime: file.type, size: file.size,
+        path: signed.path, mime: file.type, size: file.size, hash,
         scope, title: opts.title || file.name, refId: opts.refId || null,
       });
       return done.item;
@@ -64,6 +141,7 @@
     const fd = new FormData();
     fd.append('files', file, file.name);
     fd.append('scope', scope);
+    if (hash) fd.append('hash', hash);
     if (opts.title) fd.append('title', opts.title);
     if (opts.refId) fd.append('refId', opts.refId);
     const res = await fetch('/api/media', { method: 'POST', credentials: 'same-origin', body: fd });
@@ -180,5 +258,30 @@
     return (await comprimirImagen(file, 1280, 0.82)) || '';
   }
 
-  window.Media = { subir, subirMuchos, comprimirImagen, subirOUrl, desbase64 };
+  window.Media = { subir, subirMuchos, comprimirImagen, subirOUrl, desbase64, optimizar, huella };
+
+  /* ==========================================================================
+   * RED DE SEGURIDAD DEL PROXY `/media/`
+   * Las imágenes se sirven desde nuestro dominio para poder cachearlas un año
+   * (Supabase manda `private, no-cache`). Si el proxy fallara en algún entorno,
+   * el usuario se quedaría sin imágenes: aquí se reintenta UNA vez contra el
+   * original del Storage. `window.__MEDIA_BASE` lo publica realtime.js al leer
+   * /api/public/config.
+   * ========================================================================== */
+  const PREFIJO_PROXY = '/media/';
+  function activarRespaldoMedia() {
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (!img || img.tagName !== 'IMG') return;
+      const src = img.getAttribute('src') || '';
+      if (src.indexOf(PREFIJO_PROXY) !== 0 || img.dataset.mediaOriginal) return;
+      const base = window.__MEDIA_BASE;
+      if (!base) return;
+      img.dataset.mediaOriginal = '1';
+      img.src = base + src.slice(PREFIJO_PROXY.length);
+    }, true);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', activarRespaldoMedia);
+  else activarRespaldoMedia();
 })();

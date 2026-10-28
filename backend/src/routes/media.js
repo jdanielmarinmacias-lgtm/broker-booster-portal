@@ -84,19 +84,38 @@ module.exports = (store, config) => {
     } catch (e) { next(e); }
   });
 
+  /* ---- 1b) ¿Ya está subido este mismo archivo? ----
+   * El cliente manda la huella SHA-256 antes de firmar la subida. Si ya existe
+   * un registro con esa huella se devuelve su URL y no se vuelve a subir: el
+   * mismo JPEG estaba diez veces en el Storage con nombres distintos. */
+  api.post('/check', async (req, res, next) => {
+    try {
+      const hash = normalizarHash((req.body || {}).hash);
+      if (!hash) return res.status(400).json({ ok: false, error: 'Huella inválida' });
+      const item = await buscarPorHash(store, hash, (req.body || {}).scope || 'media');
+      res.json({ ok: true, item: item || null });
+    } catch (e) { next(e); }
+  });
+
   /* ---- 2) Confirmar: valida existencia, guarda metadata, publica feed ---- */
   api.post('/confirm', async (req, res, next) => {
     try {
       if (!useSupabase) return res.status(501).json({ ok: false, fallback: 'local', error: 'Sin Storage: usa POST /api/media' });
       const { path: fpath, mime, size, scope, title, refId } = req.body || {};
+      const hash = normalizarHash((req.body || {}).hash);
       const bad = checkPayload(req.user, { filename: fpath, mime, size, scope: scope || 'media' });
       if (bad) return res.status(bad.status).json({ ok: false, error: bad.error });
       if (!fpath || String(fpath).includes('..')) return res.status(400).json({ ok: false, error: 'Ruta inválida' });
       const exists = await store.adapter.storageExists(fpath);
       if (!exists) return res.status(400).json({ ok: false, error: 'El archivo no llegó al Storage' });
+      /* Carrera entre dos equipos subiendo lo mismo: el que llega segundo
+       * reutiliza el registro del primero (su copia en Storage queda sin
+       * referencia, pero la base no se duplica). */
+      const dup = await buscarPorHash(store, hash, scope || 'media');
+      if (dup) return res.status(200).json({ ok: true, item: dup, reuse: true });
       const publicUrl = store.adapter.publicUrl(fpath);
       const item = await registerMedia(store, req.user, {
-        url: publicUrl, path: fpath, mime, size: Number(size),
+        url: publicUrl, path: fpath, mime, size: Number(size), hash,
         scope: scope || 'media', title: title || safeName(fpath), refId: refId || null,
       });
       res.status(201).json({ ok: true, item });
@@ -129,11 +148,17 @@ module.exports = (store, config) => {
           for (const f of req.files || []) fs.unlink(f.path, () => {});
           return res.status(403).json({ ok: false, error: 'Sin permiso de subida' });
         }
+        const hash = normalizarHash(req.body.hash);
+        const dup = await buscarPorHash(store, hash, scope);
+        if (dup) {
+          for (const f of req.files || []) fs.unlink(f.path, () => {});
+          return res.status(200).json({ ok: true, items: [dup], reuse: true });
+        }
         const out = [];
         for (const f of req.files || []) {
           const item = await registerMedia(store, req.user, {
             url: `/uploads/${path.basename(f.filename)}`, path: f.filename, mime: f.mimetype,
-            size: f.size, scope, title: req.body.title || f.originalname, refId: req.body.refId || null,
+            size: f.size, hash, scope, title: req.body.title || f.originalname, refId: req.body.refId || null,
           });
           out.push(item);
         }
@@ -147,6 +172,23 @@ module.exports = (store, config) => {
   return r;
 };
 
+/* Huella normalizada (SHA-256 hex) o null si no es válida. */
+function normalizarHash(valor) {
+  const h = String(valor || '').toLowerCase();
+  return /^[a-f0-9]{64}$/.test(h) ? h : null;
+}
+
+/* Busca un archivo ya registrado con la misma huella EN EL MISMO DESTINO.
+ * El scope forma parte de la clave: reutilizar una imagen subida a `media` al
+ * publicar en `autoHub` se saltaría el aviso al feed y la ficha de esa sección. */
+async function buscarPorHash(store, hash, scope) {
+  if (!hash) return null;
+  try { await store.refreshIfStale(); } catch (e) { /* usa la caché cálida */ }
+  const col = db.collection(store.get(), 'media');
+  const destino = scope || 'media';
+  return col.find((m) => m && m.hash === hash && (m.scope || 'media') === destino) || null;
+}
+
 /* Guarda metadata en `media`, audita y espeja a feed si es escaparate. */
 async function registerMedia(store, user, meta) {
   const rec = {
@@ -155,6 +197,7 @@ async function registerMedia(store, user, meta) {
     path: meta.path,
     mime: meta.mime,
     size: meta.size,
+    hash: meta.hash || null,
     scope: meta.scope,
     title: meta.title,
     refId: meta.refId,

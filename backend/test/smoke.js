@@ -615,6 +615,77 @@ describe('paso 4: archivos compartidos (modo local)', () => {
   });
 });
 
+describe('fase 3: deduplicación de subidas por huella SHA-256', () => {
+  const HUELLA = 'b'.repeat(64);
+  async function subirConHuella(name) {
+    const fd = new FormData();
+    fd.append('files', new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a])], { type: 'image/png' }), name);
+    fd.append('scope', 'media');
+    fd.append('hash', HUELLA);
+    const res = await fetch(base + '/api/media', {
+      method: 'POST',
+      headers: jar.cookie ? { Cookie: jar.cookie } : {},
+      body: fd,
+    });
+    let json = null;
+    try { json = await res.json(); } catch (e) { /* no-json */ }
+    return { status: res.status, json };
+  }
+
+  it('rechaza una huella mal formada (400)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const r = await api('POST', '/api/media/check', { hash: 'no-es-una-huella' });
+    assert.equal(r.status, 400);
+  });
+
+  it('la primera subida guarda la huella y la segunda reutiliza la misma URL', async () => {
+    const vacio = await api('POST', '/api/media/check', { hash: HUELLA });
+    assert.equal(vacio.status, 200);
+    assert.equal(vacio.json.item, null);
+
+    const primera = await subirConHuella('misma.png');
+    assert.equal(primera.status, 201);
+    const url = primera.json.items[0].url;
+    assert.match(url, /^\/uploads\//);
+
+    const ya = await api('POST', '/api/media/check', { hash: HUELLA });
+    assert.equal(ya.json.item.url, url);
+
+    const segunda = await subirConHuella('copia-con-otro-nombre.png');
+    assert.equal(segunda.status, 200);
+    assert.equal(segunda.json.reuse, true);
+    assert.equal(segunda.json.items[0].url, url);
+
+    /* Una sola fila en `media` con esa huella: el archivo repetido no se
+     * registró de nuevo ni se quedó como huérfano en /uploads. */
+    const lista = await api('GET', '/api/data/media');
+    const filas = (lista.json.items || []).filter((m) => m.hash === HUELLA);
+    assert.equal(filas.length, 1);
+  });
+
+  it('la misma huella en otro destino NO se reutiliza (el aviso al feed depende del scope)', async () => {
+    const fd = new FormData();
+    fd.append('files', new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a])], { type: 'image/png' }), 'otra-seccion.png');
+    fd.append('scope', 'autoHub');
+    fd.append('hash', HUELLA);
+    const res = await fetch(base + '/api/media', {
+      method: 'POST',
+      headers: jar.cookie ? { Cookie: jar.cookie } : {},
+      body: fd,
+    });
+    const j = await res.json();
+    assert.equal(res.status, 201);
+    assert.equal(j.reuse, undefined);
+    assert.equal(j.items[0].scope, 'autoHub');
+
+    const otro = await api('POST', '/api/media/check', { hash: HUELLA, scope: 'autoHub' });
+    assert.equal(otro.json.item.scope, 'autoHub');
+    const deMedia = await api('POST', '/api/media/check', { hash: HUELLA });
+    assert.equal(deMedia.json.item.scope, 'media');
+  });
+});
+
 describe('reporte ejecutivo semanal (cron y envío dry-run)', () => {
   before(() => { process.env.REPORT_CRON_SECRET = 'sec_test_' + process.pid; });
 
@@ -736,6 +807,54 @@ describe('notificaciones: privacidad por destinatario', () => {
     assert.ok(ids.includes('notif-priv-admin'));
     assert.ok(ids.includes('notif-general'));
     assert.ok(!ids.includes('notif-priv-alumno'), 'ser admin no da acceso al aviso privado de otro');
+  });
+});
+
+describe('proxy de media: /media/* y reescritura de URLs', () => {
+  const proxy = require('../src/mediaProxy');
+  const URL_SUPA = 'https://abcdefghijkl.supabase.co/storage/v1/object/public/portal-media/media/1792-foto.png';
+
+  it('normaliza rutas y rechaza las peligrosas', () => {
+    assert.equal(proxy.normalizarRuta('media/1792-foto.png'), 'media/1792-foto.png');
+    assert.equal(proxy.normalizarRuta('/media/groups/FOTO GRUPO.png'), 'media/groups/FOTO GRUPO.png');
+    assert.equal(proxy.normalizarRuta('../../etc/passwd'), null);
+    assert.equal(proxy.normalizarRuta('media\\..\\x.png'), null);
+    assert.equal(proxy.normalizarRuta('media//x.png'), null);
+    assert.equal(proxy.normalizarRuta(''), null);
+  });
+
+  it('extrae la ruta de una URL pública del bucket', () => {
+    assert.equal(proxy.rutaDeUrl(URL_SUPA), 'media/1792-foto.png');
+    assert.equal(proxy.rutaDeUrl('/media/media/1792-foto.png'), null);
+    assert.equal(proxy.rutaDeUrl(''), null);
+  });
+
+  it('las URLs de Supabase salen reescritas a /media (y solo esas)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const put = await api('PUT', '/api/data/settings/mediaProxyTest', {
+      value: { img: URL_SUPA, externa: 'https://ejemplo.com/a.png', nota: 'texto' },
+    });
+    assert.ok(put.status === 200 || put.status === 201, 'PUT ' + put.status);
+    const g = await api('GET', '/api/data/settings');
+    assert.equal(g.status, 200);
+    const val = g.json.object.mediaProxyTest;
+    assert.equal(val.img, '/media/media/1792-foto.png', 'la imagen del bucket pasa por el proxy');
+    assert.equal(val.externa, 'https://ejemplo.com/a.png', 'una URL externa no se toca');
+    assert.equal(val.nota, 'texto', 'el resto del payload queda igual');
+  });
+
+  it('sin Storage configurado /media responde 404 (no inventa ni rompe)', async () => {
+    jar.cookie = null;
+    const r = await fetch(base + '/media/media/1792-foto.png');
+    assert.equal(r.status, 404);
+    assert.match(r.headers.get('content-type') || '', /json/);
+  });
+
+  it('rechaza métodos distintos de GET/HEAD', async () => {
+    const r = await fetch(base + '/media/media/1792-foto.png', { method: 'POST', body: 'x' });
+    assert.equal(r.status, 405);
+    assert.equal(r.headers.get('allow'), 'GET, HEAD');
   });
 });
 
