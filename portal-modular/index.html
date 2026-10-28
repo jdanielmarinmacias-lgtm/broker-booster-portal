@@ -42,6 +42,36 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- JS de la app: `defer` respeta el orden y no bloquea el parseo. -->
+    <script defer src="js/core/store.js?v=20261030a"></script>
+    <script defer src="js/core/backend.js?v=20261030a"></script>
+    <script defer src="js/core/media.js?v=20261030a"></script>
+    <script defer src="js/core/realtime.js?v=20261030a"></script>
+    <script defer src="js/services/rolesService.js?v=20261030a"></script>
+    <script defer src="js/services/userService.js?v=20261030a"></script>
+    <script defer src="js/services/repository.js?v=20261030a"></script>
+    <script defer src="js/core/actions.js?v=20261030a"></script>
+    <script defer src="js/core/bx-manual.js?v=20261030a"></script>
+    <script defer src="js/core/bx-actions.js?v=20261030a"></script>
+    <script defer src="js/legacy/00-head-utils.js?v=20261030a"></script>
+    <script defer src="js/legacy/01-core-db-roles-portal.js?v=20261030a"></script>
+    <script defer src="js/legacy/02-modulo-b.js?v=20261030a"></script>
+    <script defer src="js/legacy/03-config-73l.js?v=20261030a"></script>
+    <script defer src="js/legacy/04-modulo-d.js?v=20261030a"></script>
+    <script defer src="js/legacy/05-modulo-e.js?v=20261030a"></script>
+    <script defer src="js/legacy/06-modulo-f.js?v=20261030a"></script>
+    <script defer src="js/legacy/07-modulo-g.js?v=20261030a"></script>
+    <script defer src="js/legacy/08-snippet-h.js?v=20261030a"></script>
+    <script defer src="js/legacy/09-modulo-i.js?v=20261030a"></script>
+    <script defer src="js/legacy/10-modulo-j.js?v=20261030a"></script>
+    <script defer src="js/modules/auth-custom.js?v=20261030a"></script>
+    <script defer src="js/modules/dashboard.js?v=20261030a"></script>
+    <script defer src="js/modules/chat.js?v=20261030a"></script>
+    <script defer src="js/modules/ventas.js?v=20261030a"></script>
+    <script defer src="js/modules/inventario.js?v=20261030a"></script>
+    <script defer src="js/core/backend-shim.js?v=20261030a"></script>
+    <script defer src="js/core/sync.js?v=20261030a"></script>
+    <script defer src="js/legacy/11-init.js?v=20261030a"></script>
 </head>
 <body class="text-slate-800">
     <!-- Pantalla de carga (splash) Broker Booster: imagen completa en pantalla -->
@@ -197,37 +227,4 @@
 
 
 </body>
-    <!-- Paso 1: JS modular (mismo orden que el monolito) -->
-    <script src="js/core/store.js?v=20261030a"></script>
-    <script src="js/core/backend.js?v=20261030a"></script>
-    <script src="js/core/media.js?v=20261030a"></script>
-    <script src="js/core/realtime.js?v=20261030a"></script>
-    <script src="js/services/rolesService.js?v=20261030a"></script>
-    <script src="js/services/userService.js?v=20261030a"></script>
-    <script src="js/services/repository.js?v=20261030a"></script>
-    <!-- Acciones delegadas: sustituyen a los manejadores inline (CSP estricta).
-         actions.js define bxP/bxOn y los listeners; bx-actions.js es GENERADO
-         (tools/csp-inline.js) y bx-manual.js son las acciones con `this`. -->
-    <script src="js/core/actions.js?v=20261030a"></script>
-    <script src="js/core/bx-manual.js?v=20261030a"></script>
-    <script src="js/core/bx-actions.js?v=20261030a"></script>
-    <script src="js/legacy/00-head-utils.js?v=20261030a"></script>
-    <script src="js/legacy/01-core-db-roles-portal.js?v=20261030a"></script>
-    <script src="js/legacy/02-modulo-b.js?v=20261030a"></script>
-    <script src="js/legacy/03-config-73l.js?v=20261030a"></script>
-    <script src="js/legacy/04-modulo-d.js?v=20261030a"></script>
-    <script src="js/legacy/05-modulo-e.js?v=20261030a"></script>
-    <script src="js/legacy/06-modulo-f.js?v=20261030a"></script>
-    <script src="js/legacy/07-modulo-g.js?v=20261030a"></script>
-    <script src="js/legacy/08-snippet-h.js?v=20261030a"></script>
-    <script src="js/legacy/09-modulo-i.js?v=20261030a"></script>
-    <script src="js/legacy/10-modulo-j.js?v=20261030a"></script>
-    <script src="js/modules/auth-custom.js?v=20261030a"></script>
-    <script src="js/modules/dashboard.js?v=20261030a"></script>
-    <script src="js/modules/chat.js?v=20261030a"></script>
-    <script src="js/modules/ventas.js?v=20261030a"></script>
-    <script src="js/modules/inventario.js?v=20261030a"></script>
-    <script src="js/core/backend-shim.js?v=20261030a"></script>
-    <script src="js/core/sync.js?v=20261030a"></script>
-    <script src="js/legacy/11-init.js?v=20261030a"></script>
-</html>
+    </html>
