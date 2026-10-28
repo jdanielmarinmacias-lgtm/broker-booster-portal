@@ -118,15 +118,31 @@
       /* 'g:nombre' = función global (usada por bxOn en HTML concatenado). */
       var fn = clave.slice(0, 2) === 'g:' ? bxGlobal(clave.slice(2)) : reg[clave];
       if (typeof fn !== 'function') continue;
-      var r;
-      try {
-        /* 'g:' reproduce EXACTAMENTE una llamada inline: fn(args…) con this = el.
-         * Los cuerpos generados (aN) reciben además el evento como 1er argumento,
-         * porque su código original podía usar `event`. */
-        r = clave.slice(0, 2) === 'g:'
+      /* 'g:' reproduce EXACTAMENTE una llamada inline: fn(args…) con this = el.
+       * Los cuerpos generados (aN) reciben además el evento como 1er argumento,
+       * porque su código original podía usar `event`. */
+      var invocar = function () {
+        return clave.slice(0, 2) === 'g:'
           ? fn.apply(el, bxArgs(el))
           : fn.apply(el, [ev].concat(bxArgs(el)));
+      };
+      var r;
+      try {
+        r = invocar();
       } catch (e) {
+        /* La portada pública tiene botones que abren formularios del campus
+         * (p. ej. «Quiero Aplicar» → openSolicitudModal). Esos módulos ahora se
+         * cargan al entrar: si falta la función, se carga el campus y se
+         * reintenta UNA vez, en vez de dejar el botón muerto. */
+        if (e && e.name === 'ReferenceError' && !el.__bxReintento
+            && window.BBApp && typeof window.BBApp.cargar === 'function') {
+          el.__bxReintento = true;
+          window.BBApp.cargar().then(function () {
+            el.__bxReintento = false;
+            try { invocar(); } catch (e2) { setTimeout(function () { throw e2; }, 0); }
+          });
+          continue;
+        }
         /* Igual que un manejador inline: el error se reporta pero no tumba
          * el resto de la interfaz. */
         setTimeout(function () { throw e; }, 0);

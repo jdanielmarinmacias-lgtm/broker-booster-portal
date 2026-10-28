@@ -2265,7 +2265,17 @@ function auD(){
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('public-portal').classList.add('hidden');
                 document.getElementById('main-app').classList.remove('hidden');
-                initializeApp();
+                /* Campus diferido: initializeApp usa funciones de las secciones que
+                 * ahora se cargan al entrar (sinDB, renderConvenciones...). Este
+                 * checkSession puede correr por setTimeout antes de que la compuerta
+                 * de window.initializeApp esté puesta, así que se espera aquí. */
+                if (window.BBApp && typeof window.BBApp.cargar === 'function') {
+                    window.BBApp.cargar().then(function () {
+                        try { initializeApp(); } catch (e) { console.error('[campus] checkSession:', e); }
+                    });
+                } else {
+                    initializeApp();
+                }
             } else {
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('main-app').classList.add('hidden');

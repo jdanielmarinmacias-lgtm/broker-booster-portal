@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var V = '20261036a';
+  var V = '20261037a';
 
   /* Librerías de terceros: se piden primero, como estaban en el <head>. */
   var LIBRERIAS = [
@@ -97,6 +97,10 @@
     return !!(el && !el.classList.contains('hidden'));
   }
 
+  /* Nota: NO se dispara por "la pantalla de acceso está visible" en el arranque:
+   * el HTML la trae a la vista y se cargaría el campus en cada visita a la
+   * portada. El MutationObserver sólo reacciona al CAMBIO (clic en Acceso). */
+
   function observarAcceso() {
     var el = document.getElementById('login-screen');
     if (!el || !window.MutationObserver) return;
@@ -109,7 +113,6 @@
     observarAcceso();
     try {
       if (sessionStorage.getItem('pepes_user') || localStorage.getItem('pepes_user')) cargar();
-      else if (pantallaDeAccesoVisible()) cargar();
     } catch (e) { /* sin storage: el login dispara la carga igual */ }
   }
 
@@ -141,12 +144,16 @@
     listo: function () { return terminado; },
   };
 
-  if (document.readyState === 'loading') {
-    /* Se registra ANTES de que el núcleo registre su propio checkSession, para
-     * que la compuerta ya esté puesta cuando aquél llame a initializeApp(). */
-    document.addEventListener('DOMContentLoaded', function () { ponerCompuerta(); dispararSiHaceFalta(); });
-  } else {
+  /* Con `defer` el documento ya está en "interactive": este script corre ANTES
+   * que el núcleo, así que initializeApp() aún no existe. Por eso NO basta con
+   * intentarlo aquí: hay que reintentar en DOMContentLoaded, que es justo
+   * cuando el núcleo llama a checkSession → initializeApp(). Este listener se
+   * registra antes que el del núcleo, así que la compuerta está puesta. */
+  function instalar() {
     ponerCompuerta();
     dispararSiHaceFalta();
   }
+
+  instalar();
+  document.addEventListener('DOMContentLoaded', instalar);
 })();
