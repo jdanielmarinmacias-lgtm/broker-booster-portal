@@ -353,17 +353,16 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (!db.carruselCirculares.carrusel || typeof db.carruselCirculares.carrusel !== 'object') {
                 db.carruselCirculares.carrusel = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
             }
+            /* OJO: aquí NO se rellenan los valores por defecto de cada banner.
+             * Esos defaults son de PANTALLA (los aplica ensureCarruselDefaults
+             * al dibujar). Al escribirlos dentro de db, ensureDbDefaults corre en
+             * cada navigateTo y el sincronizador los veía como edición: el
+             * carrusel se reescribía en la base en cada carga del portal. */
             if (db.carruselCirculares) {
                 // Solo renombra el título heredado exacto; antes reescribía cualquier
                 // título que contuviera "circular" y borraba lo que el usuario escribió.
-                if (db.carruselCirculares.circulares && (!db.carruselCirculares.circulares.titulo || /^circulares?$/i.test(String(db.carruselCirculares.circulares.titulo).trim()))) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
-                if (!db.carruselCirculares.circulares.dia) db.carruselCirculares.circulares.dia = 'Martes';
-                if (!db.carruselCirculares.circulares.horario) db.carruselCirculares.circulares.horario = '19:00';
-                if (!db.carruselCirculares.circulares.imagen) db.carruselCirculares.circulares.imagen = 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200';
-                if (db.carruselCirculares.carrusel && (!db.carruselCirculares.carrusel.titulo || /^carrusel$/i.test(String(db.carruselCirculares.carrusel.titulo).trim()))) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
-                if (!db.carruselCirculares.carrusel.dia) db.carruselCirculares.carrusel.dia = 'Miércoles';
-                if (!db.carruselCirculares.carrusel.horario) db.carruselCirculares.carrusel.horario = '19:00';
-                if (!db.carruselCirculares.carrusel.imagen) db.carruselCirculares.carrusel.imagen = 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200';
+                if (db.carruselCirculares.circulares && /^circulares?$/i.test(String(db.carruselCirculares.circulares.titulo || '').trim())) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
+                if (db.carruselCirculares.carrusel && /^carrusel$/i.test(String(db.carruselCirculares.carrusel.titulo || '').trim())) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
             }
             if (!db.posts) db.posts = [];
             if (!db.groupMessages) db.groupMessages = [];
@@ -6659,10 +6658,12 @@ function initializeApp() {
                     streakEl.classList.add('hidden');
                 }
             }
-                        // --- MEJORA: actividad y última conexión ---
+                        // --- MEJORA: actividad y última conexión (solo en memoria;
+            // se persiste con el siguiente guardado real, no en cada carga) ---
             currentUser.lastActive = Date.now();
             currentUser.lastConnection = new Date().toISOString();
-            if (userInDb) { userInDb.lastActive = currentUser.lastActive; userInDb.lastConnection = currentUser.lastConnection; }
+            const usuarioEnDb = (db.users || []).find(u => String(u.id) === String(currentUser.id));
+            if (usuarioEnDb) { usuarioEnDb.lastActive = currentUser.lastActive; usuarioEnDb.lastConnection = currentUser.lastConnection; }
             
             // --- MEJORA: alarma solicitudes ---
             window.lastSolicitudesCount = (db.solicitudes||[]).length;
@@ -7257,15 +7258,18 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             navigateTo(page, { keepSidebar: true });
         }
 
+        /* Vista con los valores por defecto para PINTAR, sin escribir en db:
+         * si se guardaban en db, el sincronizador los tomaba por una edición del
+         * usuario y reescribía el carrusel en la base en cada carga. */
         function ensureCarruselDefaults(){
             if (!db.carruselCirculares || typeof db.carruselCirculares !== 'object') db.carruselCirculares = {};
             const defCirc = { titulo: 'Capacitación Semanal', dia: 'Martes', horario: '19:00', tema: 'Estrategias de Cierre', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200', zoom: 'https://zoom.us/j/123456789', participantes: [] };
             const defCarr = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
-            db.carruselCirculares.circulares = Object.assign({}, defCirc, db.carruselCirculares.circulares || {});
-            db.carruselCirculares.carrusel = Object.assign({}, defCarr, db.carruselCirculares.carrusel || {});
-            if (/^circulares?$/i.test(String(db.carruselCirculares.circulares.titulo || '').trim())) db.carruselCirculares.circulares.titulo = 'Capacitación Semanal';
-            if (/^carrusel$/i.test(String(db.carruselCirculares.carrusel.titulo || '').trim())) db.carruselCirculares.carrusel.titulo = 'Reunión Semanal';
-            return db.carruselCirculares;
+            const circulares = Object.assign({}, defCirc, db.carruselCirculares.circulares || {});
+            const carrusel = Object.assign({}, defCarr, db.carruselCirculares.carrusel || {});
+            if (/^circulares?$/i.test(String(circulares.titulo || '').trim())) circulares.titulo = 'Capacitación Semanal';
+            if (/^carrusel$/i.test(String(carrusel.titulo || '').trim())) carrusel.titulo = 'Reunión Semanal';
+            return { circulares, carrusel };
         }
         function canEditCarrusel(){ return hasRole(currentUser, ['admin','gm','desarrollador','editor']); }
         function renderCarruselCirculares(){
@@ -7340,7 +7344,9 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         
         function editCarruselItem(tipo){
             if(!canEditCarrusel()) return;
-            const item = db.carruselCirculares[tipo];
+            // Copia con los valores por defecto aplicados: se escribe en db
+            // recién cuando el usuario pulsa Guardar.
+            const item = Object.assign({}, ensureCarruselDefaults()[tipo]);
             const users = db.users.filter(u => !['prospecto'].includes(u.role));
             const participantesSet = new Set(item.participantes || []);
             showModal(`<div class="p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -7451,6 +7457,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 item.zoom = zoom;
                 item.imagen = nuevaImagenData; item.actualizado = new Date().toISOString();
                 item.participantes = participantes;
+                db.carruselCirculares[tipo] = item; // aquí sí es una edición real
                 saveDB();
                 closeModal();
                 navigateTo('carrusel-circulares');
