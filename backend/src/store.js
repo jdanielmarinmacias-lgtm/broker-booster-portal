@@ -16,7 +16,13 @@ const { createJsonFileAdapter } = require('./adapters/jsonFile');
 function selectAdapter(config) {
   if (config.supabaseUrl && config.supabaseServiceKey) {
     const { createSupabaseAdapter } = require('./adapters/supabase');
-    return createSupabaseAdapter({ url: config.supabaseUrl, serviceKey: config.supabaseServiceKey });
+    /* uploadsDir: si un documento trae /uploads/<archivo> (subido con el backend
+     * local), el adaptador lo sube al bucket antes de persistirlo. */
+    return createSupabaseAdapter({
+      url: config.supabaseUrl,
+      serviceKey: config.supabaseServiceKey,
+      uploadsDir: config.dataDir ? require('path').join(config.dataDir, 'uploads') : null,
+    });
   }
   if (config.dataDir) return createJsonFileAdapter(config.dataDir);
   return createMemoryAdapter();

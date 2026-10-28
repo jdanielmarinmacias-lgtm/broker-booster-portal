@@ -6,6 +6,7 @@
  * Tablas (ver supabase/schema.sql): documents, app_users, app_sessions, public_feed. */
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const uploads = require('../uploads');
 
 const toUserRow = (u) => ({
   id: String(u.id),
@@ -55,7 +56,7 @@ const fromUserRow = (r) => ({
 
 const MEDIA_BUCKET = 'portal-media';
 
-function createSupabaseAdapter({ url, serviceKey }) {
+function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
   const sb = createClient(url, serviceKey, { auth: { persistSession: false } });
 
   /* Huella de la última versión persistida por (collection,doc_id): evita
@@ -266,6 +267,27 @@ function createSupabaseAdapter({ url, serviceKey }) {
     }
   }
 
+  /* Archivo que solo existe en este equipo (/uploads/<nombre>): se sube al
+   * bucket para que la URL sirva desde cualquier sitio. Nombre con huella para
+   * no pisar otros archivos homónimos de otro equipo. */
+  async function externalizarUploadLocal(nombre, buf) {
+    if (!buf || !buf.length) return null;
+    const mime = uploads.mimeDe(nombre);
+    const hash = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 16);
+    const limpio = String(nombre).replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-80);
+    const ruta = 'migrados/' + hash + '-' + limpio;
+    try {
+      const { error } = await withTimeout(
+        sb.storage.from(MEDIA_BUCKET).upload(ruta, buf, { contentType: mime, upsert: true }),
+        'storage:uploads-local', 15000);
+      if (error && !/exists|duplicate|already/i.test(error.message)) throw new Error(error.message);
+      return sb.storage.from(MEDIA_BUCKET).getPublicUrl(ruta).data.publicUrl;
+    } catch (e) {
+      console.warn('[backend] no se pudo migrar /uploads/' + nombre + ':', e.message);
+      return null;
+    }
+  }
+
   /* Recorre el valor y reemplaza dataURLs por URLs de Storage. Muta `value`. */
   async function externalizarInline(value, tag) {
     let hechos = 0;
@@ -328,6 +350,26 @@ function createSupabaseAdapter({ url, serviceKey }) {
     }
   }
 
+  /* Acceso crudo para herramientas de mantenimiento (migraciones): leen y
+   * escriben filas suelas, sin pasar por la caché del store. */
+  async function loadRawDocuments() {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await withRetry(
+        () => sb.from('documents').select('collection,doc_id,data').range(from, from + 999));
+      if (error) throw new Error('Supabase documents: ' + error.message);
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
+  async function putRawDocument(collection, doc_id, data) {
+    const { error } = await withRetry(() => sb.from('documents').upsert(
+      [{ collection, doc_id, updated_at: new Date().toISOString(), data }],
+      { onConflict: 'collection,doc_id' }));
+    if (error) throw new Error('Supabase documents (put): ' + error.message);
+  }
+
   async function saveDocuments(obj) {
     // Fallback total (seed/boot). Las rutas usan saveCollections (quirúrgico).
     const names = Object.keys(obj || {}).filter(
@@ -371,6 +413,24 @@ function createSupabaseAdapter({ url, serviceKey }) {
       if (json.indexOf('data:') === -1) continue;
       const n = await externalizarInline(row.data, row.collection + '-' + row.doc_id);
       if (n) seenRows.set(key, { ...row, data: row.data });
+    }
+    /* Igual con las rutas /uploads/… del backend local: o se suben al bucket, o
+     * se quitan. Así la base compartida nunca guarda una URL que solo existe en
+     * el ordenador donde se subió (era el origen de las portadas en blanco).
+     * Va antes de la huella para que el hash describa lo que se persiste. */
+    for (const [key, row] of seenRows) {
+      let json = '';
+      try { json = JSON.stringify(row.data); } catch (e) { continue; }
+      if (json.indexOf('/uploads/') === -1) continue;
+      const r = await uploads.migrarValor(row.data, async (nombre) => {
+        const buf = uploads.leerLocal(uploadsDir, nombre);
+        return buf ? externalizarUploadLocal(nombre, buf) : null;
+      });
+      if (r.migradas || r.quitadas) {
+        console.warn('[backend] ' + row.collection + '/' + row.doc_id + ': ' +
+          r.migradas + ' archivo(s) local(es) migrados, ' + r.quitadas + ' referencia(s) muerta(s) retiradas');
+      }
+      seenRows.set(key, { ...row, data: row.data });
     }
     const seen = new Set();
     const pendingHash = new Map();
@@ -578,6 +638,9 @@ function createSupabaseAdapter({ url, serviceKey }) {
       }
       bucketReady = true;
     },
+    externalizarUploadLocal,
+    loadRawDocuments,
+    putRawDocument,
     async signUpload(storagePath) {
       const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUploadUrl(storagePath);
       if (error) throw new Error('Supabase sign: ' + error.message);

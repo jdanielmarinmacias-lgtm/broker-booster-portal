@@ -882,3 +882,32 @@ describe('poda de sesiones vencidas', () => {
     assert.equal(await sessions.get('tok-vencido'), null);
   });
 });
+
+describe('rutas locales /uploads (guard de base compartida)', () => {
+  const uploads = require('../src/uploads');
+
+  it('reconoce las rutas locales y descarta lo que no lo es', () => {
+    assert.equal(uploads.nombreDeUpload('/uploads/foto.png'), 'foto.png');
+    assert.equal(uploads.nombreDeUpload('http://localhost:3000/uploads/foto%20x.png'), 'foto x.png');
+    assert.equal(uploads.nombreDeUpload('/media/groups/foto.png'), null);
+    assert.equal(uploads.nombreDeUpload('https://x.supabase.co/storage/v1/object/public/portal-media/a.png'), null);
+    assert.equal(uploads.nombreDeUpload('/uploads/../secreto.env'), null);
+  });
+
+  it('migra lo resoluble y retira lo que ya no existe, también en arrays', async () => {
+    const doc = {
+      image: '/uploads/viva.png',
+      notas: '/uploads/muerta.png',
+      items: [{ foto: '/uploads/viva.png' }],
+      otro: '/media/groups/x.png',
+    };
+    const r = await uploads.migrarValor(doc, async (nombre) =>
+      (nombre === 'viva.png' ? 'https://cdn/migrados/viva.png' : null));
+    assert.equal(r.migradas, 2);
+    assert.equal(r.quitadas, 1);
+    assert.equal(doc.image, 'https://cdn/migrados/viva.png');
+    assert.equal(doc.notas, '');
+    assert.equal(doc.items[0].foto, 'https://cdn/migrados/viva.png');
+    assert.equal(doc.otro, '/media/groups/x.png', 'las rutas /media no se tocan');
+  });
+});
