@@ -4,7 +4,7 @@
  * - Navegación HTML: network-first con fallback a index.html en caché
  * - App Shell (CSS, JS, manifest, iconos): stale-while-revalidate
  * ========================================================================== */
-const CACHE_NAME = 'broker-booster-shell-v20261027h';
+const CACHE_NAME = 'broker-booster-shell-v20261030a';
 const CDN_HOSTS = [
   'cdnjs.cloudflare.com',
   'cdn.jsdelivr.net',
@@ -23,10 +23,14 @@ const APP_SHELL = [
   './img/splash-source.webp',
   './css/tailwind.min.css',
   './css/styles.css',
+  './js/core/splash.js',
   './js/core/store.js',
   './js/core/backend.js',
   './js/core/media.js',
   './js/core/realtime.js',
+  './js/core/actions.js',
+  './js/core/bx-manual.js',
+  './js/core/bx-actions.js',
   './js/core/backend-shim.js',
   './js/core/sync.js',
   './js/services/rolesService.js',

@@ -113,6 +113,11 @@
       const res = await fetch('/api/public/config', { credentials: 'same-origin' });
       cfg = await res.json();
     } catch (e) { return; }
+    /* Base del Storage: media.js la usa como respaldo si una imagen servida
+     * por /media/ no cargara (el proxy es nuevo; esto evita quedarse sin fotos). */
+    if (cfg && cfg.supabaseUrl) {
+      window.__MEDIA_BASE = String(cfg.supabaseUrl).replace(/\/+$/, '') + '/storage/v1/object/public/portal-media/';
+    }
     if (!cfg || !cfg.realtime || !cfg.supabaseUrl || !cfg.anonKey) return;
     try {
       const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');

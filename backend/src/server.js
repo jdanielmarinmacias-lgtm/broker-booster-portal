@@ -26,6 +26,11 @@ function createApp(store) {
   // toda la tabla documents. Las rutas de datos invocan store.refreshIfStale()
   // o store.refreshForWrite(collections) explícitamente.
 
+  /* `/media/*` (imágenes desde nuestro dominio, con caché de un año) y
+   * reescritura de las URLs de Supabase en las respuestas JSON. Ambos van
+   * antes de las rutas para que envuelvan a todas. */
+  require('./mediaProxy').montar(app);
+
   app.use('/api/auth', mw.noStorePrivate, require('./routes/auth')(store));
   app.use('/api/users', mw.noStorePrivate, require('./routes/users')(store));
   app.use('/api', mw.noStorePrivate, require('./routes/collections')(store, config));
@@ -36,7 +41,12 @@ function createApp(store) {
     // Solo local: sirve lo subido por POST /api/media. En producción los
     // bytes viven en Supabase Storage ( URLs públicas del bucket).
     const path = require('path');
-    app.use('/uploads', express.static(path.join(config.dataDir, 'uploads')));
+    // Los nombres son únicos (id + extensión): se pueden cachear de verdad.
+    // Sin esto cada visado del feed vuelve a pedir todas las imágenes.
+    app.use('/uploads', express.static(path.join(config.dataDir, 'uploads'), {
+      immutable: true,
+      maxAge: '30d',
+    }));
   }
 
   app.get('/api/salud', (req, res) => res.json({
@@ -46,7 +56,17 @@ function createApp(store) {
 
   if (fs.existsSync(config.frontendDir)) {
     // Local: sirve el frontend. En Vercel se ignora (el estático sale de outputDirectory).
-    app.use(express.static(config.frontendDir, { index: 'index.html' }));
+    app.use(express.static(config.frontendDir, {
+      index: 'index.html',
+      setHeaders: function (res, filePath) {
+        // Assets con ?v= fijo: caché corta + revalidación barata. Las imágenes
+        // del propio portal casi nunca cambian y pesan; un día de caché evita
+        // repintarlas en cada navegación.
+        if (/[\\/](img|icons)[\\/]/.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        }
+      },
+    }));
   }
 
   app.use('/api', (req, res) => res.status(404).json({ ok: false, error: 'Ruta API no encontrada' }));
