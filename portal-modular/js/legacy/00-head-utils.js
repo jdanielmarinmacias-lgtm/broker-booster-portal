@@ -1,4 +1,15 @@
 
+/* ¿Es una URL de imagen que el navegador puede pintar? Acepta http(s),
+ * protocolo relativo (//cdn…), la ruta del proxy /media/… (la API reescribe
+ * así las URLs del bucket por mediaProxy), /uploads/… del modo local, data:image
+ * y blob:. Las portadas de Academia (categorías, planes, generaciones, grupos)
+ * usaban una regla más estricta que rechazaba /media/: la subida funcionaba y
+ * el formulario avisaba "No se pudo cargar la imagen. Usa JPG o PNG.". Una
+ * sola regla compartida evita que vuelvan a divergir. */
+function psImgUrl(v) {
+    return typeof v === 'string' && v.length > 0 && (/^(https?:)?\/\//i.test(v) || /^\/(media|uploads)\//.test(v) || /^data:image\//i.test(v) || /^blob:/i.test(v));
+}
+
 function exportarEquipoCSV(){
     try{
         if (typeof db === 'undefined') { console.log('exportarEquipoCSV: db no disponible'); return; }

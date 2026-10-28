@@ -153,6 +153,11 @@
         ev.stopPropagation();
         break;
       }
+      /* stopPropagation() dentro del manejador = "no sigas subiendo". Antes se
+       * ignoraba y un botón dentro de una tarjeta clicable ejecutaba también la
+       * acción de la tarjeta: la rueda de "Editar grupo" (Mensajes) abría el
+       * editor y, acto seguido, el chat encima — parecía que no hacía nada. */
+      if (ev.cancelBubble) break;
     }
   }
 

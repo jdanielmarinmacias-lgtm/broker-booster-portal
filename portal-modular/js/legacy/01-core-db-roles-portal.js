@@ -9623,7 +9623,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
              * Era la causa de portadas que no se veían (se guardaban sin imagen). */
             const notaCat = document.getElementById('cat-image-status');
             let catImgPendiente = false;
-            const catImgVal = v => typeof v === 'string' && (/^https?:\/\//.test(v) || /^data:image\/(png|jpeg|jpg|gif|webp)/i.test(v));
+            const catImgVal = v => psImgUrl(v);
             if (imageInput) {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
@@ -11129,7 +11129,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             </label>
                         </div>
                         <div class="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
-                            ${grp && String(grp.creadoPorId) === String(currentUser.id) && esStaffComunicacion(currentUser) ? `<button data-bx-click="a344" data-p0="${bxE(function(){return String(grp.id)})}" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
+                            ${grp && !String(grp.id).startsWith('canal:') && (esStaffComunicacion(currentUser) || String(grp.creadoPorId) === String(currentUser.id) || (grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id))) ? `<button data-bx-click="a344" data-p0="${bxE(function(){return String(grp.id)})}" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100" title="Eliminar el grupo y su chat"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
                             <button data-bx-click="a345" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-indigo-700 transition">${edit ? 'Guardar cambios' : 'Crear grupo'}</button>
                         </div>
                     </div>
@@ -11185,8 +11185,13 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             try {
                 const grp = ensureChatGrupos().find(g => String(g.id) === String(gid));
                 if (!grp) return closeGrupoModal();
-                if (!esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser.id)) return showToast('Solo el creador puede eliminar este grupo', 'warning');
-                if (!confirm('¿Eliminar el grupo "' + grp.nombre + '" y su chat grupal?')) return;
+                /* Los 4 canales base los vuelve a crear ensureChatGrupos() en el
+                 * siguiente render: borrarlos solo daría la impresión de que
+                 * "no se elimina". */
+                if (String(grp.id).startsWith('canal:')) return showToast('Los canales base del equipo no se pueden eliminar', 'warning');
+                const esAdminDelGrupo = (grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id));
+                if (!esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser.id) && !esAdminDelGrupo) return showToast('Solo el creador o un admin del grupo puede eliminarlo', 'warning');
+                if (!confirm('¿Eliminar el grupo "' + grp.nombre + '" y su chat? No se puede deshacer.')) return;
                 db.chatGroups = db.chatGroups.filter(g => String(g.id) !== String(gid));
                 db.messages = (db.messages || []).filter(m => String(m.toId) !== String(gid));
                 if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['chatGroups', 'messages']);
@@ -11592,7 +11597,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             /* FIX 2026-10 portada: bloquear Guardar mientras sube + toasts de error */
             const notaPlan = document.getElementById('plan-image-status');
             let planImgPendiente = false;
-            const planImgVal = v => typeof v === 'string' && (/^https?:\/\//.test(v) || /^data:image\/(png|jpeg|jpg|gif|webp)/i.test(v));
+            const planImgVal = v => psImgUrl(v);
             if (imageInput) {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
@@ -11662,7 +11667,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             };
             const notaGen = document.getElementById('gen-image-status');
             let genImgPendiente = false;
-            const genImgVal = v => typeof v === 'string' && (/^https?:\/\//.test(v) || /^data:image\/(png|jpeg|jpg|gif|webp)/i.test(v));
+            const genImgVal = v => psImgUrl(v);
             if (imageInput) {
                 imageInput.onchange = async e => {
                     const file = e.target.files[0];
@@ -11848,7 +11853,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
              * (/media/…, que es lo que devuelve toda subida a Storage). Antes
              * solo pasaban las absolutas y /uploads/: al subir la portada, el
              * validador la rechazaba y el grupo se guardaba sin imagen. */
-            const imgVal = v => typeof v === 'string' && v.length > 0 && (/^(https?:)?\/\//i.test(v) || /^\/(media|uploads)\//.test(v) || /^data:image\//i.test(v) || /^blob:/i.test(v));
+            const imgVal = v => psImgUrl(v);
             const pintarImg = src => {
                 if (src) {
                     preview.src = src; preview.classList.remove('hidden');
