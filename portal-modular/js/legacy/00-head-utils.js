@@ -10,6 +10,15 @@ function psImgUrl(v) {
     return typeof v === 'string' && v.length > 0 && (/^(https?:)?\/\//i.test(v) || /^\/(media|uploads)\//.test(v) || /^data:image\//i.test(v) || /^blob:/i.test(v));
 }
 
+/* Plural de un día de la semana. En español lunes, martes, miércoles, jueves
+ * y viernes ya terminan en -s y NO llevan otra: el portal pintaba "Martess" y
+ * "Miércoless" porque añadía 's' a todo. Solo sábado y domingo la necesitan. */
+function psDiaPlural(dia) {
+    const d = String(dia == null ? '' : dia).trim();
+    if (!d) return '';
+    return /s$/i.test(d) ? d : d + 's';
+}
+
 function exportarEquipoCSV(){
     try{
         if (typeof db === 'undefined') { console.log('exportarEquipoCSV: db no disponible'); return; }

@@ -7333,7 +7333,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         <div class="absolute bottom-0 left-0 right-0 p-6">
                             <h3 class="text-3xl font-extrabold text-white mb-1 tracking-tight">${item.titulo}</h3>
                             <p class="text-white/80 text-sm font-medium">${item.tema || ''}</p>
-                            <p class="text-white/90 text-sm flex items-center gap-2"><i class="far fa-clock"></i> Todos los ${item.dia}s · ${item.horario} hrs</p>
+                            <p class="text-white/90 text-sm flex items-center gap-2"><i class="far fa-clock"></i> Todos los ${psDiaPlural(item.dia)} · ${item.horario} hrs</p>
                         </div>
                     </div>
                     <div class="p-6">
@@ -7387,7 +7387,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const participantesSet = new Set(item.participantes || []);
             showModal(`<div class="p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <div class="flex items-center justify-between mb-5">
-                    <h3 class="text-xl font-bold text-slate-900">Editar ${item.titulo} - ${item.dia}s</h3>
+                    <h3 class="text-xl font-bold text-slate-900">Editar ${item.titulo} - ${psDiaPlural(item.dia)}</h3>
                     <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
                 </div>
                 <form id="carrusel-form" class="space-y-5">
@@ -7840,7 +7840,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                             <div class="min-w-0 flex-1">
                                                 <p class="text-[11px] uppercase tracking-wider font-semibold" style="color:${color}">${it.titulo}</p>
                                                 <h4 class="font-bold text-slate-900 truncate">${it.tema||'Sesión en vivo'}</h4>
-                                                <p class="text-xs text-slate-600 mt-0.5 flex items-center gap-1.5"><i class="far fa-clock"></i> ${it.dia}s ${it.horario} · ${it.ponente}</p>
+                                                <p class="text-xs text-slate-600 mt-0.5 flex items-center gap-1.5"><i class="far fa-clock"></i> ${psDiaPlural(it.dia)} ${it.horario} · ${it.ponente}</p>
                                             </div>
                                             ${invited ? `<a href="${it.zoom}" target="_blank" class="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm hover:scale-105 transition" style="background:${color}" title="Entrar"><i class="fas fa-video text-sm"></i></a>` : `<span class="shrink-0 w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center" title="Solo invitados"><i class="fas fa-lock text-slate-400 text-sm"></i></span>`}
                                         </div>
@@ -11142,7 +11142,19 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         window.toggleGrupoMiembro = function (uid) {
             uid = String(uid);
             const box = document.querySelector(`input[data-mid="${uid}"]`);
-            if (box) box.checked = !box.checked;
+            if (!box) return;
+            /* El navegador YA marcó/desmarcó el checkbox antes de este `change`:
+             * aquí solo se copia al borrador del modal. Antes se invertía otra
+             * vez y el clic no seleccionaba nunca a nadie. */
+            window._grupoUsuariosSel[uid] = !!box.checked;
+            /* Quien deja de ser miembro tampoco puede seguir como admin 👑. */
+            if (!box.checked) {
+                const btn = document.querySelector(`button[data-admin-btn="${uid}"]`);
+                if (btn) {
+                    btn.classList.remove('bg-amber-100', 'text-amber-700');
+                    btn.classList.add('bg-slate-50', 'text-slate-400');
+                }
+            }
         };
         window.toggleGrupoAdmin = function (uid) {
             uid = String(uid);
