@@ -158,6 +158,17 @@ describe('paso 3: config pública y feed', () => {
     assert.equal(r.status, 200);
     assert.ok('autosDisponibles' in r.json.portal);
   });
+
+  it('el portal público refleja los settings guardados (no sirve una portada vacía)', async () => {
+    jar.cookie = null;
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+    const w = await api('PUT', '/api/data/settings/institutionName', { value: 'Academia Fase4' });
+    assert.ok(w.status === 200 || w.status === 201, 'PUT ' + w.status);
+    jar.cookie = null;
+    const r = await api('GET', '/api/public/portal', null, false);
+    assert.equal(r.status, 200);
+    assert.equal(r.json.portal.institutionName, 'Academia Fase4');
+  });
   it('IA key: 401 sin sesión; con sesión entrega clave gsk_ (no se loggea)', async () => {
     jar.cookie = null;
     const anon = await api('GET', '/api/ia/key', null, false);

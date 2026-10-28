@@ -4,7 +4,7 @@
  * - Navegación HTML: network-first con fallback a index.html en caché
  * - App Shell (CSS, JS, manifest, iconos): stale-while-revalidate
  * ========================================================================== */
-const CACHE_NAME = 'broker-booster-shell-v20261030a';
+const CACHE_NAME = 'broker-booster-shell-v4';
 const CDN_HOSTS = [
   'cdnjs.cloudflare.com',
   'cdn.jsdelivr.net',
@@ -12,6 +12,12 @@ const CDN_HOSTS = [
   'fonts.gstatic.com',
   'ui-avatars.com'
 ];
+/* Solo el esqueleto mínimo. El JS/CSS de la app NO se precarga aquí:
+ * la página los pide con `?v=<build>` y un `cache.add` sin esa marca guarda
+ * copias que el manejador de fetch nunca puede servir (la URL no coincide),
+ * así que eran ~2 MB descargados en la primera visita para nada. Los archivos
+ * reales se guardan en tiempo de ejecución, con su URL exacta, en el primer
+ * uso (ver el bloque 2 del fetch). */
 const APP_SHELL = [
   './',
   './index.html',
@@ -19,40 +25,7 @@ const APP_SHELL = [
   './img/favicon-32.png',
   './img/apple-touch-icon.png',
   './img/logo-icon-192.png',
-  './img/logo-icon-512.png',
-  './img/splash-source.webp',
-  './css/tailwind.min.css',
-  './css/styles.css',
-  './js/core/splash.js',
-  './js/core/store.js',
-  './js/core/backend.js',
-  './js/core/media.js',
-  './js/core/realtime.js',
-  './js/core/actions.js',
-  './js/core/bx-manual.js',
-  './js/core/bx-actions.js',
-  './js/core/backend-shim.js',
-  './js/core/sync.js',
-  './js/services/rolesService.js',
-  './js/services/userService.js',
-  './js/services/repository.js',
-  './js/legacy/00-head-utils.js',
-  './js/legacy/01-core-db-roles-portal.js',
-  './js/legacy/02-modulo-b.js',
-  './js/legacy/03-config-73l.js',
-  './js/legacy/04-modulo-d.js',
-  './js/legacy/05-modulo-e.js',
-  './js/legacy/06-modulo-f.js',
-  './js/legacy/07-modulo-g.js',
-  './js/legacy/08-snippet-h.js',
-  './js/legacy/09-modulo-i.js',
-  './js/legacy/10-modulo-j.js',
-  './js/legacy/11-init.js',
-  './js/modules/auth-custom.js',
-  './js/modules/dashboard.js',
-  './js/modules/chat.js',
-  './js/modules/ventas.js',
-  './js/modules/inventario.js'
+  './img/logo-icon-512.png'
 ];
 
 self.addEventListener('install', function (event) {

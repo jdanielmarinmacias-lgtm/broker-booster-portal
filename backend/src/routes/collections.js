@@ -234,6 +234,14 @@ module.exports = (store, config) => {
   let publicPortalCache = null;
   let publicPortalCacheAt = 0;
 
+  /* ¿La portada trae algo que mostrar? Si no, es preferible reintentar la
+   * lectura completa antes de servir una página en blanco. */
+  const portalTieneContenido = (d) => !!d && (
+    (d.settings && Object.keys(d.settings).length > 0)
+    || (Array.isArray(d.autoHub) && d.autoHub.length > 0)
+    || (Array.isArray(d.inmPublica) && d.inmPublica.length > 0)
+  );
+
   r.get('/public/portal', async (req, res, next) => {
     try {
       let data = store.get();
@@ -242,12 +250,29 @@ module.exports = (store, config) => {
           data = publicPortalCache;
         } else {
           data = await store.adapter.loadCollections(['settings', 'autoHub', 'inmPublica']);
-          publicPortalCache = data;
-          publicPortalCacheAt = Date.now();
+          /* Nunca se guarda un recorte vacío: envenenaba 30 s de portada. */
+          if (portalTieneContenido(data)) {
+            publicPortalCache = data;
+            publicPortalCacheAt = Date.now();
+          }
         }
       } else {
         await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
         data = store.get();
+      }
+      /* Instancia recién arrancada con el recorte vacío (credenciales que aún
+       * no ven las colecciones, caché parcial…): se reintenta por la vía
+       * completa en vez de devolver la portada sin logo ni vehículos. */
+      if (!portalTieneContenido(data)) {
+        try {
+          if (typeof store.refreshForWrite === 'function') {
+            await store.refreshForWrite(['settings', 'autoHub', 'inmPublica']);
+          } else {
+            await store.refreshIfStale();
+          }
+          const completo = store.get();
+          if (portalTieneContenido(completo)) data = completo;
+        } catch (e) { /* se sirve lo que haya */ }
       }
       const settings = data.settings || {};
       const rawAutos = Array.isArray(data.autoHub)
