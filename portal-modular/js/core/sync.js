@@ -508,6 +508,7 @@
           /* Si lo único que cambió es la presencia (lastActive/lastConnection),
            * no se escribe hasta que el latido guardado tenga 10 minutos. Antes
            * cada carga reescribía el usuario y avisaba a todos los equipos. */
+          if (window.__syncDebug) console.warn('[SYNC-DIFF] user', u.username, 'campos:', Object.keys(body).join(','));
           const soloLatido = Object.keys(body).every(function (k) { return CAMPOS_LATIDO.indexOf(k) !== -1; });
           if (soloLatido) {
             const ultimoLatido = Number(prev && prev.lastActive) || 0;
@@ -568,6 +569,7 @@
         if (mismoValor(local[k], oldObj[k])) continue;
         // Clave nueva que solo trae el valor por defecto del panel: no se escribe.
         if (!(k in oldObj) && esValorPorDefecto(local[k])) continue;
+        if (window.__syncDebug) console.warn('[SYNC-DIFF]', name + '.' + k, 'sombra:', JSON.stringify(oldObj[k]).slice(0, 120), 'local:', JSON.stringify(local[k]).slice(0, 120));
         try {
           await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k), { value: local[k] });
         } catch (e) {
@@ -782,6 +784,8 @@
       return true;
     } catch (e) { return false; }
   }
+
+  try { window.__syncDebug = /(\?|&)debugsync=1/.test(location.search); } catch (e) {}
 
   var bootDone = false;
   async function boot() {
