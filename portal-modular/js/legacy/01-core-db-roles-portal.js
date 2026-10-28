@@ -4509,7 +4509,11 @@ function renderPublicidad(){
   </div>`;
 }
 /* ¿El material subido es una imagen? (data URL image/*) */
-function pubEsImagen(p){ const f=String((p&&p.fileData)||''); return /^data:image\//.test(f) || /^https?:\/\/[^\s]+\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(f); }
+/* ¿El contenido de Publicidad es una imagen mostrable? Acepta la ruta relativa
+ * del proxy (/media/…) además de data: y URLs absolutas: al reescribir las
+ * imágenes a /media/…, la comprobación anterior las descartaba y ningún
+ * contenido de Publicidad mostraba su vista previa. */
+function pubEsImagen(p){ const f=String((p&&p.fileData)||''); if(!f) return false; if(/^data:image\//i.test(f) || /^blob:/i.test(f)) return true; if(/^image\//i.test(String((p&&p.mime)||''))) return true; return /^\/(media|uploads)\//.test(f) || /(^|\/)[^/?]+\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?|#|$)/i.test(f); }
 /* Vista ampliada de la imagen publicitaria (modal ligero) */
 function pubVerImagen(id){
   const p=(db.settings&&db.settings.publicidad||[]).find(x=>String(x.id)===String(id));
@@ -11840,7 +11844,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const saveBtn = document.getElementById('gr-save-btn');
             let imageData = imgInicial;
             let subiendoImagen = false;
-            const imgVal = v => typeof v === 'string' && v.length > 0 && (/^https?:\/\//.test(v) || /^\/uploads\//.test(v) || /^data:image\//i.test(v));
+            /* Acepta también las rutas relativas que sirve el propio portal
+             * (/media/…, que es lo que devuelve toda subida a Storage). Antes
+             * solo pasaban las absolutas y /uploads/: al subir la portada, el
+             * validador la rechazaba y el grupo se guardaba sin imagen. */
+            const imgVal = v => typeof v === 'string' && v.length > 0 && (/^(https?:)?\/\//i.test(v) || /^\/(media|uploads)\//.test(v) || /^data:image\//i.test(v) || /^blob:/i.test(v));
             const pintarImg = src => {
                 if (src) {
                     preview.src = src; preview.classList.remove('hidden');
