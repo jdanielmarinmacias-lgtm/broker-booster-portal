@@ -7,6 +7,19 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ORIG = path.join(ROOT, '..', 'portal.html');
 
+/* AVISO: este script es del Paso 1 y genera el index SIN `defer`, sin `?v=` y
+ * con el campus cargado de golpe. Desde la Fase 4 el index.html real se mantiene
+ * a mano: los scripts del campus se cargan al entrar (js/core/lazy-app.js).
+ * Correrlo sobrescribiría ese corte, así que se niega salvo --force. */
+if (!process.argv.includes('--force')) {
+  const actual = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  if (actual.includes('lazy-app.js')) {
+    console.error('index.html ya usa la carga diferida del campus (lazy-app.js).');
+    console.error('No lo sobrescribas con este script; usa --force solo si vas a rehacerlo a mano.');
+    process.exit(1);
+  }
+}
+
 const src = fs.readFileSync(ORIG, 'utf8');
 const L = src.split('\n');
 

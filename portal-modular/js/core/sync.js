@@ -808,6 +808,10 @@
     } catch (e) { hasSession = false; }
 
     if (hasSession) {
+      /* Este boot corre en paralelo al del backend-shim: si hay sesión, espera
+       * el campus diferido antes de renderizar (las secciones se cargan al
+       * entrar; sin esto, render() podría pedir funciones que aún no existen). */
+      try { if (window.BBApp && typeof window.BBApp.cargar === 'function') await window.BBApp.cargar(); } catch (e0) {}
       try {
         if (await pullAll()) {
           try { if (typeof window.applyBranding === 'function') window.applyBranding(); } catch (e0) {}

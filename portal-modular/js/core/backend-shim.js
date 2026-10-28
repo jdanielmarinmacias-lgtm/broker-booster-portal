@@ -31,6 +31,15 @@
     } catch (e) { /* sin red: la IA se ofrece igual y el error sale al usarla */ }
   }
 
+  /* Campus diferido: secciones y librerías del campus se piden al entrar (la
+   * portada pública no las usa). Se espera aquí, antes de pintar la interfaz,
+   * para que existan las funciones que cada sección necesita al renderizar. */
+  async function cargarCampus() {
+    try {
+      if (window.BBApp && typeof window.BBApp.cargar === 'function') await window.BBApp.cargar();
+    } catch (e) { /* se entra igual: el fallo concreto queda en consola */ }
+  }
+
   /* --- Flujo de entrada: espejo de login() del legacy (01-core ~línea 471) --- */
   function enterApp(user, destination) {
     destination = destination || sessionStorage.getItem('login_destination') || 'campus';
@@ -122,9 +131,9 @@
         try { if (window.BackendSync) window.BackendSync.normUser(r.user); } catch (e0) {}
         const finalDest = guardCampus(r.user);
         if (!finalDest) return;
-        // Entrar DE INMEDIATO a la interfaz tras validar credenciales (sin bloquear
-        // ~10s esperando la descarga completa de todas las colecciones). El pull del
-        // servidor corre en paralelo y refresca la vista en cuanto llega.
+        // Entrar a la interfaz tras validar credenciales. El pull del servidor
+        // corre en paralelo y refresca la vista en cuanto llega.
+        await cargarCampus();
         ensureIAEstado();
         enterApp(r.user, finalDest);
         if (window.BackendSync) {
@@ -155,6 +164,7 @@
       const me = await window.Backend.me();
       if (me && me.user) {
         try { if (window.BackendSync) window.BackendSync.normUser(me.user); } catch (e) {}
+        await cargarCampus();
         ensureIAEstado();
         enterApp(me.user, 'campus');
       }
