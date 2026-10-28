@@ -17,6 +17,7 @@
     "tailwindcss": "^3.4.17"
   },
   "scripts": {
-    "build:css": "tailwindcss -c tailwind.config.js -i portal-modular/css/tailwind.src.css -o portal-modular/css/tailwind.min.css --minify"
+    "build:css": "tailwindcss -c tailwind.config.js -i portal-modular/css/tailwind.src.css -o portal-modular/css/tailwind.min.css --minify",
+    "test": "node --test backend/test/portal-checks.js backend/test/smoke.js"
   }
 }

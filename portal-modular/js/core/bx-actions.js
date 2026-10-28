@@ -1982,3 +1982,6 @@ window.__bx.a659 = function (event) { if(window.toggleExecutiveTheme) toggleExec
 
 /* index.html:177 · click */
 window.__bx.a660 = function (event) { toggleNewsBar() };
+
+/* js/legacy/01-core-db-roles-portal.js · click (borrar grupo desde la tarjeta de Mensajes) */
+window.__bx.a661 = function (event, bx0) { event.stopPropagation(); eliminarGrupo((bx0)) };

@@ -1,0 +1,20 @@
+name: Comprobaciones
+
+# Cada push a main despliega en Vercel; estas pruebas corren a la vez y avisan
+# si el corte rompe la CSP (iframes de YouTube/Drive) o el ancho del lector.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm test

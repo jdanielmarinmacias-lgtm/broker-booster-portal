@@ -9465,12 +9465,25 @@ function filterReports(){
 
         // --- MODALS ---
         function showModal(html) { 
-            const isLarge = html.includes('max-w-7xl') || html.includes('max-w-[95vw]') || html.includes('modal-large') || html.includes('modal-scroll');
-            // El contenedor adopta el mismo ancho máximo que declara el contenido (sin franjas vacías)
-            const capMatch = isLarge ? html.match(/max-w-(?:[1-7]xl|\[95vw\])/) : null;
-            const maxWidth = capMatch ? ('w-full ' + capMatch[0]) : (isLarge ? '' : 'w-full max-w-lg');
+            /* El ancho lo decide modal-width.js (regla pura, probada en
+             * backend/test/portal-checks.js): el contenido puede pedir más
+             * espacio con `modal-large` + su propio max-w-*. */
+            const maxWidth = (window.BBModal && window.BBModal.anchoContenedor)
+                ? window.BBModal.anchoContenedor(html)
+                : 'w-full max-w-lg';
             // Verificar si el modal ya incluye un botón superior de cerrar con ícono X (fa-times / fa-xmark)
-            const hasTopCloseX = /onclick=["'][^"']*closeModal\(|cotCerrarModal\(/i.test(html) && /fa-times|fa-xmark|✕/i.test(html);
+            /* Tras la migración a CSP los cierres ya no son onclick="…": el
+             * codemod los pasó a data-bx-click="a1"/"a276" (closeModal). Sin
+             * esta comprobación se añadía SIEMPRE la X flotante y los modales
+             * que ya traían la suya mostraban dos. */
+            /* El modal ya trae su propia X arriba a la derecha si hay un botón
+             * accionable (inline o delegado) etiquetado "Cerrar" junto a un
+             * icono de aspa. Antes solo se reconocían los onclick="…" originales:
+             * tras migrar a data-bx-click se añadía SIEMPRE la X flotante y los
+             * modales con la suya mostraban dos. */
+            const botonesHtml = html.match(/<button\b[^>]*>/gi) || [];
+            const tieneCierre = botonesHtml.some(t => /(?:aria-label|title)=["'][^"']*cerrar/i.test(t) && /data-bx-click=|onclick=/i.test(t));
+            const hasTopCloseX = tieneCierre && /fa-times|fa-xmark|✕/i.test(html);
             const closeXBtn = hasTopCloseX ? '' : `<button type="button" aria-label="Cerrar ventana" title="Cerrar" data-bx-click="a276" class="modal-auto-close-x sticky top-3 float-right mr-3 mt-3 z-30 w-8 h-8 rounded-full bg-slate-100/90 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center shadow-sm transition"><i class="fas fa-times text-sm"></i></button>`;
             document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" data-bx-dblclick="a277" title="Doble clic fuera de la ventana para cerrar"><div class="relative bg-white text-slate-800 rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" data-bx-click="a141" data-bx-dblclick="a278">${closeXBtn}${html}</div></div>`; }
         function closeModal(e) { if(!e || e.target.classList.contains('modal-backdrop')){ if(window._inExam && e) return; document.getElementById('modal-container').innerHTML=''; window.cotModalId=null; } }
@@ -10659,6 +10672,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function esStaffComunicacion(u) {
             return ['gm','desarrollador','capacitador','admin'].includes(String((u && u.role) || '').toLowerCase());
         }
+        /* Quién ve el botón "Nuevo grupo" en Mensajes. */
+        function puedeCrearGrupoEquipo(u) {
+            return ['agencia', 'gm', 'maestro', 'capacitador'].includes(String((u && u.role) || '').toLowerCase());
+        }
         function gruposDeUsuario(u) {
             if (!u) return [];
             const uid = String(u.id);
@@ -11050,10 +11067,15 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         };
         function gruposChatHtml() {
             const grupos = ensureChatGrupos();
+            const puedeCrear = puedeCrearGrupoEquipo(currentUser);
+            /* Solo GM borra grupos; los 4 canales base se recrean solos y se
+             * excluyen para no ofrecer un botón que no puede cumplir. */
+            const puedeBorrar = isGM(currentUser);
             const cards = grupos.map(gr => {
                 const gm = (db.messages || []).filter(m => String(m.toId) === String(gr.id));
                 const last = gm[gm.length - 1];
                 const gear = (esGroupAdminPortal(gr)) ? `<button role="button" aria-label="Editar grupo" title="Editar grupo" data-bx-click="a337" data-p0="${bxE(function(){return String(gr.id)})}" class="shrink-0 w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center justify-center"><i class="fas fa-gear text-[10px]"></i></button>` : '';
+                const borrar = (puedeBorrar && !String(gr.id).startsWith('canal:')) ? `<button role="button" aria-label="Borrar grupo" title="Borrar grupo" data-bx-click="a661" data-p0="${bxE(function(){return String(gr.id)})}" class="shrink-0 w-6 h-6 rounded-md bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center"><i class="fas fa-trash-can text-[10px]"></i></button>` : '';
                 return `<div data-bx-click="a338" data-p0="${bxE(function(){return String(gr.id)})}" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
                     <div>
                         <div class="flex items-start justify-between gap-2 mb-1">
@@ -11064,7 +11086,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     </div>
                     <div class="flex items-center justify-between gap-2 mt-1">
                         ${gr.onlyAdminsPost ? '<span class="text-[9px] px-1 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold"><i class="fas fa-lock mr-0.5"></i> solo admins</span>' : '<span class="text-[9px] text-slate-400">' + (gr.memberIds || []).length + ' miembros</span>'}
-                        <div>${gear}</div>
+                        <div class="flex items-center gap-1">${gear}${borrar}</div>
                     </div>
                 </div>`;
             }).join('');
@@ -11072,7 +11094,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div class="mb-6">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                         <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5"><i class="fas fa-hashtag text-amber-600"></i> Grupos del Equipo</h4>
-                        <button data-bx-click="a339" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-plus"></i> Nuevo grupo</button>
+                        ${puedeCrear ? `<button data-bx-click="a339" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-plus"></i> Nuevo grupo</button>` : ''}
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">${cards}</div>
                 </div>`;
@@ -11132,7 +11154,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             </label>
                         </div>
                         <div class="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
-                            ${grp && !String(grp.id).startsWith('canal:') && (esStaffComunicacion(currentUser) || String(grp.creadoPorId) === String(currentUser.id) || (grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id))) ? `<button data-bx-click="a344" data-p0="${bxE(function(){return String(grp.id)})}" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100" title="Eliminar el grupo y su chat"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
+                            ${grp && isGM(currentUser) && !String(grp.id).startsWith('canal:') ? `<button data-bx-click="a344" data-p0="${bxE(function(){return String(grp.id)})}" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100" title="Eliminar el grupo y su chat"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
                             <button data-bx-click="a345" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-indigo-700 transition">${edit ? 'Guardar cambios' : 'Crear grupo'}</button>
                         </div>
                     </div>
@@ -11204,8 +11226,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                  * siguiente render: borrarlos solo daría la impresión de que
                  * "no se elimina". */
                 if (String(grp.id).startsWith('canal:')) return showToast('Los canales base del equipo no se pueden eliminar', 'warning');
-                const esAdminDelGrupo = (grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id));
-                if (!esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser.id) && !esAdminDelGrupo) return showToast('Solo el creador o un admin del grupo puede eliminarlo', 'warning');
+                if (!isGM(currentUser)) return showToast('Solo un GM puede borrar grupos', 'warning');
                 if (!confirm('¿Eliminar el grupo "' + grp.nombre + '" y su chat? No se puede deshacer.')) return;
                 db.chatGroups = db.chatGroups.filter(g => String(g.id) !== String(gid));
                 db.messages = (db.messages || []).filter(m => String(m.toId) !== String(gid));
