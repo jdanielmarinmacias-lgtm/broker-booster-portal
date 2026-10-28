@@ -40,7 +40,7 @@
                         </div>
                         <div><label class="text-sm font-bold">¿Por qué quieres ser agente de seguros?</label><textarea id="me-motivo" class="w-full mt-1 p-3 border rounded-xl" rows="3" placeholder="Tu motivación...">${escapeHTML(saved.motivo||'')}</textarea></div>
                     </div>
-                    <button onclick="guardarMiExperiencia()" class="mt-6 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Guardar y continuar →</button>
+                    <button data-bx-click="a423" class="mt-6 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Guardar y continuar →</button>
                     <p class="text-xs text-gray-500 mt-3">* Esta información será visible para roles Admin, GM y Desarrollador</p>
                 </div>
             </div>`;
@@ -139,7 +139,7 @@
                     ${embed ? `<div class="aspect-video bg-slate-900 rounded-xl overflow-hidden"><iframe src="${embed}" class="w-full h-full" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>` : `<div class="aspect-video bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 text-sm">Video no configurado</div>`}
                     ${canEdit ? `<div class="flex gap-2 mt-3">
                         <input id="ov_video" type="url" placeholder="https://drive.google.com/... / https://youtube.com/..." value="${escapeHTML(videoUrl)}" class="flex-1 border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300">
-                        <button onclick="guardarOfertaVideo()" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm">Guardar link</button>
+                        <button data-bx-click="a424" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm">Guardar link</button>
                     </div><p class="text-xs text-slate-500 mt-2">Drive: compartir como "Cualquiera con el enlace". YouTube: link público / no listado.</p>`:''}
                 </div>
                 <div class="bg-white rounded-2xl p-6 border border-slate-200">
@@ -149,8 +149,8 @@
                     </div>
                     <div id="ov_slides" class="relative bg-slate-50 rounded-xl p-8 text-center min-h-[200px] flex items-center justify-center">
                         <div id="ov_slide_content"></div>
-                        <button onclick="ovPrev()" class="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border rounded-full shadow-sm hover:bg-slate-50">‹</button>
-                        <button onclick="ovNext()" class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border rounded-full shadow-sm hover:bg-slate-50">›</button>
+                        <button data-bx-click="a425" class="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border rounded-full shadow-sm hover:bg-slate-50">‹</button>
+                        <button data-bx-click="a426" class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border rounded-full shadow-sm hover:bg-slate-50">›</button>
                     </div>
                     <div id="ov_dots" class="text-center mt-3 text-slate-400 text-sm"></div>
                 </div>
@@ -159,15 +159,15 @@
                     <div id="ov_editor_list" class="space-y-2 mb-4">
                         ${slides.map((s,i)=>`<div class="flex items-start gap-3 p-3 border rounded-lg bg-slate-50">
                             <div class="flex-1 text-sm"><b>${escapeHTML(s.t)}</b><br><span class="text-slate-600">${escapeHTML(s.d)}</span></div>
-                            <button onclick="editOfertaSlide(${i})" class="text-xs px-2 py-1 border rounded hover:bg-white">Editar</button>
-                            <button onclick="deleteOfertaSlide(${i})" class="text-xs px-2 py-1 border rounded text-red-600 hover:bg-white">Eliminar</button>
+                            <button data-bx-click="a427" data-p0="${bxE(function(){return i})}" class="text-xs px-2 py-1 border rounded hover:bg-white">Editar</button>
+                            <button data-bx-click="a428" data-p0="${bxE(function(){return i})}" class="text-xs px-2 py-1 border rounded text-red-600 hover:bg-white">Eliminar</button>
                         </div>`).join('')}
                     </div>
                     <div class="border-t pt-4 grid md:grid-cols-2 gap-3">
                         <input id="ov_new_t" type="text" placeholder="Título slide" class="border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300">
                         <input id="ov_new_d" type="text" placeholder="Descripción" class="border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300">
                     </div>
-                    <button onclick="addOfertaSlide()" class="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Agregar slide</button>
+                    <button data-bx-click="a429" class="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Agregar slide</button>
                     <span id="ov_editor_status" class="text-xs text-emerald-600 ml-3"></span>
                 </div>`:''}
             </div>`;
@@ -274,7 +274,7 @@
             return `<div class="max-w-6xl mx-auto">
                 <div class="flex items-start justify-between flex-wrap gap-2 mb-1">
                     <h2 class="text-2xl font-bold">Simulador de ingresos</h2>
-                    ${esGM?`<button onclick="simGuardar()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar configuración</button>`:`<span class="text-[11px] text-slate-400 max-w-[280px] text-right">Parámetros definidos por la dirección (GM). Usa las cifras para planear cuánto vender.</span>`}
+                    ${esGM?`<button data-bx-click="a430" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar configuración</button>`:`<span class="text-[11px] text-slate-400 max-w-[280px] text-right">Parámetros definidos por la dirección (GM). Usa las cifras para planear cuánto vender.</span>`}
                 </div>
                 <p class="text-slate-500 mb-5">Cálculo real por ramo: comisión, trail fee, bonos y plazos reales. Para GM: editable y guardado para toda la promotoría.</p>
                 <div class="bg-white rounded-2xl p-5 border border-slate-200 mb-4 grid md:grid-cols-3 gap-4">
@@ -411,13 +411,13 @@ function renderMisMetas(){
 
         const equipo = isAgencia ? db.users.filter(u=>u.agenciaId===currentUser.agenciaId && u.role==='agente') : [];
         const selectorAgencia = isAgencia ? `<div class="flex gap-2 items-center">
-            <select onchange="localStorage.setItem('metaAgenteId',this.value);render()" class="border rounded-lg px-3 py-1.5 text-sm bg-white text-slate-900 border-slate-300">
+            <select data-bx-change="a431" class="border rounded-lg px-3 py-1.5 text-sm bg-white text-slate-900 border-slate-300">
                 ${equipo.map(e=>`<option value="${e.id}" ${String(e.id)===String(agenteId)?'selected':''}>${e.nombre}</option>`).join('')}
             </select>
-            <button onclick="asignarMeta(agenteId)" class="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-black">Asignar meta</button>
+            <button data-bx-click="a432" class="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-black">Asignar meta</button>
         </div>` : '';
 
-        const filtroRamos = ['Todos',...ramos].map(r=>`<button onclick="localStorage.setItem('metaRamo','${r}');render()" class="px-2.5 py-1 text-xs rounded-lg border ${ramoFilter===r?'bg-slate-900 text-white border-slate-900':'bg-white hover:bg-slate-50'}">${r}</button>`).join('');
+        const filtroRamos = ['Todos',...ramos].map(r=>`<button data-bx-click="a433" data-p0="${bxE(function(){return r})}" class="px-2.5 py-1 text-xs rounded-lg border ${ramoFilter===r?'bg-slate-900 text-white border-slate-900':'bg-white hover:bg-slate-50'}">${r}</button>`).join('');
 
         const filas = ventasFiltradas.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).map(v=>{
             const fecha = new Date(v.fecha); const f = isNaN(fecha)? v.fecha : fecha.toLocaleDateString('es-MX');
@@ -436,7 +436,7 @@ function renderMisMetas(){
                 <div class="flex gap-2 items-center">
                     ${selectorAgencia}
                     <div class="flex gap-1 bg-white border rounded-lg p-1">
-                        ${['mensual','trimestral','anual'].map(t=>`<button onclick="localStorage.setItem('metaTab','${t}');render()" class="px-3 py-1 text-sm rounded ${tab===t?'bg-slate-900 text-white':'hover:bg-slate-100'}">${t}</button>`).join('')}
+                        ${['mensual','trimestral','anual'].map(t=>`<button data-bx-click="a434" data-p0="${bxE(function(){return t})}" class="px-3 py-1 text-sm rounded ${tab===t?'bg-slate-900 text-white':'hover:bg-slate-100'}">${t}</button>`).join('')}
                     </div>
                 </div>
             </div>
@@ -540,7 +540,7 @@ function renderMisLogros(){
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold">Mis Logros</h2>
                 <div class="flex gap-1 bg-white border rounded-lg p-1">
-                    ${['mensual','trimestral','anual'].map(t=>`<button onclick="localStorage.setItem('logroTab','${t}');render()" class="px-3 py-1 text-sm rounded ${tab===t?'bg-slate-900 text-white':'hover:bg-slate-100'}">${t}</button>`).join('')}
+                    ${['mensual','trimestral','anual'].map(t=>`<button data-bx-click="a435" data-p0="${bxE(function(){return t})}" class="px-3 py-1 text-sm rounded ${tab===t?'bg-slate-900 text-white':'hover:bg-slate-100'}">${t}</button>`).join('')}
                 </div>
             </div>
             <div class="grid md:grid-cols-2 gap-4 mb-6">
@@ -548,7 +548,7 @@ function renderMisLogros(){
             </div>
             <h3 class="font-semibold mb-2">Convenciones</h3>
             <div class="grid md:grid-cols-3 gap-4">
-                ${convs.map(c=>`<div class="bg-white border rounded-xl overflow-hidden ${c.ok?'ring-2 ring-emerald-500':''}"><img src="${c.imagen||'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800'}" class="w-full h-48 object-cover"><div class="p-3"><div class="font-semibold flex justify-between">${c.nombre} ${c.ok?'<span class="text-emerald-600 text-xs">✓</span>':''}</div><div class="text-xs text-slate-500">${c.destino||''}</div></div></div>`).join('')}
+                ${convs.map(c=>`<div class="bg-white border rounded-xl overflow-hidden ${c.ok?'ring-2 ring-emerald-500':''}"><img loading="lazy" decoding="async" src="${c.imagen||'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800'}" class="w-full h-48 object-cover"><div class="p-3"><div class="font-semibold flex justify-between">${c.nombre} ${c.ok?'<span class="text-emerald-600 text-xs">✓</span>':''}</div><div class="text-xs text-slate-500">${c.destino||''}</div></div></div>`).join('')}
             </div>
         </div>`;
     }catch(e){ return `<div class="p-8 text-red-600">Error: ${e.message}</div>`; }
@@ -592,10 +592,10 @@ function renderMiEquipo(){
                 <td class="p-2 text-xs text-slate-500">${a.email||''}</td>
                 <td class="text-right pr-2 font-semibold">$${total.toLocaleString('es-MX')}</td>
                 <td class="text-center whitespace-nowrap">
-                    <button onclick="localStorage.setItem('detalleAgenteId','${a.id}');render()" class="text-slate-700 text-xs mr-2 hover:underline">Detalle</button>
-                    <button onclick="asignarMeta(${a.id})" class="text-indigo-600 text-xs mr-2">Meta</button>
-                    <button onclick="registrarVenta(${a.id})" class="text-emerald-600 text-xs mr-2">Venta</button>
-                    <button onclick="quitarAgente(${a.id})" class="text-red-500 text-xs">Quitar</button>
+                    <button data-bx-click="a436" data-p0="${bxE(function(){return a.id})}" class="text-slate-700 text-xs mr-2 hover:underline">Detalle</button>
+                    <button data-bx-click="a437" data-p0="${bxE(function(){return a.id})}" class="text-indigo-600 text-xs mr-2">Meta</button>
+                    <button data-bx-click="a438" data-p0="${bxE(function(){return a.id})}" class="text-emerald-600 text-xs mr-2">Venta</button>
+                    <button data-bx-click="a439" data-p0="${bxE(function(){return a.id})}" class="text-red-500 text-xs">Quitar</button>
                 </td>
             </tr>`;
         }).join('');
@@ -606,7 +606,7 @@ function renderMiEquipo(){
                     <h3 class="font-semibold">Detalle de ${agenteDetalle.nombre||agenteDetalle.name}</h3>
                     <p class="text-xs text-slate-500">${ventasDetalle.length} ventas · Total $${ventasDetalle.reduce((s,v)=>s+Number(v.prima||0),0).toLocaleString('es-MX')}</p>
                 </div>
-                <button onclick="localStorage.removeItem('detalleAgenteId');render()" class="text-sm px-3 py-1 border rounded-lg hover:bg-slate-50">Cerrar</button>
+                <button data-bx-click="a440" class="text-sm px-3 py-1 border rounded-lg hover:bg-slate-50">Cerrar</button>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -621,7 +621,7 @@ function renderMiEquipo(){
                     </tr></thead>
                     <tbody>${ventasDetalle.map(v=>{
                         const f = new Date(v.fecha); const fecha = isNaN(f)? v.fecha : f.toLocaleDateString('es-MX');
-                        return `<tr class="border-b last:border-0"><td class="px-3 py-2">${v.contratante||'-'}</td><td class="px-3 py-2">${fecha}</td><td class="px-3 py-2">${v.ramo||'-'}</td><td class="px-3 py-2">${v.compania||'-'}</td><td class="px-3 py-2">${v.producto||'-'}</td><td class="px-3 py-2 text-right">$${Number(v.prima||0).toLocaleString('es-MX')}</td><td class="px-3 py-2 text-right">${isAg ? `<button onclick="editarVenta(${v.id})" class="text-indigo-600 text-xs mr-2 hover:underline" title="Editar"><i class="fas fa-edit"></i></button><button onclick="borrarVenta(${v.id})" class="text-red-500 text-xs hover:underline" title="Borrar"><i class="fas fa-trash"></i></button>` : '<span class="text-xs text-slate-400">-</span>'}</td></tr>`;
+                        return `<tr class="border-b last:border-0"><td class="px-3 py-2">${v.contratante||'-'}</td><td class="px-3 py-2">${fecha}</td><td class="px-3 py-2">${v.ramo||'-'}</td><td class="px-3 py-2">${v.compania||'-'}</td><td class="px-3 py-2">${v.producto||'-'}</td><td class="px-3 py-2 text-right">$${Number(v.prima||0).toLocaleString('es-MX')}</td><td class="px-3 py-2 text-right">${isAg ? `<button data-bx-click="a441" data-p0="${bxE(function(){return v.id})}" class="text-indigo-600 text-xs mr-2 hover:underline" title="Editar"><i class="fas fa-edit"></i></button><button data-bx-click="a442" data-p0="${bxE(function(){return v.id})}" class="text-red-500 text-xs hover:underline" title="Borrar"><i class="fas fa-trash"></i></button>` : '<span class="text-xs text-slate-400">-</span>'}</td></tr>`;
                     }).join('') || `<tr><td colspan="7" class="p-6 text-center text-slate-500">Sin ventas</td></tr>`}</tbody>
                 </table>
             </div>
@@ -631,11 +631,11 @@ function renderMiEquipo(){
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold">Mi Equipo</h2>
                 <div class="flex gap-2">
-                    <button onclick="exportarEquipoCSV()" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50">Exportar CSV</button>
-                    <button onclick="exportarEquipoPDF()" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-file-pdf mr-1 text-red-600"></i>Exportar PDF</button>
-                    ${isAg ? `<button onclick="verAuditoriaVentas()" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-history mr-1"></i>Auditoría</button>` : ''}
-                    ${(currentUser.role||'').toLowerCase()==='gm' ? `<button onclick="openColoresGraficas()" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-palette mr-1 text-indigo-600"></i>Colores</button>` : ''}
-                    ${isAdminGM ? `<button onclick="navigateTo('users')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm"><i class="fas fa-users-gear mr-1"></i> Asignar agentes (Usuarios)</button>` : `<span class="text-[11px] text-slate-400 max-w-[240px] text-right">Los agentes se asignan desde la sección <strong>Usuarios</strong>; aquí solo aparece tu equipo asignado.</span>`}
+                    <button data-bx-click="a443" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50">Exportar CSV</button>
+                    <button data-bx-click="a444" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-file-pdf mr-1 text-red-600"></i>Exportar PDF</button>
+                    ${isAg ? `<button data-bx-click="a445" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-history mr-1"></i>Auditoría</button>` : ''}
+                    ${(currentUser.role||'').toLowerCase()==='gm' ? `<button data-bx-click="a446" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-palette mr-1 text-indigo-600"></i>Colores</button>` : ''}
+                    ${isAdminGM ? `<button data-bx-click="a420" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm"><i class="fas fa-users-gear mr-1"></i> Asignar agentes (Usuarios)</button>` : `<span class="text-[11px] text-slate-400 max-w-[240px] text-right">Los agentes se asignan desde la sección <strong>Usuarios</strong>; aquí solo aparece tu equipo asignado.</span>`}
                 </div>
             </div>
             
@@ -654,7 +654,7 @@ function renderMiEquipo(){
                 const top10 = rank.slice(0,10);
                 const fila10 = (pos,r) => `<tr class="border-t hover:bg-slate-50 ${pos<=3?'bg-amber-50/40':''}">
                     <td class="p-2 text-center font-bold">${pos===1?'🥇':pos===2?'🥈':pos===3?'🥉':pos}</td>
-                    <td class="p-2"><div class="flex items-center gap-2"><img src="${r.avatar||('https://i.pravatar.cc/40?u='+r.id)}" class="w-7 h-7 rounded-full object-cover"><span class="font-medium">${r.name}</span></div></td>
+                    <td class="p-2"><div class="flex items-center gap-2"><img loading="lazy" decoding="async" src="${r.avatar||('https://i.pravatar.cc/40?u='+r.id)}" class="w-7 h-7 rounded-full object-cover"><span class="font-medium">${r.name}</span></div></td>
                     <td class="text-center">${r.count}</td>
                     <td class="text-right pr-3 font-semibold">$${r.total.toLocaleString('es-MX')}</td></tr>`;
                 return `<div class="bg-white border rounded-2xl p-5 mb-6">
@@ -662,7 +662,7 @@ function renderMiEquipo(){
                     ${top3.length ? `<div class="grid md:grid-cols-3 gap-4 mb-5">${top3.map((r,i)=>`
                         <div class="rounded-2xl border p-5 text-center ${i===0?'border-amber-300 bg-gradient-to-b from-amber-50 to-white':i===1?'border-slate-300 bg-gradient-to-b from-slate-50 to-white':'border-orange-200 bg-gradient-to-b from-orange-50 to-white'}">
                             <div class="text-4xl">${i===0?'🥇':i===1?'🥈':'🥉'}</div>
-                            <img src="${r.avatar||('https://i.pravatar.cc/40?u='+r.id)}" class="w-12 h-12 rounded-full object-cover mx-auto mt-2 border-2 ${i===0?'border-amber-400':i===1?'border-slate-400':'border-orange-400'}">
+                            <img loading="lazy" decoding="async" src="${r.avatar||('https://i.pravatar.cc/40?u='+r.id)}" class="w-12 h-12 rounded-full object-cover mx-auto mt-2 border-2 ${i===0?'border-amber-400':i===1?'border-slate-400':'border-orange-400'}">
                             <p class="font-bold mt-2">${r.name}</p>
                             <p class="text-sm text-slate-500">${r.count} venta${r.count===1?'':'s'}</p>
                             <p class="text-lg font-bold ${r.total>0?'text-emerald-600':'text-slate-400'} mt-1">$${r.total.toLocaleString('es-MX')}</p>
@@ -713,10 +713,10 @@ function renderMiEquipo(){
                                 </div>
                             </div>
                             <div class="grid grid-cols-4 gap-1.5 pt-1">
-                                <button onclick="localStorage.setItem('detalleAgenteId','${a.id}');render()" class="py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">Detalle</button>
-                                <button onclick="asignarMeta(${a.id})" class="py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">Meta</button>
-                                <button onclick="registrarVenta(${a.id})" class="py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold">Venta</button>
-                                <button onclick="quitarAgente(${a.id})" class="py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-semibold">Quitar</button>
+                                <button data-bx-click="a436" data-p0="${bxE(function(){return a.id})}" class="py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">Detalle</button>
+                                <button data-bx-click="a437" data-p0="${bxE(function(){return a.id})}" class="py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">Meta</button>
+                                <button data-bx-click="a438" data-p0="${bxE(function(){return a.id})}" class="py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold">Venta</button>
+                                <button data-bx-click="a439" data-p0="${bxE(function(){return a.id})}" class="py-1.5 rounded-lg bg-rose-50 text-rose-600 text-xs font-semibold">Quitar</button>
                             </div>
                         </div>`;
                     }).join('') || `<div class="p-6 text-center text-slate-500 text-sm">Sin agentes asignados. El administrador asigna agentes desde la sección Usuarios.</div>`}
@@ -738,11 +738,11 @@ function agregarAgente(){
     const rolesAgente=['agente','agente_agencia','agente_desarrollo'];
     const disponibles = db.users.filter(u=>rolesAgente.includes(u.role) && !u.agenciaId && !u.parentId);
     if(!disponibles.length){
-        showModal(`<div class="p-6 max-w-sm text-center"><i class="fas fa-circle-info text-3xl text-slate-300"></i><h3 class="font-bold mt-2">Sin agentes disponibles</h3><p class="text-sm text-slate-500 mt-2">No hay agentes libres por asignar. Crea primero el agente en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia); solo aparecerán aquí los que aún no pertenezcan a una agencia.</p><div class="mt-4"><button onclick="closeModal()" class="px-4 py-2 border rounded-lg">Entendido</button></div></div>`);
+        showModal(`<div class="p-6 max-w-sm text-center"><i class="fas fa-circle-info text-3xl text-slate-300"></i><h3 class="font-bold mt-2">Sin agentes disponibles</h3><p class="text-sm text-slate-500 mt-2">No hay agentes libres por asignar. Crea primero el agente en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia); solo aparecerán aquí los que aún no pertenezcan a una agencia.</p><div class="mt-4"><button data-bx-click="a1" class="px-4 py-2 border rounded-lg">Entendido</button></div></div>`);
         return;
     }
     const opts = disponibles.map(u=>`<option value="${u.id}">${escapeHTML(u.name||u.nombre||'')} (${escapeHTML(u.email||'')})</option>`).join('');
-    showModal(`<form id="af" class="p-4 space-y-3"><h3 class="font-bold">Agregar agente a mi equipo</h3><p class="text-xs text-slate-500">Solo se listan agentes registrados en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia) que todavía no pertenecen a ninguna agencia. También puedes asignar la agencia desde <strong>Usuarios</strong> editando el agente.</p><select name="agenteId" required class="w-full border rounded px-2 py-2 bg-white text-slate-900 border-slate-300">${opts}</select><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Agregar</button></div></form>`);
+    showModal(`<form id="af" class="p-4 space-y-3"><h3 class="font-bold">Agregar agente a mi equipo</h3><p class="text-xs text-slate-500">Solo se listan agentes registrados en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia) que todavía no pertenecen a ninguna agencia. También puedes asignar la agencia desde <strong>Usuarios</strong> editando el agente.</p><select name="agenteId" required class="w-full border rounded px-2 py-2 bg-white text-slate-900 border-slate-300">${opts}</select><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Agregar</button></div></form>`);
     document.getElementById('af').onsubmit=e=>{e.preventDefault();const id=Number(new FormData(e.target).get('agenteId'));const u=db.users.find(x=>x.id===id);if(u&&rolesAgente.includes(u.role)&&!u.agenciaId&&!u.parentId){u.agenciaId=currentUser.id;u.agencia=currentUser.id;u.parentId=currentUser.id;u.assignedTo=currentUser.id;saveDB();}closeModal();render();};
 }
 function quitarAgente(id){
@@ -752,15 +752,15 @@ function quitarAgente(id){
 
 function asignarMeta(id){
     const a=db.users.find(u=>u.id===id);
-    showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
 }
 function registrarVenta(id){
     const a=db.users.find(u=>u.id===id);
-    showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('vf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const v={id:Date.now(),agenteId:id,agenciaId:a.agenciaId,contratante:f.get('contratante'),fecha:f.get('fecha'),ramo:f.get('ramo'),compania:f.get('compania'),producto:f.get('producto'),prima:Number(f.get('prima'))};db.ventas=db.ventas||[];db.ventas.push(v); try{ const agente = db.users.find(u=>String(u.id)===String(v.agenteId)); if(agente) enviarAviso('ventas', [agente], {total: '$'+(v.prima||0).toLocaleString('es-MX'), mes: new Date(v.fecha).toLocaleDateString('es-MX',{month:'long'})}); }catch(e){} if(!db.notifications) db.notifications=[]; db.notifications.push({id:Date.now(),type:'venta',msg:'Nueva venta: '+(v.cliente||'Cliente')+' - $'+Number(v.prima).toLocaleString('es-MX'),agente:v.agente||currentUser.id,ts:new Date().toISOString(),readBy:[]}); saveDB();closeModal();render();};
 }
-function asignarMeta(id){const a=db.users.find(u=>u.id===id);showModal('<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para '+a.name+'</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="'+new Date().getFullYear()+'" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>AUTOS</option><option>DAÑOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Monto" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-indigo-600 text-white px-3 py-1 rounded">Guardar</button></div></form>');document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio&&m.mes===d.mes&&m.trimestre===d.trimestre));db.metas.push(d);saveDB();closeModal();render();};}
+function asignarMeta(id){const a=db.users.find(u=>u.id===id);showModal('<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para '+a.name+'</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="'+new Date().getFullYear()+'" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>AUTOS</option><option>DAÑOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Monto" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-indigo-600 text-white px-3 py-1 rounded">Guardar</button></div></form>');document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio&&m.mes===d.mes&&m.trimestre===d.trimestre));db.metas.push(d);saveDB();closeModal();render();};}
 
 function borrarConv(id){
     if(!confirm('¿Borrar convención?')) return;
@@ -772,11 +772,11 @@ function agregarAgente(){
     const rolesAgente=['agente','agente_agencia','agente_desarrollo'];
     const disponibles = db.users.filter(u=>rolesAgente.includes(u.role) && !u.agenciaId && !u.parentId);
     if(!disponibles.length){
-        showModal(`<div class="p-6 max-w-sm text-center"><i class="fas fa-circle-info text-3xl text-slate-300"></i><h3 class="font-bold mt-2">Sin agentes disponibles</h3><p class="text-sm text-slate-500 mt-2">No hay agentes libres por asignar. Crea primero el agente en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia); solo aparecerán aquí los que aún no pertenezcan a una agencia.</p><div class="mt-4"><button onclick="closeModal()" class="px-4 py-2 border rounded-lg">Entendido</button></div></div>`);
+        showModal(`<div class="p-6 max-w-sm text-center"><i class="fas fa-circle-info text-3xl text-slate-300"></i><h3 class="font-bold mt-2">Sin agentes disponibles</h3><p class="text-sm text-slate-500 mt-2">No hay agentes libres por asignar. Crea primero el agente en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia); solo aparecerán aquí los que aún no pertenezcan a una agencia.</p><div class="mt-4"><button data-bx-click="a1" class="px-4 py-2 border rounded-lg">Entendido</button></div></div>`);
         return;
     }
     const opts = disponibles.map(u=>`<option value="${u.id}">${escapeHTML(u.name||u.nombre||'')} (${escapeHTML(u.email||'')})</option>`).join('');
-    showModal(`<form id="af" class="p-4 space-y-3"><h3 class="font-bold">Agregar agente a mi equipo</h3><p class="text-xs text-slate-500">Solo se listan agentes registrados en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia) que todavía no pertenecen a ninguna agencia. También puedes asignar la agencia desde <strong>Usuarios</strong> editando el agente.</p><select name="agenteId" required class="w-full border rounded px-2 py-2 bg-white text-slate-900 border-slate-300">${opts}</select><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Agregar</button></div></form>`);
+    showModal(`<form id="af" class="p-4 space-y-3"><h3 class="font-bold">Agregar agente a mi equipo</h3><p class="text-xs text-slate-500">Solo se listan agentes registrados en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia) que todavía no pertenecen a ninguna agencia. También puedes asignar la agencia desde <strong>Usuarios</strong> editando el agente.</p><select name="agenteId" required class="w-full border rounded px-2 py-2 bg-white text-slate-900 border-slate-300">${opts}</select><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Agregar</button></div></form>`);
     document.getElementById('af').onsubmit=e=>{e.preventDefault();const id=Number(new FormData(e.target).get('agenteId'));const u=db.users.find(x=>x.id===id);if(u&&rolesAgente.includes(u.role)&&!u.agenciaId&&!u.parentId){u.agenciaId=currentUser.id;u.agencia=currentUser.id;u.parentId=currentUser.id;u.assignedTo=currentUser.id;saveDB();}closeModal();render();};
 }
 function quitarAgente(id){
@@ -786,12 +786,12 @@ function quitarAgente(id){
 
 function asignarMeta(id){
     const a=db.users.find(u=>u.id===id);
-    showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
 }
 function registrarVenta(id){
     const a=db.users.find(u=>u.id===id);
-    showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('vf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const v={id:Date.now(),agenteId:id,agenciaId:a.agenciaId,contratante:f.get('contratante'),fecha:f.get('fecha'),ramo:f.get('ramo'),compania:f.get('compania'),producto:f.get('producto'),prima:Number(f.get('prima'))};db.ventas=db.ventas||[];db.ventas.push(v); try{ const agente = db.users.find(u=>String(u.id)===String(v.agenteId)); if(agente) enviarAviso('ventas', [agente], {total: '$'+(v.prima||0).toLocaleString('es-MX'), mes: new Date(v.fecha).toLocaleDateString('es-MX',{month:'long'})}); }catch(e){} if(!db.notifications) db.notifications=[]; db.notifications.push({id:Date.now(),type:'venta',msg:'Nueva venta: '+(v.cliente||'Cliente')+' - $'+Number(v.prima).toLocaleString('es-MX'),agente:v.agente||currentUser.id,ts:new Date().toISOString(),readBy:[]}); saveDB();closeModal();render();};
 }
 function renderConvenciones(){
@@ -800,15 +800,15 @@ function renderConvenciones(){
         const concursos=(db.concursos||[]);
         const companias=(db.settings && db.settings.convencionCompanias)||[];
         const puedeBorrar = isAdmin(currentUser)||isGM(currentUser)||(currentUser.role||'').toLowerCase()==='maestro';
-        const cardConv = c => `<div class="bg-white border rounded-2xl overflow-hidden relative"><img src="${c.imagen||''}" class="w-full h-56 object-cover bg-slate-100" alt="${c.nombre||''}">${puedeBorrar?`<button onclick="borrarConv(${c.id})" title="Borrar" class="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 text-xs shadow-lg hover:bg-red-700"><i class="fa-solid fa-trash"></i></button>`:''}<div class="p-4"><div class="font-semibold">${c.nombre||'Convención'}</div><div class="text-xs text-slate-500">${c.destino||''} ${c.fecha? '· '+c.fecha : ''}</div>${c.descripcion?`<p class="text-xs mt-2 text-slate-600">${c.descripcion}</p>`:''}</div></div>`;
-        const cardConc = c => `<div class="bg-white border-2 border-amber-200 rounded-2xl overflow-hidden relative"><img src="${c.imagen||''}" class="w-full h-40 object-cover bg-amber-50" alt="${c.nombre||''}">${puedeBorrar?`<button onclick="borrarConc(${c.id})" title="Borrar" class="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 text-xs shadow-lg hover:bg-red-700"><i class="fa-solid fa-trash"></i></button>`:''}<div class="p-4"><div class="font-semibold flex items-center gap-1.5"><i class="fas fa-trophy text-amber-500 text-sm"></i>${c.nombre||'Concurso'}</div>${c.premio?`<div class="text-sm font-bold text-amber-600 mt-1">${c.premio}</div>`:''}<div class="text-xs text-slate-500">${c.fechaInicio?'Del '+c.fechaInicio:''} ${c.fechaFin?' al '+c.fechaFin:''}</div>${c.descripcion?`<p class="text-xs mt-2 text-slate-600">${c.descripcion}</p>`:''}</div></div>`;
+        const cardConv = c => `<div class="bg-white border rounded-2xl overflow-hidden relative"><img loading="lazy" decoding="async" src="${c.imagen||''}" class="w-full h-56 object-cover bg-slate-100" alt="${c.nombre||''}">${puedeBorrar?`<button data-bx-click="a447" data-p0="${bxE(function(){return c.id})}" title="Borrar" class="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 text-xs shadow-lg hover:bg-red-700"><i class="fa-solid fa-trash"></i></button>`:''}<div class="p-4"><div class="font-semibold">${c.nombre||'Convención'}</div><div class="text-xs text-slate-500">${c.destino||''} ${c.fecha? '· '+c.fecha : ''}</div>${c.descripcion?`<p class="text-xs mt-2 text-slate-600">${c.descripcion}</p>`:''}</div></div>`;
+        const cardConc = c => `<div class="bg-white border-2 border-amber-200 rounded-2xl overflow-hidden relative"><img loading="lazy" decoding="async" src="${c.imagen||''}" class="w-full h-40 object-cover bg-amber-50" alt="${c.nombre||''}">${puedeBorrar?`<button data-bx-click="a448" data-p0="${bxE(function(){return c.id})}" title="Borrar" class="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 text-xs shadow-lg hover:bg-red-700"><i class="fa-solid fa-trash"></i></button>`:''}<div class="p-4"><div class="font-semibold flex items-center gap-1.5"><i class="fas fa-trophy text-amber-500 text-sm"></i>${c.nombre||'Concurso'}</div>${c.premio?`<div class="text-sm font-bold text-amber-600 mt-1">${c.premio}</div>`:''}<div class="text-xs text-slate-500">${c.fechaInicio?'Del '+c.fechaInicio:''} ${c.fechaFin?' al '+c.fechaFin:''}</div>${c.descripcion?`<p class="text-xs mt-2 text-slate-600">${c.descripcion}</p>`:''}</div></div>`;
         return `<div class="p-6 max-w-6xl mx-auto">
             <div class="flex justify-between mb-4 flex-wrap gap-2">
                 <h2 class="text-2xl font-bold">Convenciones y Concursos</h2>
                 <div class="flex gap-2 flex-wrap">
-                    ${puedeBorrar?`<button onclick="openCompModal()" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-building mr-1 text-slate-400"></i>Compañías</button>
-                    <button onclick="openConc()" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-trophy mr-1 text-amber-500"></i>Concurso</button>`:''}
-                    <button onclick="openConv()" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm">Nueva convención</button>
+                    ${puedeBorrar?`<button data-bx-click="a449" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-building mr-1 text-slate-400"></i>Compañías</button>
+                    <button data-bx-click="a450" class="bg-white border px-3 py-1.5 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-trophy mr-1 text-amber-500"></i>Concurso</button>`:''}
+                    <button data-bx-click="a451" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm">Nueva convención</button>
                 </div>
             </div>
             ${companias.length?`<div class="flex flex-wrap gap-2 mb-5">${companias.map(c=>`<span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-medium text-slate-700"><i class="fas fa-building mr-1 text-slate-400"></i>${psEscape(c)}</span>`).join('')}</div>`:''}
@@ -819,7 +819,7 @@ function renderConvenciones(){
     }catch(e){ return `<div class="p-8 text-red-600">Error Convenciones: ${e.message}</div>`; }
 }
 function openConc(){
-    showModal(`<form id="ccf" class="p-4 space-y-2 max-w-md"><h3 class="font-bold">Nuevo Concurso</h3><input name="nombre" placeholder="Nombre del concurso" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="premio" placeholder="Premio (ej. $50,000 o viaje)" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><textarea name="descripcion" placeholder="Bases y reglas" rows="3" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></textarea><div class="grid grid-cols-2 gap-2"><div><label class="text-xs text-slate-500">Inicio</label><input name="fechaInicio" type="date" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><div><label class="text-xs text-slate-500">Fin</label><input name="fechaFin" type="date" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div></div><input name="imagenFile" type="file" accept="image/*" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-amber-500 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="ccf" class="p-4 space-y-2 max-w-md"><h3 class="font-bold">Nuevo Concurso</h3><input name="nombre" placeholder="Nombre del concurso" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="premio" placeholder="Premio (ej. $50,000 o viaje)" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><textarea name="descripcion" placeholder="Bases y reglas" rows="3" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></textarea><div class="grid grid-cols-2 gap-2"><div><label class="text-xs text-slate-500">Inicio</label><input name="fechaInicio" type="date" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><div><label class="text-xs text-slate-500">Fin</label><input name="fechaFin" type="date" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div></div><input name="imagenFile" type="file" accept="image/*" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-amber-500 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('ccf').onsubmit=e=>{
         e.preventDefault(); const f=new FormData(e.target); const file=f.get('imagenFile');
         const d={ id:Date.now(), nombre:f.get('nombre'), premio:f.get('premio'), descripcion:f.get('descripcion'), fechaInicio:f.get('fechaInicio'), fechaFin:f.get('fechaFin'), creadoPor:currentUser.id };
@@ -837,7 +837,7 @@ function openCompModal(){
     const companias=(db.settings && db.settings.convencionCompanias)||[];
     showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-2">Compañías participantes</h3><p class="text-sm text-slate-500 mb-3">Una por línea. Estas compañías se muestran como lista editable en esta sección.</p>
     <textarea id="comp-lista" rows="7" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">${psEscape(companias.join('\n'))}</textarea>
-    <div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button onclick="guardarCompaniasConv()" class="px-5 py-2 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800">Guardar</button></div></div>`);
+    <div class="flex justify-end gap-2 mt-4"><button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button data-bx-click="a452" class="px-5 py-2 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800">Guardar</button></div></div>`);
 }
 function guardarCompaniasConv(){
     const lista=document.getElementById('comp-lista').value.split('\n').map(s=>s.trim()).filter(Boolean);
@@ -852,7 +852,7 @@ function borrarConv(id){
     saveDB(); render();
 }
 function openConv(){
-    showModal(`<form id="cf" class="p-4 space-y-2 max-w-md"><h3 class="font-bold">Nueva Convención</h3><input name="nombre" placeholder="Nombre" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="destino" placeholder="Destino" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="imagenFile" type="file" accept="image/*" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="grid grid-cols-2 gap-2"><input name="fechaInicio" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fechaFin" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual" selected>Anual</option></select><div class="grid grid-cols-2 gap-2"><input name="metaVIDA" type="number" placeholder="Meta VIDA" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaGMM" type="number" placeholder="Meta GMM" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaDANOS" type="number" placeholder="Meta DAÑOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaAUTOS" type="number" placeholder="Meta AUTOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV" type="number" placeholder="Meta INVERSIÓN" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV Elite" type="number" placeholder="Meta INVERSIÓN ELITE" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="cf" class="p-4 space-y-2 max-w-md"><h3 class="font-bold">Nueva Convención</h3><input name="nombre" placeholder="Nombre" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="destino" placeholder="Destino" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="imagenFile" type="file" accept="image/*" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="grid grid-cols-2 gap-2"><input name="fechaInicio" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fechaFin" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual" selected>Anual</option></select><div class="grid grid-cols-2 gap-2"><input name="metaVIDA" type="number" placeholder="Meta VIDA" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaGMM" type="number" placeholder="Meta GMM" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaDANOS" type="number" placeholder="Meta DAÑOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaAUTOS" type="number" placeholder="Meta AUTOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV" type="number" placeholder="Meta INVERSIÓN" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV Elite" type="number" placeholder="Meta INVERSIÓN ELITE" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('cf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const file=f.get('imagenFile');const reader=new FileReader();reader.onload=()=>{const d={id:Date.now(),nombre:f.get('nombre'),destino:f.get('destino'),fechaInicio:f.get('fechaInicio'),fechaFin:f.get('fechaFin'),periodo:f.get('periodo'),imagen:reader.result,metas:{VIDA:Number(f.get('metaVIDA')||0),GMM:Number(f.get('metaGMM')||0),DAÑOS:Number(f.get('metaDANOS')||0),AUTOS:Number(f.get('metaAUTOS')||0),'INVERSIÓN':Number(f.get('metaINV')||0),'INVERSIÓN ELITE':Number(f.get('metaINV Elite')||0)},creadoPor:currentUser.id,agenciaId:(currentUser.role||'').toLowerCase()==='maestro'?currentUser.id:null};db.convenciones=db.convenciones||[];db.convenciones.push(d);saveDB();closeModal();render();}; if(file&&file.size){reader.readAsDataURL(file);}else{reader.onload();}};
 }
 
@@ -983,8 +983,8 @@ function renderMonitoreoAgencias(){
                     <p class="text-sm text-slate-500">Seguimiento de producción por periodo y ramo</p>
                 </div>
                 <div class="flex gap-2">
-                ${(currentUser.role||'').toLowerCase()==='gm' ? `<button onclick="openColoresGraficas()" class="px-4 py-2 bg-white border text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"><i class="fas fa-palette mr-2 text-indigo-600"></i>Colores</button>` : ''}
-                <button onclick="exportarMonitoreoCSV()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"><i class="fas fa-file-csv mr-2"></i>Exportar CSV</button>
+                ${(currentUser.role||'').toLowerCase()==='gm' ? `<button data-bx-click="a446" class="px-4 py-2 bg-white border text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"><i class="fas fa-palette mr-2 text-indigo-600"></i>Colores</button>` : ''}
+                <button data-bx-click="a453" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"><i class="fas fa-file-csv mr-2"></i>Exportar CSV</button>
                 </div>
             </div>
             
@@ -992,31 +992,31 @@ function renderMonitoreoAgencias(){
                 <div class="grid md:grid-cols-5 gap-4 items-end">
                     <div>
                         <label class="text-xs font-medium text-slate-600">Año</label>
-                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" onchange="window.monitoreoState.anio=Number(this.value); navigateTo('monitoreo')">
+                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" data-bx-change="a454">
                             ${anios.map(a=>`<option ${a===st.anio?'selected':''}>${a}</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label class="text-xs font-medium text-slate-600">Periodo</label>
                         <div class="flex gap-1">
-                            ${['mensual','trimestral','anual'].map(p=>`<button onclick="window.monitoreoState.periodo='${p}'; navigateTo('monitoreo')" class="px-3 py-2 text-xs rounded-lg border ${st.periodo===p?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600'}">${p.charAt(0).toUpperCase()+p.slice(1)}</button>`).join('')}
+                            ${['mensual','trimestral','anual'].map(p=>`<button data-bx-click="a455" data-p0="${bxE(function(){return p})}" class="px-3 py-2 text-xs rounded-lg border ${st.periodo===p?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600'}">${p.charAt(0).toUpperCase()+p.slice(1)}</button>`).join('')}
                         </div>
                     </div>
                     <div class="${st.periodo!=='mensual'?'hidden':''}">
                         <label class="text-xs font-medium text-slate-600">Mes</label>
-                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" onchange="window.monitoreoState.mes=Number(this.value); navigateTo('monitoreo')">
+                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" data-bx-change="a456">
                             ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}" ${m===st.mes?'selected':''}>${new Date(2000,m-1).toLocaleString('es',{month:'long'})}</option>`).join('')}
                         </select>
                     </div>
                     <div class="${st.periodo!=='trimestral'?'hidden':''}">
                         <label class="text-xs font-medium text-slate-600">Trimestre</label>
-                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" onchange="window.monitoreoState.trimestre=Number(this.value); navigateTo('monitoreo')">
+                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" data-bx-change="a457">
                             ${[1,2,3,4].map(t=>`<option value="${t}" ${t===st.trimestre?'selected':''}>Q${t}</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label class="text-xs font-medium text-slate-600">Agencia</label>
-                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" onchange="window.monitoreoState.agenciaId=this.value; navigateTo('monitoreo')">
+                        <select class="w-full border rounded-lg px-3 py-2 text-sm bg-white text-slate-900 border-slate-300" data-bx-change="a458">
                             <option value="todas" ${st.agenciaId==='todas'?'selected':''}>Todas</option>
                             ${agencias.map(a=>`<option value="${a.id}" ${String(st.agenciaId)===String(a.id)?'selected':''}>${a.nombre}</option>`).join('')}
                         </select>
@@ -1061,7 +1061,7 @@ function renderMonitoreoAgencias(){
                         <tbody class="divide-y">
                             ${datosFiltrados.map(ag=>{
                                 const pct = ag.metaTotal>0 ? Math.round((ag.total/ag.metaTotal)*100) : 0;
-                                return `<tr class="hover:bg-slate-50 cursor-pointer" onclick="verDetalleAgencia('${ag.id}')"><td class="px-4 py-2 font-medium">${ag.nombre}</td><td class="text-center">${ag.agentes.length}</td><td class="text-right">$${ag.porRamo.VIDA.toLocaleString('es-MX')}</td><td class="text-right">$${ag.porRamo.GMM.toLocaleString('es-MX')}</td><td class="text-right">$${ag.porRamo.DAÑOS.toLocaleString('es-MX')}</td><td class="text-right">$${ag.porRamo.AUTOS.toLocaleString('es-MX')}</td><td class="text-right">$${(ag.porRamo['INVERSIÓN']||0).toLocaleString('es-MX')}</td><td class="text-right">$${(ag.porRamo['INVERSIÓN ELITE']||0).toLocaleString('es-MX')}</td><td class="text-right font-semibold">$${ag.total.toLocaleString('es-MX')}</td><td class="text-right"><span class="px-2 py-0.5 rounded-full text-xs ${pct>=100?'bg-emerald-100 text-emerald-700':pct>=70?'bg-amber-100 text-amber-700':'bg-slate-100'}">${pct}%</span></td></tr>`;
+                                return `<tr class="hover:bg-slate-50 cursor-pointer" data-bx-click="a459" data-p0="${bxE(function(){return ag.id})}"><td class="px-4 py-2 font-medium">${ag.nombre}</td><td class="text-center">${ag.agentes.length}</td><td class="text-right">$${ag.porRamo.VIDA.toLocaleString('es-MX')}</td><td class="text-right">$${ag.porRamo.GMM.toLocaleString('es-MX')}</td><td class="text-right">$${ag.porRamo.DAÑOS.toLocaleString('es-MX')}</td><td class="text-right">$${ag.porRamo.AUTOS.toLocaleString('es-MX')}</td><td class="text-right">$${(ag.porRamo['INVERSIÓN']||0).toLocaleString('es-MX')}</td><td class="text-right">$${(ag.porRamo['INVERSIÓN ELITE']||0).toLocaleString('es-MX')}</td><td class="text-right font-semibold">$${ag.total.toLocaleString('es-MX')}</td><td class="text-right"><span class="px-2 py-0.5 rounded-full text-xs ${pct>=100?'bg-emerald-100 text-emerald-700':pct>=70?'bg-amber-100 text-amber-700':'bg-slate-100'}">${pct}%</span></td></tr>`;
                             }).join('') || `<tr><td colspan="10" class="text-center py-8 text-slate-400">Sin datos para el periodo</td></tr>`}
                         </tbody>
                     </table>
@@ -1093,7 +1093,7 @@ function verDetalleAgencia(agenciaId){
     showModal(`<div class="p-6 max-w-[95vw] max-h-[95vh] overflow-y-auto w-full" style="width: 95vw; max-width: 1400px;">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-xl font-bold">Detalle - ${ag.name||ag.nombre}</h3>
-            <button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button>
         </div>
         <div class="grid md:grid-cols-2 gap-6">
             <div>
@@ -1183,12 +1183,12 @@ function openGestionarCompanias(){
         return { cli:(db.clientes||[]).filter(c=>String(c.compania||'').toUpperCase()===n).length, ven:(db.ventas||[]).filter(v=>String(v.compania||'').toUpperCase()===n).length };
     };
     showModal(`<div class="p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold">Administrar compañías</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
-    <div class="flex gap-2 mb-3"><input id="nc-comp-nombre" placeholder="Nueva compañía (ej. GNP)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900"><button onclick="gfGuardarCompania()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">Agregar</button></div>
+    <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold">Administrar compañías</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex gap-2 mb-3"><input id="nc-comp-nombre" placeholder="Nueva compañía (ej. GNP)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900"><button data-bx-click="a460" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm">Agregar</button></div>
     <div class="space-y-1 max-h-[45vh] overflow-y-auto">${lista.map(c=>{
         const u=uso(c);
         const usada=u.cli>0||u.ven>0;
-        return `<div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2"><span class="text-sm font-medium">${escapeHTML(c)}</span><span class="flex items-center gap-2">${usada?`<span class="text-[10px] text-slate-400">${u.cli} cliente${u.cli===1?'':'s'} · ${u.ven} venta${u.ven===1?'':'s'}</span>`:''}<button onclick="gfBorrarCompania('${escapeHTML(c)}')" class="text-slate-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash text-xs"></i></button></span></div>`;
+        return `<div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2"><span class="text-sm font-medium">${escapeHTML(c)}</span><span class="flex items-center gap-2">${usada?`<span class="text-[10px] text-slate-400">${u.cli} cliente${u.cli===1?'':'s'} · ${u.ven} venta${u.ven===1?'':'s'}</span>`:''}<button data-bx-click="a461" data-p0="${bxE(function(){return escapeHTML(c)})}" class="text-slate-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash text-xs"></i></button></span></div>`;
     }).join('')}</div>
     <p class="text-[11px] text-slate-400 mt-3">No se puede eliminar una compañía que ya tiene clientes o ventas registrados.</p>
   </div>`);
@@ -1373,7 +1373,7 @@ function renderSiniestros(){
             <td class="p-3 text-xs text-slate-500">${new Date(s.fechaReporte).toLocaleDateString('es-MX')}</td>
             <td class="p-3 text-xs">${escapeHTML(s.agenteNombre)}</td>
             <td class="p-3"><div class="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden" title="${sinProgreso(s)}% del proceso"><div class="h-full rounded-full ${['Cerrado','Pagado','Efectiva'].includes(s.estado)?'bg-emerald-500':'bg-indigo-500'}" style="width:${sinProgreso(s)}%"></div></div></td>
-            <td class="p-3"><button onclick="sinDetalle(${s.id})" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700"><i class="fas fa-folder-open mr-1"></i>Seguimiento</button></td>
+            <td class="p-3"><button data-bx-click="a462" data-p0="${bxE(function(){return s.id})}" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700"><i class="fas fa-folder-open mr-1"></i>Seguimiento</button></td>
         </tr>`;
     };
     
@@ -1384,9 +1384,9 @@ function renderSiniestros(){
                 <p class="text-slate-500 text-sm mt-1">${sinPuedeTodo()?'Seguimiento de siniestros y cancelaciones de todos los agentes (ligado a Mis Clientes)':((currentUser.role||'').toLowerCase()==='agencia'?'Siniestros y cancelaciones de tus agentes asignados':'Seguimiento de siniestros y cancelaciones de tus clientes')}</p>
             </div>
             <div class="flex gap-2">
-                ${esGMRol?`<button onclick="openGestionarCompanias()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-building mr-1"></i> Compañías</button>`:''}
-                <button onclick="sinNuevo('siniestro')" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-file-circle-plus mr-1"></i> Reportar siniestro</button>
-                <button onclick="sinNuevo('cancelacion')" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-file-circle-xmark mr-1"></i> Solicitar cancelación</button>
+                ${esGMRol?`<button data-bx-click="a463" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-building mr-1"></i> Compañías</button>`:''}
+                <button data-bx-click="a464" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-file-circle-plus mr-1"></i> Reportar siniestro</button>
+                <button data-bx-click="a465" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-file-circle-xmark mr-1"></i> Solicitar cancelación</button>
             </div>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1401,30 +1401,30 @@ function renderSiniestros(){
                 <div class="flex flex-wrap gap-2">
                     <div class="relative">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input value="${psEscape(window.sinFQ||'')}" oninput="window.sinFQ=this.value;render()" placeholder="Cliente, póliza o No. de reporte..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <input value="${psEscape(window.sinFQ||'')}" data-bx-input="a466" placeholder="Cliente, póliza o No. de reporte..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     </div>
-                    <select onchange="window.sinFRamo=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a467" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los ramos</option>
                         ${ramosUnicos.map(r=>`<option ${fRamo===r?'selected':''}>${escapeHTML(r)}</option>`).join('')}
                     </select>
-                    <select onchange="window.sinFComp=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a468" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todas las compañías</option>
                         ${companiasClientes().map(c=>`<option value="${escapeHTML(c)}" ${String(fComp).toUpperCase()===String(c).toUpperCase()?'selected':''}>${escapeHTML(c)}</option>`).join('')}
                     </select>
-                    <select onchange="window.sinFTipo=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a469" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Siniestros y cancelaciones</option>
                         <option value="siniestro" ${fTipo==='siniestro'?'selected':''}>Solo siniestros</option>
                         <option value="cancelacion" ${fTipo==='cancelacion'?'selected':''}>Solo cancelaciones</option>
                     </select>
-                    <select onchange="window.sinFEstado=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a470" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los estados</option>
                         ${estadosTodos.map(e=>`<option ${fEstado===e?'selected':''}>${e}</option>`).join('')}
                     </select>
-                    ${puedeVerTodos?`<select onchange="window.sinFAgente=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    ${puedeVerTodos?`<select data-bx-change="a471" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los agentes</option>
                         ${agentesUnicos.map(a=>`<option value="${a.id}" ${String(fAgente)===String(a.id)?'selected':''}>${escapeHTML(a.nombre)}</option>`).join('')}
                     </select>`:''}
-                    <button onclick="window.sinFQ='';window.sinFRamo='';window.sinFComp='';window.sinFTipo='';window.sinFEstado='';window.sinFAgente='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
+                    <button data-bx-click="a472" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
                 </div>
             </div>
             <div>
@@ -1446,7 +1446,7 @@ function renderSiniestros(){
                                     <h4 class="font-bold text-slate-900 text-sm truncate">${escapeHTML(s.clienteNombre)}</h4>
                                     <p class="text-xs text-slate-500 truncate">${escapeHTML(s.compania)} · ${escapeHTML(s.ramo)} · Póliza <span class="font-mono font-semibold text-slate-700">${escapeHTML(s.poliza)}</span></p>
                                 </div>
-                                <button onclick="sinDetalle(${s.id})" class="px-3 py-2 bg-slate-900 text-amber-300 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1"><i class="fas fa-folder-open"></i><span>Abrir</span></button>
+                                <button data-bx-click="a462" data-p0="${bxE(function(){return s.id})}" class="px-3 py-2 bg-slate-900 text-amber-300 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1"><i class="fas fa-folder-open"></i><span>Abrir</span></button>
                             </div>
                             <div class="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
                                 <span class="truncate"><i class="fas fa-user-tie mr-1 text-slate-400"></i>${escapeHTML(s.agenteNombre)} · ${new Date(s.fechaReporte).toLocaleDateString('es-MX')}</span>
@@ -1484,7 +1484,7 @@ function renderSiniestros(){
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <h3 class="font-semibold text-lg flex items-center gap-2"><i class="fas fa-clipboard-check text-orange-600"></i> Checklist de documentos por ramo y plazos de la aseguradora</h3>
-                ${sinPuedeEditarChecklist()?`<button onclick="sinEditarChecklist()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-pen-to-square mr-1"></i> Editar checklists</button>`:''}
+                ${sinPuedeEditarChecklist()?`<button data-bx-click="a473" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-pen-to-square mr-1"></i> Editar checklists</button>`:''}
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 ${Object.keys(sinDocsConfig()).map(r=>`
@@ -1559,7 +1559,7 @@ function sinNuevo(tipo){
             <div class="space-y-4">
                 <div>
                     <label class="text-sm font-medium text-slate-700 mb-1 block">Cliente con siniestro/cancelación *</label>
-                    <input id="sin-busca" oninput="sinFiltrarClientes()" placeholder="Buscar por nombre o póliza..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 mb-2">
+                    <input id="sin-busca" data-bx-input="a474" placeholder="Buscar por nombre o póliza..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 mb-2">
                     <select id="sin-cliente" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Seleccionar cliente...</option>
                         ${clientes.map(c=>`<option value="${c.id}" data-ramo="${psEscape(c.ramo||'')}" data-compania="${psEscape(c.compania||'')}" data-poliza="${psEscape(c.poliza||'')}" data-agente="${psEscape(c.agenteNombre||'')}" data-agente-id="${psEscape(c.agenteId)}" data-whats="${psEscape(c.whatsapp||'')}">${psEscape(c.nombre)} — ${psEscape(c.compania||'')} / ${psEscape(c.poliza||'')} / ${psEscape(c.ramo||'')}</option>`).join('')}
@@ -1594,7 +1594,7 @@ function sinNuevo(tipo){
                 <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2"><i class="fas fa-lightbulb mr-1"></i><b>Apoyo:</b> ${sinPlazoRamo('')} Al guardar, revisa el checklist de documentos del ramo en esta sección.</div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+                <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
                 <button type="submit" class="px-5 py-2 rounded-lg ${tipo==='cancelacion'?'bg-rose-600 hover:bg-rose-700':'bg-orange-600 hover:bg-orange-700'} text-white font-semibold"><i class="fas fa-save mr-1"></i> Guardar expediente</button>
             </div>
         </form>`);
@@ -1679,7 +1679,7 @@ function sinDetalle(id){
                     ${s.motivoCancelacion?`<p class="text-xs text-slate-500 mt-0.5"><i class="fas fa-circle-question mr-1"></i>Motivo: ${escapeHTML(s.motivoCancelacion)}</p>`:''}
                     ${cliente&&cliente.whatsapp?`<p class="text-xs text-slate-500 mt-0.5"><i class="fab fa-whatsapp text-emerald-600 mr-1"></i>${escapeHTML(cliente.whatsapp)}</p>`:''}
                 </div>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
+                <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
             </div>
             ${s.descripcion?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mb-4"><b>Descripción:</b> ${escapeHTML(s.descripcion)}</div>`:''}
             ${!cerrado && editarHabilitado ? `
@@ -1695,7 +1695,7 @@ function sinDetalle(id){
                     <input type="date" id="sin-fecha-cierre" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                 </div>
                 <div class="flex items-end">
-                    <button onclick="sinCambiarEstado(${s.id})" class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-rotate mr-1"></i> Actualizar</button>
+                    <button data-bx-click="a475" data-p0="${bxE(function(){return s.id})}" class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-rotate mr-1"></i> Actualizar</button>
                 </div>
             </div>`:''}
             <div class="mb-4">
@@ -1712,12 +1712,12 @@ function sinDetalle(id){
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <h4 class="text-xs font-semibold uppercase text-slate-400">Checklist de documentos (${docs.length})</h4>
-                        ${sinPuedeEditarChecklist()?`<button onclick="sinEditarChecklist()" class="text-[11px] text-indigo-600 hover:underline font-medium"><i class="fas fa-pen-to-square mr-1"></i>Editar</button>`:''}
+                        ${sinPuedeEditarChecklist()?`<button data-bx-click="a473" class="text-[11px] text-indigo-600 hover:underline font-medium"><i class="fas fa-pen-to-square mr-1"></i>Editar</button>`:''}
                     </div>
                     <div class="border border-slate-200 rounded-lg divide-y">
                         ${docs.map((d,i)=>`
                             <label class="flex items-center gap-2 p-2 text-xs cursor-pointer hover:bg-slate-50">
-                                <input type="checkbox" data-doc="${psEscape(d)}" ${checks[d]?'checked':''} onchange="sinToggleDoc(this,${s.id})" class="w-4 h-4 text-emerald-600 rounded">
+                                <input type="checkbox" data-doc="${psEscape(d)}" ${checks[d]?'checked':''} data-bx-change="a476" data-p0="${bxE(function(){return s.id})}" class="w-4 h-4 text-emerald-600 rounded">
                                 <span class="${checks[d]?'line-through text-slate-400':''}">${d}</span>
                             </label>`).join('')}
                     </div>
@@ -1734,13 +1734,13 @@ function sinDetalle(id){
                     </div>
                     ${editarHabilitado?`
                     <textarea id="sin-nueva-nota" rows="2" placeholder="Agregar nota de seguimiento..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea>
-                    <button onclick="sinAgregarNota(${s.id})" class="mt-2 px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"><i class="fas fa-comment-medical mr-1"></i> Agregar nota</button>`:''}
+                    <button data-bx-click="a477" data-p0="${bxE(function(){return s.id})}" class="mt-2 px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"><i class="fas fa-comment-medical mr-1"></i> Agregar nota</button>`:''}
                 </div>
             </div>
             <div class="border border-indigo-100 bg-indigo-50/40 rounded-xl p-4 mb-4">
                 <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
                     <h4 class="text-xs font-semibold uppercase text-indigo-500"><i class="fas fa-comments mr-1"></i> Chat de seguimiento con el agente (${(s.chat||[]).length})</h4>
-                    <button onclick="sinChat(${s.id})" class="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium"><i class="fas fa-up-right-from-square mr-1"></i> Abrir chat</button>
+                    <button data-bx-click="a478" data-p0="${bxE(function(){return s.id})}" class="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium"><i class="fas fa-up-right-from-square mr-1"></i> Abrir chat</button>
                 </div>
                 <div class="space-y-1.5 max-h-24 overflow-y-auto">
                     ${(s.chat||[]).slice(-2).map(m=>`<p class="text-xs text-slate-600"><b>${psEscape(m.de)}:</b> ${psEscape(m.texto)} <span class="text-slate-400">· ${new Date(m.ts).toLocaleString('es-MX')}</span></p>`).join('') || '<p class="text-xs text-slate-400">Sin mensajes todavía. Abre el chat para escribirle al agente sobre este caso.</p>'}
@@ -1749,9 +1749,9 @@ function sinDetalle(id){
             <div class="flex items-center justify-between gap-2 flex-wrap">
                 <div class="text-[11px] text-slate-500">Última actualización: ${new Date(s.fechaActualizacion||s.fechaReporte).toLocaleString('es-MX')} · ${sinDiasSinActualizar(s)} día(s) sin movimiento</div>
                 ${cliente?`<div class="flex gap-2">
-                    <button onclick="closeModal();navigateTo('mis-clientes')" class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-address-book mr-1"></i>Ver cliente</button>
-                    <button onclick="sinEliminar(${s.id})" class="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar expediente (GM/admin)"><i class="fas fa-trash mr-1"></i>Eliminar</button>
-                </div>`:`<button onclick="sinEliminar(${s.id})" class="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar expediente (GM/admin)"><i class="fas fa-trash mr-1"></i>Eliminar</button>`}
+                    <button data-bx-click="a479" class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-address-book mr-1"></i>Ver cliente</button>
+                    <button data-bx-click="a480" data-p0="${bxE(function(){return s.id})}" class="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar expediente (GM/admin)"><i class="fas fa-trash mr-1"></i>Eliminar</button>
+                </div>`:`<button data-bx-click="a480" data-p0="${bxE(function(){return s.id})}" class="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar expediente (GM/admin)"><i class="fas fa-trash mr-1"></i>Eliminar</button>`}
             </div>
         </div>`);
 }
@@ -1775,7 +1775,7 @@ function sinChat(id){
                 <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-comments text-indigo-600"></i> Chat de seguimiento</h3>
                 <p class="text-xs text-slate-500">${psEscape(s.clienteNombre)} · ${psEscape(s.compania)} / ${psEscape(s.poliza)} · Agente: <b>${psEscape(s.agenteNombre)}</b></p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div id="sin-chat-msgs" class="border border-slate-200 rounded-xl p-3 h-64 overflow-y-auto space-y-2 bg-slate-50 mb-3">
             ${(s.chat||[]).map(m=>`
@@ -1789,7 +1789,7 @@ function sinChat(id){
         <textarea id="sin-chat-input" rows="3" placeholder="Escribe al agente sobre este caso (documentos pendientes, fechas límite, indicaciones del ajustador...)..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea>
         <div class="flex justify-between items-center gap-3 mt-2">
             <p class="text-[11px] text-slate-400">El historial queda guardado en el expediente; el agente lo ve en el detalle del caso.</p>
-            <button onclick="sinEnviarChat(${s.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium whitespace-nowrap"><i class="fas fa-paper-plane mr-1"></i> Enviar</button>
+            <button data-bx-click="a481" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium whitespace-nowrap"><i class="fas fa-paper-plane mr-1"></i> Enviar</button>
         </div>
     </div>`);
     setTimeout(()=>{ const box=document.getElementById('sin-chat-msgs'); if(box) box.scrollTop=box.scrollHeight; const ta=document.getElementById('sin-chat-input'); if(ta) ta.focus(); },0);
@@ -1820,7 +1820,7 @@ function sinEditarChecklist(){
                 <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-clipboard-list text-indigo-600"></i> Editar checklists por ramo</h3>
                 <p class="text-xs text-slate-500">Un documento por línea. Los cambios se aplican a los expedientes de ese ramo.</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="space-y-3">
             ${Object.keys(cfg).map(r=>`
@@ -1830,8 +1830,8 @@ function sinEditarChecklist(){
                 </div>`).join('')}
         </div>
         <div class="flex justify-end gap-2 mt-4">
-            <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-lg">Cancelar</button>
-            <button onclick="sinGuardarChecklist()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold"><i class="fas fa-save mr-1"></i> Guardar checklists</button>
+            <button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-lg">Cancelar</button>
+            <button data-bx-click="a482" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold"><i class="fas fa-save mr-1"></i> Guardar checklists</button>
         </div>
     </div>`);
 }
@@ -1922,11 +1922,11 @@ const AU_TABS = [
 function auTab(){ return ['unidades','clientes','equipo','monitoreo','metas','simulador','guion','pauta','practica'].includes(window.auTabId||'') ? window.auTabId : 'unidades'; }
 function auSetTab(t){ window.auTabId=t; navigateTo('auto-'+t); }
 function renderAutoAgencia(){
-    const tabsHtml = AU_TABS.map(t=>`<button onclick="auSetTab('${t[0]}')" class="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${auTab()===t[0]?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas ${t[2]} mr-1"></i>${t[1]}</button>`).join('');
+    const tabsHtml = AU_TABS.map(t=>`<button data-bx-click="a483" data-p0="${bxE(function(){return t[0]})}" class="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${auTab()===t[0]?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas ${t[2]} mr-1"></i>${t[1]}</button>`).join('');
     const abierto = localStorage.getItem('auTabsOpen')!=='0';
     return auHeaderHtml('Agencia Automotriz', 'Agencia virtual: inventario en venta, clientes, equipo, monitoreo, metas y herramientas comerciales enfocadas en la venta de autos.', true)
         + `<div class="flex items-center gap-2">
-            <button onclick="var w=document.getElementById('au-tabs-wrap'); w.classList.toggle('hidden'); localStorage.setItem('auTabsOpen', w.classList.contains('hidden')?'0':'1'); this.textContent = w.classList.contains('hidden')?'Ver m\u00f3dulos':'Ocultar m\u00f3dulos';" class="text-xs text-indigo-600 font-medium hover:underline">${abierto?'Ocultar m\u00f3dulos':'Ver m\u00f3dulos'}</button>
+            <button data-bx-click="a484" class="text-xs text-indigo-600 font-medium hover:underline">${abierto?'Ocultar m\u00f3dulos':'Ver m\u00f3dulos'}</button>
         </div>
         <div id="au-tabs-wrap" class="flex gap-2 overflow-x-auto pb-1 ${abierto?'':'hidden'}">${tabsHtml}</div>
         <div>${auTabHtml(auTab())}</div>`;
@@ -1938,7 +1938,7 @@ function auHeaderHtml(titulo, subtitulo, conBtnInventario, conKPIs){
                 <h2 class="text-2xl font-bold text-slate-900"><i class="fas fa-car-side text-indigo-600 mr-2"></i>${titulo}</h2>
                 <p class="text-slate-500 text-sm mt-1">${subtitulo}</p>
             </div>
-            ${conBtnInventario?`<button onclick="auAltaUnidad()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Cargar unidad</button>`:''}
+            ${conBtnInventario?`<button data-bx-click="a485" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Cargar unidad</button>`:''}
         </div>
         ${conKPIs!==false?auContadoresHtml():''}
     </div>`;
@@ -2023,18 +2023,18 @@ function auInventarioHtml(){
         const cliRes = u.clienteId ? d.clientes.find(c=>String(c.id)===String(u.clienteId)) : null;
         return `<div class="bg-white border rounded-2xl overflow-hidden ${est==='Vendida'?'opacity-80 border-emerald-400':(est==='Reservada'?'border-amber-300 ring-1 ring-amber-200':'border-slate-200')} hover:shadow-lg transition flex flex-col">
             <div class="relative group">
-                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer group-hover:scale-[1.02] transition" onclick="auFicha(${u.id})">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center cursor-pointer" onclick="auFicha(${u.id})"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
+                ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer group-hover:scale-[1.02] transition" data-bx-click="a486" data-p0="${bxE(function(){return u.id})}">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center cursor-pointer" data-bx-click="a486" data-p0="${bxE(function(){return u.id})}"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(est)}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}${u.destacada?'<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white">Destacada</span>':''}</div>
-                ${fotos.length>0?`<span onclick="auFicha(${u.id})" class="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[10px] font-semibold cursor-pointer"><i class="fas fa-images mr-1"></i>${fotos.length} foto${fotos.length===1?'':'s'}</span>`:''}
+                ${fotos.length>0?`<span data-bx-click="a486" data-p0="${bxE(function(){return u.id})}" class="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[10px] font-semibold cursor-pointer"><i class="fas fa-images mr-1"></i>${fotos.length} foto${fotos.length===1?'':'s'}</span>`:''}
             </div>
-            ${fotos.length>1?`<div class="flex gap-1.5 px-4 pt-2.5 overflow-x-auto">${fotos.slice(0,5).map((f,idx)=>`<img src="${f}" onclick="auFicha(${u.id},${idx})" class="w-12 h-9 object-cover rounded-md border border-slate-200 cursor-pointer hover:ring-2 hover:ring-indigo-500 shrink-0 transition" title="Foto ${idx+1}">`).join('')}${fotos.length>5?`<button onclick="auFicha(${u.id},5)" class="w-12 h-9 rounded-md border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600 shrink-0 hover:bg-slate-200">+${fotos.length-5}</button>`:''}</div>`:''}
+            ${fotos.length>1?`<div class="flex gap-1.5 px-4 pt-2.5 overflow-x-auto">${fotos.slice(0,5).map((f,idx)=>`<img loading="lazy" decoding="async" src="${f}" data-bx-click="a487" data-p0="${bxE(function(){return u.id})}" data-p1="${bxE(function(){return idx})}" class="w-12 h-9 object-cover rounded-md border border-slate-200 cursor-pointer hover:ring-2 hover:ring-indigo-500 shrink-0 transition" title="Foto ${idx+1}">`).join('')}${fotos.length>5?`<button data-bx-click="a488" data-p0="${bxE(function(){return u.id})}" class="w-12 h-9 rounded-md border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600 shrink-0 hover:bg-slate-200">+${fotos.length-5}</button>`:''}</div>`:''}
             <div class="p-4 flex-1 flex flex-col">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-slate-400 uppercase font-semibold">${psEscape(u.marca||'')} ${u.anio?'· '+psEscape(String(u.anio)):''}</p>
                         <h4 class="font-bold text-slate-900 leading-tight">${psEscape(u.modelo||'')}</h4>
                     </div>
-                    <select onchange="auCambioRapidoEstado(${u.id}, this.value)" title="Cambiar estatus de disponibilidad" class="text-[11px] font-semibold rounded-lg border px-2 py-1 cursor-pointer ${est==='Vendida'?'bg-emerald-50 border-emerald-300 text-emerald-800':(est==='Reservada'?'bg-amber-50 border-amber-300 text-amber-900':'bg-slate-50 border-slate-200 text-slate-700')}">
+                    <select data-bx-change="a489" data-p0="${bxE(function(){return u.id})}" title="Cambiar estatus de disponibilidad" class="text-[11px] font-semibold rounded-lg border px-2 py-1 cursor-pointer ${est==='Vendida'?'bg-emerald-50 border-emerald-300 text-emerald-800':(est==='Reservada'?'bg-amber-50 border-amber-300 text-amber-900':'bg-slate-50 border-slate-200 text-slate-700')}">
                         <option value="Disponible" ${est==='Disponible'?'selected':''}>🟢 Disponible</option>
                         <option value="Reservada" ${est==='Reservada'?'selected':''}>🟡 Reservada</option>
                         <option value="Vendida" ${est==='Vendida'?'selected':''}>✅ Vendida</option>
@@ -2059,24 +2059,24 @@ function auInventarioHtml(){
                 </div>
                 ${u.descripcion?`<p class="text-xs text-slate-500 mt-2 line-clamp-2">${psEscape(u.descripcion)}</p>`:''}
                 <div class="flex flex-wrap gap-1.5 mt-auto pt-3">
-                    <button onclick="auFicha(${u.id})" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ficha</button>
-                    <button onclick="auCompartirFichaModal(${u.id})" class="text-xs px-2.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-medium" title="Compartir ficha con cliente"><i class="fas fa-share-nodes mr-1"></i>Compartir</button>
-                    ${est!=='Vendida'?`<button onclick="auReservar(${u.id})" class="text-xs px-2.5 py-2 border ${est==='Reservada'?'bg-amber-100 border-amber-300 text-amber-900':'hover:bg-slate-50'} rounded-lg" title="${est==='Reservada'?'Gestionar o liberar reserva':'Apartar / Reservar'}"><i class="fas fa-hand"></i></button>`:''}
-                    ${est!=='Vendida'?`<button onclick="auVender(${u.id})" class="text-xs px-2.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" title="Registrar venta"><i class="fas fa-handshake"></i></button>`:''}
-                    <button onclick="auAltaUnidad(${u.id})" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar unidad y galería"><i class="fas fa-pen"></i></button>
-                    <button onclick="auBorrarUnidad(${u.id})" class="text-xs px-2.5 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar (GM/admin)"><i class="fas fa-trash"></i></button>
+                    <button data-bx-click="a486" data-p0="${bxE(function(){return u.id})}" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ficha</button>
+                    <button data-bx-click="a490" data-p0="${bxE(function(){return u.id})}" class="text-xs px-2.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-medium" title="Compartir ficha con cliente"><i class="fas fa-share-nodes mr-1"></i>Compartir</button>
+                    ${est!=='Vendida'?`<button data-bx-click="a491" data-p0="${bxE(function(){return u.id})}" class="text-xs px-2.5 py-2 border ${est==='Reservada'?'bg-amber-100 border-amber-300 text-amber-900':'hover:bg-slate-50'} rounded-lg" title="${est==='Reservada'?'Gestionar o liberar reserva':'Apartar / Reservar'}"><i class="fas fa-hand"></i></button>`:''}
+                    ${est!=='Vendida'?`<button data-bx-click="a492" data-p0="${bxE(function(){return u.id})}" class="text-xs px-2.5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" title="Registrar venta"><i class="fas fa-handshake"></i></button>`:''}
+                    <button data-bx-click="a493" data-p0="${bxE(function(){return u.id})}" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar unidad y galería"><i class="fas fa-pen"></i></button>
+                    <button data-bx-click="a494" data-p0="${bxE(function(){return u.id})}" class="text-xs px-2.5 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar (GM/admin)"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
         </div>`;
     };
-    const sel = (id, attr, label, todos, opciones, actual)=>`<select onchange="window.${attr}=this.value;render()" id="${id}" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">${todos}</option>${opciones.map(o=>`<option ${actual===o?'selected':''}>${psEscape(o)}</option>`).join('')}</select>`;
+    const sel = (id, attr, label, todos, opciones, actual)=>`<select data-bx-change="a495" data-p0="${bxE(function(){return attr})}" id="${id}" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">${todos}</option>${opciones.map(o=>`<option ${actual===o?'selected':''}>${psEscape(o)}</option>`).join('')}</select>`;
     return `<div class="bg-white rounded-2xl border border-slate-200 p-6">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
             <h3 class="font-semibold text-lg">Inventario (${lista.length})</h3>
             <div class="flex flex-wrap gap-2">
                 <div class="relative">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input value="${psEscape(window.auInvQ||'')}" oninput="window.auInvQ=this.value;render()" placeholder="Marca, modelo, color, año..." class="w-52 pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <input value="${psEscape(window.auInvQ||'')}" data-bx-input="a496" placeholder="Marca, modelo, color, año..." class="w-52 pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                 </div>
                 ${sel('','auInvEst','Estado','Todos los estados',['Disponible','Reservada','Vendida'],fEst)}
                 ${sel('','auInvMarca','Marca','Todas las marcas',marcas,fMarca)}
@@ -2084,14 +2084,14 @@ function auInventarioHtml(){
                 ${sel('','auInvEnt','Entidad','Toda la República',entidades,fEnt)}
                 ${sel('','auInvSuc','Agencia','Todas las agencias',sucursales,fSuc)}
                 ${sel('','auInvTrans','Transmisión','Transmisión',['Automática','Manual','CVT'],fTrans)}
-                <select onchange="window.auInvOrden=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select data-bx-change="a497" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     <option value="recientes" ${orden==='recientes'?'selected':''}>Más recientes / destacadas</option>
                     <option value="precio-asc" ${orden==='precio-asc'?'selected':''}>Precio: menor a mayor</option>
                     <option value="precio-desc" ${orden==='precio-desc'?'selected':''}>Precio: mayor a menor</option>
                     <option value="km-asc" ${orden==='km-asc'?'selected':''}>Menor kilometraje</option>
                     <option value="anio-desc" ${orden==='anio-desc'?'selected':''}>Más nuevos</option>
                 </select>
-                <button onclick="window.auInvQ='';window.auInvEst='';window.auInvMarca='';window.auInvOrig='';window.auInvEnt='';window.auInvSuc='';window.auInvTrans='';window.auInvOrden='recientes';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
+                <button data-bx-click="a498" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
             </div>
         </div>
         <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -2171,10 +2171,10 @@ function auCompartirFichaModal(id){
                 <h3 class="text-xl font-bold text-slate-900 mt-1">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
                 <p class="text-xs text-slate-500">Comparte esta unidad con tu cliente por WhatsApp, enlace directo o vista pública imprimible.</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
-            ${fotos[0]?`<img src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-car text-slate-400"></i></div>`}
+            ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-car text-slate-400"></i></div>`}
             <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5">${auEstadoBadge(u.estado||'Disponible')}<span class="text-xs font-bold text-indigo-700">$${Number(u.precio||0).toLocaleString('es-MX')}</span></div>
                 <p class="text-xs text-slate-500 truncate mt-0.5">${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}</p>
@@ -2185,7 +2185,7 @@ function auCompartirFichaModal(id){
                 <label class="text-xs font-semibold text-slate-600 block mb-1">Enlace directo a la ficha pública</label>
                 <div class="flex gap-2">
                     <input readonly value="${psEscape(url)}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 text-slate-700 font-mono">
-                    <button type="button" onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fas fa-copy mr-1"></i>Copiar link</button>
+                    <button type="button" data-bx-click="a6" data-p0="${bxE(function(){return u.id})}" class="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fas fa-copy mr-1"></i>Copiar link</button>
                 </div>
             </div>
             <div>
@@ -2194,9 +2194,9 @@ function auCompartirFichaModal(id){
             </div>
         </div>
         <div class="grid sm:grid-cols-3 gap-2 mt-5">
-            <button type="button" onclick="auWhatsAppFicha(${u.id})" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i>Enviar por WhatsApp</button>
-            <button type="button" onclick="auCopiarResumenFicha(${u.id})" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-clipboard-check"></i>Copiar texto completo</button>
-            <button type="button" onclick="auAbrirVistaPublica(${u.id})" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-up-right-from-square"></i>Abrir ficha pública</button>
+            <button type="button" data-bx-click="a7" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i>Enviar por WhatsApp</button>
+            <button type="button" data-bx-click="a499" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-clipboard-check"></i>Copiar texto completo</button>
+            <button type="button" data-bx-click="a500" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-up-right-from-square"></i>Abrir ficha pública</button>
         </div>
     </div>`);
 }
@@ -2253,26 +2253,26 @@ function auFicha(id, startIdx){
                 <h3 class="text-2xl font-bold text-slate-900">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
                 <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         ${fotos[0]?`<div class="relative rounded-xl overflow-hidden border bg-slate-50">
-            <img id="au-ficha-principal" src="${fotos[window._auFichaIdx]}" class="w-full h-80 object-cover">
+            <img loading="lazy" decoding="async" id="au-ficha-principal" src="${fotos[window._auFichaIdx]}" class="w-full h-80 object-cover">
             ${fotos.length>1?`
-                <button type="button" onclick="auFichaGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left text-xs"></i></button>
-                <button type="button" onclick="auFichaGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right text-xs"></i></button>
+                <button type="button" data-bx-click="a501" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left text-xs"></i></button>
+                <button type="button" data-bx-click="a502" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right text-xs"></i></button>
                 <span id="au-ficha-counter" class="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-black/65 text-white text-xs font-semibold">${window._auFichaIdx+1} / ${fotos.length}</span>
             `:''}
         </div>`:''}
-        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="auFichaGalGo(${i})" class="au-ficha-thumb w-24 h-16 object-cover rounded-lg border cursor-pointer shrink-0 ${i===window._auFichaIdx?'ring-2 ring-indigo-600':''} hover:ring-2 hover:ring-indigo-400 transition">`).join('')}</div>`:''}
+        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img loading="lazy" decoding="async" src="${f}" data-bx-click="a503" data-p0="${bxE(function(){return i})}" class="au-ficha-thumb w-24 h-16 object-cover rounded-lg border cursor-pointer shrink-0 ${i===window._auFichaIdx?'ring-2 ring-indigo-600':''} hover:ring-2 hover:ring-indigo-400 transition">`).join('')}</div>`:''}
         <div class="flex items-baseline justify-between flex-wrap gap-3 mt-4">
             <div class="flex items-baseline gap-3">
                 <p class="text-3xl font-black text-indigo-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
                 ${desc>0?`<p class="text-lg text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}
             </div>
             <div class="flex items-center gap-1.5">
-                <button type="button" onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar link</button>
-                <button type="button" onclick="auWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
-                <button type="button" onclick="auAbrirVistaPublica(${u.id})" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold"><i class="fas fa-up-right-from-square mr-1"></i>Vista cliente</button>
+                <button type="button" data-bx-click="a6" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar link</button>
+                <button type="button" data-bx-click="a7" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+                <button type="button" data-bx-click="a500" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold"><i class="fas fa-up-right-from-square mr-1"></i>Vista cliente</button>
             </div>
         </div>
         ${est==='Reservada' && (u.anticipo || u.reservaHasta || cliRes || u.reservaNotas) ? `<div class="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-wrap gap-x-5 gap-y-1">
@@ -2300,10 +2300,10 @@ function auFicha(id, startIdx){
         </div>
         ${u.descripcion?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mt-3"><b>Equipamiento:</b> ${psEscape(u.descripcion)}</div>`:''}
         <div class="flex justify-end gap-2 mt-4 flex-wrap">
-            <button onclick="closeModal();auCompartirFichaModal(${u.id})" class="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"><i class="fas fa-share-nodes mr-1"></i>Compartir ficha</button>
-            ${est!=='Vendida'?`<button onclick="closeModal();auReservar(${u.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>${est==='Reservada'?'Gestionar reserva':'Reservar'}</button>`:''}
-            ${est!=='Vendida'?`<button onclick="closeModal();auVender(${u.id})" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"><i class="fas fa-handshake mr-1"></i>Vender</button>`:''}
-            <button onclick="closeModal();auAltaUnidad(${u.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-pen mr-1"></i>Editar</button>
+            <button data-bx-click="a504" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"><i class="fas fa-share-nodes mr-1"></i>Compartir ficha</button>
+            ${est!=='Vendida'?`<button data-bx-click="a505" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>${est==='Reservada'?'Gestionar reserva':'Reservar'}</button>`:''}
+            ${est!=='Vendida'?`<button data-bx-click="a506" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"><i class="fas fa-handshake mr-1"></i>Vender</button>`:''}
+            <button data-bx-click="a507" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-pen mr-1"></i>Editar</button>
         </div>
     </div>`);
 }
@@ -2317,10 +2317,10 @@ function auRenderDraftFotos(){
     }
     wrap.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">${arr.map((src, i)=>`
         <div class="relative group rounded-xl overflow-hidden border ${i===0?'border-indigo-500 ring-2 ring-indigo-500/30':'border-slate-200'} bg-slate-50">
-            <img src="${src}" class="w-full h-24 object-cover">
-            ${i===0?`<span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold shadow">Portada</span>`:`<button type="button" onclick="auDraftSetPortada(${i})" class="
+            <img loading="lazy" decoding="async" src="${src}" class="w-full h-24 object-cover">
+            ${i===0?`<span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold shadow">Portada</span>`:`<button type="button" data-bx-click="a508" data-p0="${bxE(function(){return i})}" class="
             absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/65 hover:bg-indigo-600 text-white text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">Hacer portada</button>`}
-            <button type="button" onclick="auDraftQuitarFoto(${i})" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[10px] flex items-center justify-center shadow" title="Quitar foto"><i class="fas fa-trash"></i></button>
+            <button type="button" data-bx-click="a509" data-p0="${bxE(function(){return i})}" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[10px] flex items-center justify-center shadow" title="Quitar foto"><i class="fas fa-trash"></i></button>
         </div>`).join('')}</div>`;
 }
 function auDraftSetPortada(idx){
@@ -2398,17 +2398,17 @@ function auAltaUnidad(id){
                     <span class="text-[11px] text-slate-400">Puedes subir varias tandas o pegar URLs</span>
                 </div>
                 <div class="grid sm:grid-cols-2 gap-2 mb-3">
-                    <input id="au-fotos" type="file" accept="image/*" multiple onchange="auDraftSubirArchivos(this)" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-900">
+                    <input id="au-fotos" type="file" accept="image/*" multiple data-bx-change="a510" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-900">
                     <div class="flex gap-1.5">
                         <input id="au-foto-url" type="url" placeholder="O pega URL de imagen (https://...)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-900">
-                        <button type="button" onclick="auDraftAgregarUrl()" class="px-3 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Agregar URL</button>
+                        <button type="button" data-bx-click="a511" class="px-3 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Agregar URL</button>
                     </div>
                 </div>
                 <div id="au-draft-fotos-wrap"></div>
             </div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold"><i class="fas fa-save mr-1"></i> Guardar unidad</button>
         </div>
     </form>`);
@@ -2485,10 +2485,10 @@ function auReservar(id){
             <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Notas o condiciones del apartado</label><input id="au-res-notas" value="${psEscape(u.reservaNotas||'')}" placeholder="Ej. Pendiente autorizaci\u00f3n de cr\u00e9dito / entrega el s\u00e1bado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
         </div>
         <div class="flex items-center justify-between gap-2 mt-5">
-            ${(u.estado||'Disponible')==='Reservada'?`<button type="button" onclick="auLiberarReserva(${u.id})" class="px-4 py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs font-semibold"><i class="fas fa-unlock mr-1"></i>Liberar a Disponible</button>`:'<span></span>'}
+            ${(u.estado||'Disponible')==='Reservada'?`<button type="button" data-bx-click="a512" data-p0="${bxE(function(){return u.id})}" class="px-4 py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs font-semibold"><i class="fas fa-unlock mr-1"></i>Liberar a Disponible</button>`:'<span></span>'}
             <div class="flex gap-2">
-                <button type="button" onclick="closeModal();render()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
-                <button type="button" onclick="auConfirmaReserva(${u.id})" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold"><i class="fas fa-hand mr-1"></i>Guardar apartado</button>
+                <button type="button" data-bx-click="a513" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="button" data-bx-click="a514" data-p0="${bxE(function(){return u.id})}" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold"><i class="fas fa-hand mr-1"></i>Guardar apartado</button>
             </div>
         </div>
     </div>`);
@@ -2513,7 +2513,7 @@ function auConfirmaReserva(id){
 function auVender(id){
     const d = auD(); const u = d.unidades.find(x=>x.id===id); if(!u) return;
     const opts = d.clientes.map(c=>`<option value="${c.id}">${psEscape(c.nombre)}</option>`).join('');
-    showModal(`<div class="p-6"><h3 class="text-lg font-bold mb-2">Registrar venta \u2014 ${psEscape(u.marca+' '+u.modelo)}</h3><div class="space-y-3"><div><label class="text-sm font-medium text-slate-700 mb-1 block">Comprador</label><select id="au-v-cli" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">Sin registro de cliente</option>${opts}</select></div><div><label class="text-sm font-medium text-slate-700 mb-1 block">Precio final de venta ($)</label><input id="au-v-precio" type="number" value="${u.precio||''}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div><div><label class="text-sm font-medium text-slate-700 mb-1 block">Financiera (opcional)</label><input id="au-v-fin" placeholder="Ej. Ford Credit" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div></div><div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border rounded-lg">Cancelar</button><button onclick="auConfirmaVenta(${u.id})" class="px-5 py-2 bg-emerald-600 text-white rounded-lg font-semibold"><i class="fas fa-handshake mr-1"></i> Confirmar venta</button></div></div>`);
+    showModal(`<div class="p-6"><h3 class="text-lg font-bold mb-2">Registrar venta \u2014 ${psEscape(u.marca+' '+u.modelo)}</h3><div class="space-y-3"><div><label class="text-sm font-medium text-slate-700 mb-1 block">Comprador</label><select id="au-v-cli" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">Sin registro de cliente</option>${opts}</select></div><div><label class="text-sm font-medium text-slate-700 mb-1 block">Precio final de venta ($)</label><input id="au-v-precio" type="number" value="${u.precio||''}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div><div><label class="text-sm font-medium text-slate-700 mb-1 block">Financiera (opcional)</label><input id="au-v-fin" placeholder="Ej. Ford Credit" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div></div><div class="flex justify-end gap-2 mt-4"><button data-bx-click="a1" class="px-4 py-2 border rounded-lg">Cancelar</button><button data-bx-click="a515" data-p0="${bxE(function(){return u.id})}" class="px-5 py-2 bg-emerald-600 text-white rounded-lg font-semibold"><i class="fas fa-handshake mr-1"></i> Confirmar venta</button></div></div>`);
 }
 function auConfirmaVenta(id){
     const d = auD(); const u = d.unidades.find(x=>x.id===id); if(!u) return;
@@ -2556,7 +2556,7 @@ function auClientesHtml(){
         <td class="p-3 text-xs">${c.unidadId?'$'+Number(c.interesMonto||0).toLocaleString('es-MX'):'<span class="text-slate-300">—</span>'}</td>
         <td class="p-3"><span class="px-2 py-1 rounded text-[11px] font-semibold bg-sky-100 text-sky-800 whitespace-nowrap">${psEscape(c.estado||'Prospección')}</span></td>
         <td class="p-3 text-xs">${psEscape(c.agenteNombre||'')}</td>
-        <td class="p-3"><button onclick="auDetalleCliente(${c.id})" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700"><i class="fas fa-folder-open mr-1"></i>Expediente</button></td>
+        <td class="p-3"><button data-bx-click="a516" data-p0="${bxE(function(){return c.id})}" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700"><i class="fas fa-folder-open mr-1"></i>Expediente</button></td>
     </tr>`;
     };
     const cuentas = Object.keys(porAgente).map(k=>{ const m=(db.users||[]).find(u=>String(u.id)===String(k)); return { nombre:(m&&m.name)||(k==='—'?'Sin agente':('Agente '+k)), n:porAgente[k].n, monto:porAgente[k].monto, mes:lista.filter(c=>String(c.agenteId)===String(k)&&(c.fecha||'').slice(0,7)===new Date().toISOString().slice(0,7)).length }; }).sort((a,b)=>b.n-a.n);
@@ -2566,12 +2566,12 @@ function auClientesHtml(){
             <div class="flex flex-wrap gap-2">
                 <div class="relative">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input value="${psEscape(window.auCliQ||'')}" oninput="window.auCliQ=this.value;render()" placeholder="Nombre o teléfono..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <input value="${psEscape(window.auCliQ||'')}" data-bx-input="a517" placeholder="Nombre o teléfono..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                 </div>
-                <select onchange="window.auCliEst=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select data-bx-change="a518" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     <option value="">Todas las etapas</option>${etapas.map(s=>`<option ${fEst===s?'selected':''}>${s}</option>`).join('')}
                 </select>
-                <button onclick="auNuevoCliente()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i> Agregar cliente</button>
+                <button data-bx-click="a519" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i> Agregar cliente</button>
             </div>
         </div>
         ${cuentas.length>1?`<div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">${cuentas.map(x=>`<div class="border border-slate-200 rounded-xl p-3"><p class="text-xs font-semibold text-slate-700 truncate">${psEscape(x.nombre)}</p><p class="text-[11px] text-slate-400">${x.n} cliente(s) · ${x.mes} este mes</p><p class="text-sm font-bold text-indigo-700">$${Math.round(x.monto).toLocaleString('es-MX')}</p></div>`).join('')}</div>`:''}
@@ -2601,7 +2601,7 @@ function auNuevoCliente(){
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Notas</label><textarea id="au-c-notas" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea></div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Guardar</button>
         </div>
     </form>`);
@@ -2635,7 +2635,7 @@ function auDetalleCliente(id){
                 <h3 class="text-xl font-bold mt-1">${psEscape(c.nombre)}</h3>
                 <p class="text-xs text-slate-500">${psEscape(c.tel||'sin teléfono')} · Agente: ${psEscape(c.agenteNombre||'')}</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="mb-3">
             <h4 class="text-xs font-semibold uppercase text-slate-400 mb-1">Progreso</h4>
@@ -2645,12 +2645,12 @@ function auDetalleCliente(id){
         ${c.notas?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mb-3"><b>Notas:</b> ${psEscape(c.notas)}</div>`:''}
         <div class="grid md:grid-cols-3 gap-3 mb-4">
             <div><label class="text-xs font-medium text-slate-600 mb-1 block">Cambiar etapa</label><select id="au-c-estado-nuevo" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${etapas.map(e=>`<option ${e===(c.estado||'Prospección')?'selected':''}>${e}</option>`).join('')}</select></div>
-            <div class="flex items-end"><button onclick="auCambiarEstado(${c.id})" class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-rotate mr-1"></i> Actualizar</button></div>
-            <div class="flex items-end"><button onclick="auBorrarCliente(${c.id})" class="w-full px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-sm font-medium"><i class="fas fa-trash mr-1"></i> Eliminar</button></div>
+            <div class="flex items-end"><button data-bx-click="a520" data-p0="${bxE(function(){return c.id})}" class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-rotate mr-1"></i> Actualizar</button></div>
+            <div class="flex items-end"><button data-bx-click="a521" data-p0="${bxE(function(){return c.id})}" class="w-full px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-sm font-medium"><i class="fas fa-trash mr-1"></i> Eliminar</button></div>
         </div>
         <div class="grid md:grid-cols-2 gap-4">
             <div><h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">Historial (${segs.length})</h4><div class="border border-slate-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">${segs.map(sg=>`<div class="text-xs border-l-2 border-indigo-200 pl-2"><p class="text-slate-500">${new Date(sg.fecha+'T00:00:00').toLocaleDateString('es-MX')} · ${psEscape(sg.autor)}</p><p class="text-slate-700">${psEscape(sg.texto)}</p></div>`).join('') || '<p class="text-xs text-slate-400">Sin seguimientos.</p>'}</div></div>
-            <div><h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">Nuevo seguimiento</h4><input type="date" id="au-seg-fecha" value="${new Date().toISOString().slice(0,10)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><textarea id="au-seg-texto" rows="2" placeholder="Qué se hizo / compromiso..." class="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea><button onclick="auAddSeg(${c.id})" class="mt-2 px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"><i class="fas fa-calendar-plus mr-1"></i> Agregar seguimiento</button></div>
+            <div><h4 class="text-xs font-semibold uppercase text-slate-400 mb-2">Nuevo seguimiento</h4><input type="date" id="au-seg-fecha" value="${new Date().toISOString().slice(0,10)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><textarea id="au-seg-texto" rows="2" placeholder="Qué se hizo / compromiso..." class="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea><button data-bx-click="a522" data-p0="${bxE(function(){return c.id})}" class="mt-2 px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"><i class="fas fa-calendar-plus mr-1"></i> Agregar seguimiento</button></div>
         </div>
     </div>`);
 }
@@ -2705,13 +2705,13 @@ function auEquipoHtml(){
         <td class="p-3 text-xs">$${Math.round(logrado).toLocaleString('es-MX')}${meta>0?' / $'+Number(meta).toLocaleString('es-MX'):' / sin meta'}</td>
         <td class="p-3 text-xs">${uni.length} · ${disp} disp.</td>
         <td class="p-3">${meta>0?`<div class="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ${pctColor}" style="width:${pct}%"></div></div>`:'<span class="text-slate-300 text-xs">—</span>'}</td>
-        <td class="p-3"><button onclick="auMetaEditor(${m.id})" class="text-xs px-2.5 py-1.5 border rounded-lg hover:bg-slate-50"><i class="fas fa-bullseye mr-1"></i>Meta</button></td>
+        <td class="p-3"><button data-bx-click="a523" data-p0="${bxE(function(){return m.id})}" class="text-xs px-2.5 py-1.5 border rounded-lg hover:bg-slate-50"><i class="fas fa-bullseye mr-1"></i>Meta</button></td>
     </tr>`;
     }).join('');
     return `<div class="bg-white rounded-2xl border border-slate-200 p-6">
         <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
             <h3 class="font-semibold text-lg">Equipo de la agencia (${miembros.length})</h3>
-            <button onclick="auSetTab('monitoreo')" class="text-sm text-indigo-600 font-medium hover:underline">Ver monitoreo <i class="fas fa-arrow-right ml-1"></i></button>
+            <button data-bx-click="a524" class="text-sm text-indigo-600 font-medium hover:underline">Ver monitoreo <i class="fas fa-arrow-right ml-1"></i></button>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -2733,8 +2733,8 @@ function auMetaEditor(agenteId){
         <p class="text-xs text-slate-500 mb-3">Meta en pesos de unidades vendidas · ${mesActual}</p>
         <input id="au-meta-monto" type="number" value="${mt.monto||0}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
         <div class="flex justify-end gap-2 mt-4">
-            <button onclick="closeModal()" class="px-4 py-2 border rounded-lg">Cancelar</button>
-            <button onclick="auMetaGuardar(${agenteId})" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold">Guardar</button>
+            <button data-bx-click="a1" class="px-4 py-2 border rounded-lg">Cancelar</button>
+            <button data-bx-click="a525" data-p0="${bxE(function(){return agenteId})}" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold">Guardar</button>
         </div>
     </div>`);
 }
@@ -2800,7 +2800,7 @@ function auMetasHtml(){
         <td class="p-3">${mt?'$'+Number(mt.monto).toLocaleString('es-MX'):'<span class="text-slate-300">—</span>'}</td>
         <td class="p-3 text-xs">$${Math.round(logrado).toLocaleString('es-MX')}</td>
         <td class="p-3"><div class="flex items-center gap-2"><div class="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full ${pctColor}" style="width:${pct}%"></div></div><span class="text-xs font-semibold">${pct}%</span></div></td>
-        <td class="p-3"><button onclick="auMetaEditor(${m.id})" class="text-xs px-2.5 py-1.5 border rounded-lg hover:bg-slate-50"><i class="fas fa-pen mr-1"></i>Meta</button></td>
+        <td class="p-3"><button data-bx-click="a523" data-p0="${bxE(function(){return m.id})}" class="text-xs px-2.5 py-1.5 border rounded-lg hover:bg-slate-50"><i class="fas fa-pen mr-1"></i>Meta</button></td>
     </tr>`;
     }).join('');
     return `<div class="bg-white rounded-2xl border border-slate-200 p-6">
@@ -2826,7 +2826,7 @@ function auSimHtml(){
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <h3 class="font-semibold text-lg"><i class="fas fa-calculator text-orange-600 mr-2"></i>Simulador de ingresos — venta de autos</h3>
-                ${esGM?`<button onclick="auSimGuardar()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar configuración</button>`:`<span class="text-[11px] text-slate-400">Parámetros definidos por la dirección.</span>`}
+                ${esGM?`<button data-bx-click="a526" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar configuración</button>`:`<span class="text-[11px] text-slate-400">Parámetros definidos por la dirección.</span>`}
             </div>
             <div class="grid md:grid-cols-4 gap-4 mb-4">
                 ${inp('au-sim-meta', c.metaMes||60000, '¿Cuánto quieres ganar al mes? $')}
@@ -2850,13 +2850,13 @@ function auSimHtml(){
                     <h3 class="font-semibold text-lg flex items-center gap-2"><i class="fas fa-car text-emerald-600"></i> Simulador de Financiamiento para el Cliente (#13)</h3>
                     <p class="text-xs text-slate-500">Cotiza al instante enganche, plazo y mensualidad/quincena para compartir por WhatsApp con tu prospecto.</p>
                 </div>
-                <button type="button" onclick="auSimClienteWhatsApp()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"><i class="fab fa-whatsapp"></i> Compartir corrida por WhatsApp</button>
+                <button type="button" data-bx-click="a527" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5"><i class="fab fa-whatsapp"></i> Compartir corrida por WhatsApp</button>
             </div>
             <div class="grid md:grid-cols-4 gap-4 mb-4">
-                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Valor del Auto ($)</label><input id="au-cli-sim-precio" type="number" value="285000" oninput="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
-                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Enganche (%)</label><input id="au-cli-sim-eng" type="number" value="20" min="10" max="80" oninput="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
-                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Plazo (meses)</label><select id="au-cli-sim-plazo" onchange="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="12">12 meses</option><option value="24">24 meses</option><option value="36">36 meses</option><option value="48" selected>48 meses</option><option value="60">60 meses</option></select></div>
-                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Tasa anual estimada (%)</label><input id="au-cli-sim-tasa" type="number" step="0.1" value="14.9" oninput="auSimClienteCalc()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Valor del Auto ($)</label><input id="au-cli-sim-precio" type="number" value="285000" data-bx-input="a528" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Enganche (%)</label><input id="au-cli-sim-eng" type="number" value="20" min="10" max="80" data-bx-input="a528" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Plazo (meses)</label><select id="au-cli-sim-plazo" data-bx-change="a529" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="12">12 meses</option><option value="24">24 meses</option><option value="36">36 meses</option><option value="48" selected>48 meses</option><option value="60">60 meses</option></select></div>
+                <div><label class="text-xs font-semibold text-slate-600 mb-1 block">Tasa anual estimada (%)</label><input id="au-cli-sim-tasa" type="number" step="0.1" value="14.9" data-bx-input="a528" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
             </div>
             <div id="au-cli-sim-out" class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm"></div>
         </div>
@@ -2927,7 +2927,7 @@ function auGuionHtml(){
     return `<div class="bg-white rounded-2xl border border-slate-200 p-6">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
             <h3 class="font-semibold text-lg"><i class="fas fa-phone-volume text-indigo-600 mr-2"></i>Guion de llamadas — piso de venta</h3>
-            ${esGM?`<button onclick="auGuionGuardar()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar guion</button>`:`<span class="text-[11px] text-slate-400">Definido por la dirección.</span>`}
+            ${esGM?`<button data-bx-click="a530" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar guion</button>`:`<span class="text-[11px] text-slate-400">Definido por la dirección.</span>`}
         </div>
         <div class="space-y-4">
             ${[['apertura','1. Apertura (primer contacto)'],['interes','2. Descubrimiento de interés'],['prueba','3. Invitación a prueba de manejo'],['credito','4. Precalificación de crédito'],['cierre','5. Cierre / apartado']].map(([k,lb])=>`<div><label class="text-sm font-medium text-slate-700 mb-1 block">${lb}</label><textarea id="au-g-${k}" rows="2" ${ro} class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape(g[k]||'')}</textarea></div>`).join('')}
@@ -2952,13 +2952,13 @@ function auPautaHtml(){
     const card = (p)=>`<div class="bg-white border border-slate-200 rounded-xl p-4">
         <div class="flex items-start justify-between gap-2 mb-1">
             <h4 class="font-bold text-sm">${psEscape(p.titulo)}</h4>
-            ${esGM?`<button onclick="auPautaBorrar(${p.id})" class="text-rose-400 hover:text-rose-600 text-xs"><i class="fas fa-trash"></i></button>`:''}
+            ${esGM?`<button data-bx-click="a531" data-p0="${bxE(function(){return p.id})}" class="text-rose-400 hover:text-rose-600 text-xs"><i class="fas fa-trash"></i></button>`:''}
         </div>
-        ${p.imagen?`<img src="${p.imagen}" class="w-full h-36 object-cover rounded-lg mb-2 border">`:''}
+        ${p.imagen?`<img loading="lazy" decoding="async" src="${p.imagen}" class="w-full h-36 object-cover rounded-lg mb-2 border">`:''}
         <p class="text-xs text-slate-600 whitespace-pre-wrap">${psEscape(p.texto)}</p>
         <div class="flex gap-1.5 mt-2 flex-wrap">${(p.tags||[]).map(t=>`<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600">#${psEscape(t)}</span>`).join('')}</div>
         <div class="flex gap-2 mt-3">
-            <button onclick="auPautaCopiar(${p.id})" class="text-xs px-2.5 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-700"><i class="fas fa-copy mr-1"></i> Copiar texto</button>
+            <button data-bx-click="a532" data-p0="${bxE(function(){return p.id})}" class="text-xs px-2.5 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-700"><i class="fas fa-copy mr-1"></i> Copiar texto</button>
             ${p.imagen?`<a href="${p.imagen}" download="promocion" class="text-xs px-2.5 py-1.5 border rounded-lg hover:bg-slate-50"><i class="fas fa-download mr-1"></i> Imagen</a>`:''}
         </div>
     </div>`;
@@ -2969,9 +2969,9 @@ function auPautaHtml(){
                 <div class="flex gap-2">
                     <div class="relative">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input value="${psEscape(window.auPubQ||'')}" oninput="window.auPubQ=this.value;render()" placeholder="Buscar pieza..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <input value="${psEscape(window.auPubQ||'')}" data-bx-input="a533" placeholder="Buscar pieza..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     </div>
-                    ${esGM?`<button onclick="auPautaNueva()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i> Nueva pieza</button>`:''}
+                    ${esGM?`<button data-bx-click="a534" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i> Nueva pieza</button>`:''}
                 </div>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">${lista.map(card).join('') || '<p class="text-sm text-slate-400 col-span-full">Sin piezas publicitarias todavía.</p>'}</div>
@@ -2989,7 +2989,7 @@ function auPautaNueva(){
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Etiquetas (separadas por coma)</label><input id="au-p-tags" placeholder="oferta, sedan, enganche" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Guardar</button>
         </div>
     </form>`);
@@ -3029,7 +3029,7 @@ function auPracticaHtml(){
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
                 <h3 class="font-semibold text-lg"><i class="fas fa-chalkboard-user text-indigo-600 mr-2"></i>Practica tus sesiones — comprador de autos</h3>
-                <button onclick="auPracticaIniciar()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-play mr-1"></i> Iniciar práctica</button>
+                <button data-bx-click="a535" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-play mr-1"></i> Iniciar práctica</button>
             </div>
             <div class="grid grid-cols-3 gap-3 mb-4">
                 <div class="border border-slate-200 rounded-xl p-3"><p class="text-[10px] uppercase text-slate-400">Sesiones</p><p class="text-xl font-bold mt-1">${mis.length}</p></div>
@@ -3060,7 +3060,7 @@ function auPracticaIniciar(){
     if(!chat) return;
     chat.innerHTML = `<div class="flex justify-start"><div class="max-w-[85%] rounded-xl px-3 py-2 text-xs bg-white border border-slate-200"><p class="font-semibold text-slate-500">Comprador virtual</p><p>${psEscape(obst.q)}</p></div></div>
     <textarea id="au-practica-resp" rows="3" placeholder="Tu respuesta como asesor de piso..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea>
-    <button onclick="auPracticaCalificar('${psEscape(obst.q).replace(/'/g,'&#39;')}','${psEscape(obst.tips).replace(/'/g,'&#39;')}')" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium"><i class="fas fa-paper-plane mr-1"></i> Terminar y calificar</button>`;
+    <button ${bxOn('click','auPracticaCalificar',[obst.q, obst.tips])} class="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium"><i class="fas fa-paper-plane mr-1"></i> Terminar y calificar</button>`;
 }
 function auPracticaCalificar(qEnc, tipsEnc){
     const resp = ((document.getElementById('au-practica-resp')||{}).value||'').trim();
@@ -3163,7 +3163,7 @@ function vcRender(id){
             <td class="p-3"><span class="px-2 py-1 rounded text-[11px] font-semibold bg-sky-100 text-sky-800 whitespace-nowrap">${psEscape(r.seccion||cfg.secciones[0])}</span></td>
             <td class="p-3 text-xs ${prox?'text-orange-600 font-semibold':'text-slate-400'}">${prox?new Date(prox.fecha+'T00:00:00').toLocaleDateString('es-MX'):'—'}</td>
             <td class="p-3 text-xs">${psEscape(r.agenteNombre||'')}</td>
-            <td class="p-3"><button onclick="vcDetalle('${id}',${r.id})" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700"><i class="fas fa-folder-open mr-1"></i>Expediente</button></td>
+            <td class="p-3"><button data-bx-click="a536" data-p0="${bxE(function(){return id})}" data-p1="${bxE(function(){return r.id})}" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700"><i class="fas fa-folder-open mr-1"></i>Expediente</button></td>
         </tr>`;
     }).join('');
     const ths = `<th class="p-3 font-medium">Cliente</th>${cfg.campos.slice(0,3).map(c=>`<th class="p-3 font-medium">${c.label}</th>`).join('')}<th class="p-3 font-medium">Rol</th><th class="p-3 font-medium">Tipo</th><th class="p-3 font-medium">Etapa</th><th class="p-3 font-medium">Próx. seg.</th><th class="p-3 font-medium">Agente</th><th class="p-3 font-medium">Acción</th>`;
@@ -3174,7 +3174,7 @@ function vcRender(id){
                 <h2 class="text-2xl font-bold text-slate-900">${cfg.nombre}</h2>
                 <p class="text-slate-500 text-sm mt-1">${cfg.agencia} — mismas etapas y control que Mis Clientes, enfocado a ${id==='auto-cartera'?'venta y financiamiento de vehículos':(id==='fin-cartera'?'créditos hipotecarios, inversión y retiro':'venta, renta y escrituración de propiedades')}.</p>
             </div>
-            <button onclick="vcAltaModal('${id}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Agregar ${cfg.unidad.toLowerCase()}</button>
+            <button data-bx-click="a537" data-p0="${bxE(function(){return id})}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Agregar ${cfg.unidad.toLowerCase()}</button>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white rounded-2xl border border-slate-200 p-5"><p class="text-xs uppercase font-semibold text-slate-400">En proceso</p><p class="text-3xl font-bold text-slate-900 mt-1">${activos}</p><p class="text-xs text-slate-400 mt-1">Seguimiento activo</p></div>
@@ -3188,13 +3188,13 @@ function vcRender(id){
                 <div class="flex flex-wrap gap-2">
                     <div class="relative">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input value="${psEscape(window['vcFQ_'+id]||'')}" oninput="window.vcFQ_${id}=this.value;render()" placeholder="Buscar en cartera..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <input value="${psEscape(window['vcFQ_'+id]||'')}" data-bx-input="a538" data-p0="${bxE(function(){return id})}" placeholder="Buscar en cartera..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     </div>
-                    <select onchange="window.vcFSec_${id}=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a539" data-p0="${bxE(function(){return id})}" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todas las etapas</option>
                         ${cfg.secciones.map(s=>`<option ${fSec===s?'selected':''}>${s}</option>`).join('')}
                     </select>
-                    <button onclick="window.vcFQ_${id}='';window.vcFSec_${id}='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
+                    <button data-bx-click="a540" data-p0="${bxE(function(){return id})}" data-p1="${bxE(function(){return id})}" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -3248,7 +3248,7 @@ function vcAltaModal(id){
             </div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"><i class="fas fa-save mr-1"></i> Guardar</button>
         </div>
     </form>`);
@@ -3290,7 +3290,7 @@ function vcDetalle(id, rid){
                 <h3 class="text-xl font-bold">${psEscape(r.cliente)}</h3>
                 <p class="text-xs text-slate-500">${cfg.unidad} · Agente: ${psEscape(r.agenteNombre||'')} · Alta: ${new Date(r.fecha).toLocaleDateString('es-MX')}</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="grid md:grid-cols-2 gap-x-6 gap-y-1 text-sm mb-4">
             ${cfg.campos.map(c=>`<p><span class="text-slate-400 text-xs uppercase">${c.label}:</span> <b>${campoTxt(c.k)||'—'}</b></p>`).join('')}
@@ -3303,10 +3303,10 @@ function vcDetalle(id, rid){
                 <select id="vc-nueva-seccion" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${cfg.secciones.map((s,i)=>`<option ${i===idx?'selected':''}>${s}</option>`).join('')}</select>
             </div>
             <div class="flex items-end gap-2">
-                <button onclick="vcCambiarSeccion('${id}',${r.id})" class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-rotate mr-1"></i> Actualizar</button>
+                <button data-bx-click="a541" data-p0="${bxE(function(){return id})}" data-p1="${bxE(function(){return r.id})}" class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-rotate mr-1"></i> Actualizar</button>
             </div>
             <div class="flex items-end">
-                <button onclick="vcToggleCerrado('${id}',${r.id})" class="w-full px-3 py-2 ${r.cerrado?'bg-emerald-600 hover:bg-emerald-700':'bg-slate-600 hover:bg-slate-700'} text-white rounded-lg text-sm font-medium"><i class="fas fa-${r.cerrado?'lock-open':'lock'} mr-1"></i> ${r.cerrado?'Reabrir':'Cerrar'} registro</button>
+                <button data-bx-click="a542" data-p0="${bxE(function(){return id})}" data-p1="${bxE(function(){return r.id})}" class="w-full px-3 py-2 ${r.cerrado?'bg-emerald-600 hover:bg-emerald-700':'bg-slate-600 hover:bg-slate-700'} text-white rounded-lg text-sm font-medium"><i class="fas fa-${r.cerrado?'lock-open':'lock'} mr-1"></i> ${r.cerrado?'Reabrir':'Cerrar'} registro</button>
             </div>
         </div>`:''}
         <div class="grid md:grid-cols-2 gap-4">
@@ -3322,8 +3322,8 @@ function vcDetalle(id, rid){
                 <label class="text-xs text-slate-500 mb-1 block">Fecha del seguimiento</label>
                 <input type="date" id="vc-seg-fecha" value="${new Date().toISOString().slice(0,10)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                 <textarea id="vc-seg-texto" rows="3" placeholder="Qué se hizo / qué sigue / compromiso..." class="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea>
-                <button onclick="vcAddSeg('${id}',${r.id})" class="mt-2 px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"><i class="fas fa-calendar-plus mr-1"></i> Agregar seguimiento</button>
-                <button onclick="vcBorrarRegistro('${id}',${r.id})" class="mt-2 px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium ml-2" title="Eliminar registro (GM/admin)"><i class="fas fa-trash mr-1"></i> Eliminar</button>
+                <button data-bx-click="a543" data-p0="${bxE(function(){return id})}" data-p1="${bxE(function(){return r.id})}" class="mt-2 px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-medium"><i class="fas fa-calendar-plus mr-1"></i> Agregar seguimiento</button>
+                <button data-bx-click="a544" data-p0="${bxE(function(){return id})}" data-p1="${bxE(function(){return r.id})}" class="mt-2 px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-medium ml-2" title="Eliminar registro (GM/admin)"><i class="fas fa-trash mr-1"></i> Eliminar</button>
             </div>`:''}
         </div>
     </div>`);
@@ -3396,8 +3396,8 @@ function renderInmAgencia(forcedTab){
                 <p class="text-slate-500 text-sm mt-1">Carga propiedades al inventario con galería de fotos, administra disponibilidad y compártelas directo en el portal público.</p>
             </div>
             <div class="flex gap-2">
-                <button onclick="inmAltaProp()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Cargar propiedad</button>
-                <button onclick="vcAltaModal('inm-cartera')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-user-plus mr-1"></i> Nuevo expediente cliente</button>
+                <button data-bx-click="a545" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-plus mr-1"></i> Cargar propiedad</button>
+                <button data-bx-click="a546" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm"><i class="fas fa-user-plus mr-1"></i> Nuevo expediente cliente</button>
             </div>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -3407,8 +3407,8 @@ function renderInmAgencia(forcedTab){
             <div class="bg-white rounded-2xl border border-slate-200 p-5"><p class="text-xs uppercase font-semibold text-slate-400">Valor en escaparate</p><p class="text-2xl font-bold text-slate-900 mt-1">$${Math.round(valorDisp).toLocaleString('es-MX')}</p><p class="text-xs text-slate-400 mt-1">Suma de disponibles</p></div>
         </div>
         <div class="flex gap-2 border-b border-slate-200 pb-2">
-            <button onclick="inmSetTab('unidades')" class="px-4 py-2 rounded-lg text-sm font-semibold ${tab==='unidades'?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas fa-building mr-1.5"></i>Inventario de Propiedades (${props.length})</button>
-            <button onclick="inmSetTab('clientes')" class="px-4 py-2 rounded-lg text-sm font-semibold ${tab==='clientes'?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas fa-folder-open mr-1.5"></i>Expedientes y Cartera (${vcCartera('inm-cartera').filter(vcVisible).length})</button>
+            <button data-bx-click="a547" class="px-4 py-2 rounded-lg text-sm font-semibold ${tab==='unidades'?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas fa-building mr-1.5"></i>Inventario de Propiedades (${props.length})</button>
+            <button data-bx-click="a548" class="px-4 py-2 rounded-lg text-sm font-semibold ${tab==='clientes'?'bg-slate-900 text-white':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}"><i class="fas fa-folder-open mr-1.5"></i>Expedientes y Cartera (${vcCartera('inm-cartera').filter(vcVisible).length})</button>
         </div>
         <div>${tab==='clientes' ? vcRender('inm-cartera') : inmInventarioHtml()}</div>
     </div>`;
@@ -3435,18 +3435,18 @@ function inmInventarioHtml(){
         const fotos = (p.fotos||[]);
         return `<div class="bg-white border rounded-2xl overflow-hidden ${est==='Vendida'?'opacity-80 border-emerald-400':(est==='Reservada'?'border-amber-300 ring-1 ring-amber-200':'border-slate-200')} hover:shadow-lg transition flex flex-col">
             <div class="relative group">
-                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer group-hover:scale-[1.02] transition" onclick="inmFicha(${p.id})">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center cursor-pointer" onclick="inmFicha(${p.id})"><i class="fas fa-house text-slate-300 text-4xl"></i></div>`}
+                ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-full h-44 object-cover cursor-pointer group-hover:scale-[1.02] transition" data-bx-click="a549" data-p0="${bxE(function(){return p.id})}">`:`<div class="w-full h-44 bg-slate-100 flex items-center justify-center cursor-pointer" data-bx-click="a549" data-p0="${bxE(function(){return p.id})}"><i class="fas fa-house text-slate-300 text-4xl"></i></div>`}
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}${p.destacada?'<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white">Destacada</span>':''}</div>
-                ${fotos.length>0?`<span onclick="inmFicha(${p.id})" class="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[10px] font-semibold cursor-pointer"><i class="fas fa-images mr-1"></i>${fotos.length} foto${fotos.length===1?'':'s'}</span>`:''}
+                ${fotos.length>0?`<span data-bx-click="a549" data-p0="${bxE(function(){return p.id})}" class="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full bg-black/70 hover:bg-black/85 text-white text-[10px] font-semibold cursor-pointer"><i class="fas fa-images mr-1"></i>${fotos.length} foto${fotos.length===1?'':'s'}</span>`:''}
             </div>
-            ${fotos.length>1?`<div class="flex gap-1.5 px-4 pt-2.5 overflow-x-auto">${fotos.slice(0,5).map((f,idx)=>`<img src="${f}" onclick="inmFicha(${p.id},${idx})" class="w-12 h-9 object-cover rounded-md border border-slate-200 cursor-pointer hover:ring-2 hover:ring-emerald-500 shrink-0 transition" title="Foto ${idx+1}">`).join('')}${fotos.length>5?`<button onclick="inmFicha(${p.id},5)" class="w-12 h-9 rounded-md border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600 shrink-0 hover:bg-slate-200">+${fotos.length-5}</button>`:''}</div>`:''}
+            ${fotos.length>1?`<div class="flex gap-1.5 px-4 pt-2.5 overflow-x-auto">${fotos.slice(0,5).map((f,idx)=>`<img loading="lazy" decoding="async" src="${f}" data-bx-click="a550" data-p0="${bxE(function(){return p.id})}" data-p1="${bxE(function(){return idx})}" class="w-12 h-9 object-cover rounded-md border border-slate-200 cursor-pointer hover:ring-2 hover:ring-emerald-500 shrink-0 transition" title="Foto ${idx+1}">`).join('')}${fotos.length>5?`<button data-bx-click="a551" data-p0="${bxE(function(){return p.id})}" class="w-12 h-9 rounded-md border border-slate-200 bg-slate-100 text-[10px] font-bold text-slate-600 shrink-0 hover:bg-slate-200">+${fotos.length-5}</button>`:''}</div>`:''}
             <div class="p-4 flex-1 flex flex-col">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
                         <p class="text-xs text-slate-400 uppercase font-semibold truncate">${psEscape(p.colonia||'')} ${p.ciudad?'· '+psEscape(p.ciudad):''}</p>
                         <h4 class="font-bold text-slate-900 leading-tight truncate">${psEscape(p.titulo||'Propiedad')}</h4>
                     </div>
-                    <select onchange="inmCambioRapidoEstado(${p.id}, this.value)" title="Cambiar estatus de disponibilidad" class="text-[11px] font-semibold rounded-lg border px-2 py-1 cursor-pointer ${est==='Vendida'?'bg-emerald-50 border-emerald-300 text-emerald-800':(est==='Reservada'?'bg-amber-50 border-amber-300 text-amber-900':'bg-slate-50 border-slate-200 text-slate-700')}">
+                    <select data-bx-change="a552" data-p0="${bxE(function(){return p.id})}" title="Cambiar estatus de disponibilidad" class="text-[11px] font-semibold rounded-lg border px-2 py-1 cursor-pointer ${est==='Vendida'?'bg-emerald-50 border-emerald-300 text-emerald-800':(est==='Reservada'?'bg-amber-50 border-amber-300 text-amber-900':'bg-slate-50 border-slate-200 text-slate-700')}">
                         <option value="Disponible" ${est==='Disponible'?'selected':''}>🟢 Disponible</option>
                         <option value="Reservada" ${est==='Reservada'?'selected':''}>🟡 Reservada</option>
                         <option value="Vendida" ${est==='Vendida'?'selected':''}>✅ Vendida</option>
@@ -3469,12 +3469,12 @@ function inmInventarioHtml(){
                 </div>
                 ${p.desc?`<p class="text-xs text-slate-500 mt-2 line-clamp-2">${psEscape(p.desc)}</p>`:''}
                 <div class="flex flex-wrap gap-1.5 mt-auto pt-3">
-                    <button onclick="inmFicha(${p.id})" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ficha</button>
+                    <button data-bx-click="a549" data-p0="${bxE(function(){return p.id})}" class="flex-1 text-xs px-2.5 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 font-medium"><i class="fas fa-expand mr-1"></i>Ficha</button>
                     <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.colonia,p.ciudad,p.titulo].filter(Boolean).join(', '))}" target="_blank" class="text-xs px-2.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 font-medium" title="Ver ubicación en Google Maps"><i class="fas fa-map-location-dot"></i></a>
-                    <button onclick="inmCompartirFichaModal(${p.id})" class="text-xs px-2.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-medium" title="Compartir ficha"><i class="fas fa-share-nodes mr-1"></i>Compartir</button>
-                    ${est!=='Vendida'?`<button onclick="inmReservar(${p.id})" class="text-xs px-2.5 py-2 border ${est==='Reservada'?'bg-amber-100 border-amber-300 text-amber-900':'hover:bg-slate-50'} rounded-lg" title="Apartar / Reservar"><i class="fas fa-hand"></i></button>`:''}
-                    <button onclick="inmAltaProp(${p.id})" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar propiedad y galería"><i class="fas fa-pen"></i></button>
-                    <button onclick="inmBorrarProp(${p.id})" class="text-xs px-2.5 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar"><i class="fas fa-trash"></i></button>
+                    <button data-bx-click="a553" data-p0="${bxE(function(){return p.id})}" class="text-xs px-2.5 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 font-medium" title="Compartir ficha"><i class="fas fa-share-nodes mr-1"></i>Compartir</button>
+                    ${est!=='Vendida'?`<button data-bx-click="a554" data-p0="${bxE(function(){return p.id})}" class="text-xs px-2.5 py-2 border ${est==='Reservada'?'bg-amber-100 border-amber-300 text-amber-900':'hover:bg-slate-50'} rounded-lg" title="Apartar / Reservar"><i class="fas fa-hand"></i></button>`:''}
+                    <button data-bx-click="a555" data-p0="${bxE(function(){return p.id})}" class="text-xs px-2.5 py-2 border rounded-lg hover:bg-slate-50" title="Editar propiedad y galería"><i class="fas fa-pen"></i></button>
+                    <button data-bx-click="a556" data-p0="${bxE(function(){return p.id})}" class="text-xs px-2.5 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" title="Eliminar"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
         </div>`;
@@ -3485,26 +3485,26 @@ function inmInventarioHtml(){
             <div class="flex flex-wrap gap-2">
                 <div class="relative">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input value="${psEscape(window.inmInvQ||'')}" oninput="window.inmInvQ=this.value;render()" placeholder="Título, colonia, ciudad..." class="w-52 pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <input value="${psEscape(window.inmInvQ||'')}" data-bx-input="a557" placeholder="Título, colonia, ciudad..." class="w-52 pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                 </div>
-                <select onchange="window.inmInvEst=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select data-bx-change="a558" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     <option value="">Todos los estados</option>
                     ${['Disponible','Reservada','Vendida'].map(o=>`<option ${fEst===o?'selected':''}>${o}</option>`).join('')}
                 </select>
-                <select onchange="window.inmInvOp=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select data-bx-change="a559" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     <option value="">Operación</option>
                     ${['Venta','Renta','Preventa'].map(o=>`<option ${fOp===o?'selected':''}>${o}</option>`).join('')}
                 </select>
-                <select onchange="window.inmInvTipo=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select data-bx-change="a560" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     <option value="">Tipo de inmueble</option>
                     ${['Casa','Departamento','Terreno','Local / Oficina','Bodega / Nave'].map(o=>`<option ${fInm===o?'selected':''}>${o}</option>`).join('')}
                 </select>
-                <select onchange="window.inmInvRec=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <select data-bx-change="a561" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     <option value="">Recámaras (todas)</option>
                     ${[1,2,3,4].map(n=>`<option value="${n}" ${fRec===n?'selected':''}>${n}+ recámaras</option>`).join('')}
                 </select>
-                <input type="number" value="${window.inmInvMaxP||''}" oninput="window.inmInvMaxP=this.value;render()" placeholder="Precio máx $" class="w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
-                <button onclick="window.inmInvQ='';window.inmInvEst='';window.inmInvOp='';window.inmInvTipo='';window.inmInvRec='';window.inmInvMaxP='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
+                <input type="number" value="${window.inmInvMaxP||''}" data-bx-input="a562" placeholder="Precio máx $" class="w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                <button data-bx-click="a563" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
             </div>
         </div>
         <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -3573,10 +3573,10 @@ function inmCompartirFichaModal(id){
                 <h3 class="text-xl font-bold text-slate-900 mt-1">${psEscape(p.titulo||'Propiedad')}</h3>
                 <p class="text-xs text-slate-500">Comparte esta propiedad con tu cliente por WhatsApp, enlace directo o vista pública imprimible.</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
-            ${fotos[0]?`<img src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-house text-slate-400"></i></div>`}
+            ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-house text-slate-400"></i></div>`}
             <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}<span class="text-xs font-bold text-emerald-700">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'A consultar'}</span></div>
                 <p class="text-xs text-slate-500 truncate mt-0.5">${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</p>
@@ -3587,7 +3587,7 @@ function inmCompartirFichaModal(id){
                 <label class="text-xs font-semibold text-slate-600 block mb-1">Enlace directo a la ficha pública</label>
                 <div class="flex gap-2">
                     <input readonly value="${psEscape(url)}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-slate-50 text-slate-700 font-mono">
-                    <button type="button" onclick="inmCopiarLinkFicha(${p.id})" class="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fas fa-copy mr-1"></i>Copiar link</button>
+                    <button type="button" data-bx-click="a564" data-p0="${bxE(function(){return p.id})}" class="px-3 py-2 bg-slate-900 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fas fa-copy mr-1"></i>Copiar link</button>
                 </div>
             </div>
             <div>
@@ -3596,9 +3596,9 @@ function inmCompartirFichaModal(id){
             </div>
         </div>
         <div class="grid sm:grid-cols-3 gap-2 mt-5">
-            <button type="button" onclick="inmWhatsAppFicha(${p.id})" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i>Enviar por WhatsApp</button>
-            <button type="button" onclick="inmCopiarResumenFicha(${p.id})" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-clipboard-check"></i>Copiar texto completo</button>
-            <button type="button" onclick="inmAbrirVistaPublica(${p.id})" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-up-right-from-square"></i>Abrir ficha pública</button>
+            <button type="button" data-bx-click="a565" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fab fa-whatsapp text-sm"></i>Enviar por WhatsApp</button>
+            <button type="button" data-bx-click="a566" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-clipboard-check"></i>Copiar texto completo</button>
+            <button type="button" data-bx-click="a567" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fas fa-up-right-from-square"></i>Abrir ficha pública</button>
         </div>
     </div>`);
 }
@@ -3651,26 +3651,26 @@ function inmFicha(id, startIdx){
                 <h3 class="text-2xl font-bold text-slate-900">${psEscape(p.titulo||'Propiedad')}</h3>
                 <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         ${fotos[0]?`<div class="relative rounded-xl overflow-hidden border bg-slate-50">
-            <img id="inm-ficha-principal" src="${fotos[window._inmFichaIdx]}" class="w-full h-80 object-cover">
+            <img loading="lazy" decoding="async" id="inm-ficha-principal" src="${fotos[window._inmFichaIdx]}" class="w-full h-80 object-cover">
             ${fotos.length>1?`
-                <button type="button" onclick="inmFichaGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left text-xs"></i></button>
-                <button type="button" onclick="inmFichaGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right text-xs"></i></button>
+                <button type="button" data-bx-click="a568" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left text-xs"></i></button>
+                <button type="button" data-bx-click="a569" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right text-xs"></i></button>
                 <span id="inm-ficha-counter" class="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-black/65 text-white text-xs font-semibold">${window._inmFichaIdx+1} / ${fotos.length}</span>
             `:''}
         </div>`:''}
-        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="inmFichaGalGo(${i})" class="inm-ficha-thumb w-24 h-16 object-cover rounded-lg border cursor-pointer shrink-0 ${i===window._inmFichaIdx?'ring-2 ring-emerald-600':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
+        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img loading="lazy" decoding="async" src="${f}" data-bx-click="a570" data-p0="${bxE(function(){return i})}" class="inm-ficha-thumb w-24 h-16 object-cover rounded-lg border cursor-pointer shrink-0 ${i===window._inmFichaIdx?'ring-2 ring-emerald-600':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
         <div class="flex items-baseline justify-between flex-wrap gap-3 mt-4">
             <div class="flex items-baseline gap-2">
                 <p class="text-3xl font-black text-emerald-700">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'Precio a consultar'}</p>
                 ${p.tipo==='Renta'&&p.precio?'<span class="text-sm text-slate-400">/mes</span>':''}
             </div>
             <div class="flex items-center gap-1.5">
-                <button type="button" onclick="inmCopiarLinkFicha(${p.id})" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar link</button>
-                <button type="button" onclick="inmWhatsAppFicha(${p.id})" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
-                <button type="button" onclick="inmAbrirVistaPublica(${p.id})" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold"><i class="fas fa-up-right-from-square mr-1"></i>Vista cliente</button>
+                <button type="button" data-bx-click="a564" data-p0="${bxE(function(){return p.id})}" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar link</button>
+                <button type="button" data-bx-click="a565" data-p0="${bxE(function(){return p.id})}" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+                <button type="button" data-bx-click="a567" data-p0="${bxE(function(){return p.id})}" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold"><i class="fas fa-up-right-from-square mr-1"></i>Vista cliente</button>
             </div>
         </div>
         ${est==='Reservada' && (p.anticipo || p.reservaHasta || p.clienteNombre || p.reservaNotas) ? `<div class="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-wrap gap-x-5 gap-y-1">
@@ -3697,9 +3697,9 @@ function inmFicha(id, startIdx){
         </div>
         ${p.desc?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mt-3"><b>Descripción:</b> ${psEscape(p.desc)}</div>`:''}
         <div class="flex justify-end gap-2 mt-4 flex-wrap">
-            <button onclick="closeModal();inmCompartirFichaModal(${p.id})" class="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"><i class="fas fa-share-nodes mr-1"></i>Compartir ficha</button>
-            ${est!=='Vendida'?`<button onclick="closeModal();inmReservar(${p.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>${est==='Reservada'?'Gestionar reserva':'Reservar'}</button>`:''}
-            <button onclick="closeModal();inmAltaProp(${p.id})" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-pen mr-1"></i>Editar</button>
+            <button data-bx-click="a571" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-sm font-medium"><i class="fas fa-share-nodes mr-1"></i>Compartir ficha</button>
+            ${est!=='Vendida'?`<button data-bx-click="a572" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-hand mr-1"></i>${est==='Reservada'?'Gestionar reserva':'Reservar'}</button>`:''}
+            <button data-bx-click="a573" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm"><i class="fas fa-pen mr-1"></i>Editar</button>
         </div>
     </div>`);
 }
@@ -3713,9 +3713,9 @@ function inmRenderDraftFotos(){
     }
     wrap.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">${arr.map((src, i)=>`
         <div class="relative group rounded-xl overflow-hidden border ${i===0?'border-emerald-500 ring-2 ring-emerald-500/30':'border-slate-200'} bg-slate-50">
-            <img src="${src}" class="w-full h-24 object-cover">
-            ${i===0?`<span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold shadow">Portada</span>`:`<button type="button" onclick="inmDraftSetPortada(${i})" class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/65 hover:bg-emerald-600 text-white text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">Hacer portada</button>`}
-            <button type="button" onclick="inmDraftQuitarFoto(${i})" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[10px] flex items-center justify-center shadow" title="Quitar foto"><i class="fas fa-trash"></i></button>
+            <img loading="lazy" decoding="async" src="${src}" class="w-full h-24 object-cover">
+            ${i===0?`<span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold shadow">Portada</span>`:`<button type="button" data-bx-click="a574" data-p0="${bxE(function(){return i})}" class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/65 hover:bg-emerald-600 text-white text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition">Hacer portada</button>`}
+            <button type="button" data-bx-click="a575" data-p0="${bxE(function(){return i})}" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-[10px] flex items-center justify-center shadow" title="Quitar foto"><i class="fas fa-trash"></i></button>
         </div>`).join('')}</div>`;
 }
 function inmDraftSetPortada(idx){
@@ -3788,17 +3788,17 @@ function inmAltaProp(id){
                     <span class="text-[11px] text-slate-400">Puedes subir archivos o pegar URLs</span>
                 </div>
                 <div class="grid sm:grid-cols-2 gap-2 mb-3">
-                    <input id="inm-fotos" type="file" accept="image/*" multiple onchange="inmDraftSubirArchivos(this)" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-900">
+                    <input id="inm-fotos" type="file" accept="image/*" multiple data-bx-change="a576" class="w-full text-xs border border-slate-300 rounded-lg p-2 bg-white text-slate-900">
                     <div class="flex gap-1.5">
                         <input id="inm-foto-url" type="url" placeholder="O pega URL de imagen (https://...)" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-900">
-                        <button type="button" onclick="inmDraftAgregarUrl()" class="px-3 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Agregar URL</button>
+                        <button type="button" data-bx-click="a577" class="px-3 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 whitespace-nowrap"><i class="fas fa-plus mr-1"></i>Agregar URL</button>
                     </div>
                 </div>
                 <div id="inm-draft-fotos-wrap"></div>
             </div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"><i class="fas fa-save mr-1"></i> Guardar propiedad</button>
         </div>
     </form>`);
@@ -3869,10 +3869,10 @@ function inmReservar(id){
             <div><label class="text-xs font-semibold text-slate-700 mb-1 block">Notas o condiciones</label><input id="inm-res-notas" value="${psEscape(p.reservaNotas||'')}" placeholder="Ej. En trámite de avalúo hipotecario" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
         </div>
         <div class="flex items-center justify-between gap-2 mt-5">
-            ${inmEstadoProp(p)==='Reservada'?`<button type="button" onclick="inmLiberarReserva(${p.id})" class="px-4 py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs font-semibold"><i class="fas fa-unlock mr-1"></i>Liberar a Disponible</button>`:'<span></span>'}
+            ${inmEstadoProp(p)==='Reservada'?`<button type="button" data-bx-click="a578" data-p0="${bxE(function(){return p.id})}" class="px-4 py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs font-semibold"><i class="fas fa-unlock mr-1"></i>Liberar a Disponible</button>`:'<span></span>'}
             <div class="flex gap-2">
-                <button type="button" onclick="closeModal();render()" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
-                <button type="button" onclick="inmConfirmaReserva(${p.id})" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold"><i class="fas fa-hand mr-1"></i>Guardar apartado</button>
+                <button type="button" data-bx-click="a513" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+                <button type="button" data-bx-click="a579" data-p0="${bxE(function(){return p.id})}" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold"><i class="fas fa-hand mr-1"></i>Guardar apartado</button>
             </div>
         </div>
     </div>`);
@@ -3908,7 +3908,7 @@ function openColoresGraficas(){
     const ramos=['VIDA','GMM','DAÑOS','AUTOS','INVERSIÓN','INVERSIÓN ELITE'];
     const comps=companiasGraficas(db.ventas||[]);
     const fila=(tipo,nombre,i)=>`<label class="flex items-center justify-between gap-3 py-1"><span class="text-sm">${escapeHTML(nombre)}</span><input type="color" data-gt="${tipo}" data-gn="${escapeHTML(nombre)}" value="${gfColorPara(tipo,nombre,i)}" class="w-10 h-8 rounded cursor-pointer border border-slate-300 bg-white"></label>`;
-    showModal(`<div class="p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold">Colores de gráficas</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div><p class="text-xs text-slate-500 mb-3">Los colores se aplican en Mi Equipo, Mis Metas y Monitoreo Agencias.</p><div class="border border-slate-200 rounded-xl p-3 mb-3"><p class="text-xs font-bold uppercase text-slate-500 mb-1">Por ramo</p>${ramos.map((r,i)=>fila('ramo',r,i)).join('')}</div><div class="border border-slate-200 rounded-xl p-3"><p class="text-xs font-bold uppercase text-slate-500 mb-1">Por compañía</p>${comps.map((c,i)=>fila('compania',c,i)).join('')||'<p class="text-xs text-slate-400">Sin compañías aún</p>'}</div><div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button onclick="gfGuardarColores()" class="px-5 py-2 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">Guardar colores</button></div></div>`);
+    showModal(`<div class="p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold">Colores de gráficas</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div><p class="text-xs text-slate-500 mb-3">Los colores se aplican en Mi Equipo, Mis Metas y Monitoreo Agencias.</p><div class="border border-slate-200 rounded-xl p-3 mb-3"><p class="text-xs font-bold uppercase text-slate-500 mb-1">Por ramo</p>${ramos.map((r,i)=>fila('ramo',r,i)).join('')}</div><div class="border border-slate-200 rounded-xl p-3"><p class="text-xs font-bold uppercase text-slate-500 mb-1">Por compañía</p>${comps.map((c,i)=>fila('compania',c,i)).join('')||'<p class="text-xs text-slate-400">Sin compañías aún</p>'}</div><div class="flex justify-end gap-2 mt-4"><button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button data-bx-click="a580" class="px-5 py-2 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">Guardar colores</button></div></div>`);
 }
 function gfGuardarColores(){
     try{
@@ -3968,7 +3968,7 @@ function renderMisClientes(){
                 <input type="text" id="nombre-cliente" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
             </div>
             <div>
-                <label class="text-sm font-medium text-slate-700 mb-1 flex items-center justify-between">Compañía * ${esGMRol?`<button type="button" onclick="openAgregarCompania()" class="text-[11px] text-indigo-600 font-semibold hover:underline"><i class="fas fa-plus mr-0.5"></i> Agregar</button>`:''}</label>
+                <label class="text-sm font-medium text-slate-700 mb-1 flex items-center justify-between">Compañía * ${esGMRol?`<button type="button" data-bx-click="a581" class="text-[11px] text-indigo-600 font-semibold hover:underline"><i class="fas fa-plus mr-0.5"></i> Agregar</button>`:''}</label>
                 <select id="compania-cliente" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
                     <option value="">Seleccionar...</option>
                     ${companias.map(c=>`<option value="${c}">${c}</option>`).join('')}
@@ -3995,11 +3995,11 @@ function renderMisClientes(){
             </div>
             <div>
                 <label class="text-sm font-medium text-slate-700 mb-1 block">Prima total</label>
-                <input type="number" id="prima-total-cliente" step="0.01" oninput="actualizarAportacionCliente()" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                <input type="number" id="prima-total-cliente" step="0.01" data-bx-input="a582" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
             </div>
             <div>
                 <label class="text-sm font-medium text-slate-700 mb-1 block">Plazo de contratación (años)</label>
-                <input type="number" id="plazo-cliente" min="1" max="30" step="1" placeholder="Ej: 10" oninput="actualizarAportacionCliente()" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                <input type="number" id="plazo-cliente" min="1" max="30" step="1" placeholder="Ej: 10" data-bx-input="a582" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
             </div>
             <div>
                 <label class="text-sm font-medium text-slate-700 mb-1 block">Aportación total</label>
@@ -4081,13 +4081,13 @@ function renderMisClientes(){
                 <p class="text-slate-500 text-sm mt-1">${puedeVerTodos ? 'Vista completa de todos los agentes' : 'Tus clientes registrados'}</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                ${(currentUser.role||'').toLowerCase()==='gm' ? `<button onclick="openGestionarCompanias()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-building mr-1"></i> Compañías</button>` : ''}
-                <button onclick="if(window.openSimuladorPorRamo) openSimuladorPorRamo('vida-ind')" class="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium"><i class="fas fa-calculator mr-1"></i> Calculadoras por Ramo</button>
-                <button onclick="openRenovacionesMotor()" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded-lg text-sm font-medium border border-amber-400/50"><i class="fas fa-rotate mr-1"></i> Renovaciones y Edad Actuarial</button>
-                <button onclick="openCobranzaPeriodo()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium"><i class="fas fa-calendar-check mr-1"></i> Cobranza y Conciliación</button>
-                <button onclick="openEstadoCuentaComisiones()" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-sm font-semibold"><i class="fas fa-coins mr-1"></i> Estado de Cuenta Comisiones</button>
-                <button onclick="exportarClientesCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-file-csv mr-1"></i> Exportar CSV</button>
-                <button onclick="verAuditoriaClientes()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"><i class="fas fa-history mr-1"></i> Auditoría</button>
+                ${(currentUser.role||'').toLowerCase()==='gm' ? `<button data-bx-click="a463" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-building mr-1"></i> Compañías</button>` : ''}
+                <button data-bx-click="a583" class="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium"><i class="fas fa-calculator mr-1"></i> Calculadoras por Ramo</button>
+                <button data-bx-click="a584" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-300 rounded-lg text-sm font-medium border border-amber-400/50"><i class="fas fa-rotate mr-1"></i> Renovaciones y Edad Actuarial</button>
+                <button data-bx-click="a585" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium"><i class="fas fa-calendar-check mr-1"></i> Cobranza y Conciliación</button>
+                <button data-bx-click="a586" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-sm font-semibold"><i class="fas fa-coins mr-1"></i> Estado de Cuenta Comisiones</button>
+                <button data-bx-click="a587" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium"><i class="fas fa-file-csv mr-1"></i> Exportar CSV</button>
+                <button data-bx-click="a588" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium"><i class="fas fa-history mr-1"></i> Auditoría</button>
             </div>
         </div>
         ${formHtml}
@@ -4105,7 +4105,7 @@ function renderMisClientes(){
                         <p class="text-sm text-amber-800">Tienes <b>${sinSeguimiento.length}</b> prospecto(s)/cliente(s) en proceso con más de 7 días sin actividad.</p>
                     </div>
                 </div>
-                <button onclick="window.vistaMisClientes='kanban';render()" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold">Ver en Kanban</button>
+                <button data-bx-click="a589" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold">Ver en Kanban</button>
             </div>` : '';
         })()}
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
@@ -4113,40 +4113,40 @@ function renderMisClientes(){
                 <div class="flex items-center gap-3 flex-wrap">
                     <h3 class="font-semibold text-lg">Listado de Clientes (${clientes.length})</h3>
                     <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden">
-                        <button onclick="window.vistaMisClientes='tabla';render()" class="px-3 py-1.5 text-xs font-semibold ${(window.vistaMisClientes||'tabla')==='tabla'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-table mr-1"></i>Tabla</button>
-                        <button onclick="window.vistaMisClientes='kanban';render()" class="px-3 py-1.5 text-xs font-semibold ${window.vistaMisClientes==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban CRM (#23)</button>
+                        <button data-bx-click="a590" class="px-3 py-1.5 text-xs font-semibold ${(window.vistaMisClientes||'tabla')==='tabla'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-table mr-1"></i>Tabla</button>
+                        <button data-bx-click="a589" class="px-3 py-1.5 text-xs font-semibold ${window.vistaMisClientes==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban CRM (#23)</button>
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <div class="relative">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input value="${psEscape(window.filtroClienteQ||'')}" oninput="window.filtroClienteQ=this.value;render()" placeholder="Buscar por nombre o póliza..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <input value="${psEscape(window.filtroClienteQ||'')}" data-bx-input="a591" placeholder="Buscar por nombre o póliza..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                     </div>
-                    ${puedeVerTodos ? `<select onchange="window.filtroClienteAgencia=this.value; render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    ${puedeVerTodos ? `<select data-bx-change="a592" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todas las agencias</option>
                         ${(db.users||[]).filter(u=>u.role==='agencia').map(a=>`<option value="${a.id}" ${String(fAgencia)===String(a.id)?'selected':''}>${escapeHTML(a.name||a.nombre||'')}</option>`).join('')}
                     </select>` : ''}
-                    <select onchange="window.filtroClienteMes=this.value; render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a593" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los meses</option>
                         ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}" ${fMes&&Number(fMes)===m?'selected':''}>${new Date(2000,m-1).toLocaleString('es',{month:'long'})}</option>`).join('')}
                     </select>
-                    <select onchange="window.filtroClienteTrim=this.value; render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a594" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los trimestres</option>
                         ${[1,2,3,4].map(t=>`<option value="${t}" ${fTrim&&Number(fTrim)===t?'selected':''}>Q${t}</option>`).join('')}
                     </select>
-                    <select onchange="window.filtroClienteCompania=this.value; render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a595" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todas las compañías</option>
                         ${companias.map(c=>`<option ${fComp===c?'selected':''}>${c}</option>`).join('')}
                     </select>
-                    <select onchange="window.filtroClienteRamo=this.value; render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a596" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los ramos</option>
                         ${ramosUnicos.map(r=>`<option ${fRamo===r?'selected':''}>${r}</option>`).join('')}
                     </select>
-                    ${puedeVerTodos ? `<select onchange="window.filtroClienteAgente=this.value; render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    ${puedeVerTodos ? `<select data-bx-change="a597" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los agentes</option>
                         ${agentesUnicos.map(a=>`<option value="${a.id}" ${fAgente==a.id?'selected':''}>${escapeHTML(a.nombre)}</option>`).join('')}
                     </select>` : ''}
-                    <button onclick="window.filtroClienteCompania='';window.filtroClienteRamo='';window.filtroClienteAgente='';window.filtroClienteQ='';window.filtroClienteMes='';window.filtroClienteTrim='';window.filtroClienteAgencia='';render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
+                    <button data-bx-click="a598" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-eraser mr-1"></i>Limpiar</button>
                 </div>
             </div>
             ${window.vistaMisClientes === 'kanban' ? (() => {
@@ -4169,10 +4169,10 @@ function renderMisClientes(){
                                         </div>
                                         <p class="text-[11px] text-slate-500 truncate">${escapeHTML(c.compania || '')} · ${escapeHTML(c.ramo || '')} · $${Number(c.primaTotal||0).toLocaleString('es-MX')}</p>
                                         <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
-                                            <select onchange="cambiarEtapaKanbanCliente(${c.id}, this.value)" class="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 bg-slate-50 text-slate-700">
+                                            <select data-bx-change="a599" data-p0="${bxE(function(){return c.id})}" class="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 bg-slate-50 text-slate-700">
                                                 ${etapas.map(opt => `<option value="${opt}" ${(c.etapaKanban||'Emitido')===opt?'selected':''}>${opt}</option>`).join('')}
                                             </select>
-                                            <button onclick="openCobranza(${c.id})" class="text-xs text-amber-600 hover:text-amber-800 px-1.5" title="Seguimiento / Cobranza"><i class="fab fa-whatsapp"></i></button>
+                                            <button data-bx-click="a600" data-p0="${bxE(function(){return c.id})}" class="text-xs text-amber-600 hover:text-amber-800 px-1.5" title="Seguimiento / Cobranza"><i class="fab fa-whatsapp"></i></button>
                                         </div>
                                     </div>`;
                                 }).join('') || '<p class="text-xs text-slate-400 text-center py-6">Sin registros</p>'}
@@ -4189,7 +4189,7 @@ function renderMisClientes(){
                         return `<div class="rounded-2xl border ${nivelCob==='rojo'?'border-red-300 bg-red-50/40':'border-slate-200 bg-white'} p-3.5 shadow-xs space-y-2.5">
                             <div class="flex items-start justify-between gap-2.5">
                                 <div class="flex items-center gap-2.5 min-w-0">
-                                    ${c.fotoCliente ? `<img src="${c.fotoCliente}" class="w-11 h-11 rounded-full object-cover border shrink-0">` : `<div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-user text-slate-400"></i></div>`}
+                                    ${c.fotoCliente ? `<img loading="lazy" decoding="async" src="${c.fotoCliente}" class="w-11 h-11 rounded-full object-cover border shrink-0">` : `<div class="w-11 h-11 rounded-full bg-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-user text-slate-400"></i></div>`}
                                     <div class="min-w-0">
                                         <h4 class="font-bold text-slate-900 text-sm truncate">${escapeHTML(c.nombre)}</h4>
                                         <p class="text-xs text-slate-500 truncate">${escapeHTML(c.compania || '')} · Póliza <span class="font-mono font-semibold text-slate-700">${escapeHTML(c.poliza || '')}</span></p>
@@ -4203,14 +4203,14 @@ function renderMisClientes(){
                             <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100">
                                 <span><i class="fas fa-user-tie mr-1 text-slate-400"></i>${escapeHTML(c.agenteNombre||'')}</span>
                                 <span><i class="fas fa-calendar mr-1 text-slate-400"></i>${c.fechaEmision?new Date(c.fechaEmision).toLocaleDateString('es-MX'):new Date(c.fecha).toLocaleDateString('es-MX')}</span>
-                                ${c.evidencia ? `<button onclick="verEvidenciaCliente(${c.id})" class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold"><i class="fas fa-eye mr-1"></i>Póliza</button>` : ''}
+                                ${c.evidencia ? `<button data-bx-click="a601" data-p0="${bxE(function(){return c.id})}" class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold"><i class="fas fa-eye mr-1"></i>Póliza</button>` : ''}
                             </div>
                             ${puedeEditar ? `<div class="grid grid-cols-5 gap-1.5 pt-1">
-                                <button onclick="openExpediente360(${c.id})" class="py-2 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Expediente 360°"><i class="fas fa-id-card-clip text-sm"></i><span>360°</span></button>
-                                <button onclick="openCobranza(${c.id})" class="py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Cobranza"><i class="fas fa-hand-holding-dollar text-sm"></i><span>Cobro</span></button>
-                                <button onclick="sinDesdeCliente(${c.id})" class="py-2 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Siniestro"><i class="fas fa-file-shield text-sm"></i><span>Siniestro</span></button>
-                                <button onclick="editarCliente(${c.id})" class="py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Editar"><i class="fas fa-pen text-sm"></i><span>Editar</span></button>
-                                <button onclick="borrarCliente(${c.id})" class="py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Borrar"><i class="fas fa-trash text-sm"></i><span>Borrar</span></button>
+                                <button data-bx-click="a602" data-p0="${bxE(function(){return c.id})}" class="py-2 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Expediente 360°"><i class="fas fa-id-card-clip text-sm"></i><span>360°</span></button>
+                                <button data-bx-click="a600" data-p0="${bxE(function(){return c.id})}" class="py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Cobranza"><i class="fas fa-hand-holding-dollar text-sm"></i><span>Cobro</span></button>
+                                <button data-bx-click="a603" data-p0="${bxE(function(){return c.id})}" class="py-2 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Siniestro"><i class="fas fa-file-shield text-sm"></i><span>Siniestro</span></button>
+                                <button data-bx-click="a604" data-p0="${bxE(function(){return c.id})}" class="py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Editar"><i class="fas fa-pen text-sm"></i><span>Editar</span></button>
+                                <button data-bx-click="a605" data-p0="${bxE(function(){return c.id})}" class="py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-[11px] font-semibold flex flex-col items-center gap-0.5" title="Borrar"><i class="fas fa-trash text-sm"></i><span>Borrar</span></button>
                             </div>` : ''}
                         </div>`;
                     }).join('') || `<div class="p-8 text-center text-slate-500 text-sm">No hay clientes registrados</div>`}
@@ -4239,7 +4239,7 @@ function renderMisClientes(){
                             const puedeEditar = puedeVerTodos || String(c.agenteId)===String(currentUser.id);
                             const nivelCob = cbzNivel(c);
                             return `<tr class="border-t ${nivelCob==='rojo'?'bg-red-50/60':''} hover:bg-slate-50">
-                                <td class="p-3">${c.fotoCliente ? `<img src="${c.fotoCliente}" class="w-10 h-10 rounded-full object-cover border">` : `<div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center"><i class="fas fa-user text-slate-400"></i></div>`}</td>
+                                <td class="p-3">${c.fotoCliente ? `<img loading="lazy" decoding="async" src="${c.fotoCliente}" class="w-10 h-10 rounded-full object-cover border">` : `<div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center"><i class="fas fa-user text-slate-400"></i></div>`}</td>
                                 <td class="p-3 font-medium">${escapeHTML(c.nombre)}</td>
                                 <td class="p-3"><span class="px-2 py-1 bg-slate-100 rounded text-xs">${c.compania}</span></td>
                                 <td class="p-3 font-mono text-xs">${escapeHTML(c.poliza)}</td>
@@ -4249,8 +4249,8 @@ function renderMisClientes(){
                                 <td class="p-3 text-xs">${escapeHTML(c.agenteNombre)}</td>
                                 <td class="p-3 text-xs text-slate-500">${new Date(c.fecha).toLocaleDateString('es-MX')}</td>
                                 <td class="p-3 text-xs ${c.fechaEmision?'text-slate-600':'text-slate-300'}">${c.fechaEmision?new Date(c.fechaEmision).toLocaleDateString('es-MX'):'—'}</td>
-                                <td class="p-3">${c.evidencia ? `<button onclick="verEvidenciaCliente(${c.id})" class="text-indigo-600 hover:text-indigo-800 text-xs"><i class="fas fa-eye mr-1"></i>Ver</button>` : '<span class="text-slate-400 text-xs">-</span>'}</td>
-                                <td class="p-3">${puedeEditar ? `<div class="flex gap-2"><button onclick="openExpediente360(${c.id})" class="text-teal-600 hover:text-teal-800" title="Expediente 360° y Venta Cruzada (#6)"><i class="fas fa-id-card-clip"></i></button><button onclick="openCobranza(${c.id})" class="text-amber-500 hover:text-amber-700" title="Cobranza / recordatorio de pago"><i class="fas fa-hand-holding-dollar"></i></button><button onclick="sinDesdeCliente(${c.id})" class="text-orange-500 hover:text-orange-700" title="Siniestro / Cancelación"><i class="fas fa-file-shield"></i></button><button onclick="editarCliente(${c.id})" class="text-slate-500 hover:text-indigo-600" title="Modificar"><i class="fas fa-pen"></i></button><button onclick="borrarCliente(${c.id})" class="text-slate-500 hover:text-red-600" title="Borrar"><i class="fas fa-trash"></i></button></div>` : ''}</td>
+                                <td class="p-3">${c.evidencia ? `<button data-bx-click="a601" data-p0="${bxE(function(){return c.id})}" class="text-indigo-600 hover:text-indigo-800 text-xs"><i class="fas fa-eye mr-1"></i>Ver</button>` : '<span class="text-slate-400 text-xs">-</span>'}</td>
+                                <td class="p-3">${puedeEditar ? `<div class="flex gap-2"><button data-bx-click="a602" data-p0="${bxE(function(){return c.id})}" class="text-teal-600 hover:text-teal-800" title="Expediente 360° y Venta Cruzada (#6)"><i class="fas fa-id-card-clip"></i></button><button data-bx-click="a600" data-p0="${bxE(function(){return c.id})}" class="text-amber-500 hover:text-amber-700" title="Cobranza / recordatorio de pago"><i class="fas fa-hand-holding-dollar"></i></button><button data-bx-click="a603" data-p0="${bxE(function(){return c.id})}" class="text-orange-500 hover:text-orange-700" title="Siniestro / Cancelación"><i class="fas fa-file-shield"></i></button><button data-bx-click="a604" data-p0="${bxE(function(){return c.id})}" class="text-slate-500 hover:text-indigo-600" title="Modificar"><i class="fas fa-pen"></i></button><button data-bx-click="a605" data-p0="${bxE(function(){return c.id})}" class="text-slate-500 hover:text-red-600" title="Borrar"><i class="fas fa-trash"></i></button></div>` : ''}</td>
                             </tr>`;
                         }).join('') || `<tr><td colspan="12" class="p-8 text-center text-slate-500">No hay clientes registrados</td></tr>`}
                     </tbody>
@@ -4373,7 +4373,7 @@ function openCobranza(id){
     const vig=cbzVigenciaFin(c);
     const ultimo=c.ultimoRecordatorio?'<p class="text-[11px] text-slate-400 mt-1">Último recordatorio: '+new Date(c.ultimoRecordatorio).toLocaleString('es-MX')+'</p>':'';
     showModal(`<div class="p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-hand-holding-dollar text-amber-500"></i> Cobranza — ${escapeHTML(c.nombre)}</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-hand-holding-dollar text-amber-500"></i> Cobranza — ${escapeHTML(c.nombre)}</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm grid grid-cols-2 gap-2 mb-3">
         <div><span class="text-[11px] uppercase text-slate-400 font-bold">Estado</span><div>${estadoTxt}</div></div>
         <div><span class="text-[11px] uppercase text-slate-400 font-bold">Periodo</span><div class="flex items-center gap-1.5">${escapeHTML(c.periodo||'—')}${cbzBadge(c)}</div></div>
@@ -4384,14 +4384,14 @@ function openCobranza(id){
     </div>
     <div class="flex items-end gap-2 mb-3">
         <div class="flex-1"><label class="text-xs font-bold uppercase text-slate-500">Fecha de emisión (ancla del ciclo de cobranza)</label><input type="date" id="cbz-fecha" value="${fechaISO}" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
-        <button onclick="cbzGuardarFecha(${c.id})" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">Guardar fecha</button>
+        <button data-bx-click="a606" data-p0="${bxE(function(){return c.id})}" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">Guardar fecha</button>
     </div>
     <label class="text-xs font-bold uppercase text-slate-500">Mensaje del recordatorio (editable)</label>
     <textarea id="cbz-msg" rows="9" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${escapeHTML(cbzMensaje(c))}</textarea>
     ${ultimo}
     <div class="flex gap-2 mt-4">
-        <button onclick="cbzEnviar(${c.id})" class="flex-1 px-4 py-2.5 bg-[#25D366] hover:brightness-95 text-white rounded-xl font-bold" ${c.whatsapp?'':'disabled'}><i class="fab fa-whatsapp mr-1"></i> Enviar por WhatsApp</button>
-        <button onclick="cbzMarcarPagado(${c.id})" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm"><i class="fas fa-check mr-1"></i> Pagó</button>
+        <button data-bx-click="a607" data-p0="${bxE(function(){return c.id})}" class="flex-1 px-4 py-2.5 bg-[#25D366] hover:brightness-95 text-white rounded-xl font-bold" ${c.whatsapp?'':'disabled'}><i class="fab fa-whatsapp mr-1"></i> Enviar por WhatsApp</button>
+        <button data-bx-click="a608" data-p0="${bxE(function(){return c.id})}" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm"><i class="fas fa-check mr-1"></i> Pagó</button>
     </div>
     <p class="text-[11px] text-slate-400 mt-3">«Pagó» registra hoy como último pago y corre el siguiente vencimiento un periodo completo. Cambiar la fecha de emisión re-ancla el ciclo al día de emisión.</p>
   </div>`);
@@ -4440,7 +4440,7 @@ function openRenovacionesMotor(){
     showModal(`<div class="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-rotate text-amber-600"></i> Motor de Renovaciones Anuales (60 / 30 / 15 días)</h3>
-            <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+            <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
         <div class="grid grid-cols-3 gap-2.5 mb-4 text-center text-xs">
             <div class="p-3 rounded-xl bg-red-50 border border-red-200"><div class="text-2xl font-black text-red-600">${b15}</div>Urgentes (≤15 días)</div>
@@ -4463,7 +4463,7 @@ function openRenovacionesMotor(){
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
                         ${c.whatsapp?`<a href="https://wa.me/${cbzNormalizaTel(c.whatsapp)}?text=${msgRenov}" target="_blank" class="px-2.5 py-1.5 rounded-lg bg-[#25D366] text-white text-xs font-bold" title="WhatsApp Renovación"><i class="fab fa-whatsapp"></i></a>`:''}
-                        <button onclick="closeModal();navigateTo('cotizaciones');setTimeout(function(){if(window.cotModalNueva)cotModalNueva();},150)" class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold">Recotizar</button>
+                        <button data-bx-click="a609" class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold">Recotizar</button>
                     </div>
                 </div>`;
             }).join('') || '<p class="text-center text-slate-400 py-8 text-sm">No hay pólizas próximas a renovar en los siguientes 90 días.</p>'}
@@ -4498,7 +4498,7 @@ function openExpediente360(clienteId){
                 <h3 class="text-xl font-bold text-slate-900 mt-1">${escapeHTML(c.nombre)}</h3>
                 <p class="text-xs text-slate-500">WhatsApp: ${escapeHTML(c.whatsapp||'—')} · Asesor: ${escapeHTML(c.agenteNombre||'—')}</p>
             </div>
-            <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+            <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
             <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Pólizas Activas</p><p class="text-xl font-bold text-slate-900">${polizas.length}</p></div>
@@ -4552,7 +4552,7 @@ function openEstadoCuentaComisiones(){
                 <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-coins text-amber-600"></i> Estado de Cuenta de Comisiones y Conciliación (#13 y #5)</h3>
                 <p class="text-xs text-slate-500">Cálculo automático sobre prima neta/total según tabulador por ramo y recibos conciliados.</p>
             </div>
-            <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+            <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Prima en Cartera</p><p class="text-lg font-bold text-slate-900">$${Math.round(primaTotalCartera).toLocaleString('es-MX')}</p></div>
@@ -4580,12 +4580,12 @@ function openCobranzaPeriodo(){
         return `<div class="flex items-center gap-2 border border-slate-200 rounded-xl p-2.5 ${nivel==='rojo'?'bg-red-50/60':nivel==='amarillo'?'bg-amber-50/50':''}">
       ${cbzBadge(c)}
       <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-slate-800 truncate">${escapeHTML(c.nombre)}</p><p class="text-[11px] text-slate-500 truncate">Póliza ${escapeHTML(c.poliza||'—')} · ${escapeHTML(c.periodo||'—')} · $${cbzMontoCuota(c).toLocaleString('es-MX',{minimumFractionDigits:2})} por periodo · ${est} · vence ${venc?venc.toLocaleDateString('es-MX'):'—'}</p></div>
-      ${c.whatsapp?`<button onclick="cbzEnviar(${c.id})" class="px-2.5 py-1.5 bg-[#25D366] text-white rounded-lg text-xs font-bold" title="Enviar recordatorio"><i class="fab fa-whatsapp"></i></button>`:'<span class="text-[10px] text-slate-400 px-1">sin WhatsApp</span>'}
+      ${c.whatsapp?`<button data-bx-click="a607" data-p0="${bxE(function(){return c.id})}" class="px-2.5 py-1.5 bg-[#25D366] text-white rounded-lg text-xs font-bold" title="Enviar recordatorio"><i class="fab fa-whatsapp"></i></button>`:'<span class="text-[10px] text-slate-400 px-1">sin WhatsApp</span>'}
     </div>`;
     };
     const nRojo=lista.filter(c=>cbzNivel(c)==='rojo').length, nAmar=lista.filter(c=>cbzNivel(c)==='amarillo').length;
     showModal(`<div class="p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-bell text-amber-500"></i> Cobranza del periodo</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-3"><h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-bell text-amber-500"></i> Cobranza del periodo</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div class="grid grid-cols-3 gap-2 mb-3 text-center text-xs">
         <div class="bg-red-50 border border-red-200 rounded-xl p-2"><div class="text-xl font-black text-red-600">${nRojo}</div>vencidos</div>
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-2"><div class="text-xl font-black text-amber-600">${nAmar}</div>por vencer (7 días)</div>
@@ -4601,7 +4601,7 @@ function verEvidenciaCliente(id){
     if(!c || !c.evidencia) return;
     const isPdf = (c.evidenciaNombre||'').toLowerCase().endsWith('.pdf') || c.evidencia.startsWith('data:application/pdf');
     const content = isPdf ? `<iframe src="${c.evidencia}" class="w-full h-[70vh] border-0"></iframe>` : `<img src="${c.evidencia}" class="max-w-full max-h-[70vh] mx-auto">`;
-    showModal(`<div class="p-4 max-w-4xl"><div class="flex justify-between items-center mb-3"><h3 class="font-bold">Evidencia - ${escapeHTML(c.nombre)}</h3><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-500 hover:text-slate-700"><i class="fas fa-times"></i></button></div>${content}<div class="text-right mt-3"><a href="${c.evidencia}" download="${c.evidenciaNombre||'evidencia'}" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm">Descargar</a></div></div>`);
+    showModal(`<div class="p-4 max-w-4xl"><div class="flex justify-between items-center mb-3"><h3 class="font-bold">Evidencia - ${escapeHTML(c.nombre)}</h3><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-500 hover:text-slate-700"><i class="fas fa-times"></i></button></div>${content}<div class="text-right mt-3"><a href="${c.evidencia}" download="${c.evidenciaNombre||'evidencia'}" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm">Descargar</a></div></div>`);
 }
 
 function borrarCliente(id){
@@ -4647,7 +4647,7 @@ function editarCliente(id){
             <div><label class="text-sm">Nueva foto (opcional)</label><input type="file" id="edit-foto" accept="image/*" class="w-full text-sm border p-1 rounded bg-white text-slate-900 border-slate-300"></div>
             <div><label class="text-sm">Nueva evidencia (opcional)</label><input type="file" id="edit-evidencia" accept=".pdf,.jpg,.png" class="w-full text-sm border p-1 rounded bg-white text-slate-900 border-slate-300"></div>
         </div>
-        <div class="flex gap-2 pt-2"><button type="button" onclick="closeModal()" class="flex-1 border py-2 rounded">Cancelar</button><button class="flex-1 bg-indigo-600 text-white py-2 rounded">Guardar</button></div>
+        <div class="flex gap-2 pt-2"><button type="button" data-bx-click="a1" class="flex-1 border py-2 rounded">Cancelar</button><button class="flex-1 bg-indigo-600 text-white py-2 rounded">Guardar</button></div>
     </form>`);
     document.getElementById('editCliente').querySelector('[name=primaTotal]').addEventListener('input', function(){
         const pt = parseFloat(this.value)||0;
@@ -4693,7 +4693,7 @@ function verAuditoriaClientes(){
     const logs=(db.auditoria||[]).filter(l=>l.tipo&&l.tipo.includes('cliente')).slice(-50).reverse();
     let html='<div class="p-6 max-w-4xl"><h3 class="font-bold text-lg mb-3">Auditoría - Mis Clientes</h3><div class="max-h-96 overflow-auto"><table class="w-full text-xs"><thead><tr class="bg-slate-100"><th class="p-2 text-left">Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>';
     logs.forEach(l=>{ html+=`<tr class="border-t"><td class="p-1">${new Date(l.fecha).toLocaleString('es-MX')}</td><td class="p-1">${l.usuarioNombre||''}</td><td class="p-1">${l.tipo}</td><td class="p-1">${l.despues?.nombre||l.antes?.nombre||''} - ${l.despues?.poliza||l.antes?.poliza||''}</td></tr>`; });
-    html+='</tbody></table></div><div class="text-right mt-3"><button aria-label="Cerrar" onclick="closeModal()" class="border px-3 py-1 rounded">Cerrar</button></div></div>';
+    html+='</tbody></table></div><div class="text-right mt-3"><button aria-label="Cerrar" data-bx-click="a1" class="border px-3 py-1 rounded">Cerrar</button></div></div>';
     showModal(html);
 }
 
@@ -4752,7 +4752,7 @@ function renderMiAgenda(){
     const invUsuarioOpts = '<option value="">Selecciona a la persona…</option>' + otros.map(u=>`<option value="${psEscape(String(u.id))}">${psEscape(u.name||u.username||'')} (${psEscape(u.role||'')})</option>`).join('');
     const invs = invDB();
     const fmt = iso => new Date(iso).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
-    const invRecibidasHtml = invs.filter(i=>String(i.paraId)===String(currentUser.id)).map(i=>`<div class="border border-slate-200 rounded-lg p-2 text-xs"><p class="font-medium text-slate-800">${psEscape(i.titulo)}</p><p class="text-slate-500">De ${psEscape(i.deNombre)} · ${fmt(i.inicio)}</p><p class="mt-1 font-semibold ${i.estado==='aceptada'?'text-emerald-600':i.estado==='rechazada'?'text-rose-600':'text-amber-600'}">${i.estado}</p>${i.estado==='pendiente'?`<div class="flex gap-1 mt-1"><button onclick="invResponder('${i.id}','aceptada')" class="px-2 py-1 bg-emerald-600 text-white rounded">Aceptar</button><button onclick="invResponder('${i.id}','rechazada')" class="px-2 py-1 bg-slate-200 rounded">Rechazar</button></div>`:''}</div>`).join('') || '<p class="text-xs text-slate-400">Sin invitaciones</p>';
+    const invRecibidasHtml = invs.filter(i=>String(i.paraId)===String(currentUser.id)).map(i=>`<div class="border border-slate-200 rounded-lg p-2 text-xs"><p class="font-medium text-slate-800">${psEscape(i.titulo)}</p><p class="text-slate-500">De ${psEscape(i.deNombre)} · ${fmt(i.inicio)}</p><p class="mt-1 font-semibold ${i.estado==='aceptada'?'text-emerald-600':i.estado==='rechazada'?'text-rose-600':'text-amber-600'}">${i.estado}</p>${i.estado==='pendiente'?`<div class="flex gap-1 mt-1"><button data-bx-click="a610" data-p0="${bxE(function(){return i.id})}" class="px-2 py-1 bg-emerald-600 text-white rounded">Aceptar</button><button data-bx-click="a611" data-p0="${bxE(function(){return i.id})}" class="px-2 py-1 bg-slate-200 rounded">Rechazar</button></div>`:''}</div>`).join('') || '<p class="text-xs text-slate-400">Sin invitaciones</p>';
     const invEnviadasHtml = invs.filter(i=>String(i.deId)===String(currentUser.id)).map(i=>`<div class="border border-slate-200 rounded-lg p-2 text-xs"><p class="font-medium text-slate-800">${psEscape(i.titulo)}</p><p class="text-slate-500">Para ${psEscape(i.paraNombre)} · ${fmt(i.inicio)}</p><p class="mt-1 font-semibold ${i.estado==='aceptada'?'text-emerald-600':i.estado==='rechazada'?'text-rose-600':'text-amber-600'}">${i.estado}</p></div>`).join('') || '<p class="text-xs text-slate-400">Sin invitaciones</p>';
     return `
     <div class="max-w-5xl mx-auto space-y-6">
@@ -4780,8 +4780,8 @@ function renderMiAgenda(){
             </div>
             <input id="inv-titulo" placeholder="Motivo, p. ej. Acompañamiento a cita con cliente" class="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
             <div class="flex flex-wrap items-center gap-2 mt-3">
-                <button onclick="invRevisarDisponibilidad()" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">Revisar disponibilidad</button>
-                <button onclick="invEnviar()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Enviar invitación</button>
+                <button data-bx-click="a612" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">Revisar disponibilidad</button>
+                <button data-bx-click="a613" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Enviar invitación</button>
                 <span id="inv-disp" class="text-xs"></span>
             </div>
             <div class="grid md:grid-cols-2 gap-4 mt-5">
@@ -4793,13 +4793,13 @@ function renderMiAgenda(){
         <div class="bg-white rounded-2xl border border-slate-200 p-4">
             <h3 class="font-semibold mb-3">Google Calendar</h3>
             <div id="cal-embed-zone" class="text-center py-6">
-                <button onclick="cargarCalAgenda()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"><i class="fab fa-google mr-2"></i>Cargar mi Google Calendar</button>
+                <button data-bx-click="a614" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"><i class="fab fa-google mr-2"></i>Cargar mi Google Calendar</button>
             </div>
             <div class="mt-3 pt-3 border-t border-slate-100">
                 <label class="text-xs font-medium text-slate-600">Tu Calendar ID (opcional)</label>
                 <div class="flex gap-2 mt-1">
                     <input id="cal-id-input" value="${psEscape(currentUser.googleCalendarId||'')}" placeholder="ej. abc123@group.calendar.google.com" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
-                    <button onclick="guardarCalId()" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">Guardar</button>
+                    <button data-bx-click="a615" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">Guardar</button>
                 </div>
                 <p class="text-xs text-slate-500 mt-1">Cópialo desde Google Calendar → Configuración → «Integrar calendario» → ID del calendario. Déjalo vacío para usar tu calendario principal.</p>
             </div>
@@ -4809,7 +4809,7 @@ function renderMiAgenda(){
             <h3 class="font-semibold mb-3">Anotaciones personales</h3>
             <textarea id="notas-agenda" class="w-full h-32 border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900" placeholder="Escribe tus notas, recordatorios, pendientes...">${agenda.replace(/</g,'&lt;')}</textarea>
             <div class="flex justify-end mt-3">
-                <button onclick="guardarAgenda()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">Guardar notas</button>
+                <button data-bx-click="a616" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">Guardar notas</button>
             </div>
         </div>
     </div>`;

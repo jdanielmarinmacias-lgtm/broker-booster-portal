@@ -70,10 +70,10 @@ const body = bodyKept.join('\n');
 const legacy = ['00-head-utils.js', '01-core-db-roles-portal.js', '02-modulo-b.js',
   '03-config-73l.js', '04-modulo-d.js', '05-modulo-e.js', '06-modulo-f.js',
   '07-modulo-g.js', '08-snippet-h.js', '09-modulo-i.js', '10-modulo-j.js'];
-const core = ['store.js', 'backend.js', 'media.js', 'realtime.js']; // backend.js: autodetecta API (Paso 2) · media.js: subida de archivos (Paso 4) · realtime.js: feed Supabase (Paso 3+4), todos inocuos sin servidor
+const core = ['splash.js', 'store.js', 'backend.js', 'media.js', 'realtime.js', 'actions.js', 'bx-manual.js', 'bx-actions.js']; // backend.js: autodetecta API (Paso 2) · media.js: subida de archivos (Paso 4) · realtime.js: feed Supabase (Paso 3+4) · actions.js/bx-*: acciones delegadas (CSP sin inline)
 const modules = ['auth-custom.js', 'dashboard.js', 'chat.js', 'ventas.js', 'inventario.js'];
 const shim = ['backend-shim.js', 'sync.js']; // puente login legacy<->API + sync offline-first: solo actúan si hay backend
-const html = head + '\n' + body + '\n' +
+const htmlRaw = head + '\n' + body + '\n' +
   '    <!-- Paso 1: JS modular (mismo orden que el monolito) -->\n' +
   core.map((f) => `    <script src="js/core/${f}"><\/script>`).join('\n') + '\n' +
   '    <script src="js/services/rolesService.js"><\/script>\n' +
@@ -85,6 +85,10 @@ const html = head + '\n' + body + '\n' +
   '    <script src="js/legacy/11-init.js"><\/script>\n' +
   L[17423]; // </html>
 
+/* Un <img src=""> hace que el navegador pida la propia página como imagen
+ * (petición inútil y error en consola). Los logos se rellenan por JS. */
+const html = htmlRaw.replace(/(<img\b[^>]*?)\s+src=""/g, '$1');
+
 fs.writeFileSync(path.join(ROOT, 'index.html'), html);
 
 // 5) verificaciones automáticas
@@ -94,6 +98,7 @@ checks.push(['sin Tailwind CDN', !/<script[^>]+cdn\.tailwindcss\.com/i.test(html
 checks.push(['sin JS filtrado (saveDB original)', !html.includes('function saveDB() { localStorage')]);
 checks.push(['sin document.write filtrado', !html.includes('w.document.write')]);
 checks.push(['sin <style> inline restante', !/<style[^>]*>/i.test(html.replace('<link rel="stylesheet" href="css/styles.css">', ''))]);
+checks.push(['sin src vacío en <img>', !/<img\b[^>]*?\s+src=""/i.test(html)]);
 checks.push(['modal-container presente', html.includes('id="modal-container"')]);
 checks.push(['main-content presente', html.includes('id="main-content"')]);
 checks.push(['login-screen presente', html.includes('id="login-screen"')]);

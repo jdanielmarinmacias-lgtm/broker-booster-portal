@@ -35,8 +35,8 @@
     <!-- Tailwind COMPILADO (antes cdn.tailwindcss.com: ~120 KB de JS y estilos
          generados en cada visita; ahora un CSS estático cacheado). Se regenera
          con `npm run build:css` y debe ir ANTES de styles.css. -->
-    <link rel="stylesheet" href="css/tailwind.min.css?v=20261027h">
-    <link rel="stylesheet" href="css/styles.css?v=20261027h">
+    <link rel="stylesheet" href="css/tailwind.min.css?v=20261030a">
+    <link rel="stylesheet" href="css/styles.css?v=20261030a">
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -46,33 +46,19 @@
 <body class="text-slate-800">
     <!-- Pantalla de carga (splash) Broker Booster: imagen completa en pantalla -->
     <div id="splash-screen" aria-hidden="true"></div>
-    <script>
-    (function () {
-        var el = document.getElementById('splash-screen');
-        if (!el) return;
-        var hidden = false;
-        function hide() {
-            if (hidden) return;
-            hidden = true;
-            el.classList.add('splash-hide');
-            setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
-        }
-        if (document.readyState === 'complete') setTimeout(hide, 350);
-        else window.addEventListener('load', function () { setTimeout(hide, 350); });
-        setTimeout(hide, 4000); // failsafe: nunca bloquear la app
-    })();
-    </script>
+    <!-- Archivo externo (no inline): la CSP prohíbe 'unsafe-inline'. -->
+    <script src="js/core/splash.js?v=20261030a"></script>
     <div id="public-portal"></div>
     <div id="app" class="flex flex-col">
         <!-- Login Screen -->
         <div id="login-screen" class="hidden flex justify-center bg-slate-100 p-4 pt-12">
             <div class="w-full max-w-md">
                 <div class="text-center mb-8">
-                    <img id="login-logo" src="" alt="Logo" class="h-20 mx-auto mb-4 object-contain rounded-2xl bg-white p-2 shadow-sm">
+                    <img id="login-logo" alt="Logo" class="h-20 mx-auto mb-4 object-contain rounded-2xl bg-white p-2 shadow-sm">
                     <p id="login-subtitle" class="text-slate-500 mt-2">Excelencia académica, diseño premium</p>
                 </div>
                 <div class="bg-white p-8 rounded-2xl shadow-xl">
-                    <button onclick="exitLogin()" class="mb-3 text-sm text-slate-400 hover:text-indigo-600 flex items-center gap-1.5 transition"><i class="fas fa-arrow-left"></i> Regresar</button>
+                    <button data-bx-click="a653" class="mb-3 text-sm text-slate-400 hover:text-indigo-600 flex items-center gap-1.5 transition"><i class="fas fa-arrow-left"></i> Regresar</button>
                     <h2 class="text-2xl font-semibold text-center mb-6">Iniciar Sesión</h2>
                     <form id="login-form" class="space-y-4">
                         <div>
@@ -93,7 +79,7 @@
                     </div>
                 </div>
                 <div class="mt-6">
-                    <button onclick="openSolicitudModal()" class="w-full bg-white border-2 border-slate-200 text-slate-700 py-3.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-indigo-600 hover:text-indigo-600 transition flex items-center justify-center gap-2 shadow-sm">
+                    <button data-bx-click="a654" class="w-full bg-white border-2 border-slate-200 text-slate-700 py-3.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-indigo-600 hover:text-indigo-600 transition flex items-center justify-center gap-2 shadow-sm">
                         <i class="fas fa-envelope-open-text text-indigo-600"></i>
                         Solicita Información
                     </button>
@@ -104,18 +90,18 @@
         <!-- Main App -->
         <div id="main-app" class="hidden min-h-screen flex-1 flex flex-col ">
             <!-- Overlay móvil del menú lateral -->
-            <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-30 hidden transition-opacity duration-200" aria-hidden="true"></div>
+            <div id="sidebar-overlay" data-bx-click="a199" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-30 hidden transition-opacity duration-200" aria-hidden="true"></div>
             <!-- Sidebar -->
             <aside id="sidebar" class="sidebar bg-white w-72 fixed inset-y-0 left-0 z-40 transform -translate-x-full flex flex-col shadow-2xl transition-transform duration-300">
                 <div class="flex items-center justify-between gap-3 px-6 py-5 border-b border-slate-200 sidebar-header-safe">
-                     <img id="sidebar-logo" src="" alt="Logo" class="h-10 w-auto object-contain rounded-xl">
-                     <button type="button" onclick="toggleSidebar()" class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition" aria-label="Cerrar menú">
+                     <img id="sidebar-logo" alt="Logo" class="h-10 w-auto object-contain rounded-xl">
+                     <button type="button" data-bx-click="a199" class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition" aria-label="Cerrar menú">
                          <i class="fas fa-times text-lg"></i>
                      </button>
                 </div>
                 <nav id="nav-menu" class="flex-1 px-5 py-6 space-y-2 overflow-y-auto"></nav>
                 <div id="pwa-install-sidebar-wrap" class="px-4 pt-3 hidden">
-                    <button id="btn-install-pwa-sidebar" type="button" onclick="if(window.instalarPWA) instalarPWA()" class="btn-marble w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition">
+                    <button id="btn-install-pwa-sidebar" type="button" data-bx-click="a655" class="btn-marble w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition">
                         <i class="fas fa-mobile-screen-button"></i>
                         <span>Instalar App en tu dispositivo</span>
                     </button>
@@ -128,7 +114,7 @@
                             <p id="user-role" class="text-xs text-slate-500 capitalize"></p>
                         </div>
                         <span id="user-streak" class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium hidden"><i class="fas fa-fire mr-1"></i>0</span>
-                        <button onclick="logout()" class="ml-2 text-slate-400 hover:text-red-500"><i class="fas fa-sign-out-alt"></i></button>
+                        <button data-bx-click="a656" class="ml-2 text-slate-400 hover:text-red-500"><i class="fas fa-sign-out-alt"></i></button>
                     </div>
                 </div>
             </aside>
@@ -141,23 +127,23 @@
                         <h2 id="page-title" class="text-xl font-semibold text-slate-800 truncate">Dashboard</h2>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button id="btn-global-search" onclick="if(window.openGlobalSearch) openGlobalSearch()" class="px-3 py-1.5 rounded-xl border border-amber-300/80 bg-amber-50/50 hover:bg-amber-100/70 text-slate-700 text-xs font-semibold flex items-center gap-2 transition shadow-sm" title="Buscador universal (Ctrl+K)">
+                        <button id="btn-global-search" data-bx-click="a657" class="px-3 py-1.5 rounded-xl border border-amber-300/80 bg-amber-50/50 hover:bg-amber-100/70 text-slate-700 text-xs font-semibold flex items-center gap-2 transition shadow-sm" title="Buscador universal (Ctrl+K)">
                             <i class="fas fa-search text-amber-600"></i>
                             <span class="hidden sm:inline">Buscar cliente, póliza, auto...</span>
                             <kbd class="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded text-slate-500">Ctrl+K</kbd>
                         </button>
-                        <button id="btn-install-pwa-header" type="button" onclick="if(window.instalarPWA) instalarPWA()" class="hidden px-2.5 py-1.5 rounded-xl border border-amber-300/80 bg-amber-50/70 hover:bg-amber-100 text-amber-900 text-xs font-semibold items-center gap-1.5 transition shadow-xs" title="Instalar aplicación en tu celular o escritorio">
+                        <button id="btn-install-pwa-header" type="button" data-bx-click="a655" class="hidden px-2.5 py-1.5 rounded-xl border border-amber-300/80 bg-amber-50/70 hover:bg-amber-100 text-amber-900 text-xs font-semibold items-center gap-1.5 transition shadow-xs" title="Instalar aplicación en tu celular o escritorio">
                             <i class="fas fa-download text-amber-600 text-xs"></i>
                             <span class="hidden sm:inline">Instalar App</span>
                         </button>
-                        <button id="btn-push-notif" onclick="if(window.activarNotificacionesPush) activarNotificacionesPush()" class="p-2 rounded-xl border border-slate-200 hover:border-amber-300 text-slate-500 hover:text-amber-700 transition" title="Activar notificaciones del navegador (PWA)">
+                        <button id="btn-push-notif" data-bx-click="a658" class="p-2 rounded-xl border border-slate-200 hover:border-amber-300 text-slate-500 hover:text-amber-700 transition" title="Activar notificaciones del navegador (PWA)">
                             <i class="fas fa-bell-concierge text-sm"></i>
                         </button>
-                        <button id="btn-theme-toggle" onclick="if(window.toggleExecutiveTheme) toggleExecutiveTheme()" class="px-2.5 py-1.5 rounded-xl border border-amber-300/80 bg-slate-900 text-amber-300 hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Alternar Modo Oscuro Ejecutivo (Obsidiana y Oro)">
+                        <button id="btn-theme-toggle" data-bx-click="a659" class="px-2.5 py-1.5 rounded-xl border border-amber-300/80 bg-slate-900 text-amber-300 hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Alternar Modo Oscuro Ejecutivo (Obsidiana y Oro)">
                             <i id="icon-theme-toggle" class="fas fa-moon text-amber-400"></i>
                             <span id="label-theme-toggle" class="hidden md:inline">Obsidiana</span>
                         </button>
-                        <button id="bell-solicitudes" onclick="navigateTo('solicitudes')" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
+                        <button id="bell-solicitudes" data-bx-click="a212" class="hidden relative text-slate-500 hover:text-slate-800 p-2 rounded-lg hover:bg-slate-100 transition" title="Revisar solicitudes nuevas">
                             <i class="fas fa-bell text-lg"></i>
                             <span id="badge-solicitudes-header" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white">0</span>
                         </button>
@@ -174,12 +160,12 @@
                         <div class="relative overflow-hidden flex-1 h-10 flex items-center">
                             <div id="news-ticker-content" class="whitespace-nowrap will-change-transform"></div>
                         </div>
-                        <button onclick="toggleNewsBar()" class="bg-red-600 hover:bg-red-700 px-4 py-2.5 text-white font-bold text-sm transition shrink-0" title="Cerrar barra de noticias">
+                        <button data-bx-click="a660" class="bg-red-600 hover:bg-red-700 px-4 py-2.5 text-white font-bold text-sm transition shrink-0" title="Cerrar barra de noticias">
                             <i class="fas fa-times"></i> <span class="hidden sm:inline">CERRAR</span>
                         </button>
                     </div>
                 </div><!-- Botón para mostrar noticias (oculto por defecto, solo icono) -->
-<button id="show-news-btn" onclick="toggleNewsBar()" class="fixed bottom-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white p-3.5 rounded-full shadow-xl hidden items-center justify-center transition-all" title="Mostrar noticias" aria-label="Mostrar noticias">
+<button id="show-news-btn" data-bx-click="a660" class="fixed bottom-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white p-3.5 rounded-full shadow-xl hidden items-center justify-center transition-all" title="Mostrar noticias" aria-label="Mostrar noticias">
     <i class="fas fa-bullhorn text-base"></i>
     <span id="news-badge-btn" class="news-badge-count hidden absolute -top-1.5 -right-1.5 ring-2 ring-white">0</span>
 </button>
@@ -212,30 +198,36 @@
 
 </body>
     <!-- Paso 1: JS modular (mismo orden que el monolito) -->
-    <script src="js/core/store.js?v=20261019b"></script>
-    <script src="js/core/backend.js?v=20261019b"></script>
-    <script src="js/core/media.js?v=20261027a"></script>
-    <script src="js/core/realtime.js?v=20261027a"></script>
-    <script src="js/services/rolesService.js?v=20261019b"></script>
-    <script src="js/services/userService.js?v=20261019b"></script>
-    <script src="js/services/repository.js?v=20261019b"></script>
-    <script src="js/legacy/00-head-utils.js?v=20261022b"></script>
-    <script src="js/legacy/01-core-db-roles-portal.js?v=20261027h"></script>
-    <script src="js/legacy/02-modulo-b.js?v=20261026e"></script>
-    <script src="js/legacy/03-config-73l.js?v=20261019b"></script>
-    <script src="js/legacy/04-modulo-d.js?v=20261024b"></script>
-    <script src="js/legacy/05-modulo-e.js?v=20261019b"></script>
-    <script src="js/legacy/06-modulo-f.js?v=20261019b"></script>
-    <script src="js/legacy/07-modulo-g.js?v=20261019b"></script>
-    <script src="js/legacy/08-snippet-h.js?v=20261019b"></script>
-    <script src="js/legacy/09-modulo-i.js?v=20261019b"></script>
-    <script src="js/legacy/10-modulo-j.js?v=20261019b"></script>
-    <script src="js/modules/auth-custom.js?v=20261019b"></script>
-    <script src="js/modules/dashboard.js?v=20261019b"></script>
-    <script src="js/modules/chat.js?v=20261019b"></script>
-    <script src="js/modules/ventas.js?v=20261019b"></script>
-    <script src="js/modules/inventario.js?v=20261019b"></script>
-    <script src="js/core/backend-shim.js?v=20261019b"></script>
-    <script src="js/core/sync.js?v=20261027g"></script>
-    <script src="js/legacy/11-init.js?v=20261019b"></script>
+    <script src="js/core/store.js?v=20261030a"></script>
+    <script src="js/core/backend.js?v=20261030a"></script>
+    <script src="js/core/media.js?v=20261030a"></script>
+    <script src="js/core/realtime.js?v=20261030a"></script>
+    <script src="js/services/rolesService.js?v=20261030a"></script>
+    <script src="js/services/userService.js?v=20261030a"></script>
+    <script src="js/services/repository.js?v=20261030a"></script>
+    <!-- Acciones delegadas: sustituyen a los manejadores inline (CSP estricta).
+         actions.js define bxP/bxOn y los listeners; bx-actions.js es GENERADO
+         (tools/csp-inline.js) y bx-manual.js son las acciones con `this`. -->
+    <script src="js/core/actions.js?v=20261030a"></script>
+    <script src="js/core/bx-manual.js?v=20261030a"></script>
+    <script src="js/core/bx-actions.js?v=20261030a"></script>
+    <script src="js/legacy/00-head-utils.js?v=20261030a"></script>
+    <script src="js/legacy/01-core-db-roles-portal.js?v=20261030a"></script>
+    <script src="js/legacy/02-modulo-b.js?v=20261030a"></script>
+    <script src="js/legacy/03-config-73l.js?v=20261030a"></script>
+    <script src="js/legacy/04-modulo-d.js?v=20261030a"></script>
+    <script src="js/legacy/05-modulo-e.js?v=20261030a"></script>
+    <script src="js/legacy/06-modulo-f.js?v=20261030a"></script>
+    <script src="js/legacy/07-modulo-g.js?v=20261030a"></script>
+    <script src="js/legacy/08-snippet-h.js?v=20261030a"></script>
+    <script src="js/legacy/09-modulo-i.js?v=20261030a"></script>
+    <script src="js/legacy/10-modulo-j.js?v=20261030a"></script>
+    <script src="js/modules/auth-custom.js?v=20261030a"></script>
+    <script src="js/modules/dashboard.js?v=20261030a"></script>
+    <script src="js/modules/chat.js?v=20261030a"></script>
+    <script src="js/modules/ventas.js?v=20261030a"></script>
+    <script src="js/modules/inventario.js?v=20261030a"></script>
+    <script src="js/core/backend-shim.js?v=20261030a"></script>
+    <script src="js/core/sync.js?v=20261030a"></script>
+    <script src="js/legacy/11-init.js?v=20261030a"></script>
 </html>

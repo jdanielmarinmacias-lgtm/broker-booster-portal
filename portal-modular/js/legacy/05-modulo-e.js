@@ -844,7 +844,7 @@ window.addEventListener('load', ()=>{
                             </div>
                             <div><label class="text-sm font-bold">¿Por qué quieres ser agente de seguros?</label><textarea id="me-motivo" class="w-full mt-1 p-3 border rounded-xl" rows="3" placeholder="Tu motivación...">${escapeHTML(saved.motivo||'')}</textarea></div>
                         </div>
-                        <button onclick="guardarMiExperiencia()" class="mt-6 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Guardar y continuar →</button>
+                        <button data-bx-click="a423" class="mt-6 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Guardar y continuar →</button>
                         <p class="text-xs text-gray-500 mt-3">* Esta información será visible para roles Admin, GM y Desarrollador</p>
                     </div>
                 </div>`;
@@ -907,8 +907,8 @@ window.addEventListener('load', ()=>{
                         <p class="text-sm text-amber-800">El chat con tu reclutador está siempre abierto (paso 4), puedes preguntar antes de continuar.</p>
                     </div>
                     <div class="mt-6 text-center">
-                        <button onclick="navigateTo('agenda-prospectos')" class="px-8 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Continuar a Agenda →</button>
-                        <button onclick="navigateTo('chat-reclutador')" class="ml-3 px-6 py-3 border rounded-xl hover:bg-gray-50">Preguntar al reclutador</button>
+                        <button data-bx-click="a617" class="px-8 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Continuar a Agenda →</button>
+                        <button data-bx-click="a618" class="ml-3 px-6 py-3 border rounded-xl hover:bg-gray-50">Preguntar al reclutador</button>
                     </div>
                 </div>`;
             }
@@ -932,7 +932,7 @@ window.addEventListener('load', ()=>{
 
                         <div class="mb-4">
                             <label class="text-sm font-bold block mb-1">Subir archivo .xlsx</label>
-                            <input id="agenda-file" type="file" accept=".xlsx,.xls" class="w-full p-2.5 border rounded-xl text-sm bg-white" onchange="cargarAgendaXLSX(event)">
+                            <input id="agenda-file" type="file" accept=".xlsx,.xls" class="w-full p-2.5 border rounded-xl text-sm bg-white" data-bx-change="a619">
                             <p id="agenda-file-status" class="text-xs text-gray-500 mt-1"></p>
                         </div>
 
@@ -944,7 +944,7 @@ window.addEventListener('load', ()=>{
                             <div><label class="text-sm font-bold">Horario (opcional)</label><select id="agenda-hora" class="w-full mt-1 p-3 border rounded-xl"><option ${saved.hora==='Mañana'?'selected':''}>Mañana</option><option ${saved.hora==='Tarde'?'selected':''}>Tarde</option></select></div>
                         </div>
 
-                        <button onclick="guardarAgendaProspectos()" class="mt-6 w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700">Finalizar proceso →</button>
+                        <button data-bx-click="a620" class="mt-6 w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700">Finalizar proceso →</button>
                     </div>
                 </div>`;
             }

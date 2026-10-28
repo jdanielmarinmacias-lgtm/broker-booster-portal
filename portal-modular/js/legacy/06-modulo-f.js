@@ -69,7 +69,7 @@
                 <div><label class="text-sm font-bold text-gray-700">4. ¿Oficina? *</label><select id="exp-oficina" class="w-full mt-1 p-3 border border-gray-300 rounded-xl bg-white text-gray-900" required><option value="">Selecciona</option><option ${saved.oficina==='Sí propia'?'selected':''}>Sí propia</option><option ${saved.oficina==='Sí rentada'?'selected':''}>Sí rentada</option><option ${saved.oficina==='Home office'?'selected':''}>Home office</option><option ${saved.oficina==='No'?'selected':''}>No</option></select></div>
                 <div><label class="text-sm font-bold text-gray-700">5. ¿Por qué ser agente? *</label><textarea id="exp-motivo" class="w-full mt-1 p-3 border border-gray-300 rounded-xl bg-white text-gray-900" rows="3" required>${saved.motivo||''}</textarea></div>
             </div>
-            <button onclick="guardarMiExperiencia()" type="button" class="mt-6 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Guardar y continuar →</button>
+            <button data-bx-click="a423" type="button" class="mt-6 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700">Guardar y continuar →</button>
         </div></div>`;
     };
     
@@ -149,7 +149,7 @@
                 <div><label class="text-sm font-bold text-gray-700">Fecha</label><input id="agenda-fecha" type="date" class="w-full mt-1 p-3 border rounded-xl bg-white" value="${saved.fecha||''}"></div>
                 <div><label class="text-sm font-bold text-gray-700">Hora</label><input id="agenda-hora" type="time" class="w-full mt-1 p-3 border rounded-xl bg-white" value="${saved.hora||''}"></div>
             </div>
-            <button onclick="guardarAgendaProspectos()" type="button" class="mt-6 w-full py-3 bg-green-600 text-white rounded-xl font-bold">Finalizar proceso →</button>
+            <button data-bx-click="a620" type="button" class="mt-6 w-full py-3 bg-green-600 text-white rounded-xl font-bold">Finalizar proceso →</button>
         </div></div>`;
     };
 

@@ -74,17 +74,17 @@
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="exportarAgenda()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Exportar Excel</button>
-                        <button onclick="abrirModalProspecto()" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">+ Agregar Prospecto</button>
+                        <button data-bx-click="a621" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">Exportar Excel</button>
+                        <button data-bx-click="a622" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">+ Agregar Prospecto</button>
                     </div>
                 </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4 p-3 bg-gray-50 rounded-xl">
-                    <select id="filtro-fuente" onchange="filtrarAgenda()" class="p-2 border rounded text-xs bg-white"><option value="">Todas las fuentes</option>${FUENTES.map(f=>`<option value="${f.id}">${f.id}. ${f.nombre}</option>`).join('')}</select>
-                    <select id="filtro-ingreso" onchange="filtrarAgenda()" class="p-2 border rounded text-xs bg-white"><option value="">Todos ingresos</option>${OPCIONES.ingreso.map(o=>`<option>${o}</option>`).join('')}</select>
-                    <select id="filtro-prob" onchange="filtrarAgenda()" class="p-2 border rounded text-xs bg-white"><option value="">Probabilidad</option>${OPCIONES.probabilidad.map(o=>`<option>${o}</option>`).join('')}</select>
-                    <select id="filtro-hab" onchange="filtrarAgenda()" class="p-2 border rounded text-xs bg-white"><option value="">Habilidad ref.</option>${OPCIONES.habilidad.map(o=>`<option>${o}</option>`).join('')}</select>
-                    <button onclick="limpiarFiltros()" class="p-2 bg-gray-200 rounded text-xs font-bold">Limpiar</button>
+                    <select id="filtro-fuente" data-bx-change="a623" class="p-2 border rounded text-xs bg-white"><option value="">Todas las fuentes</option>${FUENTES.map(f=>`<option value="${f.id}">${f.id}. ${f.nombre}</option>`).join('')}</select>
+                    <select id="filtro-ingreso" data-bx-change="a623" class="p-2 border rounded text-xs bg-white"><option value="">Todos ingresos</option>${OPCIONES.ingreso.map(o=>`<option>${o}</option>`).join('')}</select>
+                    <select id="filtro-prob" data-bx-change="a623" class="p-2 border rounded text-xs bg-white"><option value="">Probabilidad</option>${OPCIONES.probabilidad.map(o=>`<option>${o}</option>`).join('')}</select>
+                    <select id="filtro-hab" data-bx-change="a623" class="p-2 border rounded text-xs bg-white"><option value="">Habilidad ref.</option>${OPCIONES.habilidad.map(o=>`<option>${o}</option>`).join('')}</select>
+                    <button data-bx-click="a624" class="p-2 bg-gray-200 rounded text-xs font-bold">Limpiar</button>
                 </div>
                 
                 <div class="overflow-auto max-h-[60vh] border rounded-xl">
@@ -117,7 +117,7 @@
                                     <td class="p-2">${p.probabilidad}</td>
                                     <td class="p-2">${p.habilidad}</td>
                                     <td class="p-2 font-bold text-center ${p.score>=20?'text-green-600':p.score>=11?'text-yellow-600':'text-red-600'}">${p.score}</td>
-                                    <td class="p-2"><button onclick="editarProspecto('${p.id}')" class="text-blue-600">Editar</button></td>
+                                    <td class="p-2"><button data-bx-click="a625" data-p0="${bxE(function(){return p.id})}" class="text-blue-600">Editar</button></td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -127,16 +127,16 @@
                 
                 <div class="mt-4 flex justify-between items-center">
                     <p class="text-xs text-gray-500">Los 10 primeros son tus mejores prospectos (verde). Score máximo: 30</p>
-                    <button onclick="finalizarAgenda()" class="px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold">Finalizar y Guardar →</button>
+                    <button data-bx-click="a626" class="px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold">Finalizar y Guardar →</button>
                 </div>
             </div>
         </div>
         
-        <div id="modal-prospecto" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" ondblclick="if(event.target.id==='modal-prospecto') cerrarModalProspecto()">
-            <div class="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto p-6" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
+        <div id="modal-prospecto" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" data-bx-dblclick="a627">
+            <div class="relative bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto p-6" data-bx-click="a141" data-bx-dblclick="a278">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-xl font-black" id="modal-titulo">Nuevo Prospecto</h3>
-                    <button type="button" onclick="cerrarModalProspecto()" aria-label="Cerrar" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 flex items-center justify-center transition"><i class="fas fa-times"></i></button>
+                    <button type="button" data-bx-click="a628" aria-label="Cerrar" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 flex items-center justify-center transition"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="grid md:grid-cols-2 gap-3">
                     <div class="md:col-span-2"><label class="text-xs font-bold">Nombre completo *</label><input id="mp-nombre" class="w-full p-2 border rounded bg-white"></div>
@@ -152,8 +152,8 @@
                     <div><label class="text-xs font-bold">Habilidad para Referencias</label><select id="mp-habilidad" class="w-full p-2 border rounded bg-white">${OPCIONES.habilidad.map(o=>`<option>${o}</option>`).join('')}</select></div>
                 </div>
                 <div class="flex gap-2 mt-6">
-                    <button onclick="cerrarModalProspecto()" class="flex-1 py-2 border rounded-xl">Cancelar</button>
-                    <button onclick="guardarProspecto()" class="flex-1 py-2 bg-red-600 text-white rounded-xl font-bold">Guardar</button>
+                    <button data-bx-click="a628" class="flex-1 py-2 border rounded-xl">Cancelar</button>
+                    <button data-bx-click="a629" class="flex-1 py-2 bg-red-600 text-white rounded-xl font-bold">Guardar</button>
                 </div>
             </div>
         </div>`;
@@ -236,7 +236,7 @@
                 <td class="p-2">${p.probabilidad}</td>
                 <td class="p-2">${p.habilidad}</td>
                 <td class="p-2 font-bold text-center ${p.score>=20?'text-green-600':p.score>=11?'text-yellow-600':'text-red-600'}">${p.score}</td>
-                <td class="p-2"><button onclick="editarProspecto('${p.id}')" class="text-blue-600">Editar</button></td>
+                <td class="p-2"><button data-bx-click="a625" data-p0="${bxE(function(){return p.id})}" class="text-blue-600">Editar</button></td>
             </tr>
         `).join('');
     };
@@ -306,7 +306,7 @@
                     </div>
                 </div>` : '<div class="mb-4 p-3 bg-gray-50 rounded-xl text-center text-gray-500 text-xs">Mi Experiencia no completada</div>';
                 const detalleHtml = experienciaHtml + `<div class="bg-white rounded-xl border p-3 max-h-64 overflow-auto"><div class="font-bold mb-2 text-sm">Agenda de ${u.name||'prospecto'} (${agendaScores.length} contactos):</div>${agendaHtml}</div>`;
-                return `<tr class="border-t hover:bg-gray-50 cursor-pointer" onclick="document.getElementById('${detalleId}').classList.toggle('hidden')">
+                return `<tr class="border-t hover:bg-gray-50 cursor-pointer" data-bx-click="a630" data-p0="${bxE(function(){return detalleId})}">
                     <td class="p-2 font-medium">${u.name||''} <i class="fa-solid fa-chevron-down ml-1 text-gray-400 text-xs"></i></td>
                     <td class="p-2 text-xs">${u.email||''}</td>
                     <td class="p-2 text-center">${prog['mi-experiencia']?'<span class="text-green-600">✓</span>':'<span class="text-gray-400">—</span>'}</td>
@@ -330,7 +330,7 @@
                                 <p class="text-sm text-gray-600">${prospectUsers.length} prospectos registrados - Haz clic en una fila para ver detalle</p>
                             </div>
                         </div>
-                        <button onclick="exportarResultadosProspectos()" class="px-4 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 text-sm"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</button>
+                        <button data-bx-click="a631" class="px-4 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 text-sm"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</button>
                     </div>
                     <div class="overflow-auto border rounded-xl max-h-[70vh]">
                         <table class="w-full text-sm">
@@ -362,14 +362,14 @@
             const prog = (typeof getProspectProgress==='function'?getProspectProgress(uid):{});
             const data = prog['mi-experiencia_data'] || ((db.prospectos||{})[uid] || {});
             const user = (db.users||[]).find(u=>u.id===uid) || {};
-            const html = `<div id="modal-exp" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" ondblclick="if(event.target.id==='modal-exp') this.remove()">
-                <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-auto" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
+            const html = `<div id="modal-exp" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" data-bx-dblclick="a632">
+                <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-auto" data-bx-click="a141" data-bx-dblclick="a278">
                     <div class="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
                         <div>
                             <h3 class="text-xl font-black">Mi Experiencia - ${user.name||'Prospecto'}</h3>
                             <p class="text-xs text-gray-500">${user.email||''}</p>
                         </div>
-                        <button onclick="document.getElementById('modal-exp').remove()" class="w-8 h-8 rounded-full hover:bg-gray-100"><i class="fa-solid fa-xmark"></i></button>
+                        <button data-bx-click="a633" class="w-8 h-8 rounded-full hover:bg-gray-100"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                     <div class="p-6 space-y-4 text-sm">
                         <div><div class="font-bold text-gray-700 mb-1">1. Experiencia laboral:</div><div class="bg-gray-50 p-3 rounded-xl whitespace-pre-wrap">${(data.experiencia_laboral||'No capturado').replace(/</g,'&lt;')}</div></div>
@@ -381,7 +381,7 @@
                         <div><div class="font-bold text-gray-700 mb-1">5. Motivo para unirse:</div><div class="bg-gray-50 p-3 rounded-xl whitespace-pre-wrap">${(data.motivo||'No capturado').replace(/</g,'&lt;')}</div></div>
                     </div>
                     <div class="p-4 border-t text-right">
-                        <button onclick="document.getElementById('modal-exp').remove()" class="px-4 py-2 bg-gray-900 text-white rounded-xl font-bold">Cerrar</button>
+                        <button data-bx-click="a633" class="px-4 py-2 bg-gray-900 text-white rounded-xl font-bold">Cerrar</button>
                     </div>
                 </div>
             </div>`;

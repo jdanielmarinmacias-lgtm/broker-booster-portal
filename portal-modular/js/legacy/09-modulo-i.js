@@ -198,8 +198,8 @@ function showEnVivoModal(liveClassId) {
   const roleColor = isPresenter ? 'bg-[#0a2540] text-white' : 'bg-slate-100 text-slate-700';
   
   const html = `
-  <div id="en-vivo-modal" class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-2 sm:p-4 overflow-auto" ondblclick="if(event.target.id==='en-vivo-modal') closeEnVivoModal()">
-    <div class="bg-[#f8fafc] w-full max-w-[1600px] h-[95vh] rounded-[16px] overflow-hidden flex flex-col shadow-2xl" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">
+  <div id="en-vivo-modal" class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-2 sm:p-4 overflow-auto" data-bx-dblclick="a634">
+    <div class="bg-[#f8fafc] w-full max-w-[1600px] h-[95vh] rounded-[16px] overflow-hidden flex flex-col shadow-2xl" data-bx-click="a141" data-bx-dblclick="a278">
       <!-- Header -->
       <div class="h-[64px] bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0">
         <div class="flex items-center gap-3">
@@ -214,9 +214,9 @@ function showEnVivoModal(liveClassId) {
           <span class="ml-2 px-2.5 py-1 rounded-full text-[11px] font-medium ${roleColor}">${roleLabel}: ${currentUser.role}</span>
         </div>
         <div class="flex items-center gap-2">
-          ${isPresenter ? `<button onclick="downloadEnVivoParticipants()" class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-white border border-slate-200 text-[12px] font-medium hover:bg-slate-50"><i class="fa-solid fa-download text-[12px]"></i> Descargar participantes</button>` : ''}
-          ${isPresenter ? `<button onclick="guardarComoCursoEnVivo(${liveClassId})" class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#c9a86a] text-[#0a2540] text-[12px] font-semibold hover:bg-[#b8945a]">Guardar como curso</button>` : ''}
-          <button onclick="closeEnVivoModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 grid place-items-center"><i class="fa-solid fa-xmark text-[14px]"></i></button>
+          ${isPresenter ? `<button data-bx-click="a635" class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-white border border-slate-200 text-[12px] font-medium hover:bg-slate-50"><i class="fa-solid fa-download text-[12px]"></i> Descargar participantes</button>` : ''}
+          ${isPresenter ? `<button data-bx-click="a636" data-p0="${bxE(function(){return liveClassId})}" class="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#c9a86a] text-[#0a2540] text-[12px] font-semibold hover:bg-[#b8945a]">Guardar como curso</button>` : ''}
+          <button data-bx-click="a637" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 grid place-items-center"><i class="fa-solid fa-xmark text-[14px]"></i></button>
         </div>
       </div>
       
@@ -233,19 +233,19 @@ function showEnVivoModal(liveClassId) {
           <!-- Controles -->
           <div class="rounded-[14px] bg-white border border-slate-200 p-2.5 flex flex-wrap items-center gap-2">
             ${isPresenter ? `
-            <button onclick="toggleEnVivoMic()" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-slate-900 text-white"><i class="fa-solid fa-microphone text-[14px]"></i> Mic</button>
-            <button onclick="toggleEnVivoCam()" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-slate-900 text-white"><i class="fa-solid fa-video text-[14px]"></i> Cámara</button>
-            <button onclick="toggleEnVivoScreen()" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-white border border-slate-200"><i class="fa-solid fa-display text-[14px]"></i> Compartir</button>
-            <button onclick="toggleEnVivoRecord()" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-white border border-slate-200"><i class="fa-solid fa-circle text-[12px] text-red-500"></i> Grabar</button>
+            <button data-bx-click="a638" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-slate-900 text-white"><i class="fa-solid fa-microphone text-[14px]"></i> Mic</button>
+            <button data-bx-click="a639" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-slate-900 text-white"><i class="fa-solid fa-video text-[14px]"></i> Cámara</button>
+            <button data-bx-click="a640" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-white border border-slate-200"><i class="fa-solid fa-display text-[14px]"></i> Compartir</button>
+            <button data-bx-click="a641" class="h-9 px-3 rounded-full flex items-center gap-1.5 text-[13px] font-medium bg-white border border-slate-200"><i class="fa-solid fa-circle text-[12px] text-red-500"></i> Grabar</button>
             <div class="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
             <div class="flex items-center gap-1.5">
-              ${Object.keys(EN_VIVO_FILTERS).map(k=>`<button onclick="enVivoState.filterId='${k}'; " class="h-8 px-2.5 rounded-full text-[11px] font-medium border ${enVivoState.filterId===k ? 'bg-[#0a2540] text-white border-[#0a2540]' : 'bg-white border-slate-200'}">${k}</button>`).join('')}
+              ${Object.keys(EN_VIVO_FILTERS).map(k=>`<button data-bx-click="a642" data-p0="${bxE(function(){return k})}" class="h-8 px-2.5 rounded-full text-[11px] font-medium border ${enVivoState.filterId===k ? 'bg-[#0a2540] text-white border-[#0a2540]' : 'bg-white border-slate-200'}">${k}</button>`).join('')}
             </div>
             ` : `
             <div class="text-[12px] text-slate-500">Estás viendo como Participante - Solo Capacitación transmite</div>
             `}
             <div class="ml-auto flex items-center gap-1">
-              ${['❤️','🔥','👏','😂','😮','🎉'].map(em=>`<button onclick="sendEnVivoEmoji('${em}')" class="w-8 h-8 rounded-full bg-[#f8fafc] hover:bg-white border border-slate-200 grid place-items-center text-[16px]">${em}</button>`).join('')}
+              ${['❤️','🔥','👏','😂','😮','🎉'].map(em=>`<button data-bx-click="a643" data-p0="${bxE(function(){return em})}" class="w-8 h-8 rounded-full bg-[#f8fafc] hover:bg-white border border-slate-200 grid place-items-center text-[16px]">${em}</button>`).join('')}
             </div>
           </div>
         </div>
@@ -254,16 +254,16 @@ function showEnVivoModal(liveClassId) {
         <div class="min-w-0 flex flex-col gap-3">
           <div class="rounded-[16px] bg-white border border-slate-200 overflow-hidden flex flex-col h-[520px]">
             <div class="flex border-b border-slate-100">
-              <button onclick="switchEnVivoTab('chat')" id="tab-chat" class="flex-1 h-11 text-[12px] font-medium border-b-2 border-[#0a2540] text-[#0a2540] bg-[#f8fafc]">Chat</button>
-              <button onclick="switchEnVivoTab('foro')" id="tab-foro" class="flex-1 h-11 text-[12px] font-medium border-b-2 border-transparent text-slate-500">Foro</button>
-              <button onclick="switchEnVivoTab('notas')" id="tab-notas" class="flex-1 h-11 text-[12px] font-medium border-b-2 border-transparent text-slate-500">Notas</button>
+              <button data-bx-click="a644" id="tab-chat" class="flex-1 h-11 text-[12px] font-medium border-b-2 border-[#0a2540] text-[#0a2540] bg-[#f8fafc]">Chat</button>
+              <button data-bx-click="a645" id="tab-foro" class="flex-1 h-11 text-[12px] font-medium border-b-2 border-transparent text-slate-500">Foro</button>
+              <button data-bx-click="a646" id="tab-notas" class="flex-1 h-11 text-[12px] font-medium border-b-2 border-transparent text-slate-500">Notas</button>
             </div>
             <div class="flex-1 overflow-auto p-3 space-y-2" id="en-vivo-tab-content">
               <div class="h-[360px] grid place-items-center text-[12px] text-slate-400">Sin mensajes aún</div>
             </div>
             <div class="p-3 border-t border-slate-100 flex gap-2">
-              <input id="en-vivo-input" placeholder="Escribe un mensaje..." class="flex-1 h-10 px-3 rounded-xl bg-[#f8fafc] border border-slate-200 text-[13px] outline-none" onkeydown="if(event.key==='Enter') sendEnVivoChat()">
-              <button onclick="sendEnVivoChat()" class="h-10 px-4 rounded-xl bg-[#0a2540] text-white text-[13px]">Enviar</button>
+              <input id="en-vivo-input" placeholder="Escribe un mensaje..." class="flex-1 h-10 px-3 rounded-xl bg-[#f8fafc] border border-slate-200 text-[13px] outline-none" data-bx-keydown="a647">
+              <button data-bx-click="a648" class="h-10 px-4 rounded-xl bg-[#0a2540] text-white text-[13px]">Enviar</button>
             </div>
           </div>
           
@@ -310,9 +310,9 @@ function switchEnVivoTab(tab) {
   if (tab==='chat') {
     content.innerHTML = enVivoState.chatMsgs.length ? enVivoState.chatMsgs.map(m=>`<div class="flex gap-2"><div class="h-6 w-6 rounded-full bg-[#0a2540] text-white grid place-items-center text-[10px] font-bold">${m.author[0]}</div><div><div class="text-[12px] font-semibold">${m.author} <span class="text-[10px] text-slate-400">${m.time}</span></div><div class="text-[12px]">${m.text}</div></div></div>`).join('') : '<div class="h-[360px] grid place-items-center text-[12px] text-slate-400">Sin mensajes aún</div>';
   } else if (tab==='foro') {
-    content.innerHTML = '<div class="space-y-2"><input id="foro-q" placeholder="Escribe tu duda..." class="w-full h-10 px-3 rounded-xl bg-[#f8fafc] border border-slate-200 text-[13px]"><button onclick="sendForoQ()" class="w-full h-9 rounded-full bg-[#0a2540] text-white text-[12px] mt-2">Publicar duda</button><div class="mt-3 space-y-2">'+(enVivoState.forumQs.map(q=>`<div class="p-3 rounded-xl bg-[#f8fafc] border border-slate-100"><div class="text-[12px] font-semibold">${q.author}</div><div class="text-[13px] mt-1">${q.text}</div></div>`).join('') || '<div class="text-[12px] text-slate-400 text-center py-8">Sin dudas aún</div>')+'</div></div>';
+    content.innerHTML = '<div class="space-y-2"><input id="foro-q" placeholder="Escribe tu duda..." class="w-full h-10 px-3 rounded-xl bg-[#f8fafc] border border-slate-200 text-[13px]"><button data-bx-click="a649" class="w-full h-9 rounded-full bg-[#0a2540] text-white text-[12px] mt-2">Publicar duda</button><div class="mt-3 space-y-2">'+(enVivoState.forumQs.map(q=>`<div class="p-3 rounded-xl bg-[#f8fafc] border border-slate-100"><div class="text-[12px] font-semibold">${q.author}</div><div class="text-[13px] mt-1">${q.text}</div></div>`).join('') || '<div class="text-[12px] text-slate-400 text-center py-8">Sin dudas aún</div>')+'</div></div>';
   } else if (tab==='notas') {
-    content.innerHTML = '<div class="space-y-2"><textarea id="nota-text" placeholder="Escribe una nota..." class="w-full h-20 p-3 rounded-xl bg-[#f8fafc] border border-slate-200 text-[13px]"></textarea><button onclick="saveNota()" class="w-full h-9 rounded-full bg-[#0a2540] text-white text-[12px]">Guardar nota</button><div class="mt-3 space-y-2">'+(enVivoState.notes.map(n=>`<div class="p-3 rounded-xl bg-[#fffbeb] border border-amber-200"><div class="text-[12px]">${n.text}</div><div class="text-[10px] text-slate-400">${n.time}</div></div>`).join('') || '<div class="text-[12px] text-slate-400 text-center py-8">Sin notas aún</div>')+'</div></div>';
+    content.innerHTML = '<div class="space-y-2"><textarea id="nota-text" placeholder="Escribe una nota..." class="w-full h-20 p-3 rounded-xl bg-[#f8fafc] border border-slate-200 text-[13px]"></textarea><button data-bx-click="a650" class="w-full h-9 rounded-full bg-[#0a2540] text-white text-[12px]">Guardar nota</button><div class="mt-3 space-y-2">'+(enVivoState.notes.map(n=>`<div class="p-3 rounded-xl bg-[#fffbeb] border border-amber-200"><div class="text-[12px]">${n.text}</div><div class="text-[10px] text-slate-400">${n.time}</div></div>`).join('') || '<div class="text-[12px] text-slate-400 text-center py-8">Sin notas aún</div>')+'</div></div>';
   }
 }
 
@@ -436,7 +436,7 @@ window.renderLiveClasses = function() {
             <p class="text-xs opacity-80">YouTube style: tú transmites, los demás solo ven. Sin pedir cámara a participantes.</p>
           </div>
         </div>
-        <button onclick="initEnVivoStudio('nueva')" class="px-4 py-2.5 bg-[#c9a86a] text-[#0a2540] rounded-lg font-semibold hover:bg-[#b8945a]">Iniciar transmisión</button>
+        <button data-bx-click="a651" class="px-4 py-2.5 bg-[#c9a86a] text-[#0a2540] rounded-lg font-semibold hover:bg-[#b8945a]">Iniciar transmisión</button>
       </div>
     `;
   } else {
@@ -452,7 +452,7 @@ window.renderLiveClasses = function() {
             <p class="text-xs opacity-90">Eres ${currentUser.role} - Solo ves, no necesitas cámara. ${tieneEnVivo ? 'Hay transmisión activa ahora' : 'Cuando Capacitación inicie, aparecerá aquí'}</p>
           </div>
         </div>
-        <button onclick="initEnVivoStudio('demo-en-vivo-001')" class="px-4 py-2.5 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 flex items-center gap-2"><i class="fas fa-eye"></i> Entrar a sala nueva</button>
+        <button data-bx-click="a652" class="px-4 py-2.5 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 flex items-center gap-2"><i class="fas fa-eye"></i> Entrar a sala nueva</button>
       </div>
     `;
   }

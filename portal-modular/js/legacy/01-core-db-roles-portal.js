@@ -44,7 +44,10 @@
             notifications: []
         ,
             settings: {
-                logo: "https://i.ibb.co/0jQ3ZqX/guia-logo.png",
+                /* Logo por defecto LOCAL: antes apuntaba a un PNG alojado en i.ibb.co
+                 * que ya devuelve 404 — el portal pedía un archivo muerto en cada
+                 * carga (error en consola y logo roto en login/sidebar). */
+                logo: "img/logo-icon-192.png",
                 institutionName: "Broker Booster",
                 primaryColor: "#0a2540",
                 primaryDark: "#081c30",
@@ -274,6 +277,15 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (!Array.isArray(db.convenciones)) db.convenciones = [];
             if (!db.settings || typeof db.settings !== 'object') db.settings = JSON.parse(JSON.stringify(defaultDB.settings));
             if (!db.settings.logo) db.settings.logo = defaultDB.settings.logo;
+            /* Logos MUERTOS heredados de versiones anteriores: navegadores con
+             * localStorage viejo (o filas ya guardadas antes de este cambio)
+             * seguían pidiendo URLs que hoy responden 404 — y las volvían a
+             * subir al servidor. Se limpian al cargar: logo de marca → icono
+             * local; logos de aseguradoras → sin URL (se pinta el nombre). */
+            if (typeof db.settings.logo === 'string' && db.settings.logo.indexOf('i.ibb.co/0jQ3ZqX') !== -1) db.settings.logo = defaultDB.settings.logo;
+            if (Array.isArray(db.settings.aseguradoras)) db.settings.aseguradoras.forEach(function(a){
+                if (a && typeof a.logo === 'string' && /upload\.wikimedia\.org|planseguro\.com\.mx|qualitas\.com\.mx\/images/.test(a.logo)) a.logo = '';
+            });
             if (!db.settings.institutionName) db.settings.institutionName = defaultDB.settings.institutionName;
             if (!db.settings.primaryColor) db.settings.primaryColor = defaultDB.settings.primaryColor;
             if (!db.settings.portalContent) db.settings.portalContent = JSON.parse(JSON.stringify(defaultDB.settings.portalContent));
@@ -682,7 +694,7 @@ function renderCaminosCards(){
       '<h3 class="text-2xl font-bold mb-3">'+psEscape(c.titulo)+'</h3>'+
       '<p class="'+descCls+' mb-6">'+psEscape(c.desc)+'</p>'+
       '<ul class="space-y-2.5 mb-8 text-sm">'+items+'</ul>'+
-      '<button onclick="openSolicitudModal(\''+(((db.settings.caminos||{}).ctas)&&(db.settings.caminos.ctas[c.origen||'cero'])?c.origen:(c.origen||'cero'))+'\')" class="w-full py-3 font-semibold '+btnCls+'">'+psEscape(c.cta)+'</button>'+
+      '<button ' + bxOn('click','openSolicitudModal',[(((db.settings.caminos||{}).ctas)&&(db.settings.caminos.ctas[c.origen||'cero'])?c.origen:(c.origen||'cero'))]) + ' class="w-full py-3 font-semibold '+btnCls+'">'+psEscape(c.cta)+'</button>'+
       '</div>';
   }).join('');
 }
@@ -714,10 +726,10 @@ function pubAbrirComparador(tipo){
         const items = auPublicas().filter(u => ids.includes(u.id));
         if(!items.length) return;
         showModal(`<div class="p-6 max-w-4xl w-full">
-            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Unidades Automotrices (#10)</h3><button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
+            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Unidades Automotrices (#10)</h3><button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
             <div class="grid ${gridCols3(items.length)} gap-4">
                 ${items.map(u => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
-                    ${(u.fotos||[])[0]?`<img src="${u.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
+                    ${(u.fotos||[])[0]?`<img loading="lazy" decoding="async" src="${u.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
                     <h4 class="font-bold text-slate-900">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h4>
                     <p class="text-xl font-black text-emerald-700 my-1">$${Number(u.precio||0).toLocaleString('es-MX')}</p>
                     <div class="text-xs text-slate-600 space-y-1 mt-2 border-t pt-2">
@@ -735,10 +747,10 @@ function pubAbrirComparador(tipo){
         const items = inmPubLista().filter(p => ids.includes(p.id));
         if(!items.length) return;
         showModal(`<div class="p-6 max-w-4xl w-full">
-            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Propiedades (#10)</h3><button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
+            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Propiedades (#10)</h3><button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
             <div class="grid ${gridCols3(items.length)} gap-4">
                 ${items.map(p => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
-                    ${(p.fotos||[])[0]?`<img src="${p.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
+                    ${(p.fotos||[])[0]?`<img loading="lazy" decoding="async" src="${p.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
                     <h4 class="font-bold text-slate-900">${psEscape(p.titulo||'Propiedad')}</h4>
                     <p class="text-xl font-black text-emerald-700 my-1">${p.precio?'$'+Number(p.precio).toLocaleString('es-MX'):'A consultar'}</p>
                     <div class="text-xs text-slate-600 space-y-1 mt-2 border-t pt-2">
@@ -770,34 +782,34 @@ function auVerAuto(id){
     p.innerHTML = `<div class="bg-slate-50 min-h-screen text-slate-800">
         <header class="sticky top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
             <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
-                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" onclick="irAUtos()" alt="Inicio">
+                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" data-bx-click="a4" alt="Inicio">
                 <div class="flex items-center gap-2">
-                    ${tieneSesion?`<button onclick="window._forceApp=true; try{history.replaceState(null,'',location.pathname);}catch(e){} checkSession();" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"><i class="fas fa-gauge-high mr-1"></i>Volver al portal</button>`:''}
-                    <button onclick="irAUtos()" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más autos</button>
+                    ${tieneSesion?`<button data-bx-click="a5" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"><i class="fas fa-gauge-high mr-1"></i>Volver al portal</button>`:''}
+                    <button data-bx-click="a4" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más autos</button>
                 </div>
             </div>
         </header>
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-                <button onclick="irAUtos()" class="text-sm text-slate-500 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
+                <button data-bx-click="a4" class="text-sm text-slate-500 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
                 <div class="flex items-center gap-2">
-                    <button onclick="auCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
-                    <button onclick="auWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
-                    <button onclick="auExportarFichaPDF(${u.id})" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold"><i class="fas fa-file-pdf mr-1"></i>Descargar Ficha PDF</button>
-                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir</button>
+                    <button data-bx-click="a6" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
+                    <button data-bx-click="a7" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
+                    <button data-bx-click="a8" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold"><i class="fas fa-file-pdf mr-1"></i>Descargar Ficha PDF</button>
+                    <button data-bx-click="a9" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir</button>
                 </div>
             </div>
             <div class="grid lg:grid-cols-5 gap-8">
                 <div class="lg:col-span-3">
                     <div class="relative rounded-2xl overflow-hidden border bg-slate-50">
-                        ${fotos[0]?`<img id="au-pag-principal" src="${fotos[0]}" class="w-full h-80 sm:h-96 object-cover">`:`<div class="w-full h-80 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-5xl"></i></div>`}
+                        ${fotos[0]?`<img loading="lazy" decoding="async" id="au-pag-principal" src="${fotos[0]}" class="w-full h-80 sm:h-96 object-cover">`:`<div class="w-full h-80 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-5xl"></i></div>`}
                         ${fotos.length>1?`
-                            <button type="button" onclick="auPagGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left"></i></button>
-                            <button type="button" onclick="auPagGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right"></i></button>
+                            <button type="button" data-bx-click="a10" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left"></i></button>
+                            <button type="button" data-bx-click="a11" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right"></i></button>
                             <span id="au-pag-counter" class="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/65 text-white text-xs font-semibold">1 / ${fotos.length}</span>
                         `:''}
                     </div>
-                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" data-idx="${i}" onclick="auPagGalGo(${i})" class="au-pag-thumb w-24 h-16 object-cover rounded-xl border cursor-pointer shrink-0 ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
+                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img loading="lazy" decoding="async" src="${f}" data-idx="${i}" data-bx-click="a12" data-p0="${bxE(function(){return i})}" class="au-pag-thumb w-24 h-16 object-cover rounded-xl border cursor-pointer shrink-0 ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
                         ${mini('fa-road', u.km?Number(u.km).toLocaleString('es-MX')+' km':'')}
                         ${mini('fa-gears', u.transmision)}
@@ -833,7 +845,7 @@ function auVerAuto(id){
                         <div class="grid grid-cols-2 gap-2.5 text-xs">
                             <div>
                                 <label class="text-[11px] font-semibold text-slate-500">Enganche (%)</label>
-                                <select id="au-fin-eng" onchange="auRecalcFin(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                <select id="au-fin-eng" data-bx-change="a13" data-p0="${bxE(function(){return Number(u.precio||0)})}" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
                                     <option value="20">20% ($${Math.round(Number(u.precio||0)*0.20).toLocaleString('es-MX')})</option>
                                     <option value="30" selected>30% ($${Math.round(Number(u.precio||0)*0.30).toLocaleString('es-MX')})</option>
                                     <option value="40">40% ($${Math.round(Number(u.precio||0)*0.40).toLocaleString('es-MX')})</option>
@@ -842,7 +854,7 @@ function auVerAuto(id){
                             </div>
                             <div>
                                 <label class="text-[11px] font-semibold text-slate-500">Plazo (Meses)</label>
-                                <select id="au-fin-plazo" onchange="auRecalcFin(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                <select id="au-fin-plazo" data-bx-change="a13" data-p0="${bxE(function(){return Number(u.precio||0)})}" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
                                     <option value="12">12 meses</option>
                                     <option value="24">24 meses</option>
                                     <option value="36">36 meses</option>
@@ -853,7 +865,7 @@ function auVerAuto(id){
                         </div>
                         <div id="au-fin-res" class="mt-3 p-3 rounded-xl bg-slate-900 text-white grid grid-cols-2 gap-2 text-center"></div>
                     </div>
-                    ${est!=='Vendida'?`<button onclick="auMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa este auto'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Unidad vendida</div>`}
+                    ${est!=='Vendida'?`<button data-bx-click="a14" data-p0="${bxE(function(){return u.id})}" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa este auto'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Unidad vendida</div>`}
                     <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor de la agencia ${psEscape(u.sucursal||'')} te contacta hoy.</p>
                 </div>
             </div>
@@ -861,8 +873,8 @@ function auVerAuto(id){
                 <h3 class="font-bold text-slate-900 mb-4"><i class="fas fa-car mr-2 text-emerald-700"></i>También te puede interesar</h3>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     ${auPublicas().filter(x=>x.id!==u.id).slice(0,4).map(x=>`
-                        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition" onclick="auVerAuto(${x.id})">
-                            ${(x.fotos||[])[0]?`<img src="${x.fotos[0]}" class="w-full h-28 object-cover">`:`<div class="w-full h-28 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-2xl"></i></div>`}
+                        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition" data-bx-click="a15" data-p0="${bxE(function(){return x.id})}">
+                            ${(x.fotos||[])[0]?`<img loading="lazy" decoding="async" src="${x.fotos[0]}" class="w-full h-28 object-cover">`:`<div class="w-full h-28 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-2xl"></i></div>`}
                             <div class="p-3"><p class="text-xs text-slate-400 uppercase">${psEscape(x.marca||'')} ${psEscape(String(x.anio||''))}</p><p class="font-bold text-sm">${psEscape(x.modelo||'')}</p><p class="text-sm font-black text-emerald-700">$${Number(x.precio||0).toLocaleString('es-MX')}</p></div>
                         </div>`).join('')}
                 </div>
@@ -934,10 +946,10 @@ function auVitrinaFicha(id){
                 <h3 class="text-2xl font-bold">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
                 <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}</p>
             </div>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
-        ${fotos[0]?`<img id="au-vit-principal" src="${fotos[0]}" class="w-full h-72 object-cover rounded-xl border bg-slate-50">`:''}
-        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img src="${f}" onclick="document.getElementById('au-vit-principal').src=this.src" class="w-24 h-16 object-cover rounded-lg border cursor-pointer ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
+        ${fotos[0]?`<img loading="lazy" decoding="async" id="au-vit-principal" src="${fotos[0]}" class="w-full h-72 object-cover rounded-xl border bg-slate-50">`:''}
+        ${fotos.length>1?`<div class="flex gap-2 mt-2 overflow-x-auto pb-1">${fotos.map((f,i)=>`<img loading="lazy" decoding="async" src="${f}" data-bx-click="a16" class="w-24 h-16 object-cover rounded-lg border cursor-pointer ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`).join('')}</div>`:''}
         <div class="flex items-baseline gap-3 mt-4"><p class="text-3xl font-black text-emerald-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>${desc>0?`<p class="text-lg text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}</div>
         <div class="grid md:grid-cols-2 gap-x-8 mt-3">
             <div>
@@ -956,7 +968,7 @@ function auVitrinaFicha(id){
             </div>
         </div>
         ${u.descripcion?`<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700 mt-3"><b>Equipamiento:</b> ${psEscape(u.descripcion)}</div>`:''}
-        <button onclick="auMeInteresa(${u.id})" class="w-full mt-4 py-3.5 bg-emerald-700 text-white rounded-xl font-bold hover:bg-emerald-800 transition text-lg"><i class="fab fa-whatsapp mr-2"></i>Me interesa este auto</button>
+        <button data-bx-click="a14" data-p0="${bxE(function(){return u.id})}" class="w-full mt-4 py-3.5 bg-emerald-700 text-white rounded-xl font-bold hover:bg-emerald-800 transition text-lg"><i class="fab fa-whatsapp mr-2"></i>Me interesa este auto</button>
         <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor te contacta para agendar prueba de manejo.</p>
     </div>`);
 }
@@ -975,7 +987,7 @@ function auMeInteresa(id){
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Comentario (opcional)</label><textarea id="au-pros-nota" rows="2" placeholder="Ej. me interesa probarlo el sábado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea></div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"><i class="fab fa-whatsapp mr-1"></i> Enviar solicitud</button>
         </div>
     </form>`);
@@ -999,7 +1011,7 @@ function auGuardarProspecto(id){
         <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fas fa-check text-emerald-700 text-2xl"></i></div>
         <h3 class="text-xl font-bold mb-1">¡Solicitud enviada!</h3>
         <p class="text-sm text-slate-500 mb-4">Gracias ${psEscape(nombre)}. Un asesor de la agencia ${psEscape(u&&u.sucursal||'')} te contactará por WhatsApp al ${psEscape(tel)} para agendar tu prueba de manejo del ${psEscape(u?(u.marca+' '+u.modelo):'')}.</p>
-        <button onclick="closeModal()" class="px-6 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800">Entendido</button>
+        <button data-bx-click="a1" class="px-6 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800">Entendido</button>
     </div>`);
 }
 function inmPubD(){
@@ -1061,8 +1073,8 @@ function pubAutosPagina(){
         const desc = u.precioLista && u.precioLista>u.precio ? Math.round((1-u.precio/u.precioLista)*100) : 0;
         const fotos = (u.fotos||[]);
         return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition group">
-            <div class="relative cursor-pointer" onclick="auVerAuto(${u.id})">
-                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-52 object-cover group-hover:scale-[1.03] transition">`:`<div class="w-full h-52 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
+            <div class="relative cursor-pointer" data-bx-click="a17" data-p0="${bxE(function(){return u.id})}">
+                ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-full h-52 object-cover group-hover:scale-[1.03] transition">`:`<div class="w-full h-52 bg-slate-100 flex items-center justify-center"><i class="fas fa-car-side text-slate-300 text-4xl"></i></div>`}
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(u.estado||'Disponible')}${auOrigenBadge(u.origen||'Mexicano')}${desc>0?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white">-${desc}%</span>`:''}</div>
                 ${fotos.length>1?`<span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px]"><i class="fas fa-camera mr-1"></i>${fotos.length}</span>`:''}
             </div>
@@ -1072,8 +1084,8 @@ function pubAutosPagina(){
                 <div class="flex items-baseline gap-2"><p class="text-xl font-black text-emerald-700">$${Number(u.precio||0).toLocaleString('es-MX')}</p>${desc>0?`<p class="text-xs text-slate-400 line-through">$${Number(u.precioLista).toLocaleString('es-MX')}</p>`:''}</div>
                 <p class="text-xs text-slate-500 mt-1"><i class="fas fa-location-dot mr-1"></i>${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}${u.km?' · '+Number(u.km).toLocaleString('es-MX')+' km':''}</p>
                 <div class="flex gap-2 mt-3">
-                    <button onclick="auVerAuto(${u.id})" class="flex-1 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition text-sm"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
-                    <button onclick="pubToggleCompare('auto', ${u.id})" class="px-3 py-2.5 rounded-xl border ${(window._pubCompAutos||[]).includes(u.id)?'bg-amber-500 text-white border-amber-500':'border-slate-300 text-slate-600 hover:bg-slate-50'} text-xs font-semibold" title="Comparar unidad (#10)"><i class="fas fa-scale-balanced"></i></button>
+                    <button data-bx-click="a17" data-p0="${bxE(function(){return u.id})}" class="flex-1 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition text-sm"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
+                    <button data-bx-click="a18" data-p0="${bxE(function(){return u.id})}" class="px-3 py-2.5 rounded-xl border ${(window._pubCompAutos||[]).includes(u.id)?'bg-amber-500 text-white border-amber-500':'border-slate-300 text-slate-600 hover:bg-slate-50'} text-xs font-semibold" title="Comparar unidad (#10)"><i class="fas fa-scale-balanced"></i></button>
                 </div>
             </div>
         </div>`;
@@ -1081,15 +1093,15 @@ function pubAutosPagina(){
     return `<div class="bg-slate-50 min-h-screen">
         <header class="sticky top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" onclick="pubSetView('')" alt="Inicio">
+                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" data-bx-click="a19" alt="Inicio">
                 <div class="flex items-center gap-3">
-                    <button onclick="pubSetView('')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg"><i class="fas fa-arrow-left mr-1"></i> Inicio</button>
-                    <button onclick="openSolicitudModal('aplicar')" class="px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
+                    <button data-bx-click="a19" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg"><i class="fas fa-arrow-left mr-1"></i> Inicio</button>
+                    <button data-bx-click="a20" class="px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
                 </div>
             </div>
         </header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <button onclick="pubSetView('')" class="text-sm text-slate-500 hover:text-emerald-700 mb-5"><i class="fas fa-arrow-left mr-1"></i> Volver al inicio</button>
+            <button data-bx-click="a19" class="text-sm text-slate-500 hover:text-emerald-700 mb-5"><i class="fas fa-arrow-left mr-1"></i> Volver al inicio</button>
             <div class="flex items-end justify-between flex-wrap gap-4 mb-8">
                 <div>
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium mb-3"><i class="fas fa-car-side"></i> Agencia Automotriz</div>
@@ -1101,18 +1113,18 @@ function pubAutosPagina(){
             <div class="flex flex-wrap gap-2 mb-6">
                 <div class="relative">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input value="${psEscape(window.vitQ||'')}" oninput="window.vitQ=this.value;renderPublicPortal();vitScroll()" placeholder="Buscar marca o modelo..." class="w-56 pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+                    <input value="${psEscape(window.vitQ||'')}" data-bx-input="a21" placeholder="Buscar marca o modelo..." class="w-56 pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
                 </div>
-                <select onchange="window.vitMarca=this.value;renderPublicPortal();vitScroll()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las marcas</option>${marcas.map(function(m){ return '<option '+(fMarca===m?'selected':'')+'>'+psEscape(m)+'</option>'; }).join('')}</select>
-                <select onchange="window.vitOrig=this.value;renderPublicPortal();vitScroll()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Origen</option><option ${fOrig==='Mexicano'?'selected':''}>Mexicano</option><option ${fOrig==='Americano'?'selected':''}>Americano</option><option ${fOrig==='Legalizado'?'selected':''}>Legalizado</option></select>
-                ${(fQ||fMarca||fOrig)?`<button onclick="window.vitQ='';window.vitMarca='';window.vitOrig='';renderPublicPortal();vitScroll()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
-                ${(window._pubCompAutos||[]).length ? `<button onclick="pubAbrirComparador('auto')" class="px-4 py-2.5 bg-slate-900 text-amber-300 rounded-xl text-sm font-bold shadow"><i class="fas fa-scale-balanced mr-1.5"></i>Comparar (${window._pubCompAutos.length})</button>` : ''}
+                <select data-bx-change="a22" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las marcas</option>${marcas.map(function(m){ return '<option '+(fMarca===m?'selected':'')+'>'+psEscape(m)+'</option>'; }).join('')}</select>
+                <select data-bx-change="a23" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Origen</option><option ${fOrig==='Mexicano'?'selected':''}>Mexicano</option><option ${fOrig==='Americano'?'selected':''}>Americano</option><option ${fOrig==='Legalizado'?'selected':''}>Legalizado</option></select>
+                ${(fQ||fMarca||fOrig)?`<button data-bx-click="a24" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
+                ${(window._pubCompAutos||[]).length ? `<button data-bx-click="a25" class="px-4 py-2.5 bg-slate-900 text-amber-300 rounded-xl text-sm font-bold shadow"><i class="fas fa-scale-balanced mr-1.5"></i>Comparar (${window._pubCompAutos.length})</button>` : ''}
             </div>
             <div id="au-cat-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 ${l.map(function(u){ return card(u); }).join('') || '<p class="text-slate-400 col-span-full text-center bg-white border border-slate-200 rounded-2xl p-10">Por el momento no hay autos publicados. Vuelve pronto.</p>'}
             </div>
         </div>
-        <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-7xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Agencia Automotriz · <a href="#" onclick="pubSetView('props'); return false;" class="hover:text-white">Ver propiedades</a></div></footer>
+        <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-7xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Agencia Automotriz · <a href="#" data-bx-click="a26" class="hover:text-white">Ver propiedades</a></div></footer>
     </div>`;
 }
 function pubPropsPagina(){
@@ -1127,8 +1139,8 @@ function pubPropsPagina(){
         const fotos = (p.fotos||[]);
         const est = inmEstadoProp(p);
         return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition group">
-            <div class="relative cursor-pointer" onclick="inmVerProp(${p.id})">
-                ${fotos[0]?`<img src="${fotos[0]}" class="w-full h-52 object-cover group-hover:scale-[1.03] transition">`:`<div class="w-full h-52 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-4xl"></i></div>`}
+            <div class="relative cursor-pointer" data-bx-click="a27" data-p0="${bxE(function(){return p.id})}">
+                ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-full h-52 object-cover group-hover:scale-[1.03] transition">`:`<div class="w-full h-52 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-4xl"></i></div>`}
                 <div class="absolute top-2 left-2 flex flex-wrap gap-1">${auEstadoBadge(est)}${inmPBadge(p.tipo||'Venta')}${p.inmuebleTipo?`<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900/75 text-white">${psEscape(p.inmuebleTipo)}</span>`:''}</div>
                 ${fotos.length>1?`<span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px]"><i class="fas fa-camera mr-1"></i>${fotos.length}</span>`:''}
             </div>
@@ -1142,8 +1154,8 @@ function pubPropsPagina(){
                     ${p.m2?`<span><i class="fas fa-ruler-combined mr-1"></i>${p.m2} m²</span>`:''}
                 </div>
                 <div class="flex gap-2 mt-3">
-                    <button onclick="inmVerProp(${p.id})" class="flex-1 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition text-sm"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
-                    <button onclick="pubToggleCompare('prop', ${p.id})" class="px-3 py-2.5 rounded-xl border ${(window._pubCompProps||[]).includes(p.id)?'bg-amber-500 text-white border-amber-500':'border-slate-300 text-slate-600 hover:bg-slate-50'} text-xs font-semibold" title="Comparar propiedad (#10)"><i class="fas fa-scale-balanced"></i></button>
+                    <button data-bx-click="a27" data-p0="${bxE(function(){return p.id})}" class="flex-1 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800 transition text-sm"><i class="fas fa-eye mr-1"></i> Ver detalle</button>
+                    <button data-bx-click="a28" data-p0="${bxE(function(){return p.id})}" class="px-3 py-2.5 rounded-xl border ${(window._pubCompProps||[]).includes(p.id)?'bg-amber-500 text-white border-amber-500':'border-slate-300 text-slate-600 hover:bg-slate-50'} text-xs font-semibold" title="Comparar propiedad (#10)"><i class="fas fa-scale-balanced"></i></button>
                 </div>
             </div>
         </div>`;
@@ -1151,15 +1163,15 @@ function pubPropsPagina(){
     return `<div class="bg-slate-50 min-h-screen">
         <header class="sticky top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" onclick="pubSetView('')" alt="Inicio">
+                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" data-bx-click="a19" alt="Inicio">
                 <div class="flex items-center gap-3">
-                    <button onclick="pubSetView('')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg"><i class="fas fa-arrow-left mr-1"></i> Inicio</button>
-                    <button onclick="openSolicitudModal('aplicar')" class="px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
+                    <button data-bx-click="a19" class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-emerald-700 border border-slate-200 rounded-lg"><i class="fas fa-arrow-left mr-1"></i> Inicio</button>
+                    <button data-bx-click="a20" class="px-4 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-xl hover:bg-emerald-800 transition">Quiero aplicar</button>
                 </div>
             </div>
         </header>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <button onclick="pubSetView('')" class="text-sm text-slate-500 hover:text-emerald-700 mb-5"><i class="fas fa-arrow-left mr-1"></i> Volver al inicio</button>
+            <button data-bx-click="a19" class="text-sm text-slate-500 hover:text-emerald-700 mb-5"><i class="fas fa-arrow-left mr-1"></i> Volver al inicio</button>
             <div class="flex items-end justify-between flex-wrap gap-4 mb-8">
                 <div>
                     <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium mb-3"><i class="fas fa-house"></i> Bienes Raíces</div>
@@ -1171,17 +1183,17 @@ function pubPropsPagina(){
             <div class="flex flex-wrap gap-2 mb-6">
                 <div class="relative">
                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input value="${psEscape(window.inmVitQ||'')}" oninput="window.inmVitQ=this.value;renderPublicPortal()" placeholder="Buscar por título, colonia o ciudad..." class="w-64 pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
+                    <input value="${psEscape(window.inmVitQ||'')}" data-bx-input="a29" placeholder="Buscar por título, colonia o ciudad..." class="w-64 pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">
                 </div>
-                <select onchange="window.inmVitTipo=this.value;renderPublicPortal()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las operaciones</option><option ${fTipo==='Venta'?'selected':''}>Venta</option><option ${fTipo==='Renta'?'selected':''}>Renta</option><option ${fTipo==='Preventa'?'selected':''}>Preventa</option></select>
-                ${(fQ||fTipo)?`<button onclick="window.inmVitQ='';window.inmVitTipo='';renderPublicPortal()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
-                ${(window._pubCompProps||[]).length ? `<button onclick="pubAbrirComparador('prop')" class="px-4 py-2.5 bg-slate-900 text-amber-300 rounded-xl text-sm font-bold shadow"><i class="fas fa-scale-balanced mr-1.5"></i>Comparar (${window._pubCompProps.length})</button>` : ''}
+                <select data-bx-change="a30" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"><option value="">Todas las operaciones</option><option ${fTipo==='Venta'?'selected':''}>Venta</option><option ${fTipo==='Renta'?'selected':''}>Renta</option><option ${fTipo==='Preventa'?'selected':''}>Preventa</option></select>
+                ${(fQ||fTipo)?`<button data-bx-click="a31" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm hover:bg-white"><i class="fas fa-eraser mr-1"></i>Limpiar</button>`:''}
+                ${(window._pubCompProps||[]).length ? `<button data-bx-click="a32" class="px-4 py-2.5 bg-slate-900 text-amber-300 rounded-xl text-sm font-bold shadow"><i class="fas fa-scale-balanced mr-1.5"></i>Comparar (${window._pubCompProps.length})</button>` : ''}
             </div>
             <div id="inm-cat-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 ${l.map(function(p){ return card(p); }).join('') || '<p class="text-slate-400 col-span-full text-center bg-white border border-slate-200 rounded-2xl p-10">Por el momento no hay propiedades publicadas. Vuelve pronto.</p>'}
             </div>
         </div>
-        <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-7xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Propiedades · <a href="#" onclick="pubSetView('autos'); return false;" class="hover:text-white">Ver autos en venta</a></div></footer>
+        <footer class="py-6 bg-slate-950 text-slate-500 text-sm mt-8"><div class="max-w-7xl mx-auto px-4">© 2026 ${db.settings.institutionName} — Propiedades · <a href="#" data-bx-click="a33" class="hover:text-white">Ver autos en venta</a></div></footer>
     </div>`;
 }
 function inmVerProp(id){
@@ -1199,34 +1211,34 @@ function inmVerProp(id){
     p.innerHTML = `<div class="bg-slate-50 min-h-screen text-slate-800">
         <header class="sticky top-0 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200 z-50">
             <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
-                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" onclick="pubSetView('')" alt="Inicio">
+                <img src="${db.settings.logo}" class="h-9 w-auto cursor-pointer" data-bx-click="a19" alt="Inicio">
                 <div class="flex items-center gap-2">
-                    ${tieneSesion?`<button onclick="window._forceApp=true; try{history.replaceState(null,'',location.pathname);}catch(e){} checkSession();" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"><i class="fas fa-gauge-high mr-1"></i>Volver al portal</button>`:''}
-                    <button onclick="pubSetView('props')" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más propiedades</button>
+                    ${tieneSesion?`<button data-bx-click="a5" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"><i class="fas fa-gauge-high mr-1"></i>Volver al portal</button>`:''}
+                    <button data-bx-click="a34" class="text-sm font-medium text-slate-600 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Ver más propiedades</button>
                 </div>
             </div>
         </header>
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-                <button onclick="pubSetView('props')" class="text-sm text-slate-500 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
+                <button data-bx-click="a34" class="text-sm text-slate-500 hover:text-emerald-700"><i class="fas fa-arrow-left mr-1"></i> Volver al catálogo</button>
                 <div class="flex items-center gap-2">
-                    <button onclick="inmCopiarLinkFicha(${u.id})" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
-                    <button onclick="inmWhatsAppFicha(${u.id})" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
-                    <button onclick="inmExportarFichaPDF(${u.id})" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold"><i class="fas fa-file-pdf mr-1"></i>Descargar Ficha PDF</button>
-                    <button onclick="window.print()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir</button>
+                    <button data-bx-click="a35" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-link mr-1 text-indigo-600"></i>Copiar enlace</button>
+                    <button data-bx-click="a36" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"><i class="fab fa-whatsapp mr-1"></i>Compartir WhatsApp</button>
+                    <button data-bx-click="a37" data-p0="${bxE(function(){return u.id})}" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-semibold"><i class="fas fa-file-pdf mr-1"></i>Descargar Ficha PDF</button>
+                    <button data-bx-click="a9" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700"><i class="fas fa-print mr-1"></i>Imprimir</button>
                 </div>
             </div>
             <div class="grid lg:grid-cols-5 gap-8">
                 <div class="lg:col-span-3">
                     <div class="relative rounded-2xl overflow-hidden border bg-slate-50">
-                        ${fotos[0]?`<img id="inm-pag-principal" src="${fotos[0]}" class="w-full h-80 sm:h-96 object-cover">`:`<div class="w-full h-80 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-5xl"></i></div>`}
+                        ${fotos[0]?`<img loading="lazy" decoding="async" id="inm-pag-principal" src="${fotos[0]}" class="w-full h-80 sm:h-96 object-cover">`:`<div class="w-full h-80 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-5xl"></i></div>`}
                         ${fotos.length>1?`
-                            <button type="button" onclick="inmPagGalStep(-1)" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left"></i></button>
-                            <button type="button" onclick="inmPagGalStep(1)" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right"></i></button>
+                            <button type="button" data-bx-click="a38" class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-left"></i></button>
+                            <button type="button" data-bx-click="a39" class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow"><i class="fas fa-chevron-right"></i></button>
                             <span id="inm-pag-counter" class="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-black/65 text-white text-xs font-semibold">1 / ${fotos.length}</span>
                         `:''}
                     </div>
-                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map(function(f,i){ return `<img src="${f}" onclick="inmPagGalGo(${i})" class="inm-pag-thumb w-24 h-16 object-cover rounded-xl border cursor-pointer shrink-0 ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`; }).join('')}</div>`:''}
+                    ${fotos.length>1?`<div class="flex gap-2 mt-3 overflow-x-auto pb-1">${fotos.map(function(f,i){ return `<img loading="lazy" decoding="async" src="${f}" data-bx-click="a40" data-p0="${bxE(function(){return i})}" class="inm-pag-thumb w-24 h-16 object-cover rounded-xl border cursor-pointer shrink-0 ${i===0?'ring-2 ring-emerald-500':''} hover:ring-2 hover:ring-emerald-400 transition">`; }).join('')}</div>`:''}
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
                         ${mini('fa-bed', u.recs?u.recs+' recámaras':'')}
                         ${mini('fa-bath', u.banios?u.banios+' baños':'')}
@@ -1263,7 +1275,7 @@ function inmVerProp(id){
                         <div class="grid grid-cols-2 gap-2.5 text-xs">
                             <div>
                                 <label class="text-[11px] font-semibold text-slate-500">Enganche (%)</label>
-                                <select id="inm-hip-eng" onchange="inmRecalcHip(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                <select id="inm-hip-eng" data-bx-change="a41" data-p0="${bxE(function(){return Number(u.precio||0)})}" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
                                     <option value="10">10% ($${Math.round(Number(u.precio||0)*0.10).toLocaleString('es-MX')})</option>
                                     <option value="20" selected>20% ($${Math.round(Number(u.precio||0)*0.20).toLocaleString('es-MX')})</option>
                                     <option value="30">30% ($${Math.round(Number(u.precio||0)*0.30).toLocaleString('es-MX')})</option>
@@ -1271,7 +1283,7 @@ function inmVerProp(id){
                             </div>
                             <div>
                                 <label class="text-[11px] font-semibold text-slate-500">Plazo Hipoteca</label>
-                                <select id="inm-hip-plazo" onchange="inmRecalcHip(${Number(u.precio||0)})" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
+                                <select id="inm-hip-plazo" data-bx-change="a41" data-p0="${bxE(function(){return Number(u.precio||0)})}" class="w-full mt-0.5 px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-semibold">
                                     <option value="15">15 años</option>
                                     <option value="20" selected>20 años</option>
                                 </select>
@@ -1279,7 +1291,7 @@ function inmVerProp(id){
                         </div>
                         <div id="inm-hip-res" class="mt-3 p-3 rounded-xl bg-slate-900 text-white grid grid-cols-2 gap-2 text-center"></div>
                     </div>` : ''}
-                    ${est!=='Vendida'?`<button onclick="inmMeInteresa(${u.id})" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa esta propiedad'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Propiedad cerrada</div>`}
+                    ${est!=='Vendida'?`<button data-bx-click="a42" data-p0="${bxE(function(){return u.id})}" class="w-full mt-5 py-4 bg-emerald-700 text-white rounded-2xl font-bold hover:bg-emerald-800 transition text-lg shadow-lg"><i class="fab fa-whatsapp mr-2"></i>${est==='Reservada'?'Anotarme en lista de espera':'Me interesa esta propiedad'}</button>`:`<div class="w-full mt-5 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-bold text-center text-sm">Propiedad cerrada</div>`}
                     <p class="text-[11px] text-slate-400 text-center mt-2">Sin compromiso: un asesor te contacta hoy.</p>
                 </div>
             </div>
@@ -1287,8 +1299,8 @@ function inmVerProp(id){
                 <h3 class="font-bold text-slate-900 mb-4"><i class="fas fa-house mr-2 text-emerald-700"></i>También te puede interesar</h3>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     ${inmPubLista().filter(function(x){ return x.id!==u.id; }).slice(0,4).map(function(x){ return `
-                        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition" onclick="inmVerProp(${x.id})">
-                            ${(x.fotos||[])[0]?`<img src="${x.fotos[0]}" class="w-full h-28 object-cover">`:`<div class="w-full h-28 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-2xl"></i></div>`}
+                        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition" data-bx-click="a43" data-p0="${bxE(function(){return x.id})}">
+                            ${(x.fotos||[])[0]?`<img loading="lazy" decoding="async" src="${x.fotos[0]}" class="w-full h-28 object-cover">`:`<div class="w-full h-28 bg-slate-100 flex items-center justify-center"><i class="fas fa-house text-slate-300 text-2xl"></i></div>`}
                             <div class="p-3"><p class="text-xs text-slate-400 uppercase">${psEscape(x.colonia||'')} · ${psEscape(x.ciudad||'')}</p><p class="font-bold text-sm">${psEscape(x.titulo||'Propiedad')}</p><p class="text-sm font-black text-emerald-700">${x.precio?'$'+Number(x.precio).toLocaleString('es-MX'):'A consultar'}</p></div>
                         </div>`; }).join('')}
                 </div>
@@ -1362,7 +1374,7 @@ function inmMeInteresa(id){
             <div><label class="text-sm font-medium text-slate-700 mb-1 block">Mensaje (opcional)</label><textarea id="inm-pros-msj" rows="2" placeholder="Ej. quiero agendar una visita el sábado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></textarea></div>
         </div>
         <div class="flex justify-end gap-3 mt-6">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
+            <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
             <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold"><i class="fab fa-whatsapp mr-1"></i> Enviar solicitud</button>
         </div>
     </form>`);
@@ -1392,7 +1404,7 @@ function inmGuardarProspecto(id){
         <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3"><i class="fas fa-check text-emerald-700 text-2xl"></i></div>
         <h3 class="text-xl font-bold mb-1">¡Solicitud enviada!</h3>
         <p class="text-sm text-slate-500 mb-4">Gracias ${psEscape(nombre)}. Un asesor te contactará por WhatsApp al ${psEscape(tel)} con información de "${psEscape(u.titulo||'la propiedad')}".</p>
-        <button onclick="closeModal()" class="px-6 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800">Entendido</button>
+        <button data-bx-click="a1" class="px-6 py-2.5 bg-emerald-700 text-white rounded-xl font-semibold hover:bg-emerald-800">Entendido</button>
     </div>`);
 }
 
@@ -1418,7 +1430,7 @@ function inmGuardarProspecto(id){
         function privacidadData(){ if(!db.settings.privacidad) db.settings.privacidad=privacidadDefaults(); return db.settings.privacidad; }
         function abrirPrivacidad(){
             const p = privacidadData();
-            showModal(`<div class="max-w-2xl w-full max-h-[80vh] flex flex-col"><div class="p-6 pb-4 border-b border-slate-200 flex items-start justify-between"><div><h3 class="text-xl font-bold text-slate-900">Aviso de Privacidad</h3><p class="text-xs text-slate-500 mt-1">Última actualización: ${psEscape(p.actualizado)} · Broker Booster © 2026 · Todos los derechos reservados</p></div><button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1"><i class="fas fa-times text-lg"></i></button></div><div class="p-6 pt-4 overflow-y-auto whitespace-pre-line text-sm text-slate-700 leading-relaxed">${psEscape(p.texto)}</div><div class="p-4 border-t border-slate-200 flex justify-end"><button onclick="closeModal()" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold">Entendido</button></div></div>`);
+            showModal(`<div class="max-w-2xl w-full max-h-[80vh] flex flex-col"><div class="p-6 pb-4 border-b border-slate-200 flex items-start justify-between"><div><h3 class="text-xl font-bold text-slate-900">Aviso de Privacidad</h3><p class="text-xs text-slate-500 mt-1">Última actualización: ${psEscape(p.actualizado)} · Broker Booster © 2026 · Todos los derechos reservados</p></div><button data-bx-click="a1" class="text-slate-400 hover:text-slate-600 p-1"><i class="fas fa-times text-lg"></i></button></div><div class="p-6 pt-4 overflow-y-auto whitespace-pre-line text-sm text-slate-700 leading-relaxed">${psEscape(p.texto)}</div><div class="p-4 border-t border-slate-200 flex justify-end"><button data-bx-click="a1" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold">Entendido</button></div></div>`);
         }
         function blogPost(id){
             const b = blogData(); const p = (b.posts||[]).find(x=>String(x.id)===String(id)); if(!p) return;
@@ -1512,13 +1524,13 @@ function renderPublicPortal() {
                                 <a href="#blog" data-pub-tab="blog" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Blog</a>
                                 <a href="#proceso" data-pub-tab="proceso" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Proceso</a>
                                 <div class="relative" id="nav-subs">
-                                    <button onclick="var m=document.getElementById('nav-subs-menu'); m.classList.toggle('hidden');" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition flex items-center gap-1">Disponible <i class="fas fa-chevron-down text-[10px]"></i></button>
+                                    <button data-bx-click="a44" class="text-sm font-medium text-slate-600 hover:text-emerald-700 transition flex items-center gap-1">Disponible <i class="fas fa-chevron-down text-[10px]"></i></button>
                                     <div id="nav-subs-menu" class="hidden absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 z-50">
-                                        <button onclick="pubSetView('autos')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition">
+                                        <button data-bx-click="a45" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition">
                                             <span class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center"><i class="fas fa-car-side text-emerald-700"></i></span>
                                             <span><span class="block text-sm font-semibold text-slate-900">Autos en venta</span><span class="block text-[11px] text-slate-500">Inventario de la agencia</span></span>
                                         </button>
-                                        <button onclick="pubSetView('props')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition">
+                                        <button data-bx-click="a34" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition">
                                             <span class="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center"><i class="fas fa-house text-sky-700"></i></span>
                                             <span><span class="block text-sm font-semibold text-slate-900">Propiedades</span><span class="block text-[11px] text-slate-500">Venta, renta y preventa</span></span>
                                         </button>
@@ -1526,9 +1538,9 @@ function renderPublicPortal() {
                                 </div>
                             </nav>
                             <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                                <button onclick="showCampusLogin()" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-[var(--bb-gold-deep)]"></i><span>Campus</span></button>
-                                <button onclick="openSolicitudModal('aplicar')" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-[var(--bb-forest)] text-white font-semibold rounded-xl hover:bg-[var(--bb-emerald)] transition border border-[var(--bb-gold)]"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
-                                <button onclick="showAdminLogin()" title="Acceso administrativo" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg"><i class="fas fa-lock text-[11px]"></i><span class="lg:hidden">Admin</span><span class="hidden lg:inline">Acceso administrativo</span></button>
+                                <button data-bx-click="a46" title="Entrar al Campus" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-300 transition border border-slate-300 rounded-lg"><i class="fas fa-graduation-cap text-[11px] text-[var(--bb-gold-deep)]"></i><span>Campus</span></button>
+                                <button data-bx-click="a20" class="inline-flex items-center shrink-0 px-2.5 py-1.5 sm:px-5 sm:py-2.5 text-xs sm:text-sm bg-[var(--bb-forest)] text-white font-semibold rounded-xl hover:bg-[var(--bb-emerald)] transition border border-[var(--bb-gold)]"><span class="hidden sm:inline">Quiero </span><span>Aplicar</span></button>
+                                <button data-bx-click="a47" title="Acceso administrativo" class="inline-flex items-center shrink-0 gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-700 transition border border-slate-300 rounded-lg"><i class="fas fa-lock text-[11px]"></i><span class="lg:hidden">Admin</span><span class="hidden lg:inline">Acceso administrativo</span></button>
                             </div>
                         </div>
                     </div>
@@ -1545,7 +1557,7 @@ function renderPublicPortal() {
                 <!-- Hero reclutamiento (formal, blanco/verde/negro) -->
                 <section class="pt-16 relative overflow-hidden min-h-[85vh] flex items-center bg-[var(--bb-marble)]">
                     <div class="absolute inset-0">
-                    <img src="${db.settings.hero?.imagenFondo || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2000'}" class="w-full h-full object-cover opacity-25" alt="" onerror="this.style.display='none'">
+                    <img loading="lazy" decoding="async" fetchpriority="high" src="${db.settings.hero?.imagenFondo || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=60&w=1440&fm=webp'}" class="w-full h-full object-cover opacity-25" alt="" data-bx-error="a48">
                         <div class="absolute inset-0 bg-gradient-to-br from-[var(--bb-marble)] via-[var(--bb-marble)]/95 to-[#e9efe9]/80"></div>
                         <div class="absolute inset-0 bg-[radial-gradient(circle_at_85%_40%,rgba(201,168,106,0.22),transparent_45%)]"></div>
                     </div>
@@ -1612,7 +1624,7 @@ function renderPublicPortal() {
                             <p class="text-slate-600 text-lg max-w-3xl mx-auto">${psEscape(servData().subtitulo)}</p>
                         </div>
                         <div class="flex flex-wrap justify-center gap-2 mb-10">
-                            ${servData().grupos.map(g=>`<button data-serv-tab="${g.id}" onclick="servTab('${g.id}')" class="px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${g.id==='fin'?'bg-slate-900 text-white shadow-lg':'bg-slate-100 text-slate-700 hover:bg-slate-200'}"><i class="fas ${g.ico} mr-2"></i>${psEscape(g.n)}</button>`).join('')}
+                            ${servData().grupos.map(g=>`<button data-serv-tab="${g.id}" data-bx-click="a49" data-p0="${bxE(function(){return g.id})}" class="px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${g.id==='fin'?'bg-slate-900 text-white shadow-lg':'bg-slate-100 text-slate-700 hover:bg-slate-200'}"><i class="fas ${g.ico} mr-2"></i>${psEscape(g.n)}</button>`).join('')}
                         </div>
                         ${servData().grupos.map((g,gi)=>`
                         <div data-serv-grupo="${g.id}" class="${gi===0?'':'hidden'}">
@@ -1642,7 +1654,7 @@ function renderPublicPortal() {
                         </div>
                         <div class="grid md:grid-cols-3 gap-6">
                             ${blogData().posts.map(p=>`
-                            <article class="group flex flex-col bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-[var(--bb-gold)] transition-all cursor-pointer" onclick="blogPost('${psEscape(String(p.id))}')">
+                            <article class="group flex flex-col bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-[var(--bb-gold)] transition-all cursor-pointer" data-bx-click="a50" data-p0="${bxE(function(){return psEscape(String(p.id))})}">
                                 <div class="h-2 bg-gradient-to-r from-[var(--bb-gold)] to-[var(--bb-gold-deep)]"></div>
                                 <div class="p-6 flex flex-col flex-1">
                                     <div class="flex items-center gap-2 mb-3">
@@ -1756,7 +1768,7 @@ function renderPublicPortal() {
                                     <h3 class="text-2xl font-bold mb-2">${psEscape(sec.titulo)}</h3>
                                     <p class="${destacado?'text-slate-300':'text-slate-600'} text-sm mb-5">${psEscape(sec.desc)}</p>
                                     <ul class="space-y-2.5 text-sm mb-7">${(sec.puntos||[]).map(p=>`<li class="flex items-start gap-2"><i class="fas fa-check text-emerald-500 mt-0.5"></i><span>${psEscape(p)}</span></li>`).join('')}</ul>
-                                    <button onclick="openSolicitudModal('${psEscape(sec.origen||'general')}')" class="w-full py-3 font-semibold rounded-xl ${destacado?'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg':'border-2 border-slate-900 hover:bg-slate-900 hover:text-white transition'}">${psEscape(sec.cta)}</button>
+                                    <button data-bx-click="a51" data-p0="${bxE(function(){return psEscape(sec.origen||'general')})}" class="w-full py-3 font-semibold rounded-xl ${destacado?'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg':'border-2 border-slate-900 hover:bg-slate-900 hover:text-white transition'}">${psEscape(sec.cta)}</button>
                                 </div>`;
                             }).join('')}
                         </div>
@@ -1785,9 +1797,9 @@ function renderPublicPortal() {
                                         </div>
                                         
                                         <div class="flex gap-2 mt-6">
-                                            <button onclick="setPrima(50000)" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg">Principiante</button>
-                                            <button onclick="setPrima(150000)" class="px-3 py-1.5 text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg">Intermedio</button>
-                                            <button onclick="setPrima(400000)" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg">Top</button>
+                                            <button data-bx-click="a52" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg">Principiante</button>
+                                            <button data-bx-click="a53" class="px-3 py-1.5 text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg">Intermedio</button>
+                                            <button data-bx-click="a54" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 rounded-lg">Top</button>
                                         </div>
                                     </div>
 
@@ -1885,7 +1897,7 @@ function renderPublicPortal() {
                                         <div class="flex justify-between font-semibold border-t border-white/20 pt-2 mt-2"><span id="breakAnualLabelV2">Anual:</span> <span id="breakAnual">$216,000</span></div>
                                     </div>
                                     
-                                    <button onclick="openSolicitudModal('calculadora')" class="w-full py-3.5 bg-white text-emerald-700 font-bold rounded-xl hover:bg-slate-100 transition shadow-lg">
+                                    <button data-bx-click="a55" class="w-full py-3.5 bg-white text-emerald-700 font-bold rounded-xl hover:bg-slate-100 transition shadow-lg">
                                         Quiero ganar esto
                                     </button>
                                     <p class="text-xs text-center mt-3 opacity-70">Te contactamos en menos de 2 horas</p>
@@ -1908,7 +1920,7 @@ function renderPublicPortal() {
                             ${(db.settings.historias || []).map(h => `
                             <div class="bg-white/5 backdrop-blur border border-white/10 rounded-3xl p-6 hover:bg-white/10 transition">
                                 <div class="flex items-center gap-4 mb-4">
-                                    <img src="${h.foto || 'https://i.pravatar.cc/80'}" class="w-14 h-14 rounded-2xl object-cover bg-white/10">
+                                    <img loading="lazy" decoding="async" src="${h.foto || 'https://i.pravatar.cc/80'}" class="w-14 h-14 rounded-2xl object-cover bg-white/10">
                                     <div>
                                         <div class="font-bold">${h.nombre}</div>
                                         <div class="text-xs text-slate-400">${h.tiempo}</div>
@@ -1931,12 +1943,17 @@ function renderPublicPortal() {
                 <!-- Aseguradoras con logos deslizables -->
                 ${[
                     {key:'aseguradoras', titulo:'Trabajamos con las mejores', def:[
-                        {nombre:'AXA', logo:'https://upload.wikimedia.org/wikipedia/commons/9/93/AXA_Logo.svg'},
-                        {nombre:'Plan Seguro', logo:'https://planseguro.com.mx/wp-content/uploads/2021/06/logo-planseguro.svg'},
-                        {nombre:'MAPFRE', logo:'https://upload.wikimedia.org/wikipedia/commons/7/7e/Mapfre_logo.svg'},
-                        {nombre:'HDI', logo:'https://upload.wikimedia.org/wikipedia/commons/3/3e/HDI_logo.svg'},
-                        {nombre:'Qualitas', logo:'https://www.qualitas.com.mx/images/logo.svg'},
-                        {nombre:'GNP', logo:'https://upload.wikimedia.org/wikipedia/commons/1/1a/GNP_Seguros_logo.svg'},
+                        /* Sin URL de logo: los enlaces externos que había (Wikimedia,
+                         * planseguro.com.mx, qualitas.com.mx) devuelven 404 o HTML en vez
+                         * de imagen → 404/ERR_BLOCKED_BY_ORB en consola y salto al texto.
+                         * Con logo vacío se pinta el nombre (fallback ya existente) sin
+                         * ninguna petición. El dueño puede subir sus logos en Personalizar. */
+                        {nombre:'AXA', logo:''},
+                        {nombre:'Plan Seguro', logo:''},
+                        {nombre:'MAPFRE', logo:''},
+                        {nombre:'HDI', logo:''},
+                        {nombre:'Qualitas', logo:''},
+                        {nombre:'GNP', logo:''},
                         {nombre:'Skandia', logo:''},
                         {nombre:'MetLife', logo:''},
                         {nombre:'Chubb', logo:''},
@@ -1955,19 +1972,19 @@ function renderPublicPortal() {
                         <div class="relative">
                             <div class="flex gap-16 animate-marquee whitespace-nowrap">
                                 ${(lista || [
-                                    {nombre:'AXA', logo:'https://upload.wikimedia.org/wikipedia/commons/9/93/AXA_Logo.svg'},
-                                    {nombre:'Plan Seguro', logo:'https://planseguro.com.mx/wp-content/uploads/2021/06/logo-planseguro.svg'},
-                                    {nombre:'MAPFRE', logo:'https://upload.wikimedia.org/wikipedia/commons/7/7e/Mapfre_logo.svg'},
-                                    {nombre:'HDI', logo:'https://upload.wikimedia.org/wikipedia/commons/3/3e/HDI_logo.svg'},
-                                    {nombre:'Qualitas', logo:'https://www.qualitas.com.mx/images/logo.svg'},
-                                    {nombre:'GNP', logo:'https://upload.wikimedia.org/wikipedia/commons/1/1a/GNP_Seguros_logo.svg'},
+                                    {nombre:'AXA', logo:''},
+                                    {nombre:'Plan Seguro', logo:''},
+                                    {nombre:'MAPFRE', logo:''},
+                                    {nombre:'HDI', logo:''},
+                                    {nombre:'Qualitas', logo:''},
+                                    {nombre:'GNP', logo:''},
                                     {nombre:'Skandia', logo:''},
                                     {nombre:'MetLife', logo:''},
                                     {nombre:'Chubb', logo:''},
                                     {nombre:'BX+', logo:''}
                                 ]).map(a => a.logo ? `
                                     <div class="flex items-center justify-center h-20 grayscale hover:grayscale-0 transition opacity-70 hover:opacity-100">
-                                        <img src="${a.logo}" alt="${a.nombre}" class="h-14 w-auto object-contain max-w-[160px]" onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
+                                        <img src="${a.logo}" alt="${a.nombre}" class="h-14 w-auto object-contain max-w-[160px]" decoding="async" data-bx-error="a56">
                                         <span style="display:none" class="text-2xl font-bold text-slate-700">${a.nombre}</span>
                                     </div>` : `
                                     <div class="flex items-center justify-center h-20 transition opacity-80 hover:opacity-100">
@@ -1992,13 +2009,13 @@ function renderPublicPortal() {
                             <p class="text-slate-600 text-lg max-w-2xl mx-auto">Además de tu desarrollo profesional, puedes comprar tu auto o tu casa con el respaldo y la asesoría de nuestro equipo.</p>
                         </div>
                         <div class="grid md:grid-cols-2 gap-6">
-                            <button onclick="pubSetView('autos')" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-emerald-600 hover:shadow-2xl transition-all">
+                            <button data-bx-click="a45" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-emerald-600 hover:shadow-2xl transition-all">
                                 <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mb-5"><i class="fas fa-car-side text-2xl text-emerald-700"></i></div>
                                 <h3 class="text-2xl font-bold text-slate-900 mb-2">Autos en venta <i class="fas fa-arrow-right text-sm text-emerald-600 group-hover:translate-x-1 transition-transform"></i></h3>
                                 <p class="text-slate-600 text-sm mb-4">Inventario de la agencia: origen claro (mexicano, americano o legalizado), precios transparentes y crédito precalificado en minutos.</p>
                                 <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium">${auPublicas().length} unidad(es) disponibles hoy</span>
                             </button>
-                            <button onclick="pubSetView('props')" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-sky-600 hover:shadow-2xl transition-all">
+                            <button data-bx-click="a34" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-sky-600 hover:shadow-2xl transition-all">
                                 <div class="w-14 h-14 rounded-2xl bg-sky-100 flex items-center justify-center mb-5"><i class="fas fa-house text-2xl text-sky-700"></i></div>
                                 <h3 class="text-2xl font-bold text-slate-900 mb-2">Propiedades <i class="fas fa-arrow-right text-sm text-sky-600 group-hover:translate-x-1 transition-transform"></i></h3>
                                 <p class="text-slate-600 text-sm mb-4">Casas y departamentos en venta, renta y preventa, con acompañamiento completo: crédito, escrituración y firma.</p>
@@ -2014,7 +2031,7 @@ function renderPublicPortal() {
                         <h2 class="text-4xl md:text-5xl font-black mb-4">${db.settings.ctaFinal?.titulo || 'Da el siguiente paso en tu carrera'}</h2>
                         <p class="text-xl opacity-90 mb-8">${db.settings.ctaFinal?.subtitulo || 'Agenda una llamada de 15 minutos. Sin compromiso, con información concreta.'}</p>
                         <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button onclick="openSolicitudModal('final')" class="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition shadow-xl">${db.settings.ctaFinal?.boton || 'Agendar ahora'}</button>
+                            <button data-bx-click="a57" class="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition shadow-xl">${db.settings.ctaFinal?.boton || 'Agendar ahora'}</button>
                             <a href="https://wa.me/526643640670?text=Hola,%20quiero%20informaci%C3%B3n%20para%20ser%20agente" target="_blank" class="px-8 py-4 bg-white/10 backdrop-blur border-2 border-white/30 font-semibold rounded-2xl hover:bg-white/20 transition">WhatsApp directo</a>
                         </div>
                     </div>
@@ -2031,8 +2048,8 @@ function renderPublicPortal() {
                             </div>
                         </div>
                         <div class="flex gap-6">
-                            <a href="#" onclick="showAdminLogin(); return false;" class="hover:text-white">Acceso administrativo</a>
-                            <a href="#" onclick="abrirPrivacidad(); return false;" class="hover:text-white">Aviso de privacidad</a>
+                            <a href="#" data-bx-click="a58" class="hover:text-white">Acceso administrativo</a>
+                            <a href="#" data-bx-click="a59" class="hover:text-white">Aviso de privacidad</a>
                             <a href="#blog" class="hover:text-white">Blog</a>
                         </div>
                     </div>
@@ -2262,10 +2279,14 @@ function auD(){
         function applyBranding(){
             if(!db || !db.settings) return;
             const s = db.settings;
+            /* Si el logo aún no llegó del servidor (o está vacío) se usa el icono
+             * local: asignar '' hacía que el navegador pidiera la propia página
+             * como imagen (petición inútil + error en consola). */
+            const logo = s.logo || 'img/logo-icon-192.png';
             const loginLogo = document.getElementById('login-logo');
-            if(loginLogo) loginLogo.src = s.logo;
+            if(loginLogo) loginLogo.src = logo;
             const sidebarLogo = document.getElementById('sidebar-logo');
-            if(sidebarLogo) sidebarLogo.src = s.logo;
+            if(sidebarLogo) sidebarLogo.src = logo;
             const title = document.getElementById('dynamic-title');
             if(title) title.textContent = s.institutionName + ' - Plataforma Premium';
             const subtitle = document.getElementById('login-subtitle');
@@ -2447,7 +2468,7 @@ function renderPracticaCliente() {
       
       <div class="flex items-center gap-4">
         <div id="avatarWrap" class="relative w-20 h-20 rounded-full overflow-hidden ring-2 ring-violet-500/30 cursor-pointer group shrink-0">
-          <img id="avatarPreview" class="w-full h-full object-cover teo-avatar" alt="Avatar">
+          <img loading="lazy" decoding="async" id="avatarPreview" class="w-full h-full object-cover teo-avatar" alt="Avatar">
           <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 grid place-items-center text-[11px] font-medium transition">Cambiar</div>
         </div>
         <div class="text-xs text-zinc-400 leading-relaxed">
@@ -2606,14 +2627,14 @@ function renderPracticaCliente() {
 
 
 <div id="analysisModal" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" ondblclick="closeAnalysis()"></div>
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" data-bx-dblclick="a60"></div>
   <div class="relative z-10 min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-3xl rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
       <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
         <h2 class="text-lg font-semibold">Análisis de sesión</h2>
         <div class="flex items-center gap-2">
-          <button id="btnExportPDF" onclick="exportarPDF()" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-xs font-medium">Exportar PDF</button>
-          <button id="btnCloseAnalysis" onclick="closeAnalysis()" class="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400">✕</button>
+          <button id="btnExportPDF" data-bx-click="a61" class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-xs font-medium">Exportar PDF</button>
+          <button id="btnCloseAnalysis" data-bx-click="a62" class="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400">✕</button>
         </div>
       </div>
       <div id="analysisContent" class="p-6 overflow-y-auto space-y-5"></div>
@@ -3249,7 +3270,7 @@ function renderPracticaSesiones(){
         <p class="text-slate-500 text-sm mt-1">Entrena con prospectos IA: personalízalos, elige dificultad y voz, habla con micrófono y recibe tu calificación con detección de muletillas.</p>
       </div>
       <div class="flex gap-1 bg-slate-100 rounded-xl p-1">
-        ${tabs.map(t=>`<button onclick="psSetTab('${t[0]}')" class="px-4 py-2 rounded-lg text-sm font-medium ${w===t[0]?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-700'}">${t[1]}</button>`).join('')}
+        ${tabs.map(t=>`<button data-bx-click="a63" data-p0="${bxE(function(){return t[0]})}" class="px-4 py-2 rounded-lg text-sm font-medium ${w===t[0]?'bg-white shadow text-slate-900':'text-slate-500 hover:text-slate-700'}">${t[1]}</button>`).join('')}
       </div>
     </div>
     ${ w==='sesion' ? psRenderSesion() : psRenderHistorial() }
@@ -3279,7 +3300,7 @@ function psRenderConfig(){
       <h3 class="font-semibold text-slate-900 mb-1 flex items-center gap-2"><i class="fas fa-route text-indigo-600"></i> Escenario de práctica</h3>
       <p class="text-[11px] text-slate-500 mb-3">Elige la etapa del proceso comercial que quieres entrenar. El prospecto se comporta distinto según la etapa.</p>
       <div class="grid grid-cols-3 gap-2">
-        ${Object.entries(PS_ESCENARIOS).map(([k,e])=>`<button onclick="psSetEscenario('${k}')" data-esc="${k}" class="px-2 py-2.5 rounded-xl border text-xs font-semibold transition text-left ${window.psEscSel===k?'border-indigo-600 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300'}"><span class="mr-1">${e.emoji}</span>${e.label}</button>`).join('')}
+        ${Object.entries(PS_ESCENARIOS).map(([k,e])=>`<button data-bx-click="a64" data-p0="${bxE(function(){return k})}" data-esc="${k}" class="px-2 py-2.5 rounded-xl border text-xs font-semibold transition text-left ${window.psEscSel===k?'border-indigo-600 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300'}"><span class="mr-1">${e.emoji}</span>${e.label}</button>`).join('')}
       </div>
       <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
         <div class="text-xs font-bold text-slate-700 mb-1">${PS_ESCENARIOS[window.psEscSel||'agendar'].emoji} ${PS_ESCENARIOS[window.psEscSel||'agendar'].label} · ${PS_ESCENARIOS[window.psEscSel||'agendar'].canal}</div>
@@ -3289,8 +3310,8 @@ function psRenderConfig(){
     <div class="bg-white rounded-2xl border border-slate-200 p-5">
       <h3 class="font-semibold text-slate-900 mb-3 flex items-center gap-2"><i class="fas fa-user-pen text-indigo-600"></i> Tu prospecto</h3>
       <div class="flex flex-wrap gap-2 mb-3">
-        <button onclick="psPerfilRandom()" class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100">🎲 Aleatorio</button>
-        <select id="ps-perfil-guardado" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-900" onchange="psCargarPerfilGuardado(this.value)">
+        <button data-bx-click="a65" class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100">🎲 Aleatorio</button>
+        <select id="ps-perfil-guardado" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-900" data-bx-change="a66">
           <option value="">Perfiles guardados…</option>
           ${guardados.map((g,i)=>`<option value="${i}">${psEscape(g.nombre)}</option>`).join('')}
         </select>
@@ -3308,21 +3329,21 @@ function psRenderConfig(){
       </div>
       <label class="text-xs font-medium text-slate-600 block mt-3">Memoria (contexto de la sesión)</label>
       <textarea id="ps-memoria" rows="4" class="w-full mt-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 resize-none" placeholder="Contexto del personaje: familia, ingresos, miedos, experiencia previa con seguros, para qué quiere ahorrar…"></textarea>
-      <div class="flex justify-end mt-2"><button onclick="psGuardarPerfil()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">💾 Guardar este perfil</button></div>
+      <div class="flex justify-end mt-2"><button data-bx-click="a67" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">💾 Guardar este perfil</button></div>
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 p-5">
       <h3 class="font-semibold text-slate-900 mb-3 flex items-center gap-2"><i class="fas fa-sliders text-indigo-600"></i> Dificultad y voz</h3>
       <div class="grid grid-cols-3 gap-2 mb-3" id="ps-dif-group">
-        ${Object.entries(PS_DIFICULTADES).map(([k,v])=>`<button onclick="psSetDif('${k}')" data-dif="${k}" class="ps-dif-btn px-2 py-2.5 rounded-xl border text-xs font-semibold transition ${window.psDifSel===k?'border-indigo-600 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300'}">${v.emoji}<br>${v.label}</button>`).join('')}
+        ${Object.entries(PS_DIFICULTADES).map(([k,v])=>`<button data-bx-click="a68" data-p0="${bxE(function(){return k})}" data-dif="${k}" class="ps-dif-btn px-2 py-2.5 rounded-xl border text-xs font-semibold transition ${window.psDifSel===k?'border-indigo-600 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300'}">${v.emoji}<br>${v.label}</button>`).join('')}
       </div>
       <p id="ps-dif-desc" class="text-xs text-slate-500 mb-3">${window.psDifSel?psEscape(PS_DIFICULTADES[window.psDifSel].desc):''}</p>
       <label class="text-xs font-medium text-slate-600">Voz del prospecto</label>
       <div class="flex gap-2 mt-1">
-        <select id="ps-voz" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900" onchange="psLoadVoices()"><option value="auto">Automática del navegador</option></select>
-        <button onclick="psToggleVoz()" id="ps-btn-voz" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium">🔊 Voz activa</button>
+        <select id="ps-voz" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900" data-bx-change="a69"><option value="auto">Automática del navegador</option></select>
+        <button data-bx-click="a70" id="ps-btn-voz" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium">🔊 Voz activa</button>
       </div>
-      <div class="flex gap-2 mt-2"><button onclick="psProbarVoz()" class="text-xs text-slate-500 hover:text-slate-700"><i class="fas fa-play mr-1"></i>Probar voz</button></div>
+      <div class="flex gap-2 mt-2"><button data-bx-click="a71" class="text-xs text-slate-500 hover:text-slate-700"><i class="fas fa-play mr-1"></i>Probar voz</button></div>
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 p-5">
@@ -3332,14 +3353,14 @@ function psRenderConfig(){
           <div class="mb-2">
             <label class="text-xs font-medium text-slate-600">Proveedor</label>
             <div class="grid grid-cols-3 gap-1 mt-1" id="ps-prov-group">
-              ${Object.entries(PS_PROVEEDORES).map(([k,p])=>`<button onclick="psSetProveedor('${k}')" data-prov="${k}" class="ps-prov-btn px-2 py-2 rounded-xl border text-xs font-semibold transition ${provActual===k?'border-indigo-600 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300'}">${p.label}</button>`).join('')}
+              ${Object.entries(PS_PROVEEDORES).map(([k,p])=>`<button data-bx-click="a72" data-p0="${bxE(function(){return k})}" data-prov="${k}" class="ps-prov-btn px-2 py-2 rounded-xl border text-xs font-semibold transition ${provActual===k?'border-indigo-600 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300'}">${p.label}</button>`).join('')}
             </div>
             <p id="ps-api-hint" class="text-[11px] text-slate-500 mt-1">${psEscape(prov.nota)}${prov.consola?' Consigue tu key en: '+psEscape(prov.consola):''}</p>
           </div>
-          <input id="ps-api-key" type="password" value="${psEscape(api.apiKey||PS_DEFAULT_KEY)}" oninput="psValidarKeySilencioso()" placeholder="Pega tu API key (${psEscape(prov.keyHint)}) — se guarda solo en tu navegador" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono bg-white text-slate-900">
+          <input id="ps-api-key" type="password" value="${psEscape(api.apiKey||PS_DEFAULT_KEY)}" data-bx-input="a73" placeholder="Pega tu API key (${psEscape(prov.keyHint)}) — se guarda solo en tu navegador" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono bg-white text-slate-900">
           <div class="flex gap-2 items-center">
             <input id="ps-api-url" value="${psEscape(api.apiUrl||prov.url)}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono bg-white text-slate-900">
-            <button id="ps-btn-probar" onclick="psProbarConexion()" disabled class="px-3 py-2 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium whitespace-nowrap">⚡ Probar conexión</button>
+            <button id="ps-btn-probar" data-bx-click="a74" disabled class="px-3 py-2 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium whitespace-nowrap">⚡ Probar conexión</button>
           </div>
           <input id="ps-api-model" value="${psEscape(api.apiModel||prov.model)}" list="ps-model-list" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono bg-white text-slate-900" placeholder="Modelo (ej. openai/gpt-oss-120b)">
           <datalist id="ps-model-list"><option value="openai/gpt-oss-120b"></option><option value="openai/gpt-oss-20b"></option><option value="qwen/qwen3.8-27b"></option></datalist>
@@ -3349,7 +3370,7 @@ function psRenderConfig(){
       </details>
     </div>
 
-    <button onclick="psIniciarSesion()" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold shadow-lg shadow-indigo-900/20 hover:opacity-95"><i class="fas fa-play mr-2"></i>Iniciar sesión de práctica</button>
+    <button data-bx-click="a75" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold shadow-lg shadow-indigo-900/20 hover:opacity-95"><i class="fas fa-play mr-2"></i>Iniciar sesión de práctica</button>
   </div>`;
 }
 function psRenderChat(){
@@ -3362,29 +3383,29 @@ function psRenderChat(){
         <div class="font-semibold text-slate-900 text-sm truncate">${psEscape(s.personaje.nombre)} <span class="text-xs font-normal text-slate-400">• ${s.personaje.edad} años • ${psEscape(s.personaje.ocupacion)}</span></div>
         <div class="text-xs text-slate-500">${PS_DIFICULTADES[s.dificultad].emoji} ${PS_DIFICULTADES[s.dificultad].label} • sesión en curso</div>
       </div>
-      <button onclick="psFinalizar()" class="ml-auto px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">Finalizar y analizar</button>
-      ${window.psMicOn?`<button onclick="psToggleMic()" class="px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"><i class="fas fa-stop mr-1"></i>Detener micrófono</button>`:''}
-      <button onclick="psAbortar()" title="Descartar sesión" class="p-2 rounded-xl border border-slate-300 text-slate-400 hover:text-rose-600 hover:border-rose-300"><i class="fas fa-trash text-xs"></i></button>
+      <button data-bx-click="a76" class="ml-auto px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">Finalizar y analizar</button>
+      ${window.psMicOn?`<button data-bx-click="a77" class="px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"><i class="fas fa-stop mr-1"></i>Detener micrófono</button>`:''}
+      <button data-bx-click="a78" title="Descartar sesión" class="p-2 rounded-xl border border-slate-300 text-slate-400 hover:text-rose-600 hover:border-rose-300"><i class="fas fa-trash text-xs"></i></button>
     </div>
     <div id="ps-chat" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/60">
       ${s.mensajes.map(m=>psBurbuja(m)).join('')}
     </div>
     <div id="ps-tips" class="px-4 pt-2 flex flex-wrap gap-2">
-      ${tips.map((t,i)=>`<button onclick="psUsarTip(${i})" title="${psEscape(t)}" class="text-[11px] px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 max-w-xs truncate">💡 ${psEscape(t.length>60?t.slice(0,60)+'…':t)}</button>`).join('')||'<span class="text-[11px] text-slate-400 pb-1">Los tips sugeridos aparecen según la conversación…</span>'}
+      ${tips.map((t,i)=>`<button data-bx-click="a79" data-p0="${bxE(function(){return i})}" title="${psEscape(t)}" class="text-[11px] px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 max-w-xs truncate">💡 ${psEscape(t.length>60?t.slice(0,60)+'…':t)}</button>`).join('')||'<span class="text-[11px] text-slate-400 pb-1">Los tips sugeridos aparecen según la conversación…</span>'}
     </div>
     <div class="p-3 border-t border-slate-200">
       <div id="ps-mic-live" class="flex flex-wrap gap-2 items-center mb-1 min-h-[24px]"></div>
       <div class="flex items-end gap-2">
         <textarea id="ps-input" rows="1" placeholder="Escribe o habla como asesor… (Enter para enviar)" class="flex-1 border border-slate-300 rounded-2xl px-4 py-2.5 text-sm bg-white text-slate-900 resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-        <button onclick="psToggleMic()" id="ps-btn-mic" title="Hablar en lugar de escribir (es-MX)" class="px-3 py-2.5 rounded-2xl bg-white border border-slate-300 text-slate-600 font-medium hover:bg-slate-50"><i class="fas fa-microphone"></i></button>
-        <button onclick="psSend()" id="ps-send" class="px-4 py-2.5 rounded-2xl bg-indigo-600 text-white font-medium hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button>
+        <button data-bx-click="a77" id="ps-btn-mic" title="Hablar en lugar de escribir (es-MX)" class="px-3 py-2.5 rounded-2xl bg-white border border-slate-300 text-slate-600 font-medium hover:bg-slate-50"><i class="fas fa-microphone"></i></button>
+        <button data-bx-click="a80" id="ps-send" class="px-4 py-2.5 rounded-2xl bg-indigo-600 text-white font-medium hover:bg-indigo-700"><i class="fas fa-paper-plane"></i></button>
       </div>
       <div class="flex items-center justify-between mt-1">
         <span id="ps-timer" class="text-[11px] text-slate-400 tabular-nums">⏱ 00:00</span>
         <div class="flex gap-3">
           ${psSRSupported()?'':'<span class="text-[10px] text-slate-400">🎤 requiere Chrome/Edge</span>'}
-          <button onclick="psExportarPDF()" class="text-[11px] text-slate-500 hover:text-indigo-700 font-medium"><i class="fas fa-file-pdf mr-1"></i>Exportar PDF</button>
-          <button onclick="psVerRubrica()" class="text-[11px] text-slate-500 hover:text-indigo-700 font-medium">¿Cómo se calcula tu calificación?</button>
+          <button data-bx-click="a81" class="text-[11px] text-slate-500 hover:text-indigo-700 font-medium"><i class="fas fa-file-pdf mr-1"></i>Exportar PDF</button>
+          <button data-bx-click="a82" class="text-[11px] text-slate-500 hover:text-indigo-700 font-medium">¿Cómo se calcula tu calificación?</button>
         </div>
       </div>
     </div>
@@ -3392,7 +3413,7 @@ function psRenderChat(){
 }
 function psBurbuja(m){
   if(m.rol==='asesor') return `<div class="flex justify-end"><div class="max-w-[75%] bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm shadow-sm">${psEscape(m.texto)}</div></div>`;
-  return `<div class="flex justify-start"><div class="max-w-[75%] bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm text-slate-800 shadow-sm">${psEscape(m.texto)}<button onclick="psLeerMensaje(${sIdxOf(m)})" class="ml-2 text-slate-300 hover:text-indigo-600" title="Leer en voz alta"><i class="fas fa-volume-up text-[10px]"></i></button></div></div>`;
+  return `<div class="flex justify-start"><div class="max-w-[75%] bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm text-slate-800 shadow-sm">${psEscape(m.texto)}<button data-bx-click="a83" data-p0="${bxE(function(){return sIdxOf(m)})}" class="ml-2 text-slate-300 hover:text-indigo-600" title="Leer en voz alta"><i class="fas fa-volume-up text-[10px]"></i></button></div></div>`;
 }
 function sIdxOf(m){ return window.psSesionActiva.mensajes.indexOf(m); }
 function psLeerMensaje(i){ const m=window.psSesionActiva.mensajes[i]; if(m) psSpeak(m.texto); }
@@ -3408,12 +3429,12 @@ function psRenderHistorial(){
         <div class="bg-white rounded-2xl border border-slate-200 p-4"><p class="text-xs text-slate-500">Calificación promedio</p><p class="text-2xl font-bold text-slate-900 mt-1">${prom}<span class="text-sm text-slate-400">/100</span></p></div>
         <div class="bg-white rounded-2xl border border-slate-200 p-4"><p class="text-xs text-slate-500">Mejor sesión</p><p class="text-2xl font-bold text-emerald-600 mt-1">${psMaxSafe(sesiones)}<span class="text-sm text-slate-400">/100</span></p></div>
       </div>
-      <button onclick="psExportarPDF()" class="ml-3 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 whitespace-nowrap"><i class="fas fa-file-pdf mr-1"></i>Exportar PDF</button>
+      <button data-bx-click="a81" class="ml-3 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 whitespace-nowrap"><i class="fas fa-file-pdf mr-1"></i>Exportar PDF</button>
     </div>
     <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-slate-50 text-left text-slate-600 text-xs uppercase"><tr><th class="p-3">Fecha</th><th class="p-3">Prospecto</th><th class="p-3">Dificultad</th><th class="p-3">Duración</th><th class="p-3">Calif.</th><th class="p-3">Acciones</th></tr></thead>
-        <tbody>${sesiones.map(s=>`<tr class="border-t hover:bg-slate-50"><td class="p-3 text-slate-500 text-xs">${new Date(s.inicio).toLocaleDateString('es-MX')} ${new Date(s.inicio).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td><td class="p-3 font-medium">${psEscape(s.personaje.nombre)}</td><td class="p-3">${PS_DIFICULTADES[s.dificultad]?PS_DIFICULTADES[s.dificultad].emoji:''} ${s.dificultad}</td><td class="p-3 text-slate-500">${s.duracionMin} min</td><td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs font-bold ${s.feedback&&s.feedback.total>=85?'bg-emerald-100 text-emerald-700':s.feedback&&s.feedback.total>=60?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}">${s.feedback?s.feedback.total:'—'}</span></td><td class="p-3"><button onclick="psVerSesion(${s.id})" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3">Ver</button><button onclick="psBorrarSesion(${s.id})" class="text-slate-400 hover:text-rose-600 text-xs"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody>
+        <tbody>${sesiones.map(s=>`<tr class="border-t hover:bg-slate-50"><td class="p-3 text-slate-500 text-xs">${new Date(s.inicio).toLocaleDateString('es-MX')} ${new Date(s.inicio).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</td><td class="p-3 font-medium">${psEscape(s.personaje.nombre)}</td><td class="p-3">${PS_DIFICULTADES[s.dificultad]?PS_DIFICULTADES[s.dificultad].emoji:''} ${s.dificultad}</td><td class="p-3 text-slate-500">${s.duracionMin} min</td><td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs font-bold ${s.feedback&&s.feedback.total>=85?'bg-emerald-100 text-emerald-700':s.feedback&&s.feedback.total>=60?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}">${s.feedback?s.feedback.total:'—'}</span></td><td class="p-3"><button data-bx-click="a84" data-p0="${bxE(function(){return s.id})}" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium mr-3">Ver</button><button data-bx-click="a85" data-p0="${bxE(function(){return s.id})}" class="text-slate-400 hover:text-rose-600 text-xs"><i class="fas fa-trash"></i></button></td></tr>`).join('')}</tbody>
       </table>
     </div>
   </div>`;
@@ -3546,11 +3567,11 @@ async function psFinalizar(){
   window.psSesionActiva=null;
   const modal=document.createElement('div');
   modal.id='ps-modal-fb';
-  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" ondblclick="psCerrarModalFb()"></div>
+  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-bx-dblclick="a86"></div>
   <div class="relative z-10 min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg text-slate-900">🎓 Retroalimentación de la sesión</h3><button onclick="psCerrarModalFb()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">✕</button></div>
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg text-slate-900">🎓 Retroalimentación de la sesión</h3><button data-bx-click="a87" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">✕</button></div>
     <div class="p-6 overflow-y-auto space-y-4">${psRenderFeedback(fb,{...s, duracionMin:s.duracionMin})}</div>
-    <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-2"><button onclick="psCerrarModalFb()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Entendido</button></div>
+    <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-2"><button data-bx-click="a87" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Entendido</button></div>
   </div></div></div>`;
   document.body.appendChild(modal);
   window.psPracticaTab='historial';
@@ -3560,16 +3581,16 @@ function psVerSesion(id){
   const s=psSesionesUsuario().find(x=>x.id===id); if(!s) return;
   const modal=document.createElement('div');
   modal.id='ps-modal-ver';
-  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" ondblclick="psCerrarModalVer()"></div>
+  modal.innerHTML=`<div class="fixed inset-0 z-[70]"><div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-bx-dblclick="a88"></div>
   <div class="relative z-10 min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
-    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg text-slate-900">${psEscape(s.personaje.nombre)} <span class="text-xs font-normal text-slate-400">• ${new Date(s.inicio).toLocaleString('es-MX')}</span></h3><button onclick="psCerrarModalVer()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">✕</button></div>
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h3 class="font-bold text-lg text-slate-900">${psEscape(s.personaje.nombre)} <span class="text-xs font-normal text-slate-400">• ${new Date(s.inicio).toLocaleString('es-MX')}</span></h3><button data-bx-click="a89" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">✕</button></div>
     <div class="p-6 overflow-y-auto space-y-4">
       ${s.feedback?psRenderFeedback(s.feedback,s):''}
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 max-h-72 overflow-y-auto">
         ${s.mensajes.map(m=>`<div class="text-sm ${m.rol==='asesor'?'text-right':''}"><span class="inline-block px-3 py-1.5 rounded-xl ${m.rol==='asesor'?'bg-indigo-600 text-white':'bg-white border border-slate-200'} max-w-[80%] text-left">${psEscape(m.texto)}</span></div>`).join('')}
       </div>
     </div>
-    <div class="px-6 py-4 border-t border-slate-200 flex justify-end"><button onclick="psCerrarModalVer()" class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold">Cerrar</button></div>
+    <div class="px-6 py-4 border-t border-slate-200 flex justify-end"><button data-bx-click="a89" class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold">Cerrar</button></div>
   </div></div></div>`;
   document.body.appendChild(modal);
 }
@@ -3583,7 +3604,7 @@ function psVerRubrica(){
   const h=`<div class="p-6 max-w-2xl"><h3 class="font-bold text-lg mb-3">¿Cómo se calcula tu calificación?</h3>
   <div class="space-y-2 text-sm">${PS_RUBRICA.map(r=>`<div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5"><span class="font-medium">${r.label}</span><span class="text-slate-400 text-xs">0–100 pts</span></div>`).join('')}</div>
   <p class="text-xs text-slate-500 mt-3">El promedio de las 6 claves es tu calificación final. Con IA real, la evalúa un "director de formación" virtual; sin ella, un motor de reglas que detecta preguntas, validaciones, números, objeciones y cierre.</p>
-  <div class="text-right mt-4"><button onclick="closeModal()" class="border px-4 py-2 rounded-xl">Cerrar</button></div></div>`;
+  <div class="text-right mt-4"><button data-bx-click="a1" class="border px-4 py-2 rounded-xl">Cerrar</button></div></div>`;
   if(typeof showModal==='function') showModal(h); else alert('Rúbrica: '+PS_RUBRICA.map(r=>r.label).join(', '));
 }
 function initPracticaSesiones(){ psLoadVoices(); if(window.psVoiceOn===undefined) window.psVoiceOn=true; if(!window.psProvSel){ window.psProvSel=(psGetDB().practicaConfig||{}).proveedor||'groq'; } setTimeout(()=>{ try{ psValidarKeySilencioso(); }catch(e){} },50); }
@@ -3733,9 +3754,9 @@ function renderLobby(){
       +'<span class="text-[10px] text-slate-400">'+(x.tipo==='pdf'?'PDF':'texto')+' · '+Math.round((x.tam||0)/1024)+' KB · '+new Date(x.fecha).toLocaleDateString('es-MX')+(x.por?' · '+psEscape(x.por):'')+'</span></div>'
       +'<p class="text-xs text-slate-500 mt-1 line-clamp-2">'+psEscape(String(x.texto||'').slice(0,180))+'…</p></div>'
       +'<div class="flex gap-1 shrink-0">'
-      +'<button onclick="lobbyToggle(\''+x.id+'\')" title="'+(x.activo===false?'Activar':'Pausar')+'" class="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><i class="fas '+(x.activo===false?'fa-play':'fa-pause')+' text-xs"></i></button>'
-      +'<button onclick="lobbyEditar(\''+x.id+'\')" title="Editar" class="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><i class="fas fa-pen text-xs"></i></button>'
-      +'<button onclick="lobbyEliminar(\''+x.id+'\')" title="Eliminar" class="w-8 h-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50"><i class="fas fa-trash text-xs"></i></button></div></div>';
+      +'<button ' + bxOn('click','lobbyToggle',[x.id]) + ' title="'+(x.activo===false?'Activar':'Pausar')+'" class="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><i class="fas '+(x.activo===false?'fa-play':'fa-pause')+' text-xs"></i></button>'
+      +'<button ' + bxOn('click','lobbyEditar',[x.id]) + ' title="Editar" class="w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><i class="fas fa-pen text-xs"></i></button>'
+      +'<button ' + bxOn('click','lobbyEliminar',[x.id]) + ' title="Eliminar" class="w-8 h-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50"><i class="fas fa-trash text-xs"></i></button></div></div>';
   }).join('') || '<p class="text-sm text-slate-400 text-center py-6">La base está vacía. Carga el primer material: será lo primero que Gu-IA consultará.</p>';
   const kb=d.docs.reduce((a,x)=>a+(x.tam||0),0);
   return `<div class="max-w-4xl mx-auto">
@@ -3752,15 +3773,15 @@ function renderLobby(){
             <div><label class="text-xs font-semibold text-slate-500 uppercase">Título / tema</label><input id="lobby-titulo" placeholder="Ej. AXA — comisiones y productos 2026" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900"></div>
             <div><label class="text-xs font-semibold text-slate-500 uppercase">Pegar texto</label><textarea id="lobby-texto" rows="6" placeholder="Pega aquí el material completo: comisiones, coberturas, procesos, políticas…" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900"></textarea></div>
             <div class="flex flex-wrap gap-2">
-              <button onclick="lobbyAgregarTexto()" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-floppy-disk mr-1"></i> Agregar a la base</button>
-              <label class="px-4 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"><i class="fas fa-upload mr-1"></i> Cargar archivo (TXT/MD/CSV/PDF)<input id="lobby-file" type="file" accept=".txt,.md,.csv,.json,.pdf" class="hidden" onchange="if(this.files[0]) guiaBaseLeerArchivo(this.files[0])"></label>
+              <button data-bx-click="a90" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-floppy-disk mr-1"></i> Agregar a la base</button>
+              <label class="px-4 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"><i class="fas fa-upload mr-1"></i> Cargar archivo (TXT/MD/CSV/PDF)<input id="lobby-file" type="file" accept=".txt,.md,.csv,.json,.pdf" class="hidden" data-bx-change="a91"></label>
             </div>
             <p class="text-[11px] text-slate-400">PDFs escaneados (sin texto) no se pueden extraer: pásalos a texto o pégalos manualmente. Gu-IA usará el material activo como fuente prioritaria en todas las conversaciones.</p>
           </div>
         </div>
         <div class="bg-white border border-violet-200 rounded-2xl p-5">
           <p class="text-xs font-bold text-violet-700 uppercase mb-3"><i class="fas fa-flask text-violet-600 mr-1"></i> Probar a Gu-IA</p>
-          <div class="flex gap-2"><input id="lobby-prueba" placeholder="Pregúntale algo de lo cargado, ej. ¿cuánto paga AXA?" class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900" onkeydown="if(event.key==='Enter')lobbyProbar()"><button onclick="lobbyProbar()" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-paper-plane"></i></button></div>
+          <div class="flex gap-2"><input id="lobby-prueba" placeholder="Pregúntale algo de lo cargado, ej. ¿cuánto paga AXA?" class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900" data-bx-keydown="a92"><button data-bx-click="a93" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-paper-plane"></i></button></div>
           <div id="lobby-prueba-out" class="hidden mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3"></div>
         </div>
       </div>
@@ -4028,21 +4049,21 @@ function renderCentroMensajes(){
         <p class="text-slate-500 text-sm mt-1">Plantillas por categoría con variables {nombre} y {asesor}. Copia el texto y úsalo donde quieras.</p>
       </div>
       <div class="flex gap-2">
-        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase())?`<button onclick="cmAbrirBroadcast()" class="px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700"><i class="fas fa-bullhorn mr-1"></i> Difusión al equipo</button>
-        <button onclick="cmVerAuditoria()" class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50"><i class="fas fa-clipboard-list mr-1"></i> Auditoría</button>
-        <button onclick="guiaEditarMensajes()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar plantillas</button>`:''}
+        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase())?`<button data-bx-click="a94" class="px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700"><i class="fas fa-bullhorn mr-1"></i> Difusión al equipo</button>
+        <button data-bx-click="a95" class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50"><i class="fas fa-clipboard-list mr-1"></i> Auditoría</button>
+        <button data-bx-click="a96" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar plantillas</button>`:''}
       </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-4">
-      <button onclick="window.cmCategoria='todas';render()" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${catActual==='todas'?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">Todas</button>
-      ${cmCategorias().map(([id,lbl])=>`<button onclick="window.cmCategoria='${id}';render()" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${catActual===id?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">${lbl}</button>`).join('')}
+      <button data-bx-click="a97" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${catActual==='todas'?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">Todas</button>
+      ${cmCategorias().map(([id,lbl])=>`<button data-bx-click="a98" data-p0="${bxE(function(){return id})}" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${catActual===id?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}">${lbl}</button>`).join('')}
     </div>
     <div class="grid md:grid-cols-2 gap-4">
       ${visibles.map(p=>{ const idx=plantillas.indexOf(p); return `
       <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">${cmCatNombre(p.cat)}</span>
-          <button onclick="guiaCopiarMensaje(${idx})" title="Copiar" class="text-slate-400 hover:text-emerald-600 text-xs"><i class="fas fa-copy"></i> Copiar</button>
+          <button data-bx-click="a99" data-p0="${bxE(function(){return idx})}" title="Copiar" class="text-slate-400 hover:text-emerald-600 text-xs"><i class="fas fa-copy"></i> Copiar</button>
         </div>
         <div class="font-semibold text-slate-900 text-sm mb-1">${psEscape(p.nombre)}</div>
         <p class="text-sm text-slate-600 flex-1 whitespace-pre-wrap">${psEscape(p.texto)}</p>
@@ -4051,7 +4072,7 @@ function renderCentroMensajes(){
     <div class="mt-8">
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 class="font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-users text-amber-500"></i> Cierres de la comunidad <span class="text-xs font-normal text-slate-400">todos pueden aportar</span></h3>
-        <button onclick="cmCompartirCierre()" class="px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"><i class="fas fa-plus mr-1"></i> Compartir mi cierre</button>
+        <button data-bx-click="a100" class="px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600"><i class="fas fa-plus mr-1"></i> Compartir mi cierre</button>
       </div>
       <div class="grid md:grid-cols-2 gap-3">
         ${cierres.map(c=>{ const votos=(c.votos||[]); const yoVoto=currentUser && votos.includes(currentUser.id); const mio=currentUser && String(c.autor)===String(currentUser.id); return `
@@ -4060,8 +4081,8 @@ function renderCentroMensajes(){
           <div class="flex items-center justify-between mt-2">
             <span class="text-xs text-slate-500">${psEscape(c.autorNombre||'Anónimo')} · ${new Date(c.fecha).toLocaleDateString('es-MX')}</span>
             <div class="flex items-center gap-2">
-              <button onclick="cmVotarCierre(${c.id})" class="text-xs font-semibold ${yoVoto?'text-emerald-700':'text-slate-500'} hover:text-emerald-600"><i class="fas fa-thumbs-up mr-1"></i>${votos.length}</button>
-              ${(mio||['admin','gm'].includes((currentUser.role||'').toLowerCase()))?`<button onclick="cmBorrarCierre(${c.id})" class="text-xs text-red-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>`:''}
+              <button data-bx-click="a101" data-p0="${bxE(function(){return c.id})}" class="text-xs font-semibold ${yoVoto?'text-emerald-700':'text-slate-500'} hover:text-emerald-600"><i class="fas fa-thumbs-up mr-1"></i>${votos.length}</button>
+              ${(mio||['admin','gm'].includes((currentUser.role||'').toLowerCase()))?`<button data-bx-click="a102" data-p0="${bxE(function(){return c.id})}" class="text-xs text-red-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>`:''}
             </div>
           </div>
         </div>`;}).join('') || '<p class="text-sm text-slate-400 col-span-2 text-center py-6 bg-white border rounded-2xl">Aún no hay cierres compartidos. ¡Sé el primero en ayudar a la comunidad!</p>'}
@@ -4071,7 +4092,7 @@ function renderCentroMensajes(){
 }
 function cmVerAuditoria(){
   const logs=(db.settings && db.settings.auditoriaContenido)||[];
-  showModal(`<div class="p-6 max-w-2xl w-full"><div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold"><i class="fas fa-clipboard-list text-emerald-600 mr-2"></i>Auditoría de modificaciones</h3><div class="flex items-center gap-2"><button onclick="exportarAuditoriaCSV()" class="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100"><i class="fas fa-file-csv mr-1"></i>Exportar CSV</button><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div></div>
+  showModal(`<div class="p-6 max-w-2xl w-full"><div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold"><i class="fas fa-clipboard-list text-emerald-600 mr-2"></i>Auditoría de modificaciones</h3><div class="flex items-center gap-2"><button data-bx-click="a2" class="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100"><i class="fas fa-file-csv mr-1"></i>Exportar CSV</button><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div></div>
     <div class="max-h-[60vh] overflow-y-auto">${logs.map(l=>`<div class="border-b border-slate-100 py-2.5"><div class="flex justify-between text-xs text-slate-500"><span class="font-semibold text-slate-700">${psEscape(l.seccion)}</span><span>${new Date(l.fecha).toLocaleString('es-MX')}</span></div><p class="text-sm text-slate-800">${psEscape(l.accion)}${l.detalle?` — <span class="text-slate-500">${psEscape(l.detalle)}</span>`:''}</p><p class="text-xs text-slate-400">por ${psEscape(l.usuario)}</p></div>`).join('') || '<p class="text-sm text-slate-400 text-center py-8">Sin modificaciones registradas todavía</p>'}</div></div>`);
 }
 function exportarAuditoriaCSV(){
@@ -4097,7 +4118,7 @@ function cmAbrirBroadcast(){
   showModal(`<div class="p-6 max-w-lg w-full">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-bullhorn text-amber-600"></i> Difusión / Anuncio al equipo</h3>
-      <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+      <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
     </div>
     <p class="text-sm text-slate-500 mb-4">Envía un comunicado directo al buzón de Mensajes de todos los usuarios o de un rol específico.</p>
     <div class="space-y-3">
@@ -4117,8 +4138,8 @@ function cmAbrirBroadcast(){
       </div>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-sm">Cancelar</button>
-      <button onclick="cmEnviarBroadcast()" class="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-semibold hover:bg-amber-700"><i class="fas fa-paper-plane mr-1"></i> Enviar a todos</button>
+      <button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl text-sm">Cancelar</button>
+      <button data-bx-click="a103" class="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-semibold hover:bg-amber-700"><i class="fas fa-paper-plane mr-1"></i> Enviar a todos</button>
     </div>
   </div>`);
 }
@@ -4161,7 +4182,7 @@ function cmEnviarBroadcast(){
 function cmCompartirCierre(){
   showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-2">Compartir un cierre</h3><p class="text-sm text-slate-500 mb-4">Tu cierre ayudará a toda la comunidad. Se publicará con tu nombre.</p>
     <textarea id="cm-cierre-texto" rows="4" placeholder="Ej.: ¿Le parece el jueves a las 6 pm?..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900"></textarea>
-    <div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button onclick="cmGuardarCierre()" class="px-5 py-2 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600">Publicar</button></div></div>`);
+    <div class="flex justify-end gap-2 mt-4"><button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button data-bx-click="a104" class="px-5 py-2 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600">Publicar</button></div></div>`);
 }
 function cmGuardarCierre(){
   const texto=document.getElementById('cm-cierre-texto').value.trim();
@@ -4197,7 +4218,7 @@ function cmFilaPlantilla(p,i){
     <div class="flex gap-2">
       <input cm-nombre value="${psEscape(p.nombre||'')}" placeholder="Nombre de la plantilla" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
       <select cm-cat class="px-2 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${cats.map(([id,lbl])=>`<option value="${id}" ${p.cat===id?'selected':''}>${lbl}</option>`).join('')}</select>
-      <button onclick="this.closest('[data-cmrow]').remove()" class="px-2 text-red-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>
+      <button data-bx-click="a105" class="px-2 text-red-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>
     </div>
     <textarea cm-texto rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape(p.texto||'')}</textarea>
   </div>`;
@@ -4209,15 +4230,15 @@ function cmAddFila(){
 function guiaEditarMensajes(){
   const plantillas=(db.settings && Array.isArray(db.settings.plantillasMensajes)) ? db.settings.plantillasMensajes : [];
   showModal(`<div class="p-6 max-w-2xl w-full">
-    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar plantillas de mensajes</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar plantillas de mensajes</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div id="cm-rows" class="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
       ${plantillas.map((p,i)=>cmFilaPlantilla(p,i)).join('')}
     </div>
-    <button onclick="cmAddFila()" class="mt-3 text-sm text-emerald-700 font-semibold"><i class="fas fa-plus mr-1"></i> Agregar plantilla</button>
+    <button data-bx-click="a106" class="mt-3 text-sm text-emerald-700 font-semibold"><i class="fas fa-plus mr-1"></i> Agregar plantilla</button>
     <p class="text-xs text-slate-500 mt-2">Usa {nombre} y {asesor} como variables. Los cambios quedan registrados en la auditoría.</p>
     <div class="flex justify-end gap-2 mt-4">
-      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button>
-      <button onclick="guiaGuardarMensajes()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button>
+      <button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button>
+      <button data-bx-click="a107" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button>
     </div>
   </div>`);
 }
@@ -4258,10 +4279,10 @@ function renderGuionLlamadas(){
       </div>
       <div class="flex items-center gap-2">
         <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden">
-          <button onclick="window.guionModo='lista';render()" class="px-3 py-1.5 text-xs font-semibold ${modo==='lista'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-list mr-1"></i>Completo</button>
-          <button onclick="window.guionModo='interactivo';window.guionPasoIdx=0;render()" class="px-3 py-1.5 text-xs font-semibold ${modo==='interactivo'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-headset mr-1"></i>Modo Llamada en Vivo</button>
+          <button data-bx-click="a108" class="px-3 py-1.5 text-xs font-semibold ${modo==='lista'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-list mr-1"></i>Completo</button>
+          <button data-bx-click="a109" class="px-3 py-1.5 text-xs font-semibold ${modo==='interactivo'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-headset mr-1"></i>Modo Llamada en Vivo</button>
         </div>
-        ${puede?`<button onclick="guionEditar()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar guion</button>`:''}
+        ${puede?`<button data-bx-click="a110" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar guion</button>`:''}
       </div>
     </div>
     ${modo === 'interactivo' ? (() => {
@@ -4269,19 +4290,19 @@ function renderGuionLlamadas(){
       return `<div class="bg-white rounded-2xl border-2 border-amber-400 p-6 shadow-md">
         <div class="flex items-center justify-between mb-4">
           <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Paso ${pasoIdx + 1} de ${guion.length} · ${psEscape(actual.fase)}</span>
-          <div class="flex gap-1">${guion.map((_, i) => `<button onclick="window.guionPasoIdx=${i};render()" class="w-7 h-2 rounded-full ${i===pasoIdx?'bg-amber-600':'bg-slate-200'}"></button>`).join('')}</div>
+          <div class="flex gap-1">${guion.map((_, i) => `<button data-bx-click="a111" data-p0="${bxE(function(){return i})}" class="w-7 h-2 rounded-full ${i===pasoIdx?'bg-amber-600':'bg-slate-200'}"></button>`).join('')}</div>
         </div>
         <ul class="space-y-3 mb-5">
           ${(actual.puntos||[]).map(p => `<li class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-sm flex items-start gap-2.5"><i class="fas fa-comment-dots text-amber-600 mt-1"></i><span>${psEscape(p)}</span></li>`).join('')}
         </ul>
         <div class="mb-4">
           <label class="text-xs font-semibold text-slate-500 uppercase block mb-1">Notas de esta fase con el prospecto</label>
-          <textarea oninput="window.guionNotasLive=window.guionNotasLive||{};window.guionNotasLive[${pasoIdx}]=this.value" rows="2" placeholder="Anota respuestas clave del cliente en esta etapa..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">${psEscape(notas[pasoIdx]||'')}</textarea>
+          <textarea data-bx-input="a112" data-p0="${bxE(function(){return pasoIdx})}" rows="2" placeholder="Anota respuestas clave del cliente en esta etapa..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900">${psEscape(notas[pasoIdx]||'')}</textarea>
         </div>
         <div class="flex items-center justify-between pt-3 border-t border-slate-100">
-          <button ${pasoIdx===0?'disabled':''} onclick="window.guionPasoIdx=Math.max(0,${pasoIdx-1});render()" class="px-4 py-2 rounded-xl border border-slate-300 text-sm font-semibold disabled:opacity-40"><i class="fas fa-arrow-left mr-1"></i> Anterior</button>
-          <button onclick="copiarNotasGuionLive()" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold"><i class="fas fa-copy mr-1"></i> Copiar resumen de llamada</button>
-          <button ${pasoIdx>=guion.length-1?'disabled':''} onclick="window.guionPasoIdx=Math.min(${guion.length-1},${pasoIdx+1});render()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40">Siguiente <i class="fas fa-arrow-right ml-1"></i></button>
+          <button ${pasoIdx===0?'disabled':''} data-bx-click="a113" data-p0="${bxE(function(){return pasoIdx-1})}" class="px-4 py-2 rounded-xl border border-slate-300 text-sm font-semibold disabled:opacity-40"><i class="fas fa-arrow-left mr-1"></i> Anterior</button>
+          <button data-bx-click="a114" class="px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold"><i class="fas fa-copy mr-1"></i> Copiar resumen de llamada</button>
+          <button ${pasoIdx>=guion.length-1?'disabled':''} data-bx-click="a115" data-p0="${bxE(function(){return guion.length-1})}" data-p1="${bxE(function(){return pasoIdx+1})}" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40">Siguiente <i class="fas fa-arrow-right ml-1"></i></button>
         </div>
       </div>`;
     })() : `<div class="space-y-3">
@@ -4308,7 +4329,7 @@ function guionEditar(){
   if(!guionPuedeEditar()){ showToast('No tienes permiso para editar el guion','warning'); return; }
   const guion=(db.settings && Array.isArray(db.settings.guionLlamadas) && db.settings.guionLlamadas.length) ? db.settings.guionLlamadas : guionDefaults();
   showModal(`<div class="p-6 max-w-2xl w-full">
-    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar guion de llamadas</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar guion de llamadas</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div class="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
       ${guion.map((g,i)=>`
       <div class="border border-slate-200 rounded-xl p-3 space-y-2">
@@ -4319,8 +4340,8 @@ function guionEditar(){
     </div>
     <p class="text-xs text-slate-500 mt-2">Editable por Admin, GM, Editor y Capacitador. Los cambios quedan en la auditoría.</p>
     <div class="flex justify-end gap-2 mt-4">
-      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button>
-      <button onclick="guionGuardar()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button>
+      <button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button>
+      <button data-bx-click="a116" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button>
     </div>
   </div>`);
 }
@@ -4349,12 +4370,12 @@ function renderCasosExito(){
         <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-trophy text-amber-500"></i> Casos de Éxito</h2>
         <p class="text-slate-500 text-sm mt-1">Agentes reales de la promotoría y lo que construyeron.</p>
       </div>
-      ${puede?`<button onclick="guiaEditarCasos()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar casos</button>`:''}
+      ${puede?`<button data-bx-click="a117" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-pen mr-1"></i> Editar casos</button>`:''}
     </div>
     <div class="grid md:grid-cols-3 gap-4">
       ${casos.map(c=>`
       <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col hover:shadow-lg transition">
-        ${c.foto?`<img src="${c.foto}" alt="${psEscape(c.nombre)}" class="w-full h-40 object-cover">`:''}
+        ${c.foto?`<img loading="lazy" decoding="async" src="${c.foto}" alt="${psEscape(c.nombre)}" class="w-full h-40 object-cover">`:''}
         <div class="p-5 flex flex-col flex-1">
           ${c.foto?'':`<div class="w-12 h-12 rounded-2xl bg-amber-50 grid place-items-center mb-3"><i class="fas fa-medal text-amber-500 text-xl"></i></div>`}
           <div class="font-bold text-slate-900">${psEscape(c.nombre)}</div>
@@ -4371,15 +4392,15 @@ function guiaEditarCasos(){
   if(!puede){ showToast('No tienes permiso para editar los casos','warning'); return; }
   const casos=(db.settings && Array.isArray(db.settings.casosExito)) ? db.settings.casosExito : [];
   showModal(`<div class="p-6 max-w-2xl w-full">
-    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar casos de éxito</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar casos de éxito</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div id="cx-rows" class="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
       ${casos.map((c,i)=>casosFila(c,i)).join('')}
     </div>
-    <button onclick="casosAddFila()" class="mt-3 text-sm text-emerald-700 font-semibold"><i class="fas fa-plus mr-1"></i> Agregar caso</button>
+    <button data-bx-click="a118" class="mt-3 text-sm text-emerald-700 font-semibold"><i class="fas fa-plus mr-1"></i> Agregar caso</button>
     <p class="text-xs text-slate-500 mt-2">Puedes agregar, editar y eliminar casos, y subir una foto por caso. Los cambios quedan en la auditoría.</p>
     <div class="flex justify-end gap-2 mt-4">
-      <button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button>
-      <button onclick="guiaGuardarCasos()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button>
+      <button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button>
+      <button data-bx-click="a119" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button>
     </div>
   </div>`);
 }
@@ -4388,15 +4409,15 @@ function casosFila(c,i){
     <div class="flex gap-2">
       <input cx-nombre value="${psEscape(c.nombre||'')}" placeholder="Nombre" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold bg-white text-slate-900">
       <input cx-resultado value="${psEscape(c.resultado||'')}" placeholder="Resultado ($)" class="w-44 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
-      <button onclick="this.closest('[data-cxrow]').remove()" class="px-2 text-red-400 hover:text-red-600" title="Eliminar caso"><i class="fas fa-trash"></i></button>
+      <button data-bx-click="a120" class="px-2 text-red-400 hover:text-red-600" title="Eliminar caso"><i class="fas fa-trash"></i></button>
     </div>
     <input cx-rol value="${psEscape(c.rol||'')}" placeholder="Rol / antigüedad" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
     <textarea cx-historia rows="3" placeholder="Historia" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape(c.historia||'')}</textarea>
     <div class="flex items-center gap-3">
       <label class="text-xs px-3 py-1.5 bg-slate-100 rounded-lg cursor-pointer hover:bg-slate-200"><i class="fas fa-camera mr-1"></i> Foto
-        <input type="file" accept="image/*" class="hidden" onchange="casosFotoSel(this)">
+        <input type="file" accept="image/*" class="hidden" data-bx-change="a121">
       </label>
-      <img cx-foto-preview src="${c.foto||''}" class="h-10 ${c.foto?'':'hidden'} rounded object-cover border">
+      <img loading="lazy" decoding="async" cx-foto-preview src="${c.foto||''}" class="h-10 ${c.foto?'':'hidden'} rounded object-cover border">
     </div>
   </div>`;
 }
@@ -4444,22 +4465,22 @@ function renderPublicidad(){
         <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-bullhorn text-emerald-600"></i> Publicidad</h2>
         <p class="text-slate-500 text-sm mt-1">Material descargable y enlaces (Drive o web) para toda la fuerza comercial, organizado por categoría, compañía y ramo.</p>
       </div>
-      ${puede?`<button onclick="openPublicidadModal()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i> Nuevo contenido</button>`:''}
+      ${puede?`<button data-bx-click="a122" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><i class="fas fa-plus mr-1"></i> Nuevo contenido</button>`:''}
     </div>
     <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-5 grid md:grid-cols-4 gap-3">
       <div class="relative">
         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input value="${psEscape(f.q)}" oninput="window.pubFiltros.q=this.value;render()" placeholder="Buscar material..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+        <input value="${psEscape(f.q)}" data-bx-input="a123" placeholder="Buscar material..." class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
       </div>
-      <select onchange="window.pubFiltros.cat=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+      <select data-bx-change="a124" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
         <option value="">Todas las categorías</option>
         ${PUB_CATS.map(([id,lbl])=>`<option value="${id}" ${f.cat===id?'selected':''}>${lbl}</option>`).join('')}
       </select>
-      <select onchange="window.pubFiltros.comp=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+      <select data-bx-change="a125" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
         <option value="">Todas las compañías</option>
         ${pubCompanias().map(c=>`<option value="${psEscape(c)}" ${f.comp===c?'selected':''}>${psEscape(c)}</option>`).join('')}
       </select>
-      <select onchange="window.pubFiltros.ramo=this.value;render()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+      <select data-bx-change="a126" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
         <option value="">Todos los ramos</option>
         ${PUB_RAMOS.map(r=>`<option value="${r}" ${f.ramo===r?'selected':''}>${r}</option>`).join('')}
       </select>
@@ -4467,10 +4488,10 @@ function renderPublicidad(){
     <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
       ${items.map(p=>`
       <div class="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col hover:shadow-md transition">
-        ${pubEsImagen(p)?`<button type="button" onclick="pubVerImagen('${p.id}')" title="Ver imagen completa" class="block w-full mb-3 -mx-4 -mt-4"><img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="h-64 sm:h-80 w-full object-cover rounded-t-2xl border-b border-slate-200" loading="lazy"></button>`:''}
+        ${pubEsImagen(p)?`<button type="button" data-bx-click="a127" data-p0="${bxE(function(){return p.id})}" title="Ver imagen completa" class="block w-full mb-3 -mx-4 -mt-4"><img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="h-64 sm:h-80 w-full object-cover rounded-t-2xl border-b border-slate-200" loading="lazy"></button>`:''}
         <div class="flex items-start justify-between mb-2">
           <div class="w-10 h-10 rounded-xl bg-emerald-50 grid place-items-center"><i class="fas ${p.tipo==='enlace'?'fa-link':'fa-file-lines'} text-emerald-600"></i></div>
-          ${puede?`<div class="flex gap-2"><button onclick="openPublicidadModal('${p.id}')" class="text-slate-400 hover:text-indigo-600 text-xs"><i class="fas fa-pen"></i></button><button onclick="borrarPublicidad('${p.id}')" class="text-slate-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button></div>`:''}
+          ${puede?`<div class="flex gap-2"><button data-bx-click="a128" data-p0="${bxE(function(){return p.id})}" class="text-slate-400 hover:text-indigo-600 text-xs"><i class="fas fa-pen"></i></button><button data-bx-click="a129" data-p0="${bxE(function(){return p.id})}" class="text-slate-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button></div>`:''}
         </div>
         <div class="font-semibold text-slate-900 text-sm">${psEscape(p.titulo)}</div>
         ${p.descripcion?`<p class="text-xs text-slate-500 mt-1 flex-1">${psEscape(p.descripcion)}</p>`:'<div class="flex-1"></div>'}
@@ -4494,7 +4515,7 @@ function pubVerImagen(id){
   const p=(db.settings&&db.settings.publicidad||[]).find(x=>String(x.id)===String(id));
   if(!p||!pubEsImagen(p)){ showToast('No hay imagen para mostrar','warning'); return; }
   showModal(`<div class="p-4 max-w-3xl w-full text-center">
-    <div class="flex items-center justify-between mb-3"><h3 class="text-base font-bold truncate">${psEscape(p.titulo)}</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-3"><h3 class="text-base font-bold truncate">${psEscape(p.titulo)}</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <img src="${p.fileData}" alt="${psEscape(p.titulo)}" class="w-full max-h-[78vh] object-contain rounded-xl border border-slate-200 bg-white">
     ${p.descripcion?`<p class="text-xs text-slate-500 mt-2">${psEscape(p.descripcion)}</p>`:''}
   </div>`);
@@ -4503,7 +4524,7 @@ function pubFilaArchivo(p){
   return `<div><label class="text-sm font-medium">Archivo (opcional si usas enlace)</label>
   <div class="flex items-center gap-3 mt-1">
     <label class="px-4 py-2 bg-slate-100 rounded-xl cursor-pointer hover:bg-slate-200 text-sm"><i class="fas fa-upload mr-1"></i> Subir documento
-      <input type="file" class="hidden" onchange="window._pbFileName=this.files[0]?this.files[0].name:'';window._pbFileSel=this.files[0]||null;pbPreviaArchivo();document.getElementById('pb-file-name').textContent=window._pbFileName||'Ningún archivo seleccionado'">
+      <input type="file" class="hidden" data-bx-change="a130">
     </label>
     <span id="pb-file-name" class="text-xs text-slate-500">${psEscape(p&&p.archivoNombre||'Ningún archivo seleccionado')}</span>
   </div>
@@ -4515,7 +4536,7 @@ function pbPreviaArchivo(){
   const f=window._pbFileSel;
   if(!f||!f.type||!f.type.startsWith('image/')){ caja.innerHTML=''; return; }
   const reader=new FileReader();
-  reader.onload=ev=>{ if(document.getElementById('pb-previa')) caja.innerHTML=`<img src="${ev.target.result}" class="mt-2 h-32 w-full object-cover rounded-xl border border-slate-200" alt="Vista previa">`; };
+  reader.onload=ev=>{ if(document.getElementById('pb-previa')) caja.innerHTML=`<img loading="lazy" decoding="async" src="${ev.target.result}" class="mt-2 h-32 w-full object-cover rounded-xl border border-slate-200" alt="Vista previa">`; };
   reader.readAsDataURL(f);
 }
 function openPublicidadModal(id){
@@ -4524,7 +4545,7 @@ function openPublicidadModal(id){
   window._pbFile=null; window._pbFileSel=null;
   const p = id ? (db.settings.publicidad||[]).find(x=>String(x.id)===String(id)) : null;
   showModal(`<div class="p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">${p?'Editar':'Nuevo'} contenido publicitario</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">${p?'Editar':'Nuevo'} contenido publicitario</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div class="space-y-3">
       <div><label class="text-sm font-medium">Título *</label><input id="pb-titulo" value="${psEscape(p?p.titulo:'')}" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
       <div><label class="text-sm font-medium">Descripción</label><textarea id="pb-desc" rows="2" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape(p?p.descripcion:'')}</textarea></div>
@@ -4537,7 +4558,7 @@ function openPublicidadModal(id){
       ${pubFilaArchivo(p)}
       <p class="text-[11px] text-slate-400">Consejo: en Google Drive usa «Compartir → Cualquier persona con el enlace → Lector» para que todos puedan abrirlo.</p>
     </div>
-    <div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button onclick="guardarPublicidad('${p?p.id:''}')" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button></div>
+    <div class="flex justify-end gap-2 mt-4"><button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button data-bx-click="a131" data-p0="${bxE(function(){return p?p.id:''})}" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button></div>
   </div>`);
 }
 function guardarPublicidad(idStr){
@@ -4857,10 +4878,10 @@ function borrarPublicidad(id){
                         <p class="text-slate-500 text-sm mt-1">${cotEsProcesador() ? 'Bandeja de procesamiento: toma solicitudes, cotiza, analiza y envía.' : 'Solicita cotizaciones y emisiones; sigue el avance y responde aclaraciones.'}</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button onclick="openSimuladorPorRamo()" class="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-sm font-bold hover:bg-amber-200"><i class="fas fa-calculator mr-1.5 text-amber-700"></i> Simuladores por Ramo</button>
-                        ${cotEsProcesador() ? `<button onclick="cotTabAnalitica()" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200"><i class="fas fa-chart-bar mr-1"></i> Analítica</button>` : ''}
-                        ${cotPuedeConfigurar() ? `<button onclick="cotConfigModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200"><i class="fas fa-sliders mr-1"></i> Configurar</button>` : ''}
-                        <button onclick="cotModalNueva()" class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow"><i class="fas fa-plus mr-1"></i> Nueva solicitud</button>
+                        <button data-bx-click="a132" class="px-4 py-2.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-sm font-bold hover:bg-amber-200"><i class="fas fa-calculator mr-1.5 text-amber-700"></i> Simuladores por Ramo</button>
+                        ${cotEsProcesador() ? `<button data-bx-click="a133" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200"><i class="fas fa-chart-bar mr-1"></i> Analítica</button>` : ''}
+                        ${cotPuedeConfigurar() ? `<button data-bx-click="a134" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200"><i class="fas fa-sliders mr-1"></i> Configurar</button>` : ''}
+                        <button data-bx-click="a135" class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow"><i class="fas fa-plus mr-1"></i> Nueva solicitud</button>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -4871,12 +4892,12 @@ function borrarPublicidad(id){
                 </div>
                 <div class="flex flex-wrap items-center gap-2 mb-4">
                     <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden mr-2">
-                        <button onclick="window.cotVista='lista';render()" class="px-3 py-1.5 text-xs font-semibold ${(window.cotVista||'lista')==='lista'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-list mr-1"></i>Lista</button>
-                        <button onclick="window.cotVista='kanban';render()" class="px-3 py-1.5 text-xs font-semibold ${window.cotVista==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban</button>
+                        <button data-bx-click="a136" class="px-3 py-1.5 text-xs font-semibold ${(window.cotVista||'lista')==='lista'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-list mr-1"></i>Lista</button>
+                        <button data-bx-click="a137" class="px-3 py-1.5 text-xs font-semibold ${window.cotVista==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban</button>
                     </div>
-                    ${filtros.map(x=>`<button onclick="cotSetFiltro('${x}')" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${f===x?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}">${x==='todas'?'Todas':(COT_ESTADO_LABEL[x]||x)}${x!=='todas'?' ('+lista.filter(s=>s.estado===x).length+')':''}</button>`).join('')}
+                    ${filtros.map(x=>`<button data-bx-click="a138" data-p0="${bxE(function(){return x})}" class="px-3 py-1.5 rounded-full text-xs font-semibold border ${f===x?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}">${x==='todas'?'Todas':(COT_ESTADO_LABEL[x]||x)}${x!=='todas'?' ('+lista.filter(s=>s.estado===x).length+')':''}</button>`).join('')}
                     <div class="ml-auto relative"><i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input id="cot-busca" value="${escapeHTML(q)}" oninput="cotSetBusca(this.value)" placeholder="Buscar folio, cliente, ramo…" class="pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl w-56 focus:outline-none focus:ring-2 focus:ring-emerald-500"></div>
+                    <input id="cot-busca" value="${escapeHTML(q)}" data-bx-input="a139" placeholder="Buscar folio, cliente, ramo…" class="pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl w-56 focus:outline-none focus:ring-2 focus:ring-emerald-500"></div>
                 </div>
                 ${window.cotVista === 'kanban' ? (() => {
                     const cols = [
@@ -4898,17 +4919,17 @@ function borrarPublicidad(id){
                                     ${itemsCol.map(s => {
                                         const sla = cotSlaInfo(s);
                                         const semCls = sla.nivel === 'over' ? 'bg-red-500' : sla.nivel === 'warn' ? 'bg-amber-500' : 'bg-emerald-500';
-                                        return `<div class="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition cursor-pointer" onclick="cotAbrir('${s.id}')">
+                                        return `<div class="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition cursor-pointer" data-bx-click="a140" data-p0="${bxE(function(){return s.id})}">
                                             <div class="flex items-center justify-between gap-1 mb-1">
                                                 <span class="font-bold text-xs text-slate-900">${s.id}</span>
                                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${semCls}" title="Semáforo SLA"><i class="fas fa-clock"></i> ${sla.etiqueta}</span>
                                             </div>
                                             <p class="text-xs font-semibold text-slate-800 truncate">${escapeHTML(s.cliente.nombre)}</p>
                                             <p class="text-[11px] text-slate-500 truncate">${escapeHTML(s.ramoNombre)} · ${escapeHTML(s.compania)}</p>
-                                            ${cotEsProcesador() ? `<div class="mt-2 pt-2 border-t border-slate-100 flex justify-end gap-1" onclick="event.stopPropagation()">
-                                                ${col.id !== 'revision' ? `<button onclick="cotCambiarEstadoKanban('${s.id}','revision')" class="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-amber-100 rounded font-semibold">Cotizar</button>` : ''}
-                                                ${col.id !== 'cotizada' ? `<button onclick="cotCambiarEstadoKanban('${s.id}','cotizada')" class="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-indigo-100 rounded font-semibold">Cotizada</button>` : ''}
-                                                ${col.id !== 'emitida' ? `<button onclick="cotCambiarEstadoKanban('${s.id}','emitida')" class="px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded font-semibold">Emitir</button>` : ''}
+                                            ${cotEsProcesador() ? `<div class="mt-2 pt-2 border-t border-slate-100 flex justify-end gap-1" data-bx-click="a141">
+                                                ${col.id !== 'revision' ? `<button data-bx-click="a142" data-p0="${bxE(function(){return s.id})}" class="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-amber-100 rounded font-semibold">Cotizar</button>` : ''}
+                                                ${col.id !== 'cotizada' ? `<button data-bx-click="a143" data-p0="${bxE(function(){return s.id})}" class="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-indigo-100 rounded font-semibold">Cotizada</button>` : ''}
+                                                ${col.id !== 'emitida' ? `<button data-bx-click="a144" data-p0="${bxE(function(){return s.id})}" class="px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded font-semibold">Emitir</button>` : ''}
                                             </div>` : ''}
                                         </div>`;
                                     }).join('') || '<p class="text-xs text-slate-400 text-center py-6">Sin trámites</p>'}
@@ -4925,7 +4946,7 @@ function borrarPublicidad(id){
             const r = cotRamo(s.ramo);
             const pend = (s.checklist||[]).filter(c=>!c.ok).length;
             const chatNoLeido = (s.chat||[]).some(m=>{ const v=(s.vistoPor||{})[currentUser.id]||0; return m.fecha>v && String(m.de.id)!==String(currentUser.id); });
-            return `<div class="bg-white rounded-2xl border border-slate-200 p-4 hover:shadow-md transition cursor-pointer" onclick="cotAbrir('${s.id}')">
+            return `<div class="bg-white rounded-2xl border border-slate-200 p-4 hover:shadow-md transition cursor-pointer" data-bx-click="a140" data-p0="${bxE(function(){return s.id})}">
                 <div class="flex flex-wrap items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><i class="fas ${r.icon} text-emerald-600"></i></div>
                     <div class="min-w-0 flex-1">
@@ -4992,8 +5013,8 @@ function borrarPublicidad(id){
             const carga = {};
             lista.filter(s=>s.asignadoA && ['solicitud','revision','aclaracion'].includes(s.estado)).forEach(s=>{ carga[s.asignadoA.nombre]=(carga[s.asignadoA.nombre]||0)+1; });
             const procesadores = (db.users||[]).filter(u=>hasRole(u,['agencia','admin','gm','desarrollador']));
-            showModal(`<div class="max-w-3xl w-full bg-white rounded-2xl p-6 modal-scroll" onclick="event.stopPropagation()">
-                <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-slate-800"><i class="fas fa-chart-bar text-emerald-600 mr-2"></i>Analítica de cotizaciones</h3><button onclick="closeModal()" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button></div>
+            showModal(`<div class="max-w-3xl w-full bg-white rounded-2xl p-6 modal-scroll" data-bx-click="a141">
+                <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-slate-800"><i class="fas fa-chart-bar text-emerald-600 mr-2"></i>Analítica de cotizaciones</h3><button data-bx-click="a1" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button></div>
                 ${porRamo.length? `<div class="overflow-x-auto"><table class="w-full text-sm">
                     <thead class="bg-slate-50"><tr><th class="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Ramo</th><th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Total</th><th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Activas</th><th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Retrasadas</th><th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Resp. prom.</th></tr></thead>
                     <tbody class="divide-y divide-slate-100">${porRamo.map(x=>`<tr><td class="px-3 py-2 font-medium text-slate-700">${x.r.nombre}</td><td class="px-3 py-2 text-center">${x.n}</td><td class="px-3 py-2 text-center">${x.act}</td><td class="px-3 py-2 text-center ${x.ret?'text-red-600 font-bold':'text-slate-400'}">${x.ret}</td><td class="px-3 py-2 text-center">${x.prom?x.prom.toFixed(1)+' h':'—'}</td></tr>`).join('')}</tbody>
@@ -5004,7 +5025,7 @@ function borrarPublicidad(id){
         }
         /* ---------- Configuración GM: compañías y checklist ---------- */
         function cotCfgChkRow(ramoId, c){
-            return '<div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mb-1.5" data-chkk="'+escapeHTML(c.k)+'"><span class="text-sm text-slate-700">'+escapeHTML(c.t)+'</span><button onclick="cotCfgChkDel(\''+ramoId+'\', this)" class="text-xs text-red-500 hover:text-red-600" title="Quitar requisito"><i class="fas fa-trash"></i></button></div>';
+            return '<div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 mb-1.5" data-chkk="'+escapeHTML(c.k)+'"><span class="text-sm text-slate-700">'+escapeHTML(c.t)+'</span><button ' + bxOn('click','bxM.cotChkDel',[ramoId]) + ' class="text-xs text-red-500 hover:text-red-600" title="Quitar requisito"><i class="fas fa-trash"></i></button></div>';
         }
         function cotCfgChkAdd(ramoId){
             const inp = document.getElementById('cot-cfg-new-'+ramoId);
@@ -5049,18 +5070,18 @@ function borrarPublicidad(id){
                 return `<details class="bg-white border border-slate-200 rounded-xl p-3"><summary class="cursor-pointer select-none text-sm font-bold text-slate-700"><i class="fas ${r.icon} text-emerald-600 mr-1"></i>${r.nombre} <span class="text-xs text-slate-400 font-normal">(${items.length} requisitos)</span></summary>
                     <div class="mt-2" id="cot-cfg-chk-${r.id}">${items.map(c=>cotCfgChkRow(r.id,c)).join('')}</div>
                     <div class="flex gap-2 mt-2">
-                        <input id="cot-cfg-new-${r.id}" placeholder="Nuevo requisito…" class="flex-1 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900" onkeydown="if(event.key==='Enter')cotCfgChkAdd('${r.id}')">
-                        <button onclick="cotCfgChkAdd('${r.id}')" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800"><i class="fas fa-plus"></i></button>
+                        <input id="cot-cfg-new-${r.id}" placeholder="Nuevo requisito…" class="flex-1 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900" data-bx-keydown="a145" data-p0="${bxE(function(){return r.id})}">
+                        <button data-bx-click="a146" data-p0="${bxE(function(){return r.id})}" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800"><i class="fas fa-plus"></i></button>
                     </div>
                     <p class="text-[11px] text-slate-400 mt-1">El checklist del GM reemplaza la lista del ramo: puedes agregar o quitar requisitos.</p>
                 </details>`;
             }).join('');
             const ia = cotIaCfg();
-            showModal(`<div class="max-w-2xl w-full bg-white rounded-2xl modal-scroll" onclick="event.stopPropagation()">
+            showModal(`<div class="max-w-2xl w-full bg-white rounded-2xl modal-scroll" data-bx-click="a141">
                 <div class="p-6 pb-3 border-b border-slate-100 flex items-center justify-between">
                     <div><h3 class="text-lg font-bold text-slate-800"><i class="fas fa-sliders text-emerald-600 mr-2"></i>Configuración del cotizador</h3>
                     <p class="text-xs text-slate-500 mt-0.5">Exclusivo GM / Admin / Desarrollador. Los cambios aplican de inmediato para toda la agencia.</p></div>
-                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
+                    <button data-bx-click="a1" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
                 </div>
                 <div class="p-6 space-y-4">
                     <div class="border border-violet-200 bg-violet-50/50 rounded-xl p-4">
@@ -5068,7 +5089,7 @@ function borrarPublicidad(id){
                         <p class="text-[11px] text-slate-500 mb-3">Esta IA lee el documento de la póliza y lo compara punto por punto con la solicitud (tipo de seguro, asegurado, prima, suma, deducibles…). La clave se guarda solo en este navegador.</p>
                         <div class="grid sm:grid-cols-2 gap-3">
                             <div><label class="text-xs font-semibold text-slate-500">Proveedor</label>
-                                <select id="cot-ia-prov" onchange="cotIaCfgProvChange()" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900">
+                                <select id="cot-ia-prov" data-bx-change="a147" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900">
                                     <option value="gemini" ${(ia.proveedor||'gemini')==='gemini'?'selected':''}>Google Gemini (recomendado, con capa gratuita)</option>
                                     <option value="openai" ${ia.proveedor==='openai'?'selected':''}>OpenAI</option>
                                     <option value="groq" ${ia.proveedor==='groq'?'selected':''}>Groq</option>
@@ -5080,17 +5101,17 @@ function borrarPublicidad(id){
                             <div class="sm:col-span-2" id="cot-ia-url-wrap" style="${ia.proveedor==='custom'?'':'display:none'}"><label class="text-xs font-semibold text-slate-500">URL del endpoint</label><input id="cot-ia-url" value="${escapeHTML(ia.url||'')}" placeholder="https://…/v1/chat/completions" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900"></div>
                         </div>
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <button onclick="cotIaCfgGuardar()" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar configuración IA</button>
-                            <button onclick="cotIaProbar(this)" class="px-4 py-2 border border-violet-300 text-violet-700 rounded-xl text-sm font-semibold hover:bg-violet-100"><i class="fas fa-plug mr-1"></i> Probar conexión</button>
+                            <button data-bx-click="a148" class="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar configuración IA</button>
+                            <button data-bx-click="a149" class="px-4 py-2 border border-violet-300 text-violet-700 rounded-xl text-sm font-semibold hover:bg-violet-100"><i class="fas fa-plug mr-1"></i> Probar conexión</button>
                         </div>
                     </div>
                     <div>
                         <p class="text-xs font-bold text-slate-600 uppercase mb-2"><i class="fas fa-building-shield text-emerald-600 mr-1"></i> Compañías aseguradoras</p>
-                        <div class="flex flex-wrap gap-2 mb-2">${comps.map((c,i)=>`<span class="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full pl-3 pr-1.5 py-1 text-xs font-semibold text-slate-700">${escapeHTML(c)}<button onclick="cotCfgCompDel(${i})" class="w-5 h-5 rounded-full hover:bg-red-100 text-red-500" title="Quitar"><i class="fas fa-times text-[10px]"></i></button></span>`).join('')}</div>
+                        <div class="flex flex-wrap gap-2 mb-2">${comps.map((c,i)=>`<span class="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-full pl-3 pr-1.5 py-1 text-xs font-semibold text-slate-700">${escapeHTML(c)}<button data-bx-click="a150" data-p0="${bxE(function(){return i})}" class="w-5 h-5 rounded-full hover:bg-red-100 text-red-500" title="Quitar"><i class="fas fa-times text-[10px]"></i></button></span>`).join('')}</div>
                         <div class="flex flex-wrap gap-2">
-                            <input id="cot-cfg-comp-new" placeholder="Nombre de la compañía…" class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900" onkeydown="if(event.key==='Enter')cotCfgCompAdd()">
-                            <button onclick="cotCfgCompAdd()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i> Agregar</button>
-                            <button onclick="cotCfgResetComps()" class="px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50">Restaurar</button>
+                            <input id="cot-cfg-comp-new" placeholder="Nombre de la compañía…" class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white text-slate-900" data-bx-keydown="a151">
+                            <button data-bx-click="a152" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-plus mr-1"></i> Agregar</button>
+                            <button data-bx-click="a153" class="px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50">Restaurar</button>
                         </div>
                     </div>
                     <div>
@@ -5141,11 +5162,11 @@ function borrarPublicidad(id){
             if(!(cotEsSolicitante()||cotEsProcesador())) return;
             window.cotNuevaChk = {};
             const opcionesRamo = COT_RAMOS.map(r=>`<option value="${r.id}">${r.nombre}</option>`).join('');
-            showModal(`<div class="cot-nueva bg-white rounded-2xl modal-scroll" onclick="event.stopPropagation()">
+            showModal(`<div class="cot-nueva bg-white rounded-2xl modal-scroll" data-bx-click="a141">
                 <div class="px-5 sm:px-7 lg:px-8 py-5 border-b border-slate-100 grid sm:grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                     <div><h3 class="text-lg font-bold text-slate-800"><i class="fas fa-file-circle-plus text-emerald-600 mr-2"></i>Nueva solicitud de cotización</h3>
                     <p class="text-xs text-slate-500 mt-0.5">Completa los datos y marca el checklist de requisitos; puedes adjuntar documentos.</p></div>
-                    <button onclick="closeModal()" class="justify-self-end text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
+                    <button data-bx-click="a1" class="justify-self-end text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
                 </div>
                 <div class="p-5 sm:p-7 lg:p-8 space-y-5">
                     <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200">
@@ -5155,7 +5176,7 @@ function borrarPublicidad(id){
                         </div>
                         <label class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold cursor-pointer hover:bg-slate-800 shrink-0">
                             <i class="fas fa-wand-magic-sparkles mr-1"></i>Escanear INE / Carátula
-                            <input type="file" accept=".pdf,image/*,.txt" class="hidden" onchange="cotAutoFillDesdeDoc(this)">
+                            <input type="file" accept=".pdf,image/*,.txt" class="hidden" data-bx-change="a154">
                         </label>
                     </div>
                     <p class="text-[10px] font-bold uppercase text-slate-400 tracking-wider"><i class="fas fa-user-pen mr-1"></i> Datos del cliente</p>
@@ -5175,7 +5196,7 @@ function borrarPublicidad(id){
                     </div>
                     <div class="grid gap-4 sm:grid-cols-[240px_minmax(0,1fr)]">
                         <div><label class="text-xs font-semibold text-slate-500 uppercase">Ramo *</label>
-                            <select id="cot-ramo" onchange="cotRamoChange()" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm">${opcionesRamo}</select></div>
+                            <select id="cot-ramo" data-bx-change="a155" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm">${opcionesRamo}</select></div>
                         <div class="sm:col-span-2"><label class="text-xs font-semibold text-slate-500 uppercase">Notas para el procesador</label>
                             <textarea id="cot-notas" rows="2" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none" placeholder="Contexto del cliente, urgencia, preferencias…"></textarea></div>
                     </div>
@@ -5192,8 +5213,8 @@ function borrarPublicidad(id){
                     </div>
                 </div>
                 <div class="px-5 sm:px-7 lg:px-8 pb-5 sm:pb-6 pt-4 flex flex-wrap justify-end gap-2">
-                    <button onclick="closeModal()" class="px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-medium">Cancelar</button>
-                    <button onclick="cotCrear()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-paper-plane mr-1"></i> Enviar solicitud</button>
+                    <button data-bx-click="a1" class="px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-medium">Cancelar</button>
+                    <button data-bx-click="a156" class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-paper-plane mr-1"></i> Enviar solicitud</button>
                 </div>
             </div>`);
             cotRamoChange();
@@ -5206,7 +5227,7 @@ function borrarPublicidad(id){
             const lbl = `<label class="text-xs font-semibold text-slate-500 uppercase">${c.t}</label>`;
             if(c.tipo==='opciones'){
                 if((c.opciones||[]).length>=2 && (c.opciones||[]).length<=4){
-                    const btns = (c.opciones||[]).map(o=>`<button type="button" onclick="cotOptSel('${pid}','${o}')" data-valor="${o}" class="cot-opt-btn px-2.5 py-2 rounded-xl text-xs sm:text-sm font-semibold">${o}</button>`).join('');
+                    const btns = (c.opciones||[]).map(o=>`<button type="button" data-bx-click="a157" data-p0="${bxE(function(){return pid})}" data-p1="${bxE(function(){return o})}" data-valor="${o}" class="cot-opt-btn px-2.5 py-2 rounded-xl text-xs sm:text-sm font-semibold">${o}</button>`).join('');
                     return `${wrapOpen}<label class="text-xs font-semibold text-slate-500 uppercase">${c.t}</label>
                         <div class="flex flex-wrap gap-2 mt-1" id="${pid}">${btns}</div>${wrapClose}`;
                 }
@@ -5240,7 +5261,7 @@ function borrarPublicidad(id){
         function cotIntegrantesHTML(pref){
             return `<div class="cot-span2"><div class="flex items-center justify-between mt-1 mb-1">
                     <label class="text-xs font-semibold text-slate-500 uppercase">Integrantes adicionales</label>
-                    <button type="button" onclick="cotIntegranteAdd('${pref}')" class="text-xs font-semibold text-emerald-700 hover:underline"><i class="fas fa-plus mr-1"></i>Agregar integrante</button></div>
+                    <button type="button" data-bx-click="a158" data-p0="${bxE(function(){return pref})}" class="text-xs font-semibold text-emerald-700 hover:underline"><i class="fas fa-plus mr-1"></i>Agregar integrante</button></div>
                 <div id="${pref}integrantes" class="space-y-2"></div></div>`;
         }
         function cotIntegranteAdd(pref){
@@ -5248,12 +5269,12 @@ function borrarPublicidad(id){
             const i = wrap.children.length;
             const div = document.createElement('div');
             div.className = 'cot-int-row rounded-xl p-3';
-            div.innerHTML = `<div class="flex items-center justify-between mb-2"><p class="text-xs font-bold text-slate-600">Integrante ${i+1}</p><button type="button" onclick="this.closest('.cot-int-row').remove();cotIntegranteReenum('${pref}')" class="text-xs text-red-500 hover:text-red-600"><i class="fas fa-trash"></i> Quitar</button></div>
+            div.innerHTML = `<div class="flex items-center justify-between mb-2"><p class="text-xs font-bold text-slate-600">Integrante ${i+1}</p><button type="button" data-bx-click="a159" data-p0="${bxE(function(){return pref})}" class="text-xs text-red-500 hover:text-red-600"><i class="fas fa-trash"></i> Quitar</button></div>
                 <div class="grid sm:grid-cols-2 gap-x-3 gap-y-2">
                     <div><label class="text-[10px] font-semibold text-slate-400 uppercase">Nombre</label><input name="${pref}i-n" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900" placeholder="Nombre completo"></div>
                     <div><label class="text-[10px] font-semibold text-slate-400 uppercase">Parentesco</label><input name="${pref}i-p" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900" placeholder="Ej. Cónyuge, Hijo(a)"></div>
                     <div><label class="text-[10px] font-semibold text-slate-400 uppercase">Fecha de nacimiento</label><input type="date" name="${pref}i-f" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900"></div>
-                    <div><label class="text-[10px] font-semibold text-slate-400 uppercase">Género</label><div class="flex flex-wrap gap-1.5 mt-0.5" name="${pref}i-g"><button type="button" onclick="cotOptSel(this.parentNode,'MASCULINO')" data-valor="MASCULINO" class="cot-opt-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold">MASCULINO</button><button type="button" onclick="cotOptSel(this.parentNode,'FEMENINO')" data-valor="FEMENINO" class="cot-opt-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold">FEMENINO</button></div></div>
+                    <div><label class="text-[10px] font-semibold text-slate-400 uppercase">Género</label><div class="flex flex-wrap gap-1.5 mt-0.5" name="${pref}i-g"><button type="button" data-bx-click="a160" data-valor="MASCULINO" class="cot-opt-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold">MASCULINO</button><button type="button" data-bx-click="a161" data-valor="FEMENINO" class="cot-opt-btn px-2.5 py-1.5 rounded-lg text-xs font-semibold">FEMENINO</button></div></div>
                     <div><label class="text-[10px] font-semibold text-slate-400 uppercase">Reconocimiento de antigüedad</label><input type="date" name="${pref}i-a" class="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900"></div>
                 </div>`;
             wrap.appendChild(div);
@@ -5271,8 +5292,8 @@ function borrarPublicidad(id){
             const btnCalc = `<div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                 <span class="text-xs font-semibold text-slate-700"><i class="fas fa-wand-magic-sparkles text-amber-600 mr-1"></i>Herramienta especializada para <b>${r.nombre}</b>:</span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="openSimuladorPorRamo('${ramo}')" class="px-3 py-1 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600"><i class="fas fa-calculator mr-1"></i>Abrir Calculadora de ${r.nombre}</button>
-                    ${r.colectivo ? `<label class="px-3 py-1 rounded-lg bg-emerald-700 text-white text-xs font-bold cursor-pointer hover:bg-emerald-800"><i class="fas fa-file-csv mr-1"></i>Importar Censo CSV<input type="file" accept=".csv,.txt" class="hidden" onchange="cotImportarCensoCSV(this, '${ramo}')"></label>` : ''}
+                    <button type="button" data-bx-click="a162" data-p0="${bxE(function(){return ramo})}" class="px-3 py-1 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600"><i class="fas fa-calculator mr-1"></i>Abrir Calculadora de ${r.nombre}</button>
+                    ${r.colectivo ? `<label class="px-3 py-1 rounded-lg bg-emerald-700 text-white text-xs font-bold cursor-pointer hover:bg-emerald-800"><i class="fas fa-file-csv mr-1"></i>Importar Censo CSV<input type="file" accept=".csv,.txt" class="hidden" data-bx-change="a163" data-p0="${bxE(function(){return ramo})}"></label>` : ''}
                 </div>
             </div>`;
             document.getElementById('cot-campos-extra').innerHTML = btnCalc + (campos.length ? `<div class="cot-fields grid gap-3">${campos.map(c=> c.tipo==='integrantes' ? cotIntegrantesHTML(pref) : cotCampoHTML(c,pref)).join('')}</div>` : '');
@@ -5281,7 +5302,7 @@ function borrarPublicidad(id){
             window.cotNuevaChk = {};
             document.getElementById('cot-check-wrap').innerHTML = `<div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                 <p class="text-xs font-bold text-slate-600 uppercase mb-2"><i class="fas fa-clipboard-check text-emerald-600 mr-1"></i> Checklist de requisitos — ${r.nombre}</p>
-                <div class="space-y-1.5">${items.map(c=>`<label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" data-cotchk="${c.k}" data-cott="${escapeHTML(c.t)}" onchange="window.cotNuevaChk['${c.k}']=this.checked" class="mt-0.5 accent-emerald-600"><span>${c.t}</span></label>`).join('')}</div>
+                <div class="space-y-1.5">${items.map(c=>`<label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" data-cotchk="${c.k}" data-cott="${escapeHTML(c.t)}" data-bx-change="a164" data-p0="${bxE(function(){return c.k})}" class="mt-0.5 accent-emerald-600"><span>${c.t}</span></label>`).join('')}</div>
                 <p class="text-[11px] text-slate-400 mt-2">Puedes enviar aunque falten requisitos, pero se marcarán como pendientes y pueden retrasar la cotización.</p></div>`;
         }
 
@@ -5324,10 +5345,10 @@ function borrarPublicidad(id){
                 body = `<div class="space-y-4">
                     <p class="text-xs text-slate-500">Calcula la <b>Suma Asegurada Ideal</b> para proteger el ingreso familiar, liquidar pasivos y garantizar el fondo universitario de los hijos.</p>
                     <div class="grid sm:grid-cols-2 gap-3">
-                        <div><label class="text-xs font-bold text-slate-600">Gasto mensual familiar ($ MXN)</label><input id="sim-vida-gasto" type="number" value="35000" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Años de respaldo deseados</label><input id="sim-vida-anios" type="number" value="10" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Deudas / Hipoteca actual ($ MXN)</label><input id="sim-vida-deuda" type="number" value="800000" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Fondo Universitario por hijo ($ MXN)</label><input id="sim-vida-uni" type="number" value="900000" oninput="calcSimVida()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Gasto mensual familiar ($ MXN)</label><input id="sim-vida-gasto" type="number" value="35000" data-bx-input="a165" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Años de respaldo deseados</label><input id="sim-vida-anios" type="number" value="10" data-bx-input="a165" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Deudas / Hipoteca actual ($ MXN)</label><input id="sim-vida-deuda" type="number" value="800000" data-bx-input="a165" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Fondo Universitario por hijo ($ MXN)</label><input id="sim-vida-uni" type="number" value="900000" data-bx-input="a165" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
                     </div>
                     <div id="sim-vida-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
                 </div>`;
@@ -5335,10 +5356,10 @@ function borrarPublicidad(id){
                 body = `<div class="space-y-4">
                     <p class="text-xs text-slate-500">Muestra al cliente cuánto pagaría él y cuánto absorbe la aseguradora ante una hospitalización real según su <b>Deducible, Coaseguro y Tope de Coaseguro</b>.</p>
                     <div class="grid sm:grid-cols-2 gap-3">
-                        <div><label class="text-xs font-bold text-slate-600">Monto del Siniestro Hospitalario ($)</label><input id="sim-gmm-siniestro" type="number" value="450000" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Deducible Contratado ($)</label><input id="sim-gmm-ded" type="number" value="30000" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Coaseguro (%)</label><input id="sim-gmm-coa" type="number" value="10" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Tope de Coaseguro ($)</label><input id="sim-gmm-tope" type="number" value="65000" oninput="calcSimGMM()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Monto del Siniestro Hospitalario ($)</label><input id="sim-gmm-siniestro" type="number" value="450000" data-bx-input="a166" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Deducible Contratado ($)</label><input id="sim-gmm-ded" type="number" value="30000" data-bx-input="a166" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Coaseguro (%)</label><input id="sim-gmm-coa" type="number" value="10" data-bx-input="a166" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Tope de Coaseguro ($)</label><input id="sim-gmm-tope" type="number" value="65000" data-bx-input="a166" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
                     </div>
                     <div id="sim-gmm-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
                 </div>`;
@@ -5346,10 +5367,10 @@ function borrarPublicidad(id){
                 body = `<div class="space-y-4">
                     <p class="text-xs text-slate-500">Simulador de <b>Plan Personal de Retiro (Art. 151 LISR)</b> con cálculo de devolución anual del SAT e interés compuesto.</p>
                     <div class="grid sm:grid-cols-2 gap-3">
-                        <div><label class="text-xs font-bold text-slate-600">Aportación Mensual ($ MXN)</label><input id="sim-ppr-mes" type="number" value="5000" oninput="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Plazo de Inversión (Años)</label><input id="sim-ppr-anios" type="number" value="15" oninput="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Tasa ISR del Cliente (%)</label><select id="sim-ppr-isr" onchange="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="30" selected>30% (Ingresos medios-altos)</option><option value="23">23% (Ingresos medios)</option><option value="35">35% (Tasa máxima)</option></select></div>
-                        <div><label class="text-xs font-bold text-slate-600">Rendimiento Anual Estimado (%)</label><select id="sim-ppr-tasa" onchange="calcSimPPR()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="8.5">8.5% (Conservador)</option><option value="10.5" selected>10.5% (Dinámico)</option><option value="12.5">12.5% (Inversionista)</option></select></div>
+                        <div><label class="text-xs font-bold text-slate-600">Aportación Mensual ($ MXN)</label><input id="sim-ppr-mes" type="number" value="5000" data-bx-input="a167" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Plazo de Inversión (Años)</label><input id="sim-ppr-anios" type="number" value="15" data-bx-input="a167" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Tasa ISR del Cliente (%)</label><select id="sim-ppr-isr" data-bx-change="a168" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="30" selected>30% (Ingresos medios-altos)</option><option value="23">23% (Ingresos medios)</option><option value="35">35% (Tasa máxima)</option></select></div>
+                        <div><label class="text-xs font-bold text-slate-600">Rendimiento Anual Estimado (%)</label><select id="sim-ppr-tasa" data-bx-change="a168" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="8.5">8.5% (Conservador)</option><option value="10.5" selected>10.5% (Dinámico)</option><option value="12.5">12.5% (Inversionista)</option></select></div>
                     </div>
                     <div id="sim-ppr-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
                 </div>`;
@@ -5357,29 +5378,29 @@ function borrarPublicidad(id){
                 body = `<div class="space-y-4">
                     <p class="text-xs text-slate-500">Evita el <b>infraseguro</b> calculando el Valor Real de Reconstrucción por m² de construcción y contenidos.</p>
                     <div class="grid sm:grid-cols-3 gap-3">
-                        <div><label class="text-xs font-bold text-slate-600">Superficie construida (m²)</label><input id="sim-dan-m2" type="number" value="180" oninput="calcSimDanos()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
-                        <div><label class="text-xs font-bold text-slate-600">Nivel de Acabados</label><select id="sim-dan-tipo" onchange="calcSimDanos()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="14500">Interés Medio ($14,500/m²)</option><option value="21000" selected>Residencial ($21,000/m²)</option><option value="32000">Residencial Plus / Lujo ($32,000/m²)</option><option value="16000">Nave / Local PyME ($16,000/m²)</option></select></div>
-                        <div><label class="text-xs font-bold text-slate-600">% Contenidos / Mobiliario</label><input id="sim-dan-cont" type="number" value="30" oninput="calcSimDanos()" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Superficie construida (m²)</label><input id="sim-dan-m2" type="number" value="180" data-bx-input="a169" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
+                        <div><label class="text-xs font-bold text-slate-600">Nivel de Acabados</label><select id="sim-dan-tipo" data-bx-change="a170" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm bg-white"><option value="14500">Interés Medio ($14,500/m²)</option><option value="21000" selected>Residencial ($21,000/m²)</option><option value="32000">Residencial Plus / Lujo ($32,000/m²)</option><option value="16000">Nave / Local PyME ($16,000/m²)</option></select></div>
+                        <div><label class="text-xs font-bold text-slate-600">% Contenidos / Mobiliario</label><input id="sim-dan-cont" type="number" value="30" data-bx-input="a169" class="w-full mt-1 px-3 py-2 border rounded-xl text-sm"></div>
                     </div>
                     <div id="sim-dan-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
                 </div>`;
             } else {
                 body = `<div class="space-y-4">
                     <p class="text-xs text-slate-500">Validador rápido de <b>Censos / Padrones Colectivos</b> (Vida, GMM o Flotilla de Autos). Pega tus filas separadas por coma (Nombre, Edad, Suma/Unidad).</p>
-                    <textarea id="sim-col-txt" rows="4" oninput="calcSimColectivo()" class="w-full p-3 border rounded-xl text-xs font-mono" placeholder="Juan Pérez, 34, 1000000\nMaría López, 29, 1000000\nCarlos Ruiz, 45, 1500000">Juan Pérez, 34, 1000000\nMaría López, 29, 1000000\nCarlos Ruiz, 45, 1500000\nAna Torres, 38, 1000000</textarea>
+                    <textarea id="sim-col-txt" rows="4" data-bx-input="a171" class="w-full p-3 border rounded-xl text-xs font-mono" placeholder="Juan Pérez, 34, 1000000\nMaría López, 29, 1000000\nCarlos Ruiz, 45, 1500000">Juan Pérez, 34, 1000000\nMaría López, 29, 1000000\nCarlos Ruiz, 45, 1500000\nAna Torres, 38, 1000000</textarea>
                     <div id="sim-col-out" class="p-4 rounded-2xl bg-slate-900 text-white"></div>
                 </div>`;
             }
-            showModal(`<div class="max-w-3xl w-full bg-white rounded-2xl p-6 modal-scroll" onclick="event.stopPropagation()">
+            showModal(`<div class="max-w-3xl w-full bg-white rounded-2xl p-6 modal-scroll" data-bx-click="a141">
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">Herramientas por Ramo</span>
                         <h3 class="text-xl font-bold text-slate-900 mt-0.5"><i class="fas fa-calculator text-amber-600 mr-1.5"></i>Simuladores Técnicos y Financieros</h3>
                     </div>
-                    <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+                    <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
                 </div>
                 <div class="flex flex-wrap gap-1.5 mb-5 pb-3 border-b border-slate-200">
-                    ${tabs.map(t=>`<button type="button" onclick="openSimuladorPorRamo('${t.id}')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition ${tab===t.id?'bg-slate-900 text-amber-300 shadow':'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas ${t.icon} mr-1"></i>${t.lbl}</button>`).join('')}
+                    ${tabs.map(t=>`<button type="button" data-bx-click="a172" data-p0="${bxE(function(){return t.id})}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition ${tab===t.id?'bg-slate-900 text-amber-300 shadow':'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas ${t.icon} mr-1"></i>${t.lbl}</button>`).join('')}
                 </div>
                 ${body}
             </div>`);
@@ -6065,18 +6086,18 @@ function borrarPublicidad(id){
                 </label>
                 <label class="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-semibold cursor-pointer shrink-0">
                     <i class="fas fa-upload mr-1"></i>Subir doc
-                    <input type="file" class="hidden" onchange="cotAdjuntarDocRequisito('${s.id}','${c.k}',this)">
+                    <input type="file" class="hidden" data-bx-change="a173" data-p0="${bxE(function(){return s.id})}" data-p1="${bxE(function(){return c.k})}">
                 </label>
             </div>`).join('');
             const docsHtml = (s.docs||[]).map((d,i)=>'<a href="'+d.dataURL+'" download="'+escapeHTML(d.nombre)+'" class="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"><i class="fas '+(/pdf/.test(d.tipo)?'fa-file-pdf text-red-500':'fa-file-image text-blue-500')+'"></i>'+escapeHTML(d.nombre)+'</a>').join('') || '<p class="text-xs text-slate-400">Sin documentos adjuntos.</p>';
             const detHtml = Object.entries(s.detalles||{}).map(([k,v])=>'<div><p class="text-[10px] uppercase font-semibold text-slate-400">'+escapeHTML(k)+'</p><p class="text-sm text-slate-700">'+escapeHTML(String(v))+'</p></div>').join('');
             let acciones = '';
             if(esProc && ['solicitud','revision','aclaracion'].includes(s.estado)){
-                if(!s.asignadoA) acciones += '<button onclick="cotTomar(\''+s.id+'\')" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"><i class="fas fa-hand-paper mr-1"></i> Tomar solicitud</button>';
+                if(!s.asignadoA) acciones += '<button ' + bxOn('click','cotTomar',[s.id]) + ' class="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"><i class="fas fa-hand-paper mr-1"></i> Tomar solicitud</button>';
                 else if(String(s.asignadoA.id)===String(currentUser.id)) acciones += '<span class="text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-xl font-semibold"><i class="fas fa-user-check mr-1"></i>Atendiéndola tú</span>';
                 else acciones += '<span class="text-xs bg-slate-100 text-slate-500 px-3 py-2 rounded-xl font-semibold"><i class="fas fa-user mr-1"></i>Asignada a '+escapeHTML(s.asignadoA.nombre)+'</span>';
-                acciones += '<button onclick="cotPedirAclaracion(\''+s.id+'\')" class="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600"><i class="fas fa-circle-question mr-1"></i> Pedir aclaración</button>';
-                acciones += '<button onclick="cotRechazar(\''+s.id+'\')" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-300"><i class="fas fa-ban mr-1"></i> Rechazar</button>';
+                acciones += '<button ' + bxOn('click','cotPedirAclaracion',[s.id]) + ' class="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600"><i class="fas fa-circle-question mr-1"></i> Pedir aclaración</button>';
+                acciones += '<button ' + bxOn('click','cotRechazar',[s.id]) + ' class="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-300"><i class="fas fa-ban mr-1"></i> Rechazar</button>';
             }
             if(esPropio && s.estado==='aclaracion') acciones += '<span class="text-xs bg-orange-100 text-orange-700 px-3 py-2 rounded-xl font-semibold"><i class="fas fa-comment-dots mr-1"></i>Responde en el chat la aclaración solicitada</span>';
             const bodyHtml = {
@@ -6100,17 +6121,17 @@ function borrarPublicidad(id){
                         <div class="space-y-1">${(s.chat||[]).filter(m=>m.sistema).map(m=>'<p class="text-[11px] text-slate-400"><i class="fas fa-clock mr-1"></i>'+new Date(m.fecha).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+' — '+escapeHTML(m.texto)+'</p>').join('')}</div></div>
                 </div>`,
                 chat: `<div id="cot-chat-lista" class="space-y-1 max-h-[46vh] overflow-y-auto pr-1">${chatHtml}</div>
-                    <div class="flex gap-2 mt-3"><input id="cot-chat-input" onkeydown="if(event.key==='Enter')cotEnviarMsg('${s.id}')" placeholder="Escribe un mensaje…" class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"><button onclick="cotEnviarMsg('${s.id}')" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-paper-plane"></i></button></div>`,
+                    <div class="flex gap-2 mt-3"><input id="cot-chat-input" data-bx-keydown="a174" data-p0="${bxE(function(){return s.id})}" placeholder="Escribe un mensaje…" class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"><button data-bx-click="a175" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-paper-plane"></i></button></div>`,
                 cotizacion: cotTabCotizacionHtml(s, esProc, esPropio)
             }[window.cotModalTab] || '';
-            showModal(`<div class="max-w-4xl w-full bg-white rounded-2xl modal-scroll" onclick="event.stopPropagation()">
+            showModal(`<div class="max-w-4xl w-full bg-white rounded-2xl modal-scroll" data-bx-click="a141">
                 <div class="p-6 pb-3 border-b border-slate-100">
                     <div class="flex items-start justify-between gap-3">
                         <div><div class="flex items-center gap-2 flex-wrap"><h3 class="text-lg font-bold text-slate-800">${s.id}</h3><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${COT_ESTADO_COLOR[s.estado]}">${COT_ESTADO_LABEL[s.estado]||s.estado}</span></div>
                         <p class="text-sm text-slate-500 mt-0.5"><i class="fas ${r.icon} text-emerald-600 mr-1"></i>${escapeHTML(s.ramoNombre)} · ${escapeHTML(s.compania)}</p></div>
-                        <button onclick="cotCerrarModal()" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
+                        <button data-bx-click="a176" class="text-slate-400 hover:text-slate-700"><i class="fas fa-times text-lg"></i></button>
                     </div>
-                    <div class="flex gap-1 mt-4">${tabs.map(t=>`<button onclick="cotAbrir('${s.id}','${t[0]}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold ${window.cotModalTab===t[0]?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas ${t[2]} mr-1"></i>${t[1]}</button>`).join('')}</div>
+                    <div class="flex gap-1 mt-4">${tabs.map(t=>`<button data-bx-click="a177" data-p0="${bxE(function(){return s.id})}" data-p1="${bxE(function(){return t[0]})}" class="px-3 py-1.5 rounded-lg text-xs font-semibold ${window.cotModalTab===t[0]?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas ${t[2]} mr-1"></i>${t[1]}</button>`).join('')}</div>
                 </div>
                 <div class="p-6">${bodyHtml}</div>
             </div>`);
@@ -6135,7 +6156,7 @@ function borrarPublicidad(id){
                         </div>
                         <div><label class="text-xs font-semibold text-slate-500">Notas del procesador para el agente</label><textarea id="cot-q-nota" rows="2" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="Deducibles, exclusiones relevantes, condiciones…"></textarea></div>
                         <div class="flex flex-wrap gap-2">
-                            <button onclick="cotCargarYAnalizar('${s.id}')" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800"><i class="fas fa-robot mr-1"></i> Cargar y analizar</button>
+                            <button data-bx-click="a178" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800"><i class="fas fa-robot mr-1"></i> Cargar y analizar</button>
                         </div>
                     </div>
                     <div class="bg-white border-2 border-dashed border-emerald-200 rounded-xl p-4">
@@ -6144,15 +6165,15 @@ function borrarPublicidad(id){
                         <div class="mb-3 border-2 border-dashed border-emerald-200 rounded-xl p-3 bg-emerald-50/40">
                             <p class="text-xs font-bold uppercase text-emerald-700 mb-2"><i class="fas fa-wand-magic-sparkles text-emerald-600 mr-1"></i> Análisis con IA del documento</p>
                             <p class="text-[11px] text-slate-500 mb-2">Carga el PDF o imagen de la cotización/póliza y la IA lo analiza a detalle, lo compara con la solicitud (tipo de seguro, asegurado, prima, suma, deducible, coaseguro, gama…) y te informa errores y diferencias.</p>
-                            <input id="cot-ia-doc" type="file" accept="application/pdf,image/*" onchange="cotIaDocCargada()" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white">
+                            <input id="cot-ia-doc" type="file" accept="application/pdf,image/*" data-bx-change="a179" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white">
                             <p id="cot-ia-doc-info" class="text-[11px] text-slate-400 mt-1">Opcional: si no cargas documento, la IA analiza el texto pegado abajo (o el PDF adjunto en "Cargar cotización").</p>
                         </div>
                         <div id="cot-ia-vivo" class="hidden mb-3"><div id="cot-ia-vivo-inner"></div></div>
                         <div class="mb-3"><label class="text-[10px] font-semibold text-slate-400 uppercase">Texto de la póliza (opcional, para análisis automático)</label><textarea id="cot-q-poltxt" rows="2" placeholder="Pega aquí el texto de la cotización/póliza: asegurado, prima, deducible, coaseguro, gama, CP…" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-white text-slate-900"></textarea></div>
-                        <button onclick="cotIaAnalizar('${s.id}', this)" class="mt-1 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA</button>
+                        <button data-bx-click="a180" data-p0="${bxE(function(){return s.id})}" class="mt-1 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA</button>
                         <div class="grid sm:grid-cols-2 gap-2 mb-3">${cotCmpInputs(s)}</div>
                         <div id="cot-analista-vivo">${cotAnalistaBadge(cotAnalista(s))}</div>
-                        <button onclick="cotReevaluarEnVivo('${s.id}')" class="mt-2 px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><i class="fas fa-rotate mr-1"></i> Analizar ahora</button>
+                        <button data-bx-click="a181" data-p0="${bxE(function(){return s.id})}" class="mt-2 px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"><i class="fas fa-rotate mr-1"></i> Analizar ahora</button>
                     </div>
                 </div>`;
             }
@@ -6186,15 +6207,15 @@ function borrarPublicidad(id){
                             <div class="sm:col-span-2">
                                 <div class="border-2 border-dashed border-emerald-200 rounded-xl p-3 bg-emerald-50/40 mb-2">
                                     <p class="text-xs font-bold uppercase text-emerald-700 mb-2"><i class="fas fa-wand-magic-sparkles text-emerald-600 mr-1"></i> Análisis con IA del documento (nueva versión)</p>
-                                    <input id="cot-ia-doc-r" type="file" accept="application/pdf,image/*" onchange="cotIaDocCargada()" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white">
+                                    <input id="cot-ia-doc-r" type="file" accept="application/pdf,image/*" data-bx-change="a179" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white">
                                     <p id="cot-ia-doc-info" class="text-[11px] text-slate-400 mt-1">Opcional: analiza el texto pegado abajo o el PDF adjunto.</p>
                                 </div>
                                 <label class="text-xs font-semibold text-slate-500">Texto de la póliza (opcional, para análisis automático)</label><textarea id="cot-r-poltxt" rows="2" placeholder="Pega el texto de la nueva versión de la póliza…" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-white text-slate-900"></textarea>
-                                <button onclick="cotIaAnalizar('${s.id}', this)" class="mt-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA</button>
+                                <button data-bx-click="a180" data-p0="${bxE(function(){return s.id})}" class="mt-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"><i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA</button>
                             </div>
                         </div>
                         <div><label class="text-xs font-semibold text-slate-500">Notas del procesador para el agente</label><textarea id="cot-r-nota" rows="2" class="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm">${escapeHTML(q.notas||'')}</textarea></div>
-                        <div><button onclick="cotRecargar('${s.id}')" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800"><i class="fas fa-robot mr-1"></i> Re-analizar versión corregida</button></div>
+                        <div><button data-bx-click="a182" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800"><i class="fas fa-robot mr-1"></i> Re-analizar versión corregida</button></div>
                     </div></details>`;
                 }
                 html += cotRevHistorialHtml(s);
@@ -6202,14 +6223,14 @@ function borrarPublicidad(id){
                 const pend = cotCotejoPendiente(s);
                 html += `<div class="flex flex-wrap gap-2 mt-4">`
                     + (pend.length? `<span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-2 rounded-xl font-semibold"><i class="fas fa-triangle-exclamation mr-1"></i>${pend.length} dato(s) sin cotejar con la póliza</span>` : `<span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-xl font-semibold"><i class="fas fa-circle-check mr-1"></i>Cotejo póliza↔solicitud completo</span>`)
-                    + `<button onclick="cotEnviarAgente('${s.id}')" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-paper-plane mr-1"></i> Enviar al agente</button></div>`;
+                    + `<button data-bx-click="a183" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-paper-plane mr-1"></i> Enviar al agente</button></div>`;
             }
             }
             if(esPropio && s.estado==='cotizada'){
                 html += `<div class="bg-violet-50 border border-violet-200 rounded-xl p-4 mt-4"><p class="text-sm font-bold text-violet-800 mb-2"><i class="fas fa-flag-checkered mr-1"></i> ¿Cómo deseas proceder con esta cotización?</p>
                     <div class="flex flex-wrap gap-2">
-                        <button onclick="cotDecidir('${s.id}','emitir')" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-check mr-1"></i> Emitir póliza</button>
-                        <button onclick="cotDecidir('${s.id}','no-emitir')" class="px-4 py-2 bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-400"><i class="fas fa-times mr-1"></i> No emitir</button>
+                        <button data-bx-click="a184" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-check mr-1"></i> Emitir póliza</button>
+                        <button data-bx-click="a185" data-p0="${bxE(function(){return s.id})}" class="px-4 py-2 bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-400"><i class="fas fa-times mr-1"></i> No emitir</button>
                     </div></div>`;
             }
             if(!q && !esProc) html += '<p class="text-center text-slate-400 text-sm py-8"><i class="fas fa-hourglass-half text-2xl block mb-2"></i>Aún no hay cotización cargada. Te avisaremos en el chat cuando esté lista.</p>';
@@ -6349,7 +6370,7 @@ function renderComparadorProductos(){
         <div class="border-2 border-emerald-200 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
             <p class="text-[10px] uppercase font-bold text-emerald-700">Cotización A</p>
-            <label class="text-[11px] text-emerald-700 font-semibold cursor-pointer hover:underline"><i class="fas fa-paperclip mr-0.5"></i> Subir archivo<input type="file" accept=".pdf,.txt,.csv,.md,.json" class="hidden" onchange="cpLeerArchivo('A',this)"></label>
+            <label class="text-[11px] text-emerald-700 font-semibold cursor-pointer hover:underline"><i class="fas fa-paperclip mr-0.5"></i> Subir archivo<input type="file" accept=".pdf,.txt,.csv,.md,.json" class="hidden" data-bx-change="a186"></label>
           </div>
           <textarea id="cp-txt-a" rows="8" placeholder="Pega aquí el texto de la cotización A (prima, deducible, coaseguro, suma asegurada, coberturas, plazo…) o sube el PDF/Documento." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 resize-y font-mono text-xs"></textarea>
           <p id="cp-arch-a" class="text-[11px] text-slate-400 mt-1">Sin archivo cargado</p>
@@ -6357,14 +6378,14 @@ function renderComparadorProductos(){
         <div class="border-2 border-blue-200 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
             <p class="text-[10px] uppercase font-bold text-blue-700">Cotización B</p>
-            <label class="text-[11px] text-blue-700 font-semibold cursor-pointer hover:underline"><i class="fas fa-paperclip mr-0.5"></i> Subir archivo<input type="file" accept=".pdf,.txt,.csv,.md,.json" class="hidden" onchange="cpLeerArchivo('B',this)"></label>
+            <label class="text-[11px] text-blue-700 font-semibold cursor-pointer hover:underline"><i class="fas fa-paperclip mr-0.5"></i> Subir archivo<input type="file" accept=".pdf,.txt,.csv,.md,.json" class="hidden" data-bx-change="a187"></label>
           </div>
           <textarea id="cp-txt-b" rows="8" placeholder="Pega aquí el texto de la cotización B (prima, deducible, coaseguro, suma asegurada, coberturas, plazo…) o sube el PDF/Documento." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 resize-y font-mono text-xs"></textarea>
           <p id="cp-arch-b" class="text-[11px] text-slate-400 mt-1">Sin archivo cargado</p>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3 mt-4">
-        <button id="cp-btn-analizar" onclick="cpAnalizarIA()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-60"><i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA</button>
+        <button id="cp-btn-analizar" data-bx-click="a188" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-60"><i class="fas fa-wand-magic-sparkles mr-1"></i> Analizar con IA</button>
         <span id="cp-status" class="text-xs text-slate-400">La IA extrae criterios, ventajas y conclusión; después puedes corregir la tabla antes de presentarla.</span>
       </div>
       <div id="cp-result" class="hidden mt-5"></div>
@@ -6379,7 +6400,7 @@ function comparadorCriterioFila(cr){
     <input cr-nombre value="${psEscape(cr.nombre||'')}" placeholder="Criterio" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
     <input cr-a value="${psEscape(cr.a||'')}" placeholder="Valor A" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
     <input cr-b value="${psEscape(cr.b||'')}" placeholder="Valor B" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
-    <button onclick="this.closest('[data-crrow]').remove()" class="px-1 text-red-400 hover:text-red-600" title="Quitar criterio"><i class="fas fa-times"></i></button>
+    <button data-bx-click="a189" class="px-1 text-red-400 hover:text-red-600" title="Quitar criterio"><i class="fas fa-times"></i></button>
   </div>`;
 }
 function comparadorAddCriterio(){
@@ -6447,8 +6468,8 @@ function cpRenderGuardada(c){
       <div class="flex items-center gap-2 flex-wrap">
         ${c.ramo?`<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold">${psEscape(c.ramo)}</span>`:''}
         ${c.fuente==='IA'?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold"><i class="fas fa-robot mr-0.5"></i>IA</span>':''}
-        <button onclick="cpPdf('${c.id}')" class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"><i class="fas fa-file-pdf mr-0.5"></i> PDF</button>
-        ${puede?`<button onclick="cpEditarGuardada('${c.id}')" class="text-slate-400 hover:text-indigo-600 text-xs" title="Editar"><i class="fas fa-pen"></i></button><button onclick="cpBorrarGuardada('${c.id}')" class="text-slate-400 hover:text-red-600 text-xs" title="Eliminar"><i class="fas fa-trash"></i></button>`:''}
+        <button data-bx-click="a190" data-p0="${bxE(function(){return c.id})}" class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"><i class="fas fa-file-pdf mr-0.5"></i> PDF</button>
+        ${puede?`<button data-bx-click="a191" data-p0="${bxE(function(){return c.id})}" class="text-slate-400 hover:text-indigo-600 text-xs" title="Editar"><i class="fas fa-pen"></i></button><button data-bx-click="a192" data-p0="${bxE(function(){return c.id})}" class="text-slate-400 hover:text-red-600 text-xs" title="Eliminar"><i class="fas fa-trash"></i></button>`:''}
       </div>
     </div>
     <div class="grid md:grid-cols-[1fr_auto_1fr] gap-3 mt-4">
@@ -6520,8 +6541,8 @@ async function cpAnalizarIA(){
       <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
         <p class="text-sm font-bold text-indigo-800"><i class="fas fa-robot mr-1"></i> Comparativa generada por Gu-IA — revísala y corrige antes de presentarla</p>
         <div class="flex gap-2">
-          <button onclick="cpPdf(window._cpUltimo)" class="px-3 py-1.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50"><i class="fas fa-file-pdf mr-1"></i> Descargar PDF</button>
-          <button onclick="cpGuardarUltimo()" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar en el portal</button>
+          <button data-bx-click="a193" class="px-3 py-1.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50"><i class="fas fa-file-pdf mr-1"></i> Descargar PDF</button>
+          <button data-bx-click="a194" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"><i class="fas fa-floppy-disk mr-1"></i> Guardar en el portal</button>
         </div>
       </div>
       ${cpRenderGuardada(r)}
@@ -6574,7 +6595,7 @@ function cpEditarGuardada(id){
   const NL=String.fromCharCode(10);
   const ramos=['VIDA','GMM','DAÑOS','AUTOS','INVERSIÓN','INVERSIÓN ELITE'];
   showModal(`<div class="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar comparación</h3><button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
+    <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">Editar comparación</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button></div>
     <div class="space-y-3">
       <div><label class="text-sm font-medium">Título *</label><input id="cp-titulo" value="${psEscape(c.titulo)}" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"></div>
       <div class="grid grid-cols-2 gap-3">
@@ -6584,7 +6605,7 @@ function cpEditarGuardada(id){
       <div><label class="text-xs font-medium text-slate-500">Ramo</label><select id="cp-ramo" class="w-full mt-1 px-2 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900"><option value="">—</option>${ramos.map(r=>`<option ${c.ramo===r?'selected':''}>${r}</option>`).join('')}</select></div>
       <div><p class="text-xs font-bold uppercase text-slate-500 mb-1">Criterios de comparación</p>
         <div id="cp-rows" class="space-y-2">${(Array.isArray(c.criterios)&&c.criterios.length?c.criterios:[{nombre:'',a:'',b:''}]).map(comparadorCriterioFila).join('')}</div>
-        <button onclick="comparadorAddCriterio()" class="mt-2 text-sm text-emerald-700 font-semibold"><i class="fas fa-plus mr-1"></i> Agregar criterio</button>
+        <button data-bx-click="a195" class="mt-2 text-sm text-emerald-700 font-semibold"><i class="fas fa-plus mr-1"></i> Agregar criterio</button>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="text-xs font-medium text-slate-500">Ventajas de A (una por línea)</label><textarea id="cp-ventA" rows="3" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape((c.ventajasA||[]).join(NL))}</textarea></div>
@@ -6593,7 +6614,7 @@ function cpEditarGuardada(id){
       <div><label class="text-sm font-medium">Conclusión</label><textarea id="cp-conclusion" rows="3" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape(c.conclusion||'')}</textarea></div>
       <div><label class="text-sm font-medium">Notas</label><textarea id="cp-notas" rows="2" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">${psEscape(c.notas||'')}</textarea></div>
     </div>
-    <div class="flex justify-end gap-2 mt-4"><button onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button onclick="cpGuardarEdit('${c.id}')" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button></div>
+    <div class="flex justify-end gap-2 mt-4"><button data-bx-click="a1" class="px-4 py-2 border border-slate-300 rounded-xl">Cancelar</button><button data-bx-click="a196" data-p0="${bxE(function(){return c.id})}" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700">Guardar</button></div>
   </div>`);
 }
 function cpGuardarEdit(idStr){
@@ -6836,7 +6857,7 @@ function initializeApp() {
                     const canAccess = canAccessProspectStep(currentUser.id, item.id);
                     const active = window.lastPage === item.id ? 'bg-red-50 text-red-700 border-r-4 border-red-600' : 'text-gray-700';
                     const lockIcon = !canAccess ? '<i class="fas fa-lock ml-auto text-gray-400"></i>' : (done ? '<i class="fas fa-check-circle ml-auto text-green-500"></i>' : '<span class="ml-auto w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center text-[10px]">'+(idx+1)+'</span>');
-                    return `<button ${canAccess ? `onclick="navigateTo('${item.id}')"` : 'disabled'} class="w-full flex items-center gap-3 px-4 py-3 text-left transition ${active} ${!canAccess ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">
+                    return `<button ${canAccess ? `data-bx-click="a197" data-p0="${bxE(function(){return item.id})}"` : 'disabled'} class="w-full flex items-center gap-3 px-4 py-3 text-left transition ${active} ${!canAccess ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}">
                         <i class="fas ${item.icon} w-5 ${done ? 'text-green-600' : ''}"></i>
                         <span class="font-medium">${item.label}</span>
                         ${lockIcon}
@@ -6951,7 +6972,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const comercialIds = ['monitoreo','mi-equipo','mis-clientes','mis-metas','mis-logros','convenciones','mi-experiencia','simulador','practica-sesiones','guion-llamadas','publicidad','cotizaciones','comparador-productos','siniestros'];
             const exitoIds = ['casos-exito'];
             const itemHtml = (item) => `
-                <a href="#" onclick="navigateTo('${item.id}')" data-page="${item.id}" class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition ml-2">
+                <a href="#" data-bx-click="a197" data-p0="${bxE(function(){return item.id})}" data-page="${item.id}" class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition ml-2">
                     <i class="fas ${item.icon} w-5 text-center text-slate-500"></i>
                     <span class="flex-1 text-sm">${item.label}</span>${item.id==='mis-clientes' && ['admin','gm','agencia','desarrollador'].includes((currentUser.role||'').toLowerCase()) && getUnreadNotifications()>0 ? `<span class="ml-auto bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">${getUnreadNotifications()}</span>` : ''}
                     ${item.id==='messages' && unreadMsgCount > 0 ? `<span id="badge-messages" class="ml-auto bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">${unreadMsgCount}</span>` : ''}
@@ -6986,7 +7007,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const isOpen = (window._openMenuGroups && id in window._openMenuGroups) ? window._openMenuGroups[id] : open;
                 return `
                 <div class="mb-2">
-                    <button type="button" onclick="toggleGroup('${id}')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-50 transition group">
+                    <button type="button" data-bx-click="a198" data-p0="${bxE(function(){return id})}" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-slate-50 transition group">
                         <div class="flex items-center gap-3">
                             <i class="fas ${icon} w-5 text-center text-slate-700"></i>
                             <span class="font-semibold text-slate-800 text-sm uppercase tracking-wide">${title}</span>
@@ -7098,7 +7119,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             bar.style.gridTemplateColumns = `repeat(${tabs.length || 5}, minmax(0, 1fr))`;
             bar.innerHTML = tabs.map(t => {
                 if (t.id === '__menu__') {
-                    return `<button type="button" onclick="toggleSidebar()" class="mob-nav-btn" data-mob-page="__menu__" aria-label="Abrir menú completo">
+                    return `<button type="button" data-bx-click="a199" class="mob-nav-btn" data-mob-page="__menu__" aria-label="Abrir menú completo">
                         <i class="fas ${t.icon}"></i>
                         <span class="mob-nav-label">${t.label}</span>
                     </button>`;
@@ -7109,7 +7130,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 if (t.id === 'messages' || t.id === 'chat-reclutador') badge = unreadMsgCount;
                 else if (t.id === 'my-courses' && dueCards > 0) badge = dueCards;
 
-                return `<button type="button" ${isLockedProspect ? 'disabled' : `onclick="navigateTo('${t.id}')"`} class="mob-nav-btn ${isActive ? 'active' : ''} ${isLockedProspect ? 'opacity-40' : ''}" data-mob-page="${t.id}">
+                return `<button type="button" ${isLockedProspect ? 'disabled' : `data-bx-click="a200" data-p0="${bxE(function(){return t.id})}"`} class="mob-nav-btn ${isActive ? 'active' : ''} ${isLockedProspect ? 'opacity-40' : ''}" data-mob-page="${t.id}">
                     <i class="fas ${isLockedProspect ? 'fa-lock' : t.icon}"></i>
                     <span class="mob-nav-label">${t.label}</span>
                     ${badge > 0 ? `<span class="mob-nav-badge">${badge > 99 ? '99+' : badge}</span>` : ''}
@@ -7300,7 +7321,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         <span class="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider text-white shadow-lg" style="background:${color}">${item.dia}</span>
                     </div>
                     ${canEdit ? `<div class="absolute top-4 right-4 z-10 flex gap-2">
-                        <button onclick="editCarruselItem('${tipo}')" class="w-9 h-9 rounded-full bg-white/90 backdrop-blur text-slate-700 hover:bg-white shadow-md flex items-center justify-center" title="Editar"><i class="fas fa-pen text-sm"></i></button>
+                        <button data-bx-click="a201" data-p0="${bxE(function(){return tipo})}" class="w-9 h-9 rounded-full bg-white/90 backdrop-blur text-slate-700 hover:bg-white shadow-md flex items-center justify-center" title="Editar"><i class="fas fa-pen text-sm"></i></button>
                     </div>` : ''}
                     <div class="relative h-[560px] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
                         <img src="${item.imagen}" alt="${item.titulo}" class="w-full h-full object-contain">
@@ -7363,7 +7384,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             showModal(`<div class="p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <div class="flex items-center justify-between mb-5">
                     <h3 class="text-xl font-bold text-slate-900">Editar ${item.titulo} - ${item.dia}s</h3>
-                    <button aria-label="Cerrar" onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
+                    <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
                 </div>
                 <form id="carrusel-form" class="space-y-5">
                     <div class="grid md:grid-cols-2 gap-4">
@@ -7400,7 +7421,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             <span id="cc-file-name" class="text-sm text-slate-600 truncate">Ningún archivo seleccionado</span>
                         </div>
                         <div class="mt-3 rounded-xl overflow-hidden border border-slate-200 h-48 bg-slate-50 flex items-center justify-center">
-                            <img id="cc-preview" src="${item.imagen||''}" class="w-full h-full object-cover" style="${item.imagen?'':'display:none'}">
+                            <img loading="lazy" decoding="async" id="cc-preview" src="${item.imagen||''}" class="w-full h-full object-cover" style="${item.imagen?'':'display:none'}">
                             <span id="cc-preview-placeholder" class="text-slate-400 text-sm" style="${item.imagen?'display:none':''}"><i class="fas fa-image mr-2"></i>Vista previa</span>
                         </div>
                         <p class="text-xs text-slate-500 mt-1.5">Se guarda dentro del portal (no requiere link). Recomendado 1200x600px, JPG o PNG.</p>
@@ -7423,12 +7444,12 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             </div>
                         </div>
                         <div class="flex gap-2 mt-2">
-                            <button type="button" onclick="document.querySelectorAll('.cc-participante').forEach(cb=>cb.checked=true)" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg">Todos</button>
-                            <button type="button" onclick="document.querySelectorAll('.cc-participante').forEach(cb=>cb.checked=false)" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg">Ninguno</button>
+                            <button type="button" data-bx-click="a202" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg">Todos</button>
+                            <button type="button" data-bx-click="a203" class="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg">Ninguno</button>
                         </div>
                     </div>
                     <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="closeModal()" class="flex-1 px-4 py-3 border border-slate-300 rounded-xl font-medium hover:bg-slate-50">Cancelar</button>
+                        <button type="button" data-bx-click="a1" class="flex-1 px-4 py-3 border border-slate-300 rounded-xl font-medium hover:bg-slate-50">Cancelar</button>
                         <button type="submit" class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 shadow-md">Guardar cambios</button>
                     </div>
                 </form>
@@ -7484,7 +7505,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             return `<div class="bg-white rounded-2xl p-6 border border-slate-200 mb-5">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold flex items-center gap-2"><i class="fas fa-bullhorn text-indigo-600"></i> Tablón de Anuncios</h3>
-                    ${isTutor ? `<button onclick="openNewPostModal(${groupId})" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i> Nuevo Anuncio</button>` : ''}
+                    ${isTutor ? `<button data-bx-click="a204" data-p0="${bxE(function(){return groupId})}" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"><i class="fas fa-plus mr-1"></i> Nuevo Anuncio</button>` : ''}
                 </div>
                 <div class="space-y-3 max-h-64 overflow-y-auto" id="board-${groupId}">
                     ${posts.length ? posts.map(p=>{const author=db.users.find(u=>u.id===p.authorId); return `<div class="p-4 bg-slate-50 rounded-xl ${p.pinned?'ring-1 ring-amber-300':''}"><div class="flex items-start gap-3"><img src="${author?.avatar}" class="w-8 h-8 rounded-full"><div class="flex-1"><div class="flex items-center gap-2"><span class="font-medium text-sm">${escapeHTML(author?.name)}</span>${p.pinned?'<span class="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">FIJADO</span>':''}<span class="text-xs text-slate-500 ml-auto">${new Date(p.createdAt).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})}</span></div><p class="text-sm mt-1 whitespace-pre-wrap">${escapeHTML(p.content)}</p></div></div></div>`}).join('') : '<p class="text-sm text-slate-500 text-center py-4">No hay anuncios aún</p>'}
@@ -7493,7 +7514,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         }
 
         function openNewPostModal(groupId) {
-            showModal(`<div class="p-6 w-full max-w-md"><h3 class="text-lg font-semibold mb-4">Nuevo Anuncio</h3><form id="post-form"><textarea id="post-content" class="w-full border rounded-lg p-3 text-sm bg-white text-slate-900 border-slate-300" rows="4" placeholder="Escribe el anuncio..." required></textarea><label class="flex items-center gap-2 mt-3 text-sm"><input type="checkbox" id="post-pinned" class="bg-white text-slate-900 border border-slate-300"> <span>Fijar anuncio</span></label><div class="flex gap-2 mt-5"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg">Publicar</button></div></form></div>`);
+            showModal(`<div class="p-6 w-full max-w-md"><h3 class="text-lg font-semibold mb-4">Nuevo Anuncio</h3><form id="post-form"><textarea id="post-content" class="w-full border rounded-lg p-3 text-sm bg-white text-slate-900 border-slate-300" rows="4" placeholder="Escribe el anuncio..." required></textarea><label class="flex items-center gap-2 mt-3 text-sm"><input type="checkbox" id="post-pinned" class="bg-white text-slate-900 border border-slate-300"> <span>Fijar anuncio</span></label><div class="flex gap-2 mt-5"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg">Publicar</button></div></form></div>`);
             document.getElementById('post-form').onsubmit = e => {
                 e.preventDefault();
                 const content = document.getElementById('post-content').value.trim();
@@ -7679,29 +7700,29 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         <p class="text-slate-500">${titulo} • Período: <strong class="text-amber-700 uppercase">${filtroPeriodo}</strong> • Tu posición: #${myPos || '-'}</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <select onchange="window.filtroRankPeriodo=this.value; navigateTo('leaderboard')" class="px-3 py-2 border border-amber-300 rounded-lg text-sm bg-amber-50/60 text-slate-900 font-semibold">
+                        <select data-bx-change="a205" class="px-3 py-2 border border-amber-300 rounded-lg text-sm bg-amber-50/60 text-slate-900 font-semibold">
                             <option value="todo" ${filtroPeriodo==='todo'?'selected':''}>Todo el historial</option>
                             <option value="semana" ${filtroPeriodo==='semana'?'selected':''}>Esta Semana</option>
                             <option value="mes" ${filtroPeriodo==='mes'?'selected':''}>Este Mes</option>
                             <option value="trimestre" ${filtroPeriodo==='trimestre'?'selected':''}>Trimestre</option>
                             <option value="anio" ${filtroPeriodo==='anio'?'selected':''}>Año en curso</option>
                         </select>
-                        <select onchange="window.filtroRankRamo=this.value; navigateTo('leaderboard')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <select data-bx-change="a206" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="todos" ${filtroRamo==='todos'?'selected':''}>Todos los ramos</option>
                             <option value="vida" ${filtroRamo==='vida'?'selected':''}>Vida / Ahorro</option>
                             <option value="gmm" ${filtroRamo==='gmm'?'selected':''}>Gastos Médicos</option>
                             <option value="autos" ${filtroRamo==='autos'?'selected':''}>Automotriz / Autos</option>
                             <option value="inmobiliario" ${filtroRamo==='inmobiliario'?'selected':''}>Inmobiliario</option>
                         </select>
-                        <select onchange="window.filtroRankPlan=this.value; window.filtroRankGen=''; window.filtroRankGrupo=''; navigateTo('leaderboard')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <select data-bx-change="a207" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="">Todas las formaciones</option>
                             ${db.planes.map(p=>`<option value="${p.id}" ${filtroPlan===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}
                         </select>
-                        <select onchange="window.filtroRankGen=this.value; window.filtroRankGrupo=''; navigateTo('leaderboard')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <select data-bx-change="a208" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="">Todas las generaciones</option>
                             ${gensFiltradas.map(g=>`<option value="${g.id}" ${filtroGen===g.id?'selected':''}>${g.name}</option>`).join('')}
                         </select>
-                        <select onchange="window.filtroRankGrupo=this.value; navigateTo('leaderboard')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <select data-bx-change="a209" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="">Todos los grupos</option>
                             ${gruposFiltrados.map(gr=>`<option value="${gr.id}" ${filtroGrupo===gr.id?'selected':''}>${gr.name}</option>`).join('')}
                         </select>
@@ -7787,8 +7808,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                 <p class="text-2xl font-bold text-slate-900 leading-tight">${total} nuevo${total===1?'':'s'} trámite${total===1?'':'s'} sin revisar</p>
                                 <p class="text-xs text-slate-500 mt-0.5">${nCot} cotización${nCot===1?'':'es'} · ${nSin} siniestro${nSin===1?'':'s'}/cancelaci${nSin===1?'ón':'ones'}</p>
                             </div>
-                            ${nCot? `<button onclick="navigateTo('cotizaciones')" class="shrink-0 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-file-invoice-dollar mr-1"></i> Ver cotizaciones (${nCot})</button>`:''}
-                            ${nSin? `<button onclick="navigateTo('siniestros')" class="shrink-0 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800"><i class="fas fa-file-shield mr-1"></i> Ver siniestros (${nSin})</button>`:''}
+                            ${nCot? `<button data-bx-click="a210" class="shrink-0 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700"><i class="fas fa-file-invoice-dollar mr-1"></i> Ver cotizaciones (${nCot})</button>`:''}
+                            ${nSin? `<button data-bx-click="a211" class="shrink-0 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-800"><i class="fas fa-file-shield mr-1"></i> Ver siniestros (${nSin})</button>`:''}
                         </div>
                     </div>`;
                 })()}
@@ -7806,7 +7827,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             return `<div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition group">
                                 <div class="flex">
                                     <div class="w-28 h-24 shrink-0 relative">
-                                        <img src="${it.imagen}" class="w-full h-full object-cover">
+                                        <img loading="lazy" decoding="async" src="${it.imagen}" class="w-full h-full object-cover">
                                         <div class="absolute inset-0 bg-black/20"></div>
                                         <span class="absolute bottom-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/90 text-slate-800">${it.dia}</span>
                                     </div>
@@ -7845,13 +7866,13 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                 <p class="text-xs text-emerald-100/90 mt-0.5">${_sols.length} total · ${_cont} contactada${_cont === 1 ? '' : 's'} · ${_conv} convertida${_conv === 1 ? '' : 's'}</p>
                             </div>
                         </div>
-                        <button onclick="navigateTo('solicitudes')" class="shrink-0 px-4 py-2.5 bg-white text-emerald-700 font-semibold rounded-xl hover:bg-emerald-50 transition text-sm"><i class="fas fa-arrow-right mr-1"></i>Revisar solicitudes</button>
+                        <button data-bx-click="a212" class="shrink-0 px-4 py-2.5 bg-white text-emerald-700 font-semibold rounded-xl hover:bg-emerald-50 transition text-sm"><i class="fas fa-arrow-right mr-1"></i>Revisar solicitudes</button>
                     </div>
                     ${_nuevas > 0 ? `<div class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center animate-pulse ring-2 ring-white">${_nuevas > 9 ? '9+' : _nuevas}</div>` : ''}
                 </div>`;
                 })()}
 
-                ${isStudent(currentUser) && db.liveClasses ? (() => { const upcoming = db.liveClasses.filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.start) > new Date()).sort((a,b) => new Date(a.start) - new Date(b.start))[0]; return upcoming ? `<div class="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 rounded-xl shadow-sm flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-video"></i></div><div><p class="text-sm opacity-90">Próxima clase</p><p class="font-semibold">${upcoming.title} - ${new Date(upcoming.start).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})}</p></div></div><button onclick="navigateTo('live-classes')" class="px-4 py-2 bg-white text-indigo-700 rounded-lg font-medium hover:bg-slate-100">Ver</button></div>` : ''; })() : ''}
+                ${isStudent(currentUser) && db.liveClasses ? (() => { const upcoming = db.liveClasses.filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.start) > new Date()).sort((a,b) => new Date(a.start) - new Date(b.start))[0]; return upcoming ? `<div class="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 rounded-xl shadow-sm flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-video"></i></div><div><p class="text-sm opacity-90">Próxima clase</p><p class="font-semibold">${upcoming.title} - ${new Date(upcoming.start).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})}</p></div></div><button data-bx-click="a213" class="px-4 py-2 bg-white text-indigo-700 rounded-lg font-medium hover:bg-slate-100">Ver</button></div>` : ''; })() : ''}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     ${!(isStudent(currentUser)) ? `
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><div class="flex items-center justify-between"><div><p class="text-slate-500 text-sm">Usuarios</p><p class="text-3xl font-bold">${stats.users}</p></div><div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center"><i class="fas fa-users"></i></div></div></div>
@@ -7881,9 +7902,9 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                 <p class="text-xs text-slate-500">Métricas consolidadas en tiempo real: Prospectos → Cotizaciones → Emisiones</p>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="exportReporteEjecutivoPDF()" class="px-3.5 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Reporte Ejecutivo PDF</button>
-                                <button onclick="exportDashboardKPIsCSV()" class="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50/70 text-amber-900 text-xs font-semibold hover:bg-amber-100 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar KPIs CSV</button>
-                                <button onclick="navigateTo('messages')" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-comments"></i> Ir a Mensajes</button>
+                                <button data-bx-click="a214" class="px-3.5 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Reporte Ejecutivo PDF</button>
+                                <button data-bx-click="a215" class="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50/70 text-amber-900 text-xs font-semibold hover:bg-amber-100 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar KPIs CSV</button>
+                                <button data-bx-click="a216" class="px-3.5 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-comments"></i> Ir a Mensajes</button>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -7914,7 +7935,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 ${isStudent(currentUser) ? `
                                 <!-- Tarjeta SRS -->
                 <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition" onclick="startSRSStudy()">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition" data-bx-click="a217">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-slate-500 text-sm">Repasos SRS</p>
@@ -8016,13 +8037,13 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         return { id:g.id, name:g.name||g.nombre||('Agencia '+g.id), avatar:g.avatar, total: vs.filter(v=>String(v.agenciaId)===gid || ids.includes(String(v.agenteId))).reduce((s,v)=>s+Number(v.prima||0),0) };
                     }).sort((x,y)=>y.total-x.total).slice(0,3);
                     const filaRk = (pos,r) => `<div class="flex items-center justify-between p-2.5 rounded-lg ${pos===1?'bg-amber-50 border-amber-200':pos===2?'bg-slate-50 border-slate-200':'bg-orange-50/60 border-orange-100'} border">
-                        <div class="flex items-center gap-3 min-w-0"><span class="text-xl w-8 text-center">${pos===1?'🥇':pos===2?'🥈':'🥉'}</span><img src="${r.avatar||('https://i.pravatar.cc/40?u='+r.id)}" class="w-8 h-8 rounded-full object-cover"><span class="font-medium text-sm text-slate-800 truncate">${r.name}</span></div>
+                        <div class="flex items-center gap-3 min-w-0"><span class="text-xl w-8 text-center">${pos===1?'🥇':pos===2?'🥈':'🥉'}</span><img loading="lazy" decoding="async" src="${r.avatar||('https://i.pravatar.cc/40?u='+r.id)}" class="w-8 h-8 rounded-full object-cover"><span class="font-medium text-sm text-slate-800 truncate">${r.name}</span></div>
                         <span class="font-bold text-sm ${r.total>0?'text-emerald-600':'text-slate-400'} whitespace-nowrap">$${r.total.toLocaleString('es-MX')}</span></div>`;
                     const colRk = (titulo, icono, lista) => `<div><div class="flex items-center gap-2 mb-3"><i class="fas ${icono} text-indigo-600"></i><h4 class="font-semibold text-sm uppercase tracking-wide text-slate-600">${titulo}</h4></div><div class="space-y-2">${lista.map((r,i)=>filaRk(i+1,r)).join('') || '<p class="text-xs text-slate-400 py-4 text-center">Sin ventas en el periodo</p>'}</div></div>`;
                     return `<div class="mt-8 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                             <h3 class="font-semibold text-lg flex items-center gap-2"><i class="fas fa-trophy text-amber-500"></i> Rankings de Producción <span class="text-xs font-normal text-slate-400">Top 3</span></h3>
-                            <div class="flex gap-1">${['mensual','trimestral','anual'].map(pp=>`<button onclick="window.dashRankPeriodo='${pp}';navigateTo('dashboard')" class="px-3 py-1.5 text-xs rounded-lg border ${per===pp?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 hover:bg-slate-50'}">${pp.charAt(0).toUpperCase()+pp.slice(1)}</button>`).join('')}</div>
+                            <div class="flex gap-1">${['mensual','trimestral','anual'].map(pp=>`<button data-bx-click="a218" data-p0="${bxE(function(){return pp})}" class="px-3 py-1.5 text-xs rounded-lg border ${per===pp?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 hover:bg-slate-50'}">${pp.charAt(0).toUpperCase()+pp.slice(1)}</button>`).join('')}</div>
                         </div>
                         <div class="grid md:grid-cols-2 gap-6">${colRk('Ranking de Agencias','fa-building',rankG)}${colRk('Ranking de Agentes','fa-user-tie',rankA)}</div>
                     </div>`;
@@ -8164,10 +8185,10 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                                 <div class="relative flex-1 sm:flex-none">
                                     <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                                    <input id="user-search-input" value="${escapeHTML(window.usersSearchQ||'')}" oninput="window.usersSearchQ=this.value;filterUsersByRole()" placeholder="Buscar nombre, usuario, correo..." class="pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 w-full sm:w-52">
+                                    <input id="user-search-input" value="${escapeHTML(window.usersSearchQ||'')}" data-bx-input="a219" placeholder="Buscar nombre, usuario, correo..." class="pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 w-full sm:w-52">
                                 </div>
                                 <div class="relative">
-                                    <select id="user-role-filter" onchange="window.usersRoleFiltro=this.value;filterUsersByRole()" class="appearance-none pl-8 pr-7 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                                    <select id="user-role-filter" data-bx-change="a220" class="appearance-none pl-8 pr-7 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
                                         <option value="all" ${roleF==='all'?'selected':''}>Todos los roles</option>
                                         <option value="prospecto" ${roleF==='prospecto'?'selected':''}>Prospecto</option>
                                         <option value="agente_desarrollo" ${roleF==='agente_desarrollo'?'selected':''}>Agente en Desarrollo</option>
@@ -8183,14 +8204,14 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                     </select>
                                     <i class="fas fa-filter absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                                 </div>
-                                <select id="user-agencia-filter" onchange="window.usersAgenciaFiltro=this.value;filterUsersByRole()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                <select id="user-agencia-filter" data-bx-change="a221" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                                     <option value="" ${!agF?'selected':''}>Todas las agencias</option>
                                     <option value="__none__" ${agF==='__none__'?'selected':''}>Sin agencia asignada</option>
                                     ${agenciasList.map(a => `<option value="${a.id}" ${String(agF)===String(a.id)?'selected':''}>${escapeHTML(a.name||a.username)}</option>`).join('')}
                                 </select>
-                                ${(roleF!=='all' || estadoF || agF || qF) ? `<button onclick="window.usersRoleFiltro='all';window.usersEstadoFiltro=null;window.usersAgenciaFiltro='';window.usersSearchQ='';navigateTo('users')" class="px-2.5 py-2 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50" title="Limpiar filtros"><i class="fas fa-eraser"></i></button>` : ''}
-                                <button onclick="exportarUsuariosCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap" title="Exportar directorio en CSV"><i class="fas fa-file-csv mr-1"></i>CSV</button>
-                                <button onclick="openUserModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap"><i class="fas fa-plus mr-1.5"></i>Nuevo Usuario</button>
+                                ${(roleF!=='all' || estadoF || agF || qF) ? `<button data-bx-click="a222" class="px-2.5 py-2 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50" title="Limpiar filtros"><i class="fas fa-eraser"></i></button>` : ''}
+                                <button data-bx-click="a223" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap" title="Exportar directorio en CSV"><i class="fas fa-file-csv mr-1"></i>CSV</button>
+                                <button data-bx-click="a224" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap"><i class="fas fa-plus mr-1.5"></i>Nuevo Usuario</button>
                             </div>
                         </div>
                         ${renderMapaUsuarios()}
@@ -8204,16 +8225,16 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                 const groupHtml = esRolAgenteU
                                     ? (agenciaDeU ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs"><i class="fas fa-building mr-0.5"></i>${escapeHTML(agenciaDeU.name)}</span>` : '<span class="text-slate-400 text-xs">Sin agencia — edítalo para asignarla</span>')
                                     : u.role==='agencia'
-                                    ? `<span class="text-xs text-slate-600"><i class="fas fa-people-group mr-1 text-slate-400"></i>${nAgentesAg} agente${nAgentesAg===1?'':'s'} asignado${nAgentesAg===1?'':'s'}</span><button onclick="navigateTo('mi-equipo')" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-2">Ver equipo</button>`
+                                    ? `<span class="text-xs text-slate-600"><i class="fas fa-people-group mr-1 text-slate-400"></i>${nAgentesAg} agente${nAgentesAg===1?'':'s'} asignado${nAgentesAg===1?'':'s'}</span><button data-bx-click="a225" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-2">Ver equipo</button>`
                                     : (isStudent(u) 
                                     ? (mentors.length ? mentors.map(m=>`<span class="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-full text-xs mr-1"><img src="${m.avatar}" class="w-4 h-4 rounded-full">${escapeHTML(m.name)}</span>`).join('') : '<span class="text-slate-400 text-xs">Sin asignar</span>')
-                                    : `<div class="flex items-center gap-2"><span class="text-slate-600">${(u.students||[]).length} alumnos</span><button onclick="openAssignStudentsModal(${u.id})" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"><i class="fas fa-user-plus mr-1"></i>Asignar</button></div>`);
+                                    : `<div class="flex items-center gap-2"><span class="text-slate-600">${(u.students||[]).length} alumnos</span><button data-bx-click="a226" data-p0="${bxE(function(){return u.id})}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"><i class="fas fa-user-plus mr-1"></i>Asignar</button></div>`);
                                 const isOnline = u.lastActive && (Date.now() - u.lastActive < 300000);
                                 const puedeModificar = canModifyUser(currentUser, u);
                                 const waClean = String(u.phone || '').replace(/[^0-9]/g, '');
                                 const waBtn = waClean && waClean !== '521000000000' ? `<a href="https://wa.me/${waClean}?text=${encodeURIComponent('Hola ' + (u.name || u.username) + ', tus datos de acceso al portal Broker Booster están listos. Usuario: ' + u.username)}" target="_blank" class="text-emerald-600 hover:text-emerald-700 mr-2.5" title="Enviar acceso por WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
-                                const copyBtn = `<button onclick="copiarCredencialesUsuario(${u.id})" class="text-slate-400 hover:text-amber-600 mr-2.5" title="Copiar datos de acceso"><i class="fas fa-key"></i></button>`;
-                                const accionesHtml = puedeModificar ? `${waBtn}${copyBtn}<button onclick="openUserModal(${u.id})" class="text-slate-500 hover:text-indigo-600 mr-2.5" title="Editar usuario"><i class="fas fa-edit"></i></button><button onclick="deleteUser(${u.id})" class="text-slate-500 hover:text-red-600" title="Eliminar usuario"><i class="fas fa-trash"></i></button>` : `<span class="text-slate-300" title="Cuenta GM protegida: no modificable ni eliminable"><i class="fas fa-lock"></i></span>`;
+                                const copyBtn = `<button data-bx-click="a227" data-p0="${bxE(function(){return u.id})}" class="text-slate-400 hover:text-amber-600 mr-2.5" title="Copiar datos de acceso"><i class="fas fa-key"></i></button>`;
+                                const accionesHtml = puedeModificar ? `${waBtn}${copyBtn}<button data-bx-click="a228" data-p0="${bxE(function(){return u.id})}" class="text-slate-500 hover:text-indigo-600 mr-2.5" title="Editar usuario"><i class="fas fa-edit"></i></button><button data-bx-click="a229" data-p0="${bxE(function(){return u.id})}" class="text-slate-500 hover:text-red-600" title="Eliminar usuario"><i class="fas fa-trash"></i></button>` : `<span class="text-slate-300" title="Cuenta GM protegida: no modificable ni eliminable"><i class="fas fa-lock"></i></span>`;
                                 const estadoHtml = `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full ${isOnline?'bg-green-500 animate-pulse':'bg-slate-300'}"></span><span class="text-xs text-slate-500">${u.lastConnection?new Date(u.lastConnection).toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'Nunca'}</span></span>`;
                                 const estU = estadoDeUsuario(u);
                                 const ubicHtml = estU ? `<span class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs"><i class="fas fa-map-marker-alt"></i>${escapeHTML(estU)}</span>` : '<span class="text-slate-300 text-xs">—</span>';
@@ -8221,7 +8242,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                 return `
                                 <tr class="border-t user-row" style="${visible?'':'display:none'}" data-role="${escapeHTML(u.role||'')}" data-estado="${escapeHTML(estU||'')}" data-agencia="${escapeHTML(String(u.agenciaId||''))}" data-search="${escapeHTML([u.name,u.username,u.email,u.phone,estU,u.role].join(' ').toLowerCase())}">
                                     <td class="p-4 flex items-center gap-3">
-                                        <img src="${u.avatar}" class="w-8 h-8 rounded-full object-cover">
+                                        <img loading="lazy" decoding="async" src="${u.avatar}" class="w-8 h-8 rounded-full object-cover">
                                         <div>
                                             <div class="font-medium text-slate-900">${escapeHTML(u.name || u.username)}</div>
                                             <div class="text-xs text-slate-400 font-mono">@${escapeHTML(u.username || '')}</div>
@@ -8331,7 +8352,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const sel = window.usersEstadoFiltro===e.n;
                 const fill = c===0 ? '#eef2f1' : 'hsl(232,'+Math.round(45+t*35)+'%,'+Math.round(96-t*76)+'%)';
                 const tooltip = '<title>'+escapeHTML(e.n)+': '+c+' usuario'+(c===1?'':'s')+'</title>';
-                const path = '<path d="'+e.d+'" class="cursor-pointer transition duration-150 '+(sel?'':'hover:opacity-80')+'" style="fill:'+fill+';stroke:'+(sel?'#f59e0b':'#ffffff')+';stroke-width:'+(sel?2.5:1.2)+';stroke-linejoin:round" onclick="usuariosEstadoSel(\''+escapeHTML(e.n)+'\')">'+tooltip+'</path>';
+                const path = '<path d="'+e.d+'" class="cursor-pointer transition duration-150 '+(sel?'':'hover:opacity-80')+'" style="fill:'+fill+';stroke:'+(sel?'#f59e0b':'#ffffff')+';stroke-width:'+(sel?2.5:1.2)+';stroke-linejoin:round" ' + bxOn('click','usuariosEstadoSel',[escapeHTML(e.n)]) + '>'+tooltip+'</path>';
                 let labels='';
                 if(e.nl){
                     labels = '<line x1="'+e.cx+'" y1="'+e.cy+'" x2="'+e.lx+'" y2="'+e.ly+'" stroke="#94a3b8" stroke-width="1" pointer-events="none"/><circle cx="'+e.cx+'" cy="'+e.cy+'" r="1.8" fill="#64748b" pointer-events="none"/>'
@@ -8345,13 +8366,13 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 + '<div class="flex items-start justify-between flex-wrap gap-2 mb-3">'
                 + '<div><h3 class="text-lg font-bold text-slate-900 flex items-center gap-2"><i class="fas fa-map text-indigo-600"></i> Mapa de usuarios por estado</h3>'
                 + '<p class="text-xs text-slate-500 mt-0.5">Intensidad de azul según número de usuarios. Clic en un estado para filtrar la tabla.</p></div>'
-                + (window.usersEstadoFiltro ? '<button onclick="usuariosEstadoLimpiar()" class="text-xs font-semibold px-3 py-1.5 bg-indigo-100 text-indigo-800 rounded-full border border-indigo-300 hover:bg-indigo-200 shrink-0"><i class="fas fa-filter mr-1"></i>'+escapeHTML(window.usersEstadoFiltro)+' <i class="fas fa-times ml-1"></i></button>' : '')
+                + (window.usersEstadoFiltro ? '<button data-bx-click="a230" class="text-xs font-semibold px-3 py-1.5 bg-indigo-100 text-indigo-800 rounded-full border border-indigo-300 hover:bg-indigo-200 shrink-0"><i class="fas fa-filter mr-1"></i>'+escapeHTML(window.usersEstadoFiltro)+' <i class="fas fa-times ml-1"></i></button>' : '')
                 + '</div>'
                 + '<div class="flex flex-col lg:flex-row gap-4">'
                 + '<div class="flex-1 min-w-0 bg-slate-50 rounded-xl border border-slate-100 p-2"><svg viewBox="0 0 793 498" class="w-full h-auto select-none" role="img" aria-label="Mapa de México con usuarios por estado">'+(()=>{ const ps=ESTADOS_MEX.map(pieza); return ps.map(p=>p.path).join('')+ps.map(p=>p.labels).join(''); })()+'</svg></div>'
                 + '<div class="lg:w-60 shrink-0 space-y-3">'
                 + '<div class="bg-slate-50 rounded-xl border border-slate-100 p-3"><p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Top estados</p>'
-                + (top.length ? top.map(([n,c])=>'<button onclick="usuariosEstadoSel(\''+escapeHTML(n)+'\')" class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-indigo-50 '+(window.usersEstadoFiltro===n?'bg-indigo-100 ring-1 ring-indigo-300':'')+'"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:hsl(232,60%,'+Math.round(96-(c/maxC)*76)+'%)"></span><span class="flex-1 text-left truncate font-medium text-slate-700">'+escapeHTML(n)+'</span><span class="font-bold text-indigo-700">'+c+'</span></button>').join('') : '<p class="text-xs text-slate-400">Asigna ubicaciones para ver el mapa</p>')
+                + (top.length ? top.map(([n,c])=>'<button ' + bxOn('click','usuariosEstadoSel',[escapeHTML(n)]) + ' class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-indigo-50 '+(window.usersEstadoFiltro===n?'bg-indigo-100 ring-1 ring-indigo-300':'')+'"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:hsl(232,60%,'+Math.round(96-(c/maxC)*76)+'%)"></span><span class="flex-1 text-left truncate font-medium text-slate-700">'+escapeHTML(n)+'</span><span class="font-bold text-indigo-700">'+c+'</span></button>').join('') : '<p class="text-xs text-slate-400">Asigna ubicaciones para ver el mapa</p>')
                 + '</div>'
                 + (sinEstado ? '<div class="bg-slate-50 rounded-xl border border-slate-100 p-3"><p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Sin ubicación</p><p class="text-sm font-bold text-slate-700 mt-1">'+sinEstado+' usuario'+(sinEstado===1?'':'s')+'</p></div>' : '')
                 + '<div class="bg-slate-50 rounded-xl border border-slate-100 p-3"><p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Escala</p><div class="h-2.5 rounded-full" style="background:linear-gradient(90deg,hsl(232,45%,96%),hsl(232,55%,72%),hsl(232,75%,45%),hsl(232,80%,25%))"></div><div class="flex justify-between text-[10px] text-slate-500 mt-1"><span>0</span><span>'+maxC+' usuario'+(maxC===1?'':'s')+'</span></div></div>'
@@ -8360,7 +8381,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         function renderMapaPickerUbicacion(){
             const pieza = e => {
                 const tooltip = '<title>'+escapeHTML(e.n)+'</title>';
-                const path = '<path d="'+e.d+'" class="cursor-pointer transition duration-150 hover:opacity-80" style="fill:#eef2f7;stroke:#ffffff;stroke-width:1.2;stroke-linejoin:round" onclick="userUbicacionSel(\''+escapeHTML(e.n)+'\')">'+tooltip+'</path>';
+                const path = '<path d="'+e.d+'" class="cursor-pointer transition duration-150 hover:opacity-80" style="fill:#eef2f7;stroke:#ffffff;stroke-width:1.2;stroke-linejoin:round" ' + bxOn('click','userUbicacionSel',[escapeHTML(e.n)]) + '>'+tooltip+'</path>';
                 let labels='';
                 if(e.nl){
                     labels = '<line x1="'+e.cx+'" y1="'+e.cy+'" x2="'+e.lx+'" y2="'+e.ly+'" stroke="#94a3b8" stroke-width="1" pointer-events="none"/><circle cx="'+e.cx+'" cy="'+e.cy+'" r="1.8" fill="#64748b" pointer-events="none"/>'
@@ -8375,7 +8396,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
         function openAssignStudentsModal(userId){
             const user = db.users.find(u=>u.id===userId);
             const alumnos = db.users.filter(u=>isStudent(u));
-            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Asignar Alumnos a ${user.name}</h3><p class="text-sm text-slate-500 mb-4">Selecciona los alumnos que formarán parte del grupo de este ${user.role}</p><div class="space-y-2 max-h-64 overflow-y-auto">${alumnos.map(a=>`<label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" value="${a.id}" ${(user.students||[]).includes(a.id)?'checked':''} class="assign-student-check rounded bg-white text-slate-900 border border-slate-300"><img src="${a.avatar}" class="w-8 h-8 rounded-full"><span>${a.name}</span></label>`).join('')}</div><div class="flex justify-end gap-3 mt-6"><button aria-label="Cerrar" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button onclick="saveAssignStudents(${userId})" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">Guardar</button></div></div>`);
+            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Asignar Alumnos a ${user.name}</h3><p class="text-sm text-slate-500 mb-4">Selecciona los alumnos que formarán parte del grupo de este ${user.role}</p><div class="space-y-2 max-h-64 overflow-y-auto">${alumnos.map(a=>`<label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" value="${a.id}" ${(user.students||[]).includes(a.id)?'checked':''} class="assign-student-check rounded bg-white text-slate-900 border border-slate-300"><img src="${a.avatar}" class="w-8 h-8 rounded-full"><span>${a.name}</span></label>`).join('')}</div><div class="flex justify-end gap-3 mt-6"><button aria-label="Cerrar" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button data-bx-click="a231" data-p0="${bxE(function(){return userId})}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">Guardar</button></div></div>`);
         }
         function saveAssignStudents(userId){
             const user = db.users.find(u=>u.id===userId);
@@ -8413,19 +8434,19 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         <div class="flex flex-col  justify-between items-start lg:items-center gap-4">
                             <h3 class="font-semibold text-lg">Categorías</h3>
                             <div class="flex flex-wrap items-center gap-2">
-                                <select onchange="window.filtroCatTipo=this.value; window.filtroCatPlan=''; navigateTo('categories')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                <select data-bx-change="a232" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                                     <option value="all" ${filtroTipo==='all'?'selected':''}>Todos los tipos</option>
                                     ${['Capacitación Comercial','Capacitación Administrativa','curso','certificacion','capacitacion','taller'].map(t=>`<option value="${t}" ${filtroTipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
                                 </select>
-                                <select onchange="window.filtroCatPlan=this.value; navigateTo('categories')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                <select data-bx-change="a233" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                                     <option value="">Todas las formaciones</option>
                                     ${db.planes.filter(p=>filtroTipo==='all'||p.tipo===filtroTipo).map(p=>`<option value="${p.id}" ${filtroPlan===p.id?'selected':''}>${p.nombre}</option>`).join('')}
                                 </select>
-                                <select onchange="window.filtroCatGen=this.value; navigateTo('categories')" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                <select data-bx-change="a234" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                                     <option value="">Todas las generaciones</option>
                                     ${db.generations.map(g=>`<option value="${g.id}" ${filtroGen===g.id?'selected':''}>${g.name}</option>`).join('')}
                                 </select>
-                                ${canEdit?`<button onclick="openCategoryModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-plus mr-2"></i>Nueva Categoría</button>`:''}
+                                ${canEdit?`<button data-bx-click="a235" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-plus mr-2"></i>Nueva Categoría</button>`:''}
                             </div>
                         </div>
                     </div>
@@ -8445,10 +8466,10 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             return `
                             <div ${canEdit?'draggable="true"':''} data-cat-id="${cat.id}" ${canEdit?'title="Arrastra para ordenar"':''} class="group relative bg-white border border-slate-200/70 rounded-xl overflow-hidden hover:shadow-md hover:border-slate-300 transition-all ${canEdit?'cursor-move':''}">
                                 <div class="h-32 bg-slate-100 relative">
-                                    ${cat.image ? `<img src="${cat.image}" class="w-full h-full object-cover pointer-events-none" onerror="this.remove()">` : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-2xl"></i></div>`}
+                                    ${cat.image ? `<img loading="lazy" decoding="async" src="${cat.image}" class="w-full h-full object-cover pointer-events-none" data-bx-error="a236">` : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-2xl"></i></div>`}
                                     ${plan?`<span class="absolute bottom-2 left-2 text-[10px] px-2 py-0.5 bg-white/90 backdrop-blur rounded-full text-indigo-700 font-medium">${plan.nombre}</span>`:''}
                                     ${canEdit?`<span class="absolute top-2 left-2 w-7 h-7 flex items-center justify-center bg-white/80 backdrop-blur rounded-lg text-slate-400" title="Arrastra para ordenar"><i class="fas fa-arrows-alt text-xs"></i></span>`:''}
-                                    ${canEdit?`<div class="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition"><button onclick="openCategoryModal(${cat.id})" class="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur text-slate-600 hover:text-[var(--primary)] rounded-lg shadow" title="Editar"><i class="fas fa-pen text-xs"></i></button>${isAdmin(currentUser)?`<button onclick="deleteCategory(${cat.id})" class="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur text-slate-600 hover:text-red-600 rounded-lg shadow" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div>`:''}
+                                    ${canEdit?`<div class="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition"><button data-bx-click="a237" data-p0="${bxE(function(){return cat.id})}" class="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur text-slate-600 hover:text-[var(--primary)] rounded-lg shadow" title="Editar"><i class="fas fa-pen text-xs"></i></button>${isAdmin(currentUser)?`<button data-bx-click="a238" data-p0="${bxE(function(){return cat.id})}" class="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur text-slate-600 hover:text-red-600 rounded-lg shadow" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div>`:''}
                                 </div>
                                 <div class="p-5">
                                 <div class="flex justify-between items-start"><div><h4 class="text-[17px] font-medium text-slate-900 tracking-tight">${cat.name}</h4><p class="text-sm text-slate-500 mt-0.5 line-clamp-2">${cat.description}</p></div></div>
@@ -8458,7 +8479,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                                     </div>
                                     <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full rounded-full ${colorProgreso} transition-all" style="width:${totalCeldas?pctProgreso:0}%"></div></div>
                                 </div>
-                                ${canEdit?`<div class="mt-4 pt-3 border-t border-slate-100 flex justify-end"><button onclick="openAssignModal(${cat.id})" class="text-[13px] font-medium text-[var(--primary)] opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5">Asignar alumnos <i class="fas fa-arrow-right text-[10px]"></i></button></div>`:''}
+                                ${canEdit?`<div class="mt-4 pt-3 border-t border-slate-100 flex justify-end"><button data-bx-click="a239" data-p0="${bxE(function(){return cat.id})}" class="text-[13px] font-medium text-[var(--primary)] opacity-0 group-hover:opacity-100 transition flex items-center gap-1.5">Asignar alumnos <i class="fas fa-arrow-right text-[10px]"></i></button></div>`:''}
                                 </div>
                             </div>`;
                         }).join('')}
@@ -8524,7 +8545,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const cat = (db.categories||[]).find(c=>String(c.id)===String(catId));
             return `<div class="${cls} rounded-lg overflow-hidden border border-slate-200 bg-slate-100 relative flex-shrink-0">
                 <i class="fas fa-book text-slate-300 flex items-center justify-center h-full text-xs"></i>
-                ${cat && cat.image ? `<img src="${cat.image}" alt="${escapeHTML(cat.name||'')}" title="Categoría: ${escapeHTML(cat.name||'')}" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">` : ''}
+                ${cat && cat.image ? `<img loading="lazy" decoding="async" src="${cat.image}" alt="${escapeHTML(cat.name||'')}" title="Categoría: ${escapeHTML(cat.name||'')}" class="absolute inset-0 w-full h-full object-cover" data-bx-error="a236">` : ''}
             </div>`;
         }
 
@@ -8537,13 +8558,13 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                         <h3 class="font-semibold text-lg">Lecciones</h3>
                         <div class="flex items-center gap-3 w-full sm:w-auto">
                             <div class="relative flex-1 sm:flex-none">
-                                <select id="lesson-category-filter" onchange="filterLessonsByCategory()" class="appearance-none pl-9 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white w-full sm:w-56 text-slate-900">
+                                <select id="lesson-category-filter" data-bx-change="a240" class="appearance-none pl-9 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white w-full sm:w-56 text-slate-900">
                                     <option value="all">Todas las categorías</option>
                                     ${db.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
                                 </select>
                                 <i class="fas fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                             </div>
-                            ${canEdit?`<button onclick="openLessonModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap"><i class="fas fa-plus mr-2"></i>Nueva Lección</button>`:''}
+                            ${canEdit?`<button data-bx-click="a241" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap"><i class="fas fa-plus mr-2"></i>Nueva Lección</button>`:''}
                         </div>
                     </div>
                     <div class="overflow-x-auto"><table class="w-full text-sm">
@@ -8553,11 +8574,11 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                             const videoBadge = getLessonVideoBadge(l);
                             return `
                             <tr class="border-t lesson-row" data-category="${l.categoryId}"><td class="p-4 font-medium"><div class="flex items-center gap-3">${catCoverBox(l.categoryId,'w-11 h-11')}<span class="min-w-0">${escapeHTML(l.title)}</span></div></td><td class="p-4 text-slate-600">${escapeHTML(cat?.name || 'N/A')}</td><td class="p-4">${videoBadge}</td><td class="p-4">${l.quiz.length} preguntas</td><td class="p-4">${l.flashcards?.length||0}</td><td class="p-4 space-x-2">
-                                <button onclick="openLesson(${l.id})" class="text-slate-500 hover:text-indigo-600" title="Ver lección"><i class="fas fa-eye"></i></button>
-                                ${canEdit?`<button onclick="openLessonModal(${l.id})" class="text-slate-500 hover:text-indigo-600" title="Editar"><i class="fas fa-edit"></i></button>`:''}
-                                ${canEdit?`<button onclick="openQuizModal(${l.id})" class="text-slate-500 hover:text-green-600" title="Quiz"><i class="fas fa-question-circle"></i></button>`:''}
-                                ${canEdit?`<button onclick="openFlashcardsModal(${l.id})" class="text-slate-500 hover:text-amber-600" title="Flashcards"><i class="fas fa-layer-group"></i></button>`:''}
-                                ${canEdit?`<button onclick="deleteLesson(${l.id})" class="text-slate-500 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>`:''}
+                                <button data-bx-click="a242" data-p0="${bxE(function(){return l.id})}" class="text-slate-500 hover:text-indigo-600" title="Ver lección"><i class="fas fa-eye"></i></button>
+                                ${canEdit?`<button data-bx-click="a243" data-p0="${bxE(function(){return l.id})}" class="text-slate-500 hover:text-indigo-600" title="Editar"><i class="fas fa-edit"></i></button>`:''}
+                                ${canEdit?`<button data-bx-click="a244" data-p0="${bxE(function(){return l.id})}" class="text-slate-500 hover:text-green-600" title="Quiz"><i class="fas fa-question-circle"></i></button>`:''}
+                                ${canEdit?`<button data-bx-click="a245" data-p0="${bxE(function(){return l.id})}" class="text-slate-500 hover:text-amber-600" title="Flashcards"><i class="fas fa-layer-group"></i></button>`:''}
+                                ${canEdit?`<button data-bx-click="a246" data-p0="${bxE(function(){return l.id})}" class="text-slate-500 hover:text-red-600" title="Eliminar"><i class="fas fa-trash"></i></button>`:''}
                             </td></tr>`;
                         }).join('')}</tbody>
                     </table></div>
@@ -8579,19 +8600,19 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             return `
                 <div class="space-y-6">${myCategories.map(cat => {
                     const lessons = db.lessons.filter(l => l.categoryId === cat.id);
-                    return `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="h-28 relative">${cat.image?`<img src="${cat.image}" class="w-full h-full object-cover" onerror="this.remove()">`:`<div class="w-full h-full bg-gradient-to-r from-slate-100 to-slate-200"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div><div class="absolute bottom-0 p-4 text-white"><h3 class="font-bold text-xl">${cat.name}</h3><p class="text-xs opacity-90">${cat.description}</p></div></div><div class="divide-y">${lessons.map(l => {
+                    return `<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><div class="h-28 relative">${cat.image?`<img loading="lazy" decoding="async" src="${cat.image}" class="w-full h-full object-cover" data-bx-error="a236">`:`<div class="w-full h-full bg-gradient-to-r from-slate-100 to-slate-200"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div><div class="absolute bottom-0 p-4 text-white"><h3 class="font-bold text-xl">${cat.name}</h3><p class="text-xs opacity-90">${cat.description}</p></div></div><div class="divide-y">${lessons.map(l => {
                         const progress = db.progress.find(p => String(p.userId) === String(currentUser.id) && String(p.lessonId) === String(l.id));
                         const isCompleted = progress?.completed;
                         const dueCount = getDueFlashcardsCount(l.id, currentUser?.id);
                         const plainSnippet = stripRichText(l.content || '').substring(0, 80);
                         const hasVideo = (l.videoType && l.videoType !== 'none' && (l.videoUrl || l.videoData));
-                        return `<div class="p-4 flex items-center justify-between hover:bg-slate-50 gap-4"><div class="flex-1 min-w-0"><p class="font-medium truncate flex items-center gap-2">${escapeHTML(l.title)} ${hasVideo ? '<span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold"><i class="fas fa-play-circle"></i>Video</span>' : ''}</p><p class="text-xs text-slate-500 truncate">${escapeHTML(plainSnippet)}...</p>${dueCount>0?`<span class="inline-flex items-center gap-1 mt-1.5 text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><i class="fas fa-brain"></i>${dueCount} repasos</span>`:''}</div><div class="flex gap-2 flex-shrink-0">${dueCount>0?`<button onclick="startSRSStudy(${l.id})" class="px-3 py-2 text-sm font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600 whitespace-nowrap"><i class="fas fa-brain mr-1"></i>Repasar</button>`:''}<button onclick="openLesson(${l.id})" class="px-4 py-2 text-sm font-semibold rounded-lg whitespace-nowrap ${isCompleted?'bg-green-100 text-green-700':'bg-indigo-600 text-white hover:bg-indigo-700'}">${isCompleted?'Completada':'Iniciar'}</button></div></div>`;
+                        return `<div class="p-4 flex items-center justify-between hover:bg-slate-50 gap-4"><div class="flex-1 min-w-0"><p class="font-medium truncate flex items-center gap-2">${escapeHTML(l.title)} ${hasVideo ? '<span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold"><i class="fas fa-play-circle"></i>Video</span>' : ''}</p><p class="text-xs text-slate-500 truncate">${escapeHTML(plainSnippet)}...</p>${dueCount>0?`<span class="inline-flex items-center gap-1 mt-1.5 text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full"><i class="fas fa-brain"></i>${dueCount} repasos</span>`:''}</div><div class="flex gap-2 flex-shrink-0">${dueCount>0?`<button data-bx-click="a247" data-p0="${bxE(function(){return l.id})}" class="px-3 py-2 text-sm font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600 whitespace-nowrap"><i class="fas fa-brain mr-1"></i>Repasar</button>`:''}<button data-bx-click="a242" data-p0="${bxE(function(){return l.id})}" class="px-4 py-2 text-sm font-semibold rounded-lg whitespace-nowrap ${isCompleted?'bg-green-100 text-green-700':'bg-indigo-600 text-white hover:bg-indigo-700'}">${isCompleted?'Completada':'Iniciar'}</button></div></div>`;
                     }).join('')}</div></div>`;
                 }).join('')}</div>`;
         }
 function renderMyProgress() {
             const myProgress = db.progress.filter(p => p.userId === currentUser.id);
-            return `<div class="bg-white rounded-xl shadow-sm border border-slate-200"><div class="p-6 border-b flex justify-between items-center"><h3 class="font-semibold text-lg">Mi Progreso</h3><!-- FASE 1 - PDF REAL --><button onclick="exportMyProgressPDF()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-download"></i> Descargar mi reporte PDF</button></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="p-4 text-left font-medium">Lección</th><th class="p-4 text-left font-medium">Estado</th><th class="p-4 text-left font-medium">Calificación</th><th class="p-4 text-left font-medium">Última actividad</th></tr></thead><tbody>${myProgress.map(p => { const lesson = db.lessons.find(l=>l.id===p.lessonId); const fecha = p.date ? new Date(p.date).toLocaleDateString('es-MX') : '-'; return `<tr class="border-t"><td class="p-4">${lesson?.title||'N/A'}</td><td class="p-4"><span class="px-2 py-1 text-xs rounded-full ${p.completed?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'}">${p.completed?'Completado':'En progreso'}</span></td><td class="p-4 font-medium">${p.score}%</td><td class="p-4 text-slate-500 text-xs">${fecha}</td></tr>`}).join('')}</tbody></table></div></div>`;
+            return `<div class="bg-white rounded-xl shadow-sm border border-slate-200"><div class="p-6 border-b flex justify-between items-center"><h3 class="font-semibold text-lg">Mi Progreso</h3><!-- FASE 1 - PDF REAL --><button data-bx-click="a248" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-download"></i> Descargar mi reporte PDF</button></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="p-4 text-left font-medium">Lección</th><th class="p-4 text-left font-medium">Estado</th><th class="p-4 text-left font-medium">Calificación</th><th class="p-4 text-left font-medium">Última actividad</th></tr></thead><tbody>${myProgress.map(p => { const lesson = db.lessons.find(l=>l.id===p.lessonId); const fecha = p.date ? new Date(p.date).toLocaleDateString('es-MX') : '-'; return `<tr class="border-t"><td class="p-4">${lesson?.title||'N/A'}</td><td class="p-4"><span class="px-2 py-1 text-xs rounded-full ${p.completed?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'}">${p.completed?'Completado':'En progreso'}</span></td><td class="p-4 font-medium">${p.score}%</td><td class="p-4 text-slate-500 text-xs">${fecha}</td></tr>`}).join('')}</tbody></table></div></div>`;
         }
 
         
@@ -8643,28 +8664,28 @@ function renderMyProgress() {
                             <div class="border-t pt-5">
                                 <h4 class="font-semibold text-sm mb-3 text-slate-700">Paleta de colores</h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label class="text-xs text-slate-600">Primario</label><div class="flex gap-2 mt-1"><input id="brand-primary" type="color" value="${s.primaryColor}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.primaryColor}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" oninput="document.getElementById('brand-primary').value=this.value"></div></div>
+                                    <div><label class="text-xs text-slate-600">Primario</label><div class="flex gap-2 mt-1"><input id="brand-primary" type="color" value="${s.primaryColor}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.primaryColor}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" data-bx-input="a249"></div></div>
                                     <div class="md:col-span-2 mb-2">
                                         <label class="text-xs text-slate-600 font-medium">Identidad del portal</label>
                                         <div class="flex flex-wrap gap-2 mt-1">
-                                            <button type="button" onclick="aplicarPresetMarca('formal')" class="px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-emerald-50 text-emerald-800 text-xs font-semibold hover:bg-emerald-100">⬛ Formal (blanco / verde / negro)</button>
-                                            <button type="button" onclick="aplicarPresetMarca('ejecutivo')" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">◼ Ejecutivo azul</button>
-                                            <button type="button" onclick="aplicarPresetMarca('premium')" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">✦ Premium dorado</button>
-                                            <button type="button" onclick="toggleExecutiveTheme()" class="px-3 py-1.5 rounded-lg border border-amber-400 bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800"><i class="fas fa-moon mr-1"></i>Alternar Obsidiana y Oro</button>
+                                            <button type="button" data-bx-click="a250" class="px-3 py-1.5 rounded-lg border-2 border-emerald-600 bg-emerald-50 text-emerald-800 text-xs font-semibold hover:bg-emerald-100">⬛ Formal (blanco / verde / negro)</button>
+                                            <button type="button" data-bx-click="a251" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">◼ Ejecutivo azul</button>
+                                            <button type="button" data-bx-click="a252" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-medium hover:bg-slate-50">✦ Premium dorado</button>
+                                            <button type="button" data-bx-click="a253" class="px-3 py-1.5 rounded-lg border border-amber-400 bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800"><i class="fas fa-moon mr-1"></i>Alternar Obsidiana y Oro</button>
                                         </div>
                                         <p class="text-[11px] text-slate-500 mt-1">Presets de colores institucionales. Luego pulsa Guardar para aplicarlos.</p>
                                     </div>
-                                    <div><label class="text-xs text-slate-600">Primario oscuro</label><div class="flex gap-2 mt-1"><input id="brand-primary-dark" type="color" value="${s.primaryDark}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.primaryDark}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" oninput="document.getElementById('brand-primary-dark').value=this.value"></div></div>
-                                    <div><label class="text-xs text-slate-600">Acento</label><div class="flex gap-2 mt-1"><input id="brand-accent" type="color" value="${s.accent}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.accent}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" oninput="document.getElementById('brand-accent').value=this.value"></div></div>
-                                                                        <div><label class="text-xs text-slate-600">Barra noticias</label><div class="flex gap-2 mt-1"><input id="brand-news" type="color" value="${s.newsBg || s.primaryColor}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.newsBg || s.primaryColor}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" oninput="document.getElementById('brand-news').value=this.value"></div></div>
-                                    <div><label class="text-xs text-slate-600">Acento noticias</label><div class="flex gap-2 mt-1"><input id="brand-news-accent" type="color" value="${s.newsAccent || '#dc2626'}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.newsAccent || '#dc2626'}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" oninput="document.getElementById('brand-news-accent').value=this.value"></div></div>
+                                    <div><label class="text-xs text-slate-600">Primario oscuro</label><div class="flex gap-2 mt-1"><input id="brand-primary-dark" type="color" value="${s.primaryDark}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.primaryDark}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" data-bx-input="a254"></div></div>
+                                    <div><label class="text-xs text-slate-600">Acento</label><div class="flex gap-2 mt-1"><input id="brand-accent" type="color" value="${s.accent}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.accent}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" data-bx-input="a255"></div></div>
+                                                                        <div><label class="text-xs text-slate-600">Barra noticias</label><div class="flex gap-2 mt-1"><input id="brand-news" type="color" value="${s.newsBg || s.primaryColor}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.newsBg || s.primaryColor}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" data-bx-input="a256"></div></div>
+                                    <div><label class="text-xs text-slate-600">Acento noticias</label><div class="flex gap-2 mt-1"><input id="brand-news-accent" type="color" value="${s.newsAccent || '#dc2626'}" class="w-12 h-9 rounded border bg-white text-slate-900 border-slate-300"><input type="text" value="${s.newsAccent || '#dc2626'}" class="flex-1 px-2 py-1.5 border rounded text-xs font-mono bg-white text-slate-900 border-slate-300" data-bx-input="a257"></div></div>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-200">
-                            <button onclick="resetBranding()" class="px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50">Restablecer</button>
-                            <button onclick="saveBranding()" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700">Guardar cambios</button>
+                            <button data-bx-click="a258" class="px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50">Restablecer</button>
+                            <button data-bx-click="a259" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700">Guardar cambios</button>
                         </div>
                     </div>
                 </div>`;
@@ -8766,19 +8787,19 @@ function renderGlossary() {
                         <p class="text-sm text-slate-500 mt-1">${filtered.length} conceptos • ${categories.length} ramos</p>
                     </div>
                     <div class="flex gap-2">
-                        ${canEdit ? `<button onclick="openNewGlossaryCategory()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-folder-plus mr-1.5"></i>Nuevo Ramo</button>` : ''}
-                        ${canEdit ? `<button onclick="openNewConcept()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-1.5"></i>Nuevo Concepto</button>` : ''}
+                        ${canEdit ? `<button data-bx-click="a260" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-folder-plus mr-1.5"></i>Nuevo Ramo</button>` : ''}
+                        ${canEdit ? `<button data-bx-click="a261" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-1.5"></i>Nuevo Concepto</button>` : ''}
                     </div>
                 </div>
                 
                 <div class="flex flex-col md:flex-row gap-3 mb-6 p-4 bg-slate-50 rounded-xl">
                     <div class="flex-1">
                         <label class="text-xs text-slate-600 mb-1 block">Buscar</label>
-                        <input id="glossary-search" type="text" placeholder="Buscar concepto o definición..." value="${window.glossarySearch||''}" oninput="window.glossarySearch=this.value; navigateTo('glossary')" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                        <input id="glossary-search" type="text" placeholder="Buscar concepto o definición..." value="${window.glossarySearch||''}" data-bx-input="a262" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
                     </div>
                     <div class="md:w-56">
                         <label class="text-xs text-slate-600 mb-1 block">Filtrar por Ramo</label>
-                        <select id="glossary-cat-filter" onchange="window.glossaryFilterCat=this.value; navigateTo('glossary')" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                        <select id="glossary-cat-filter" data-bx-change="a263" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
                             <option value="all">Todos los ramos</option>
                             ${categories.map(cat => `<option value="${cat.id}" ${selectedCat==cat.id?'selected':''}>${cat.name}</option>`).join('')}
                         </select>
@@ -8786,7 +8807,7 @@ function renderGlossary() {
                 </div>
                 
                 ${filtered.length === 0 ? 
-                    `<div class="text-center py-16 text-slate-500"><i class="fas fa-book-open text-4xl mb-3 opacity-30"></i><p>No hay conceptos${searchTerm ? ' que coincidan' : ''}</p>${canEdit ? '<button onclick="openNewConcept()" class="mt-4 text-indigo-600 text-sm font-medium">Crear primer concepto</button>' : ''}</div>` :
+                    `<div class="text-center py-16 text-slate-500"><i class="fas fa-book-open text-4xl mb-3 opacity-30"></i><p>No hay conceptos${searchTerm ? ' que coincidan' : ''}</p>${canEdit ? '<button data-bx-click="a261" class="mt-4 text-indigo-600 text-sm font-medium">Crear primer concepto</button>' : ''}</div>` :
                     `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         ${filtered.map(concept => {
                             const cat = categories.find(c => c.id === concept.categoryId);
@@ -8795,8 +8816,8 @@ function renderGlossary() {
                                 <div class="flex items-start justify-between mb-3">
                                     <span class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded">${cat ? cat.name : 'Sin ramo'}</span>
                                     ${canEdit ? `<div class="opacity-0 group-hover:opacity-100 transition flex gap-1">
-                                        <button onclick="editConcept(${concept.id})" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded" title="Editar"><i class="fas fa-pen text-xs"></i></button>
-                                        <button onclick="deleteConcept(${concept.id})" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-red-600 rounded" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
+                                        <button data-bx-click="a264" data-p0="${bxE(function(){return concept.id})}" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-indigo-600 rounded" title="Editar"><i class="fas fa-pen text-xs"></i></button>
+                                        <button data-bx-click="a265" data-p0="${bxE(function(){return concept.id})}" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-red-600 rounded" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
                                     </div>` : ''}
                                 </div>
                                 <h4 class="font-semibold text-lg mb-2 text-slate-800">${concept.term}</h4>
@@ -8820,14 +8841,14 @@ function renderGlossary() {
                 const canDelete = cat.id !== 1;
                 htmlList += '<div class="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50">' +
                     '<div><p class="font-medium text-sm">' + cat.name + '</p><p class="text-xs text-slate-500">' + count + ' conceptos</p></div>' +
-                    (canDelete ? '<button onclick="deleteGlossaryCategory(' + cat.id + ')" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 rounded" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>' : '<span class="text-[10px] text-slate-400 px-2">Sistema</span>') +
+                    (canDelete ? '<button ' + bxOn('click','deleteGlossaryCategory',[cat.id]) + ' class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 rounded" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>' : '<span class="text-[10px] text-slate-400 px-2">Sistema</span>') +
                     '</div>';
             });
             
             showModal('<div class="p-6 max-w-md w-full"><h3 class="text-xl font-semibold mb-4">Gestionar Ramos</h3>' +
                 '<form id="new-cat-form" class="space-y-3 mb-5"><div class="flex gap-2"><input id="cat-name" required class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white text-slate-900 border-slate-300" placeholder="Nuevo ramo..."><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Agregar</button></div></form>' +
                 '<div class="space-y-2 max-h-64 overflow-y-auto">' + htmlList + '</div>' +
-                '<div class="mt-5 flex justify-end"><button aria-label="Cerrar" onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm">Cerrar</button></div></div>');
+                '<div class="mt-5 flex justify-end"><button aria-label="Cerrar" data-bx-click="a1" class="px-4 py-2 border rounded-lg text-sm">Cerrar</button></div></div>');
             
             document.getElementById('new-cat-form').onsubmit = function(e) {
                 e.preventDefault();
@@ -8864,7 +8885,7 @@ function renderGlossary() {
         function openNewConcept(editId = null) {
             const concept = editId ? db.glossaryConcepts.find(c => c.id === editId) : null;
             const categories = db.glossaryCategories;
-            showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-semibold mb-4">${concept ? 'Editar' : 'Nuevo'} Concepto</h3><form id="concept-form" class="space-y-4"><div><label class="text-sm font-medium">Ramo</label><select id="concept-cat" required class="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 border-slate-300">${categories.map(c => `<option value="${c.id}" ${concept && concept.categoryId==c.id ? 'selected':''}>${c.name}</option>`).join('')}</select></div><div><label class="text-sm font-medium">Concepto</label><input id="concept-term" required value="${concept?concept.term:''}" class="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 border-slate-300" placeholder="Ej: Álgebra"></div><div><label class="text-sm font-medium">Definición</label><textarea id="concept-def" required rows="4" class="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 border-slate-300" placeholder="Explica el concepto de forma clara...">${concept?concept.definition:''}</textarea></div><div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg">${concept ? 'Guardar' : 'Crear'}</button></div></form></div>`);
+            showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-semibold mb-4">${concept ? 'Editar' : 'Nuevo'} Concepto</h3><form id="concept-form" class="space-y-4"><div><label class="text-sm font-medium">Ramo</label><select id="concept-cat" required class="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 border-slate-300">${categories.map(c => `<option value="${c.id}" ${concept && concept.categoryId==c.id ? 'selected':''}>${c.name}</option>`).join('')}</select></div><div><label class="text-sm font-medium">Concepto</label><input id="concept-term" required value="${concept?concept.term:''}" class="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 border-slate-300" placeholder="Ej: Álgebra"></div><div><label class="text-sm font-medium">Definición</label><textarea id="concept-def" required rows="4" class="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900 border-slate-300" placeholder="Explica el concepto de forma clara...">${concept?concept.definition:''}</textarea></div><div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg">${concept ? 'Guardar' : 'Crear'}</button></div></form></div>`);
             document.getElementById('concept-form').onsubmit = e => {
                 e.preventDefault();
                 const categoryId = parseInt(document.getElementById('concept-cat').value);
@@ -9191,33 +9212,33 @@ function renderGlossary() {
             <div class="flex items-center gap-3">
                 <div class="text-sm text-slate-500">${alumnos.length} alumnos · ${db.lessons.length} lecciones</div>
                 <!-- FASE 1 - PDF REAL -->
-                <button onclick="exportReportsPDF()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+                <button data-bx-click="a266" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div class="relative">
-                <select id="filter-alumno" onchange="filterReports()" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
+                <select id="filter-alumno" data-bx-change="a267" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
                     <option value="all">Todos los alumnos</option>
                     ${alumnos.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}
                 </select>
                 <i class="fas fa-user absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
             </div>
             <div class="relative">
-                <select id="filter-categoria" onchange="filterReports()" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
+                <select id="filter-categoria" data-bx-change="a267" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
                     <option value="all">Todas las categorías</option>
                     ${db.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
                 </select>
                 <i class="fas fa-folder absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
             </div>
             <div class="relative">
-                <select id="filter-leccion" onchange="filterReports()" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
+                <select id="filter-leccion" data-bx-change="a267" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
                     <option value="all">Todas las lecciones</option>
                     ${db.lessons.map(l=>`<option value="${l.id}">${l.title}</option>`).join('')}
                 </select>
                 <i class="fas fa-book-open absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
             </div>
             <div class="relative">
-                <select id="filter-maestro" onchange="filterReports()" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
+                <select id="filter-maestro" data-bx-change="a267" class="w-full appearance-none pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900">
                     <option value="all">Todos los maestros</option>
                     ${maestros.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}
                 </select>
@@ -9336,20 +9357,20 @@ function renderReportesProgreso() {
         <div class="flex justify-between items-center mb-3">
             <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-funnel-dollar text-indigo-600"></i> Embudo de Conversión Comercial y SLA</h3>
             <div class="flex items-center gap-2">
-                <button onclick="exportEmbudoCSV()" class="px-3 py-1.5 border border-emerald-200 text-emerald-700 text-sm rounded-lg hover:bg-emerald-50 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar CSV</button>
-                <button onclick="exportEmbudoPDF()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+                <button data-bx-click="a268" class="px-3 py-1.5 border border-emerald-200 text-emerald-700 text-sm rounded-lg hover:bg-emerald-50 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar CSV</button>
+                <button data-bx-click="a269" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
             </div>
         </div>
         <p class="text-xs text-slate-500 mb-3">${labelPeriodo}</p>
         <div class="flex flex-wrap items-center gap-2 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
             <span class="text-xs font-semibold text-slate-600"><i class="fas fa-calendar-alt mr-1"></i>Fechas</span>
-            <input type="date" id="embudo-desde" value="${vDesde}" onchange="window._embudoDesde=this.value; navigateTo('reportes-progreso')" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+            <input type="date" id="embudo-desde" value="${vDesde}" data-bx-change="a270" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
             <span class="text-xs text-slate-400">—</span>
-            <input type="date" id="embudo-hasta" value="${vHasta}" onchange="window._embudoHasta=this.value; navigateTo('reportes-progreso')" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
-            <button onclick="setEmbudoPreset('mes')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Este mes</button>
-            <button onclick="setEmbudoPreset('prev')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Mes anterior</button>
-            <button onclick="setEmbudoPreset('anio')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Este año</button>
-            <button onclick="setEmbudoPreset('todo')" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Todo</button>
+            <input type="date" id="embudo-hasta" value="${vHasta}" data-bx-change="a271" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+            <button data-bx-click="a272" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Este mes</button>
+            <button data-bx-click="a273" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Mes anterior</button>
+            <button data-bx-click="a274" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Este año</button>
+            <button data-bx-click="a275" class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700">Todo</button>
         </div>
         ${renderEmbudoComercial(r)}
     </div>`;
@@ -9446,8 +9467,8 @@ function filterReports(){
             const maxWidth = capMatch ? ('w-full ' + capMatch[0]) : (isLarge ? '' : 'w-full max-w-lg');
             // Verificar si el modal ya incluye un botón superior de cerrar con ícono X (fa-times / fa-xmark)
             const hasTopCloseX = /onclick=["'][^"']*closeModal\(|cotCerrarModal\(/i.test(html) && /fa-times|fa-xmark|✕/i.test(html);
-            const closeXBtn = hasTopCloseX ? '' : `<button type="button" aria-label="Cerrar ventana" title="Cerrar" onclick="if(window.stopChatLive)try{stopChatLive();}catch(e){} closeModal()" class="modal-auto-close-x sticky top-3 float-right mr-3 mt-3 z-30 w-8 h-8 rounded-full bg-slate-100/90 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center shadow-sm transition"><i class="fas fa-times text-sm"></i></button>`;
-            document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" ondblclick="closeModal(event)" title="Doble clic fuera de la ventana para cerrar"><div class="relative bg-white text-slate-800 rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">${closeXBtn}${html}</div></div>`; }
+            const closeXBtn = hasTopCloseX ? '' : `<button type="button" aria-label="Cerrar ventana" title="Cerrar" data-bx-click="a276" class="modal-auto-close-x sticky top-3 float-right mr-3 mt-3 z-30 w-8 h-8 rounded-full bg-slate-100/90 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center shadow-sm transition"><i class="fas fa-times text-sm"></i></button>`;
+            document.getElementById('modal-container').innerHTML = `<div class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" data-bx-dblclick="a277" title="Doble clic fuera de la ventana para cerrar"><div class="relative bg-white text-slate-800 rounded-2xl shadow-xl ${maxWidth} max-h-[95vh] overflow-y-auto" data-bx-click="a141" data-bx-dblclick="a278">${closeXBtn}${html}</div></div>`; }
         function closeModal(e) { if(!e || e.target.classList.contains('modal-backdrop')){ if(window._inExam && e) return; document.getElementById('modal-container').innerHTML=''; window.cotModalId=null; } }
 
         function openUserModal(id=null) {
@@ -9465,11 +9486,11 @@ function filterReports(){
                 <div class="sm:col-span-2">
                     <label class="text-sm font-medium">Ubicación (estado)</label>
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
-                        <select id="user-ubicacion" name="ubicacion" onchange="userUbicacionSel(this.value)" class="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <select id="user-ubicacion" name="ubicacion" data-bx-change="a279" class="flex-1 min-w-[200px] px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="">— Selecciona un estado —</option>
                             ${estadosOpts}
                         </select>
-                        <button type="button" onclick="userUbicacionToggle()" class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 bg-white"><i class="fas fa-map-marked-alt text-indigo-600"></i> Elegir en mapa</button>
+                        <button type="button" data-bx-click="a280" class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 bg-white"><i class="fas fa-map-marked-alt text-indigo-600"></i> Elegir en mapa</button>
                     </div>
                     <div id="ub-seleccionado" class="text-xs text-slate-500 mt-1">${ubicActual?'<i class="fas fa-map-marker-alt mr-1 text-indigo-600"></i> Estado asignado: <b>'+escapeHTML(ubicActual)+'</b>':'<span class="text-slate-400">Sin ubicación asignada</span>'}</div>
                     <div id="ub-picker-wrap" class="hidden">${renderMapaPickerUbicacion()}</div>
@@ -9477,12 +9498,12 @@ function filterReports(){
                 <div>
                     <div class="flex items-center justify-between">
                         <label class="text-sm font-medium">${user ? 'Nueva contraseña <span class="text-xs font-normal text-slate-400">(opcional)</span>' : 'Contraseña inicial <span class="text-red-500">*</span>'}</label>
-                        <button type="button" onclick="generarPasswordModalUsuario()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800"><i class="fas fa-wand-magic-sparkles mr-1"></i>Generar clave</button>
+                        <button type="button" data-bx-click="a281" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800"><i class="fas fa-wand-magic-sparkles mr-1"></i>Generar clave</button>
                     </div>
                     <div class="relative mt-1">
                         <input id="user-modal-pass" type="password" name="password" autocomplete="new-password" data-1p-ignore data-lpignore="true" value="" ${user ? '' : 'required'} placeholder="${user ? 'Dejar en blanco para conservar su contraseña actual' : 'Escribe o genera una contraseña'}" class="w-full pl-3 pr-20 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">
                         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <button type="button" onclick="const inp=document.getElementById('user-modal-pass');if(inp){inp.type=inp.type==='password'?'text':'password';this.querySelector('i').className=inp.type==='password'?'fas fa-eye':'fas fa-eye-slash';}" class="p-1.5 text-slate-400 hover:text-slate-700" title="Mostrar/Ocultar contraseña"><i class="fas fa-eye"></i></button>
+                            <button type="button" data-bx-click="a282" class="p-1.5 text-slate-400 hover:text-slate-700" title="Mostrar/Ocultar contraseña"><i class="fas fa-eye"></i></button>
                         </div>
                     </div>
                     ${user ? '<p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-shield-halved mr-1"></i>La contraseña actual está protegida en el servidor y NO se borrará si dejas este campo vacío.</p>' : ''}
@@ -9503,7 +9524,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 <select name="agenciaId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></select>
 <p class="text-xs text-slate-500 mt-1">El agente aparecerá en "Mi Equipo" de esa agencia.</p></div><div id="color-field" style="display:none;"><label class="text-sm font-medium">Color para calendario <span class="text-slate-500">(maestros/instructores)</span></label>
 <input type="color" name="calendarColor" value="${user?.calendarColor||'#0a2540'}" class="w-full mt-1 h-10 px-1 py-1 border rounded-lg cursor-pointer bg-white text-slate-900 border-slate-300">
-<p class="text-xs text-slate-500 mt-1">Este color se usará en el calendario de clases en vivo</p></div><div><label class="text-sm font-medium">Foto de perfil</label><input type="file" name="avatarFile" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><div class="mt-2 flex items-center gap-2">${user?.avatar?`<img src="${user.avatar}" class="w-10 h-10 rounded-full object-cover"><span class="text-xs text-slate-500">Actual</span>`: '<span class="text-xs text-slate-500">Se usará avatar automático si no subes</span>'}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold">Guardar</button></div></form>`);
+<p class="text-xs text-slate-500 mt-1">Este color se usará en el calendario de clases en vivo</p></div><div><label class="text-sm font-medium">Foto de perfil</label><input type="file" name="avatarFile" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><div class="mt-2 flex items-center gap-2">${user?.avatar?`<img loading="lazy" decoding="async" src="${user.avatar}" class="w-10 h-10 rounded-full object-cover"><span class="text-xs text-slate-500">Actual</span>`: '<span class="text-xs text-slate-500">Se usará avatar automático si no subes</span>'}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold">Guardar</button></div></form>`);
             setTimeout(()=>{ const rs=document.querySelector('#user-form select[name=role]'); const af=document.getElementById('agencia-field'); const as=document.querySelector('#user-form select[name=agenciaId]'); if(as){ as.innerHTML='<option value="">Sin asignar</option>'+db.users.filter(u=>u.role==='agencia').map(a=>`<option value="${a.id}" ${String(user?.agenciaId||'')===String(a.id)?'selected':''}>${escapeHTML(a.name)}</option>`).join(''); } const tg=()=>{ if(af) af.style.display = rs && ['agente_agencia','agente_desarrollo','agente'].includes(rs.value) ? 'block':'none'; const cf=document.getElementById('color-field'); if(cf) cf.style.display = rs && ['maestro','capacitador','agencia','admin','gm'].includes(rs.value) ? 'block':'none'; }; if(rs){ rs.addEventListener('change',tg); tg(); } if(!isGM(currentUser) && user?.role!=='gm'){ const gmOpt=document.querySelector('#user-form option[value=gm]'); if(gmOpt) gmOpt.remove(); }
                 // Refuerzo anti-autocompletado: algunos gestores/navegadores ignoran
                 // autocomplete y rellenan la sesión guardada; dejar las casillas en blanco.
@@ -9590,7 +9611,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
         function openCategoryModal(id=null){
             const cat = id ? db.categories.find(c=>c.id===id) : null;
-            showModal(`<form id="cat-form" class="p-6"><h3 class="text-xl font-bold mb-4">${cat?'Editar':'Nueva'} Categoría</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${cat?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Descripción</label><textarea name="description" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${cat?.description||''}</textarea></div><div><label class="text-sm">Formación Académica</label><select name="planId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${cat?.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div><div><label class="text-sm">Imagen de portada</label><input type="file" id="cat-image-input" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="cat-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${cat?.image?`<img id="cat-image-preview" src="${cat.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img id="cat-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
+            showModal(`<form id="cat-form" class="p-6"><h3 class="text-xl font-bold mb-4">${cat?'Editar':'Nueva'} Categoría</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${cat?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Descripción</label><textarea name="description" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${cat?.description||''}</textarea></div><div><label class="text-sm">Formación Académica</label><select name="planId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${cat?.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div><div><label class="text-sm">Imagen de portada</label><input type="file" id="cat-image-input" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="cat-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${cat?.image?`<img loading="lazy" decoding="async" id="cat-image-preview" src="${cat.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img loading="lazy" decoding="async" id="cat-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
             const imageInput = document.getElementById('cat-image-input');
             const preview = document.getElementById('cat-image-preview');
             let imageData = cat?.image || '';
@@ -9627,7 +9648,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function openAssignModal(catId){
             const cat = db.categories.find(c=>c.id===catId);
             const alumnos = db.users.filter(u=>isStudent(u));
-            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Asignar Alumnos a ${cat.name}</h3><div class="space-y-2 max-h-64 overflow-y-auto">${alumnos.map(a=>`<label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded"><input type="checkbox" value="${a.id}" ${cat.assignedTo.includes(a.id)?'checked':''} class="assign-check bg-white text-slate-900 border border-slate-300"><img src="${a.avatar}" class="w-8 h-8 rounded-full"><span>${a.name}</span></label>`).join('')}</div><div class="flex justify-end gap-3 mt-6"><button aria-label="Cerrar" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button onclick="saveAssign(${catId})" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></div>`);
+            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Asignar Alumnos a ${cat.name}</h3><div class="space-y-2 max-h-64 overflow-y-auto">${alumnos.map(a=>`<label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded"><input type="checkbox" value="${a.id}" ${cat.assignedTo.includes(a.id)?'checked':''} class="assign-check bg-white text-slate-900 border border-slate-300"><img src="${a.avatar}" class="w-8 h-8 rounded-full"><span>${a.name}</span></label>`).join('')}</div><div class="flex justify-end gap-3 mt-6"><button aria-label="Cerrar" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button data-bx-click="a283" data-p0="${bxE(function(){return catId})}" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></div>`);
         }
         function saveAssign(catId){ const cat=db.categories.find(c=>c.id===catId); cat.assignedTo=Array.from(document.querySelectorAll('.assign-check:checked')).map(c=>parseInt(c.value)); saveDB(); closeModal(); navigateTo('categories'); }
 
@@ -9805,7 +9826,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <a href="${escapeHTML(info.src)}" target="_blank" rel="noopener noreferrer" class="text-slate-300 hover:text-white flex items-center gap-1">Abrir archivo <i class="fas fa-external-link-alt text-[10px]"></i></a>
                     </div>
                     <div class="relative w-full aspect-video bg-black flex items-center justify-center">
-                        <video src="${escapeHTML(info.src)}" controls playsinline preload="metadata" onended="markLessonViewed(${lesson.id}, true)" class="w-full h-full max-h-[480px]"></video>
+                        <video src="${escapeHTML(info.src)}" controls playsinline preload="metadata" data-bx-ended="a284" data-p0="${bxE(function(){return lesson.id})}" class="w-full h-full max-h-[480px]"></video>
                     </div>
                 </div>`;
             }
@@ -9826,19 +9847,19 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     <div>
                         <div class="flex items-center justify-between mb-1">
                             <label class="text-sm font-medium">Contenido de la lección (formato enriquecido)</label>
-                            <button type="button" onclick="document.getElementById('lesson-content-preview-wrap').classList.toggle('hidden'); updateLessonFormatPreview();" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fas fa-eye mr-1"></i>Vista previa</button>
+                            <button type="button" data-bx-click="a285" class="text-xs text-indigo-600 font-semibold hover:underline"><i class="fas fa-eye mr-1"></i>Vista previa</button>
                         </div>
                         <div class="flex flex-wrap items-center gap-1 p-1.5 bg-slate-100 border border-slate-300 rounded-t-lg">
-                            <button type="button" onclick="insertLessonFormat('h2')" class="px-2 py-1 text-xs font-bold bg-white border border-slate-200 rounded hover:bg-slate-50" title="Título de sección">H2</button>
-                            <button type="button" onclick="insertLessonFormat('h3')" class="px-2 py-1 text-xs font-semibold bg-white border border-slate-200 rounded hover:bg-slate-50" title="Subtítulo">H3</button>
-                            <button type="button" onclick="insertLessonFormat('bold')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Negrita"><i class="fas fa-bold"></i></button>
-                            <button type="button" onclick="insertLessonFormat('italic')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Cursiva"><i class="fas fa-italic"></i></button>
-                            <button type="button" onclick="insertLessonFormat('ul')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Lista de viñetas"><i class="fas fa-list-ul"></i></button>
-                            <button type="button" onclick="insertLessonFormat('ol')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Lista numerada"><i class="fas fa-list-ol"></i></button>
-                            <button type="button" onclick="insertLessonFormat('callout')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50 text-amber-700" title="Nota destacada"><i class="fas fa-lightbulb mr-1"></i>Nota</button>
-                            <button type="button" onclick="insertLessonFormat('link')" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50 text-indigo-700" title="Insertar enlace"><i class="fas fa-link"></i></button>
+                            <button type="button" data-bx-click="a286" class="px-2 py-1 text-xs font-bold bg-white border border-slate-200 rounded hover:bg-slate-50" title="Título de sección">H2</button>
+                            <button type="button" data-bx-click="a287" class="px-2 py-1 text-xs font-semibold bg-white border border-slate-200 rounded hover:bg-slate-50" title="Subtítulo">H3</button>
+                            <button type="button" data-bx-click="a288" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Negrita"><i class="fas fa-bold"></i></button>
+                            <button type="button" data-bx-click="a289" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Cursiva"><i class="fas fa-italic"></i></button>
+                            <button type="button" data-bx-click="a290" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Lista de viñetas"><i class="fas fa-list-ul"></i></button>
+                            <button type="button" data-bx-click="a291" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50" title="Lista numerada"><i class="fas fa-list-ol"></i></button>
+                            <button type="button" data-bx-click="a292" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50 text-amber-700" title="Nota destacada"><i class="fas fa-lightbulb mr-1"></i>Nota</button>
+                            <button type="button" data-bx-click="a293" class="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded hover:bg-slate-50 text-indigo-700" title="Insertar enlace"><i class="fas fa-link"></i></button>
                         </div>
-                        <textarea id="lesson-content-input" name="content" rows="6" oninput="updateLessonFormatPreview()" required class="w-full px-3 py-2 border border-t-0 rounded-b-lg bg-white text-slate-900 border-slate-300 font-sans text-sm">${escapeHTML(lesson?.content||'')}</textarea>
+                        <textarea id="lesson-content-input" name="content" rows="6" data-bx-input="a294" required class="w-full px-3 py-2 border border-t-0 rounded-b-lg bg-white text-slate-900 border-slate-300 font-sans text-sm">${escapeHTML(lesson?.content||'')}</textarea>
                         <div id="lesson-content-preview-wrap" class="hidden mt-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
                             <p class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 mb-2">Vista previa del formato</p>
                             <div id="lesson-content-preview" class="text-sm"></div>
@@ -9864,7 +9885,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube directo al servidor/Storage mediante Media.subir sin saturar la base de datos.</p>
                     </div>
                 </div>
-                <div class="flex justify-end gap-3 mt-6"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button id="lesson-save-btn" type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Guardar</button></div>
+                <div class="flex justify-end gap-3 mt-6"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button id="lesson-save-btn" type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700">Guardar</button></div>
             </form>`);
             document.getElementById('video-type').onchange = e => {
                 const v = e.target.value;
@@ -9946,7 +9967,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     </div>
                     <div id="opts-vf" class="hidden"><p class="text-sm text-slate-600">Opciones: Verdadero / Falso</p></div>
                     <div><label class="text-sm">Correcta</label><select id="q-correct" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></select></div>
-                    <div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-green-600 text-white">Agregar Pregunta</button></div>
+                    <div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-green-600 text-white">Agregar Pregunta</button></div>
                 </form></div>`);
             
             const updateQuizUI = () => {
@@ -10096,8 +10117,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function openFlashcardsModal(lessonId){
             const lesson = db.lessons.find(l=>l.id===lessonId);
             if(!lesson.flashcards) lesson.flashcards = [];
-            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Flashcards: ${escapeHTML(lesson.title)}</h3><div id="fc-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto">${lesson.flashcards.map((f,i)=>`<div class="p-3 border rounded-lg flex justify-between items-center"><div><p class="font-medium text-sm">${escapeHTML(f.front)}</p><p class="text-xs text-slate-500">${escapeHTML(f.back)}</p></div><button onclick="deleteFlashcard(${lessonId},${i})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`).join('') || '<p class="text-slate-500">Sin flashcards</p>'}</div>
-                <form id="fc-form" class="border-t pt-4 space-y-3"><div><label class="text-sm">Frente</label><input id="fc-front" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Pregunta o término"></div><div><label class="text-sm">Reverso</label><input id="fc-back" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Respuesta o definición"></div><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white">Agregar</button></div></form></div>`);
+            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Flashcards: ${escapeHTML(lesson.title)}</h3><div id="fc-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto">${lesson.flashcards.map((f,i)=>`<div class="p-3 border rounded-lg flex justify-between items-center"><div><p class="font-medium text-sm">${escapeHTML(f.front)}</p><p class="text-xs text-slate-500">${escapeHTML(f.back)}</p></div><button data-bx-click="a295" data-p0="${bxE(function(){return lessonId})}" data-p1="${bxE(function(){return i})}" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`).join('') || '<p class="text-slate-500">Sin flashcards</p>'}</div>
+                <form id="fc-form" class="border-t pt-4 space-y-3"><div><label class="text-sm">Frente</label><input id="fc-front" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Pregunta o término"></div><div><label class="text-sm">Reverso</label><input id="fc-back" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Respuesta o definición"></div><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white">Agregar</button></div></form></div>`);
             document.getElementById('fc-form').onsubmit = e => { e.preventDefault(); lesson.flashcards.push({ id: 'fc_' + Date.now() + '_' + Math.floor(Math.random()*1000), front: document.getElementById('fc-front').value.trim(), back: document.getElementById('fc-back').value.trim(), interval: 1, ease: 2.5, due: new Date(0).toISOString(), reps: 0, lapses: 0 }); saveDB(); openFlashcardsModal(lessonId); };
         }
         
@@ -10130,11 +10151,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         </div>
                     </div>
                     <div id="reveal-btn" class="flex justify-center">
-                        <button onclick="document.getElementById('card-back').classList.remove('hidden'); document.getElementById('reveal-btn').classList.add('hidden'); document.getElementById('rate-btns').classList.remove('hidden')" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">Mostrar respuesta</button>
+                        <button data-bx-click="a296" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">Mostrar respuesta</button>
                     </div>
                     <div id="rate-btns" class="hidden grid grid-cols-2 gap-3">
-                        <button onclick="rateCard(false)" class="px-4 py-3 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200 transition"><i class="fas fa-times mr-2"></i>No supe (1d)</button>
-                        <button onclick="rateCard(true)" class="px-4 py-3 bg-green-100 text-green-700 rounded-lg font-semibold hover:bg-green-200 transition"><i class="fas fa-check mr-2"></i>Lo supe</button>
+                        <button data-bx-click="a297" class="px-4 py-3 bg-red-100 text-red-700 rounded-lg font-semibold hover:bg-red-200 transition"><i class="fas fa-times mr-2"></i>No supe (1d)</button>
+                        <button data-bx-click="a298" class="px-4 py-3 bg-green-100 text-green-700 rounded-lg font-semibold hover:bg-green-200 transition"><i class="fas fa-check mr-2"></i>Lo supe</button>
                     </div>
                 </div>`);
                 window.rateCard = function(known){
@@ -10192,13 +10213,13 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div id="flashcards-section" class="mt-8">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                         <h4 class="font-bold text-lg flex items-center gap-2"><i class="fas fa-layer-group text-amber-500"></i> Flashcards de repaso (${lesson.flashcards.length})</h4>
-                        ${dueCount > 0 ? `<button onclick="startSRSStudy(${lesson.id})" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition flex items-center gap-1.5"><i class="fas fa-brain"></i> Iniciar Repaso SRS (${dueCount} pendientes)</button>` : `<span class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full font-medium"><i class="fas fa-check-circle mr-1"></i>SRS al día para ti</span>`}
+                        ${dueCount > 0 ? `<button data-bx-click="a299" data-p0="${bxE(function(){return lesson.id})}" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition flex items-center gap-1.5"><i class="fas fa-brain"></i> Iniciar Repaso SRS (${dueCount} pendientes)</button>` : `<span class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full font-medium"><i class="fas fa-check-circle mr-1"></i>SRS al día para ti</span>`}
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         ${lesson.flashcards.map((f, idx)=>{
                             const uSrs = getUserFlashcardSRS(lesson.id, idx, f, currentUser?.id);
                             return `
-                            <div class="flashcard h-40 cursor-pointer" onclick="this.classList.toggle('flipped')">
+                            <div class="flashcard h-40 cursor-pointer" data-bx-click="a300">
                                 <div class="flashcard-inner">
                                     <div class="flashcard-front bg-white border-2 border-amber-200 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm"><p class="font-medium text-slate-800">${escapeHTML(f.front)}</p><span class="text-[10px] text-slate-400 mt-2">Repeticiones: ${uSrs.reps || 0}</span></div>
                                     <div class="flashcard-back bg-amber-500 text-white rounded-xl p-4 flex items-center justify-center text-center shadow-sm"><p class="font-medium">${escapeHTML(f.back)}</p></div>
@@ -10221,21 +10242,21 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div class="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
                     <h4 class="font-semibold mb-3 flex items-center gap-2"><i class="fas fa-bolt text-indigo-600"></i> Actividades de la Lección</h4>
                     <div class="flex flex-wrap gap-3">
-                        ${hasVideo ? `<button onclick="const vp=document.getElementById('lesson-video-player'); if(vp) vp.scrollIntoView({behavior:'smooth'}); else openDriveVideo('${escapeHTML(vInfo.rawUrl)}');" class="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2"><i class="fas fa-play"></i> Ir al Video</button>` : ''}
-                        ${hasFlashcards ? `<button onclick="document.getElementById('flashcards-section').scrollIntoView({behavior:'smooth'})" class="px-4 py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition flex items-center gap-2"><i class="fas fa-layer-group"></i> Flashcards (${lesson.flashcards.length})</button>` : ''}
-                        ${dueCount > 0 ? `<button onclick="startSRSStudy(${lessonId})" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2"><i class="fas fa-brain"></i> Repasar SRS (${dueCount})</button>` : ''}
-                        ${hasQuiz ? `<button onclick="startQuiz(${lessonId})" class="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-2"><i class="fas fa-question-circle"></i> Resolver Quiz (${lesson.quiz.length})</button>` : ''}
+                        ${hasVideo ? `<button data-bx-click="a301" data-p0="${bxE(function(){return escapeHTML(vInfo.rawUrl)})}" class="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2"><i class="fas fa-play"></i> Ir al Video</button>` : ''}
+                        ${hasFlashcards ? `<button data-bx-click="a302" class="px-4 py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition flex items-center gap-2"><i class="fas fa-layer-group"></i> Flashcards (${lesson.flashcards.length})</button>` : ''}
+                        ${dueCount > 0 ? `<button data-bx-click="a303" data-p0="${bxE(function(){return lessonId})}" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2"><i class="fas fa-brain"></i> Repasar SRS (${dueCount})</button>` : ''}
+                        ${hasQuiz ? `<button data-bx-click="a304" data-p0="${bxE(function(){return lessonId})}" class="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-2"><i class="fas fa-question-circle"></i> Resolver Quiz (${lesson.quiz.length})</button>` : ''}
                     </div>
                 </div>
             ` : '';
             
             const viewedAlready = lesson.views && lesson.views.includes(currentUser.id);
-            showModal(`<div class="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-3">${catCoverBox(lesson.categoryId,'w-16 h-16')}<div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
+            showModal(`<div class="p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-3">${catCoverBox(lesson.categoryId,'w-16 h-16')}<div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
                 ${videoEmbedHtml}
                 <div class="prose max-w-none bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">${formattedContentHtml}</div>
                 ${actionsHtml}
                 ${flashcardsHtml}
-                <div class="mt-8 pt-6 border-t flex justify-between items-center"><div>${lesson.quiz.length>0?`<span class="text-sm text-slate-600"><i class="fas fa-question-circle mr-1"></i>${lesson.quiz.length} preguntas en el quiz</span>`:''}</div><div class="flex gap-3"><button id="mark-viewed" onclick="markLessonViewed(${lessonId})" class="px-5 py-2.5 ${viewedAlready?'bg-green-600':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-semibold transition">${viewedAlready?'¡Vista!':'Marcar como vista'}</button></div></div></div>`);
+                <div class="mt-8 pt-6 border-t flex justify-between items-center"><div>${lesson.quiz.length>0?`<span class="text-sm text-slate-600"><i class="fas fa-question-circle mr-1"></i>${lesson.quiz.length} preguntas en el quiz</span>`:''}</div><div class="flex gap-3"><button id="mark-viewed" data-bx-click="a305" data-p0="${bxE(function(){return lessonId})}" class="px-5 py-2.5 ${viewedAlready?'bg-green-600':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-semibold transition">${viewedAlready?'¡Vista!':'Marcar como vista'}</button></div></div></div>`);
         }
         function openDriveVideo(url) {
             // Convierte link de Drive a preview
@@ -10266,7 +10287,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const renderQ = () => {
                 if(idx>=lesson.quiz.length){ finishQuiz(); return; }
                 const q = lesson.quiz[idx];
-                showModal(`<div class="p-6"><div class="flex justify-between mb-4"><h3 class="font-bold text-lg">Quiz: ${lesson.title}</h3><span class="text-sm text-slate-500">${idx+1}/${lesson.quiz.length}</span></div><p class="text-lg mb-6">${q.question}</p><div class="space-y-2">${q.options.map((opt,i)=>`<button onclick="answerQuiz(${i})" class="w-full text-left p-3 border rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition">${opt}</button>`).join('')}</div></div>`);
+                showModal(`<div class="p-6"><div class="flex justify-between mb-4"><h3 class="font-bold text-lg">Quiz: ${lesson.title}</h3><span class="text-sm text-slate-500">${idx+1}/${lesson.quiz.length}</span></div><p class="text-lg mb-6">${q.question}</p><div class="space-y-2">${q.options.map((opt,i)=>`<button data-bx-click="a306" data-p0="${bxE(function(){return i})}" class="w-full text-left p-3 border rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition">${opt}</button>`).join('')}</div></div>`);
             };
             window.answerQuiz = (i) => { answers.push(i); if(i===lesson.quiz[idx].correct) score++; idx++; renderQ(); };
             const finishQuiz = () => {
@@ -10294,7 +10315,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <p class="text-xs text-slate-600 mt-2 italic"><i class="fas fa-lightbulb mr-1"></i>${q.explanation}</p>
                     </div>`;
                 }).join('');
-                showModal(`<div class="p-6 max-h-[80vh] overflow-y-auto"><div class="text-center mb-6"><div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center ${percent>=70?'bg-green-100 text-green-600':'bg-amber-100 text-amber-600'} mb-4"><i class="fas ${percent>=70?'fa-check':'fa-redo'} text-3xl"></i></div><h3 class="text-2xl font-bold mb-2">${percent>=70?'¡Aprobado!':'Inténtalo de nuevo'}</h3><p class="text-slate-600">Obtuviste ${score} de ${lesson.quiz.length} correctas (${percent}%)</p></div><h4 class="font-semibold mb-3">Revisión:</h4>${feedbackHtml}<div class="flex justify-end gap-3 mt-4"><button onclick="closeModal(); startQuiz(${lessonId})" class="px-4 py-2 rounded-lg border">Reintentar</button><button onclick="closeModal(); navigateTo('my-progress')" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold">Ver mi progreso</button></div></div>`);
+                showModal(`<div class="p-6 max-h-[80vh] overflow-y-auto"><div class="text-center mb-6"><div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center ${percent>=70?'bg-green-100 text-green-600':'bg-amber-100 text-amber-600'} mb-4"><i class="fas ${percent>=70?'fa-check':'fa-redo'} text-3xl"></i></div><h3 class="text-2xl font-bold mb-2">${percent>=70?'¡Aprobado!':'Inténtalo de nuevo'}</h3><p class="text-slate-600">Obtuviste ${score} de ${lesson.quiz.length} correctas (${percent}%)</p></div><h4 class="font-semibold mb-3">Revisión:</h4>${feedbackHtml}<div class="flex justify-end gap-3 mt-4"><button data-bx-click="a307" data-p0="${bxE(function(){return lessonId})}" class="px-4 py-2 rounded-lg border">Reintentar</button><button data-bx-click="a308" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold">Ver mi progreso</button></div></div>`);
             };
             renderQ();
         }
@@ -10347,11 +10368,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                                                 <span class="text-xs px-2 py-1 rounded-full ${lastAttempt.result==='EXENTADO'?'bg-purple-100 text-purple-700':lastAttempt.result==='APROBADO'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${lastAttempt.result} (${lastAttempt.score}%)</span>
                                                 <span class="text-xs text-slate-400">${new Date(lastAttempt.date).toLocaleDateString('es-MX')}</span>
                                                 ${lastAttempt.xpAwarded > 0 ? `<span class="text-xs text-amber-600 font-medium">+${lastAttempt.xpAwarded} XP</span>` : ''}
-                                                ${(lastAttempt.result==='APROBADO' || lastAttempt.result==='EXENTADO') ? `<button onclick="descargarCertificadoExamen(${exam.id}, ${lastAttempt.score})" class="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-1"><i class="fas fa-award text-amber-600"></i> Descargar Certificado PDF</button>` : ''}
+                                                ${(lastAttempt.result==='APROBADO' || lastAttempt.result==='EXENTADO') ? `<button data-bx-click="a309" data-p0="${bxE(function(){return exam.id})}" data-p1="${bxE(function(){return lastAttempt.score})}" class="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-1"><i class="fas fa-award text-amber-600"></i> Descargar Certificado PDF</button>` : ''}
                                             </div>
                                         </div>` : ''}
                                     </div>
-                                    <button onclick="startExam(${exam.id})" class="ml-4 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-sm">
+                                    <button data-bx-click="a310" data-p0="${bxE(function(){return exam.id})}" class="ml-4 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-sm">
                                         <i class="fas fa-play mr-2"></i>Iniciar
                                     </button>
                                 </div>
@@ -10364,12 +10385,12 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 return `<div class="bg-white p-6 rounded-xl shadow-sm">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-clipboard-check text-indigo-600"></i> Exámenes</h3>
-                        <button onclick="openExamModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-sm">
+                        <button data-bx-click="a311" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-sm">
                             <i class="fas fa-plus mr-2"></i>Nuevo Examen
                         </button>
                     </div>
                     <div class="mb-4">
-                        <select id="filter-exam-cat" onchange="filterExams()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                        <select id="filter-exam-cat" data-bx-change="a312" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                             <option value="all">Todas las categorías</option>
                             ${db.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
                         </select>
@@ -10394,10 +10415,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                                         </div>
                                     </div>
                                     <div class="flex gap-2 ml-4">
-                                        <button onclick="openAssignExamModal(${exam.id})" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg transition" title="Asignar"><i class="fas fa-user-plus"></i></button>
-                                        <button onclick="openExamResults(${exam.id})" class="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition" title="Resultados"><i class="fas fa-chart-bar"></i></button>
-                                        <button onclick="openExamModal(${exam.id})" class="px-3 py-1.5 text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg transition" title="Editar"><i class="fas fa-edit"></i></button>
-                                        <button onclick="deleteExam(${exam.id})" class="px-3 py-1.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition" title="Eliminar"><i class="fas fa-trash"></i></button>
+                                        <button data-bx-click="a313" data-p0="${bxE(function(){return exam.id})}" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg transition" title="Asignar"><i class="fas fa-user-plus"></i></button>
+                                        <button data-bx-click="a314" data-p0="${bxE(function(){return exam.id})}" class="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition" title="Resultados"><i class="fas fa-chart-bar"></i></button>
+                                        <button data-bx-click="a315" data-p0="${bxE(function(){return exam.id})}" class="px-3 py-1.5 text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg transition" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <button data-bx-click="a316" data-p0="${bxE(function(){return exam.id})}" class="px-3 py-1.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition" title="Eliminar"><i class="fas fa-trash"></i></button>
                                     </div>
                                 </div>
                             </div>`;
@@ -10434,7 +10455,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 </form>
                 
                 <h4 class="font-semibold mb-3">Preguntas (${exam.questions.length})</h4>
-                <div id="exam-questions" class="space-y-2 mb-4 max-h-48 overflow-y-auto">${exam.questions.map((q,i)=>`<div class="p-3 border rounded-lg flex justify-between items-start"><div class="flex-1"><p class="text-sm font-medium">${i+1}. ${q.question} <span class="text-xs px-1.5 py-0.5 rounded ${q.type==='multiple'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}">${q.type==='multiple'?'Múltiple':'V/F'}</span></p><p class="text-xs text-slate-500 mt-1">Correcta: ${q.options[q.correct]}</p></div><button onclick="deleteExamQuestion(${exam.id},${i})" class="text-red-500 ml-2"><i class="fas fa-times"></i></button></div>`).join('') || '<p class="text-slate-500 text-sm">Sin preguntas</p>'}</div>
+                <div id="exam-questions" class="space-y-2 mb-4 max-h-48 overflow-y-auto">${exam.questions.map((q,i)=>`<div class="p-3 border rounded-lg flex justify-between items-start"><div class="flex-1"><p class="text-sm font-medium">${i+1}. ${q.question} <span class="text-xs px-1.5 py-0.5 rounded ${q.type==='multiple'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}">${q.type==='multiple'?'Múltiple':'V/F'}</span></p><p class="text-xs text-slate-500 mt-1">Correcta: ${q.options[q.correct]}</p></div><button data-bx-click="a317" data-p0="${bxE(function(){return exam.id})}" data-p1="${bxE(function(){return i})}" class="text-red-500 ml-2"><i class="fas fa-times"></i></button></div>`).join('') || '<p class="text-slate-500 text-sm">Sin preguntas</p>'}</div>
                 
                 <form id="exam-q-form" class="border-t pt-4 space-y-3">
                     <div><label class="text-sm">Tipo</label><select id="eq-type" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="multiple">Opción múltiple</option><option value="vf">Verdadero/Falso</option></select></div>
@@ -10451,8 +10472,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 </form>
                 
                 <div class="flex justify-end gap-2 mt-6 pt-4 border-t">
-                    <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button>
-                    <button onclick="saveExam(${exam.id})" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium">Guardar Examen</button>
+                    <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button>
+                    <button data-bx-click="a318" data-p0="${bxE(function(){return exam.id})}" class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium">Guardar Examen</button>
                 </div>
             </div>`);
             
@@ -10512,7 +10533,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const alumnos = db.users.filter(u => isStudent(u));
             showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Asignar: ${exam.title}</h3>
                 <div class="space-y-2 max-h-64 overflow-y-auto mb-4">${alumnos.map(a => `<label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded"><input type="checkbox" value="${a.id}" ${exam.assignedTo.includes(a.id)?'checked':''} class="assign-check bg-white text-slate-900 border border-slate-300"> <img src="${a.avatar}" class="w-8 h-8 rounded-full"> <span class="text-sm">${a.name}</span></label>`).join('')}</div>
-                <div class="flex justify-end gap-2"><button aria-label="Cerrar" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Cancelar</button><button onclick="saveAssignExam(${examId})" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                <div class="flex justify-end gap-2"><button aria-label="Cerrar" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button data-bx-click="a319" data-p0="${bxE(function(){return examId})}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </div>`);
         }
 
@@ -10530,7 +10551,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             showModal(`<div class="p-6 max-w-3xl"><h3 class="text-xl font-bold mb-4">Resultados: ${exam.title}</h3>
                 <div class="overflow-x-auto max-h-96"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-3 py-2 text-left">Alumno</th><th class="px-3 py-2 text-left">Fecha</th><th class="px-3 py-2 text-left">Score</th><th class="px-3 py-2 text-left">Resultado</th><th class="px-3 py-2 text-left">XP</th></tr></thead>
                 <tbody>${attempts.map(a => { const u = db.users.find(x => x.id === a.userId); return `<tr class="border-b"><td class="px-3 py-2">${u?.name||'?'}</td><td class="px-3 py-2">${new Date(a.date).toLocaleString('es-MX')}</td><td class="px-3 py-2">${a.score}%</td><td class="px-3 py-2"><span class="px-2 py-0.5 text-xs rounded ${a.result==='EXENTADO'?'bg-purple-100 text-purple-700':a.result==='APROBADO'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${a.result}</span></td><td class="px-3 py-2">${a.xpAwarded}</td></tr>`; }).join('') || '<tr><td colspan="5" class="text-center py-8 text-slate-500">Sin intentos</td></tr>'}</tbody></table></div>
-                <div class="flex justify-end mt-4"><button aria-label="Cerrar" onclick="closeModal()" class="px-4 py-2 bg-slate-600 text-white rounded-lg">Cerrar</button></div>
+                <div class="flex justify-end mt-4"><button aria-label="Cerrar" data-bx-click="a1" class="px-4 py-2 bg-slate-600 text-white rounded-lg">Cerrar</button></div>
             </div>`);
         }
 
@@ -10542,7 +10563,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             showModal(`<div class="p-6 text-center"><div class="w-16 h-16 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-4"><i class="fas fa-clipboard-check text-indigo-600 text-2xl"></i></div>
                 <h3 class="text-xl font-bold mb-2">${exam.title}</h3><p class="text-slate-600 mb-4">${exam.description||''}</p>
                 <div class="bg-slate-50 rounded-lg p-4 mb-6 text-sm space-y-1"><p><strong>Duración:</strong> ${exam.duration} minutos</p><p><strong>Preguntas:</strong> ${exam.questions.length}</p><p><strong>Para aprobar:</strong> ${exam.passPercent}% (+200 XP)</p><p><strong>Para exentar:</strong> ${exam.exemptPercent}% (+300 XP)</p></div>
-                <div class="flex gap-3 justify-center"><button aria-label="Cerrar" onclick="closeModal()" class="px-5 py-2.5 border rounded-lg">Cancelar</button><button onclick="beginExam(${examId})" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium">Comenzar</button></div>
+                <div class="flex gap-3 justify-center"><button aria-label="Cerrar" data-bx-click="a1" class="px-5 py-2.5 border rounded-lg">Cancelar</button><button data-bx-click="a320" data-p0="${bxE(function(){return examId})}" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium">Comenzar</button></div>
             </div>`);
         }
 
@@ -10566,12 +10587,12 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <h3 class="font-bold">${exam.title}</h3>
                         <div class="flex items-center gap-4">
                             <div class="text-sm"><span class="text-slate-500">Tiempo:</span> <span class="font-mono font-bold ${timeLeft<60?'text-red-600':''}">${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}</span></div>
-                            <button onclick="if(confirm('¿Abandonar examen?')){clearInterval(examTimer); window._inExam=false;closeModal();}" class="text-slate-400 hover:text-red-500"><i class="fas fa-times"></i></button>
+                            <button data-bx-click="a321" class="text-slate-400 hover:text-red-500"><i class="fas fa-times"></i></button>
                         </div>
                     </div>
                     <div class="px-6 py-2 bg-slate-50 border-b"><div class="w-full bg-slate-200 rounded-full h-1.5"><div class="bg-indigo-600 h-1.5 rounded-full transition-all" style="width:${((currentQ+1)/exam.questions.length)*100}%"></div></div><p class="text-xs text-slate-500 mt-1">Pregunta ${currentQ+1} de ${exam.questions.length}</p></div>
-                    <div class="flex-1 overflow-y-auto p-6"><div class="max-w-2xl mx-auto"><p class="text-lg font-medium mb-6">${q.question}</p><div class="space-y-3">${q.options.map((opt,i)=>`<button onclick="selectAnswer(${i})" class="w-full text-left p-4 border-2 rounded-xl hover:border-indigo-300 transition ${answers[currentQ]===i?'border-indigo-600 bg-indigo-50':''}">${String.fromCharCode(65+i)}. ${opt}</button>`).join('')}</div></div></div>
-                    <div class="border-t px-6 py-4 flex justify-between"><button onclick="prevQ()" ${currentQ===0?'disabled':''} class="px-4 py-2 border rounded-lg disabled:opacity-50">Anterior</button><button onclick="nextQ()" class="px-5 py-2.5 ${currentQ===exam.questions.length-1?'bg-green-600 hover:bg-green-700':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-medium">${currentQ===exam.questions.length-1?'Finalizar':'Siguiente'}</button></div>
+                    <div class="flex-1 overflow-y-auto p-6"><div class="max-w-2xl mx-auto"><p class="text-lg font-medium mb-6">${q.question}</p><div class="space-y-3">${q.options.map((opt,i)=>`<button data-bx-click="a322" data-p0="${bxE(function(){return i})}" class="w-full text-left p-4 border-2 rounded-xl hover:border-indigo-300 transition ${answers[currentQ]===i?'border-indigo-600 bg-indigo-50':''}">${String.fromCharCode(65+i)}. ${opt}</button>`).join('')}</div></div></div>
+                    <div class="border-t px-6 py-4 flex justify-between"><button data-bx-click="a323" ${currentQ===0?'disabled':''} class="px-4 py-2 border rounded-lg disabled:opacity-50">Anterior</button><button data-bx-click="a324" class="px-5 py-2.5 ${currentQ===exam.questions.length-1?'bg-green-600 hover:bg-green-700':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-medium">${currentQ===exam.questions.length-1?'Finalizar':'Siguiente'}</button></div>
                 </div>`);
             };
             
@@ -10603,7 +10624,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     <h3 class="text-2xl font-bold mb-2">${result}</h3><p class="text-slate-600 mb-1">${correct} de ${exam._shuffled.length} correctas</p><p class="text-3xl font-bold mb-4 ${result==='EXENTADO'?'text-purple-600':result==='APROBADO'?'text-green-600':'text-red-600'}">${score}%</p>
                     ${xpAwarded>0?`<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4"><p class="text-amber-800 font-medium"><i class="fas fa-bolt mr-1"></i>+${xpAwarded} XP ganados</p></div>`:''}
                     <div class="text-left bg-slate-50 rounded-lg p-4 max-h-48 overflow-y-auto mb-4">${exam._shuffled.map((q,i)=>{ const ok = answers[i]===q.correct; return `<div class="text-xs mb-2 pb-2 border-b last:border-0"><p class="font-medium">${i+1}. ${q.question}</p><p class="${ok?'text-green-700':'text-red-700'}">Tu respuesta: ${q.options[answers[i]]||'Sin responder'} ${ok?'✓':'✗'}</p>${!ok?`<p class="text-green-700">Correcta: ${q.options[q.correct]}</p>`:''}</div>` }).join('')}</div>
-                    <button onclick="closeModal(); navigateTo('exams')" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium">Volver a exámenes</button>
+                    <button data-bx-click="a325" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium">Volver a exámenes</button>
                 </div>`);
             };
             
@@ -10721,15 +10742,15 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <p class="text-xs text-slate-500 mt-0.5">Comunicación directa en tiempo real con todo el equipo, asesores, capacitadores y administración</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase()) ? `<button onclick="cmAbrirBroadcast()" class="px-3.5 py-2 rounded-xl bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 flex items-center gap-1.5"><i class="fas fa-bullhorn"></i> Anuncio al equipo</button>` : ''}
-                        <button onclick="navigateTo('centro-mensajes')" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-copy text-amber-600"></i> Plantillas de Mensajes</button>
+                        ${['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase()) ? `<button data-bx-click="a94" class="px-3.5 py-2 rounded-xl bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 flex items-center gap-1.5"><i class="fas fa-bullhorn"></i> Anuncio al equipo</button>` : ''}
+                        <button data-bx-click="a326" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-copy text-amber-600"></i> Plantillas de Mensajes</button>
                     </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 mb-5 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
                     <div class="relative flex-1 min-w-[220px]">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input type="text" value="${psEscape(window.msgSearchQuery || '')}" oninput="window.msgSearchQuery=this.value;render()" placeholder="Buscar usuario por nombre, correo o rol..." class="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 text-sm bg-white text-slate-900">
+                        <input type="text" value="${psEscape(window.msgSearchQuery || '')}" data-bx-input="a327" placeholder="Buscar usuario por nombre, correo o rol..." class="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-300 text-sm bg-white text-slate-900">
                     </div>
                     <div class="flex flex-wrap gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                         ${[
@@ -10740,7 +10761,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             ['agencia','Agencias'],
                             ['agente','Agentes'],
                             ['alumno','Alumnos']
-                        ].map(([id,lbl]) => `<button onclick="window.msgRoleFilter='${id}';render()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition ${roleFilter===id ? 'bg-slate-900 text-amber-300 border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}">${lbl}</button>`).join('')}
+                        ].map(([id,lbl]) => `<button data-bx-click="a328" data-p0="${bxE(function(){return id})}" class="px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition ${roleFilter===id ? 'bg-slate-900 text-amber-300 border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}">${lbl}</button>`).join('')}
                     </div>
                 </div>
 
@@ -10760,10 +10781,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         const seenTick = lastMsg && String(lastMsg.fromId) === String(currentUser.id)
                             ? (lastMsg.read ? '<i class="fas fa-check-double text-sky-500 mr-1" title="Visto"></i>' : '<i class="fas fa-check text-slate-400 mr-1" title="Enviado"></i>')
                             : '';
-                        return `<div class="border ${unread > 0 ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200 bg-white'} rounded-2xl p-3.5 sm:p-4 hover:shadow-md active:scale-[0.99] cursor-pointer transition" onclick="openChat('${contact.id}')">
+                        return `<div class="border ${unread > 0 ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200 bg-white'} rounded-2xl p-3.5 sm:p-4 hover:shadow-md active:scale-[0.99] cursor-pointer transition" data-bx-click="a329" data-p0="${bxE(function(){return contact.id})}">
                             <div class="flex items-center gap-3">
                                 <div class="relative shrink-0">
-                                    <img src="${contact.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(contact.name||'U')}" class="w-12 h-12 rounded-full object-cover border border-amber-200">
+                                    <img loading="lazy" decoding="async" src="${contact.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(contact.name||'U')}" class="w-12 h-12 rounded-full object-cover border border-amber-200">
                                     <span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${online ? 'bg-emerald-500' : 'bg-slate-300'}" title="${online ? 'En línea recientemente' : 'Desconectado'}"></span>
                                     ${unread > 0 ? `<span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center">${unread}</span>` : ''}
                                 </div>
@@ -10783,7 +10804,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                                 <div class="flex flex-col items-end gap-1.5 shrink-0">
                                     <span class="text-[10px] text-slate-400 hidden sm:inline">${totalMsgs} msgs</span>
                                     <div class="flex items-center gap-1">
-                                        ${contact.phone ? `<button onclick="event.stopPropagation();openWhatsApp('${contact.id}')" class="w-9 h-9 flex items-center justify-center text-emerald-600 bg-emerald-50/70 hover:bg-emerald-100 rounded-xl transition" title="WhatsApp"><i class="fab fa-whatsapp text-base"></i></button>` : ''}
+                                        ${contact.phone ? `<button data-bx-click="a330" data-p0="${bxE(function(){return contact.id})}" class="w-9 h-9 flex items-center justify-center text-emerald-600 bg-emerald-50/70 hover:bg-emerald-100 rounded-xl transition" title="WhatsApp"><i class="fab fa-whatsapp text-base"></i></button>` : ''}
                                         <span class="w-8 h-8 flex items-center justify-center text-amber-700 bg-amber-50/60 rounded-xl"><i class="fas fa-chevron-right text-xs"></i></span>
                                     </div>
                                 </div>
@@ -10853,7 +10874,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
               // Renderiza como mención etiquetada con tooltip
               return `<span class="relative inline-block text-indigo-600 hover:text-indigo-800" 
                       title="Mencionar a ${user.name || username}"
-                      onclick="if(event) event.stopPropagation();">
+                      data-bx-click="a331">
                 @${username}
               </span>`;
             }
@@ -10938,8 +10959,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const tiempo = p.createdAt ? new Date(p.createdAt) : null;
                 const hace = tiempo ? (Date.now() - tiempo.getTime() < 60000 ? 'ahora' : tiempo.toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : '';
                 const reacciones = foroReacciones(p);
-                const barra = reacciones.map(rr => `<button onclick="foroReaccionar('${String(p.id)}','${rr.emoji}')" class="text-[11px] px-1.5 py-0.5 rounded-full bg-white border ${rr.users.includes(uid) ? 'border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-500'} hover:border-indigo-400">${rr.emoji} ${rr.users.length}</button>`).join(' ');
-                const acciones = `<div class="flex items-center gap-1 mt-1.5 flex-wrap">${FORO_EMOJIS.slice(0, 6).map(e => `<button onclick="foroReaccionar('${String(p.id)}','${e}')" title="Reaccionar ${e}" class="w-6 h-6 rounded-full bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 text-xs leading-none">${e}</button>`).join('')}<span class="text-[10px] text-slate-300 ml-1">·</span>${barra}</div>`;
+                const barra = reacciones.map(rr => `<button data-bx-click="a332" data-p0="${bxE(function(){return String(p.id)})}" data-p1="${bxE(function(){return rr.emoji})}" class="text-[11px] px-1.5 py-0.5 rounded-full bg-white border ${rr.users.includes(uid) ? 'border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-500'} hover:border-indigo-400">${rr.emoji} ${rr.users.length}</button>`).join(' ');
+                const acciones = `<div class="flex items-center gap-1 mt-1.5 flex-wrap">${FORO_EMOJIS.slice(0, 6).map(e => `<button data-bx-click="a333" data-p0="${bxE(function(){return String(p.id)})}" data-p1="${bxE(function(){return e})}" title="Reaccionar ${e}" class="w-6 h-6 rounded-full bg-slate-50 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 text-xs leading-none">${e}</button>`).join('')}<span class="text-[10px] text-slate-300 ml-1">·</span>${barra}</div>`;
                 return `<div class="p-3 rounded-xl border ${mias ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'} hover:shadow-sm transition">
                     <div class="flex items-center gap-2.5 mb-1.5">
                         <div class="w-8 h-8 rounded-full bg-slate-900 text-amber-300 flex items-center justify-center text-[11px] font-bold shrink-0">${iniciales}</div>
@@ -10947,7 +10968,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             <p class="text-xs font-bold text-slate-800 truncate">${psEscape(p.fromName || 'Usuario')} ${aut ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold">${rolEtiqueta(aut)}</span>` : ''}</p>
                             <p class="text-[10px] text-slate-400">${hace}</p>
                         </div>
-                        ${(mias || esStaffComunicacion(currentUser)) ? `<button aria-label="Eliminar" onclick="foroEliminar('${String(p.id)}')" class="w-7 h-7 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 shrink-0"><i class="fas fa-trash-can text-[10px]"></i></button>` : ''}
+                        ${(mias || esStaffComunicacion(currentUser)) ? `<button aria-label="Eliminar" data-bx-click="a334" data-p0="${bxE(function(){return String(p.id)})}" class="w-7 h-7 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 shrink-0"><i class="fas fa-trash-can text-[10px]"></i></button>` : ''}
                     </div>
                     <p class="text-sm text-slate-700 whitespace-pre-wrap break-words">${p.text ? renderMentions(p.text) : ''}</p>
                     ${acciones}
@@ -10960,10 +10981,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <span class="text-[11px] text-slate-400">Todo el equipo puede participar ${ensureForumPosts().length ? `· ${ensureForumPosts().length} participaciones` : ''}</span>
                     </div>
                     <div class="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-3">
-                        <form onsubmit="foroEnviar(); event.preventDefault()">
+                        <form data-bx-submit="a335">
                             <textarea id="foro-input" rows="2" maxlength="600" placeholder="Comparte con toda la comunidad: logros, tips, avisos… 😃" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                             <div class="flex items-center justify-between mt-1.5 flex-wrap gap-2">
-                                <div class="flex gap-1 flex-wrap">${FORO_EMOJIS.map(e => `<button type="button" onclick="foroAddEmoji('${e}')" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-sm leading-none">${e}</button>`).join('')}</div>
+                                <div class="flex gap-1 flex-wrap">${FORO_EMOJIS.map(e => `<button type="button" data-bx-click="a336" data-p0="${bxE(function(){return e})}" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 text-sm leading-none">${e}</button>`).join('')}</div>
                                 <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-paper-plane"></i> Publicar en el foro</button>
                             </div>
                         </form>
@@ -11025,8 +11046,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const cards = grupos.map(gr => {
                 const gm = (db.messages || []).filter(m => String(m.toId) === String(gr.id));
                 const last = gm[gm.length - 1];
-                const gear = (esGroupAdminPortal(gr)) ? `<button role="button" aria-label="Editar grupo" title="Editar grupo" onclick="event.stopPropagation();openGrupoModal('${String(gr.id)}')" class="shrink-0 w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center justify-center"><i class="fas fa-gear text-[10px]"></i></button>` : '';
-                return `<div onclick="openChannelChat('${String(gr.id)}')" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                const gear = (esGroupAdminPortal(gr)) ? `<button role="button" aria-label="Editar grupo" title="Editar grupo" data-bx-click="a337" data-p0="${bxE(function(){return String(gr.id)})}" class="shrink-0 w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center justify-center"><i class="fas fa-gear text-[10px]"></i></button>` : '';
+                return `<div data-bx-click="a338" data-p0="${bxE(function(){return String(gr.id)})}" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
                     <div>
                         <div class="flex items-start justify-between gap-2 mb-1">
                             <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5"><i class="fas ${gr.icon || 'fa-users'} text-amber-600"></i> ${psEscape(gr.nombre || 'Grupo')}</span>
@@ -11044,7 +11065,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div class="mb-6">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                         <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5"><i class="fas fa-hashtag text-amber-600"></i> Grupos del Equipo</h4>
-                        <button onclick="openGrupoModal('')" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-plus"></i> Nuevo grupo</button>
+                        <button data-bx-click="a339" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"><i class="fas fa-plus"></i> Nuevo grupo</button>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">${cards}</div>
                 </div>`;
@@ -11064,11 +11085,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 usuarios.forEach(u => { window._grupoUsuariosSel[String(u.id)] = selIds.has(String(u.id)); });
                 const adminIds = grp ? (grp.adminIds || []).map(toIdVal).map(String) : [];
                 const html = `
-                <div id="grupo-modal" class="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm p-2 sm:p-4" onclick="if(event.target===this)closeGrupoModal()">
+                <div id="grupo-modal" class="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm p-2 sm:p-4" data-bx-click="a340">
                     <div class="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[88dvh] flex flex-col overflow-hidden shadow-2xl">
                         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                             <h3 class="font-bold text-slate-900 text-base">${edit ? '<i class="fas fa-gear text-indigo-600 mr-2"></i>Editar grupo' : '<i class="fas fa-plus text-indigo-600 mr-2"></i>Nuevo grupo del equipo'}</h3>
-                            <button aria-label="Cerrar" onclick="closeGrupoModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fas fa-times"></i></button>
+                            <button aria-label="Cerrar" data-bx-click="a341" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fas fa-times"></i></button>
                         </div>
                         <div class="flex-1 overflow-y-auto p-4 space-y-4">
                             <div>
@@ -11090,11 +11111,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                                     const esAdmin = adminIds.includes(uid);
                                     return `<div class="flex items-center justify-between px-3 py-2">
                                         <label class="flex items-center gap-2.5 flex-1 min-w-0">
-                                            <input type="checkbox" data-mid="${uid}" ${marcado ? 'checked' : ''} onchange="toggleGrupoMiembro('${uid}')" class="accent-indigo-600 w-4 h-4">
+                                            <input type="checkbox" data-mid="${uid}" ${marcado ? 'checked' : ''} data-bx-change="a342" data-p0="${bxE(function(){return uid})}" class="accent-indigo-600 w-4 h-4">
                                             <span class="text-xs text-slate-700 truncate font-semibold">${psEscape(u.name)}</span>
                                             <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">${rolEtiqueta(u)}</span>
                                         </label>
-                                        <button data-admin-btn="${uid}" role="button" aria-label="Admin del grupo" title="Admin del grupo" onclick="toggleGrupoAdmin('${uid}')" class="ml-2 w-7 h-7 rounded-md text-[11px] flex items-center justify-center ${esAdmin ? 'bg-amber-100 text-amber-700' : 'bg-slate-50 text-slate-400'}">👑</button>
+                                        <button data-admin-btn="${uid}" role="button" aria-label="Admin del grupo" title="Admin del grupo" data-bx-click="a343" data-p0="${bxE(function(){return uid})}" class="ml-2 w-7 h-7 rounded-md text-[11px] flex items-center justify-center ${esAdmin ? 'bg-amber-100 text-amber-700' : 'bg-slate-50 text-slate-400'}">👑</button>
                                     </div>`;
                                 }).join('')}</div>
                             </div>
@@ -11104,8 +11125,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             </label>
                         </div>
                         <div class="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
-                            ${grp && String(grp.creadoPorId) === String(currentUser.id) && esStaffComunicacion(currentUser) ? `<button onclick="eliminarGrupo('${String(grp.id)}')" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
-                            <button onclick="saveGrupoModal()" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-indigo-700 transition">${edit ? 'Guardar cambios' : 'Crear grupo'}</button>
+                            ${grp && String(grp.creadoPorId) === String(currentUser.id) && esStaffComunicacion(currentUser) ? `<button data-bx-click="a344" data-p0="${bxE(function(){return String(grp.id)})}" class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100"><i class="fas fa-trash-can mr-1"></i>Eliminar</button>` : ''}
+                            <button data-bx-click="a345" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-indigo-700 transition">${edit ? 'Guardar cambios' : 'Crear grupo'}</button>
                         </div>
                     </div>
                 </div>`;
@@ -11248,7 +11269,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 }
             }
             try { renderNav(); } catch(e){}
-            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300 shrink-0"><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500 truncate">${rolEtiqueta(otherUser)} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button onclick="openWhatsApp('${userId}')" class="w-9 h-9 flex items-center justify-center text-green-600 hover:bg-green-50 rounded-xl shrink-0" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${userId}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${userId}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo de esta conversación y sugiere la respuesta"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe un mensaje..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><img loading="lazy" decoding="async" src="${otherUser.avatar || 'https://ui-avatars.com/api/?name='+encodeURIComponent(otherUser.name||'U')}" class="w-10 h-10 rounded-full object-cover border border-amber-300 shrink-0"><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(otherUser.name)}</h3><p class="text-xs text-slate-500 truncate">${rolEtiqueta(otherUser)} · ${psEscape(otherUser.email||'')}</p></div>${otherUser.phone ? `<button data-bx-click="a346" data-p0="${bxE(function(){return userId})}" class="w-9 h-9 flex items-center justify-center text-green-600 hover:bg-green-50 rounded-xl shrink-0" title="Abrir WhatsApp"><i class="fab fa-whatsapp text-xl"></i></button>` : ''}<button aria-label="Cerrar" data-bx-click="a347" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div><form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" data-bx-change="a348" data-p0="${bxE(function(){return userId})}"></label><button type="button" data-bx-click="a349" data-p0="${bxE(function(){return userId})}" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo de esta conversación y sugiere la respuesta"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe un mensaje..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form></div>`);
             renderConversationBox(userId);
             startChatLive(userId);
             bindChatPasteTarget(userId);
@@ -11280,7 +11301,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const subtitulo = !esMiembro ? 'No eres miembro de este grupo (vista de solo lectura)' : grp.onlyAdminsPost ? 'Solo los admins del grupo pueden compartir información' : 'Chat grupal del equipo Broker Booster';
             const readonly = grp.onlyAdminsPost && !esAdminGrupo;
             const esCanalLegacy = String(grp.id).startsWith('canal:');
-            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas ${grp.icon || 'fa-hashtag'}"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(grp.nombre)}</h3><p class="text-xs text-slate-500 truncate">${readonly ? '🔒 Solo lectura — los admins comparten la información' : psEscape(subtitulo)}${esAdminGrupo && grp.onlyAdminsPost ? ' · <span class="text-indigo-600 font-bold">Eres admin 👑</span>' : ''}</p></div>${!esCanalLegacy && esAdminGrupo ? `<button aria-label="Editar grupo" onclick="stopChatLive();closeModal();openGrupoModal('${String(grp.id)}')" class="w-9 h-9 flex items-center justify-center text-amber-700 hover:bg-amber-100 rounded-xl shrink-0" title="Editar grupo"><i class="fas fa-gear"></i></button>` : ''}<button aria-label="Cerrar" onclick="stopChatLive();closeModal();render()" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div>${readonly ? `<div class="p-3 sm:p-4 border-t bg-white rounded-b-2xl text-center text-xs text-slate-500 bg-slate-50"><i class="fas fa-lock text-indigo-500 mr-1"></i> Solo los admins de "${psEscape(grp.nombre)}" pueden publicar aquí</div>` : `<form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" onchange="enviarAdjuntoChat('${String(grp.id)}', this)"></label><button type="button" onclick="sugerirRespuestaIAChat('${String(grp.id)}')" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo en la conversación"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe al grupo ${psEscape(grp.nombre)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form>`}`);
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas ${grp.icon || 'fa-hashtag'}"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(grp.nombre)}</h3><p class="text-xs text-slate-500 truncate">${readonly ? '🔒 Solo lectura — los admins comparten la información' : psEscape(subtitulo)}${esAdminGrupo && grp.onlyAdminsPost ? ' · <span class="text-indigo-600 font-bold">Eres admin 👑</span>' : ''}</p></div>${!esCanalLegacy && esAdminGrupo ? `<button aria-label="Editar grupo" data-bx-click="a350" data-p0="${bxE(function(){return String(grp.id)})}" class="w-9 h-9 flex items-center justify-center text-amber-700 hover:bg-amber-100 rounded-xl shrink-0" title="Editar grupo"><i class="fas fa-gear"></i></button>` : ''}<button aria-label="Cerrar" data-bx-click="a347" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div>${readonly ? `<div class="p-3 sm:p-4 border-t bg-white rounded-b-2xl text-center text-xs text-slate-500 bg-slate-50"><i class="fas fa-lock text-indigo-500 mr-1"></i> Solo los admins de "${psEscape(grp.nombre)}" pueden publicar aquí</div>` : `<form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" data-bx-change="a351" data-p0="${bxE(function(){return String(grp.id)})}"></label><button type="button" data-bx-click="a352" data-p0="${bxE(function(){return String(grp.id)})}" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo en la conversación"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe al grupo ${psEscape(grp.nombre)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form>`}`);
             renderChannelConversationBox(channelGroupId, grp.nombre);
             startChatLive(channelGroupId, grp.nombre);
             if (!readonly) {
@@ -11423,7 +11444,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const defaultMsg = ['maestro', 'capacitador'].includes(rolOtro)
                 ? `Hola ${String(person.name || '').split(' ')[0]}, soy ${currentUser.name}, de la promotoría. Me interesa agendar una sesión.`
                 : `Hola, te contacto desde Broker Booster.`;
-            showModal(`<div class="p-6 max-w-md"><div class="text-center mb-5"><div class="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3"><i class="fab fa-whatsapp text-green-600 text-3xl"></i></div><h3 class="text-xl font-bold mb-1">Enviar WhatsApp</h3><p class="text-sm text-slate-600">a ${psEscape(person.name)}</p></div><div class="space-y-4"><div><label class="text-sm font-medium text-slate-700">Mensaje</label><textarea id="wa-message" rows="4" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white text-slate-900">${psEscape(defaultMsg)}</textarea><p class="text-xs text-slate-500 mt-1">Se abrirá WhatsApp con este mensaje</p></div><div class="bg-slate-50 rounded-lg p-3 text-xs"><p class="font-medium mb-1">Número: +${psEscape(phone)}</p><p class="text-slate-600">Se abre WhatsApp Web o la app con el chat listo para enviar</p></div></div><div class="flex gap-3 mt-6"><button aria-label="Cerrar" onclick="closeModal()" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cancelar</button><button onclick="sendWhatsApp('${phone}', '${String(person.id)}')" class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center justify-center gap-2"><i class="fab fa-whatsapp"></i> Abrir WhatsApp</button></div></div>`);
+            showModal(`<div class="p-6 max-w-md"><div class="text-center mb-5"><div class="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3"><i class="fab fa-whatsapp text-green-600 text-3xl"></i></div><h3 class="text-xl font-bold mb-1">Enviar WhatsApp</h3><p class="text-sm text-slate-600">a ${psEscape(person.name)}</p></div><div class="space-y-4"><div><label class="text-sm font-medium text-slate-700">Mensaje</label><textarea id="wa-message" rows="4" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white text-slate-900">${psEscape(defaultMsg)}</textarea><p class="text-xs text-slate-500 mt-1">Se abrirá WhatsApp con este mensaje</p></div><div class="bg-slate-50 rounded-lg p-3 text-xs"><p class="font-medium mb-1">Número: +${psEscape(phone)}</p><p class="text-slate-600">Se abre WhatsApp Web o la app con el chat listo para enviar</p></div></div><div class="flex gap-3 mt-6"><button aria-label="Cerrar" data-bx-click="a1" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cancelar</button><button data-bx-click="a353" data-p0="${bxE(function(){return phone})}" data-p1="${bxE(function(){return String(person.id)})}" class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center justify-center gap-2"><i class="fab fa-whatsapp"></i> Abrir WhatsApp</button></div></div>`);
         }
         function sendWhatsApp(phone, userId) {
             const message = ((document.getElementById('wa-message') || {}).value || '').trim();
@@ -11465,15 +11486,15 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             return `<div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold">Generaciones</h2>
                 <div class="flex items-center gap-3">
-                    <select onchange="window.filtroGenTipo=this.value; window.filtroGenPlan=''; navigateTo('generations')" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a354" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="all" ${filtroTipo==='all'?'selected':''}>Todos los tipos</option>
                         ${['Capacitación Comercial','Capacitación Administrativa','curso','certificacion','capacitacion','taller'].map(t=>`<option value="${t}" ${filtroTipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
                     </select>
-                    <select onchange="window.filtroGenPlan=this.value; navigateTo('generations')" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a355" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todas las formaciones</option>
                         ${db.planes.filter(p=>filtroTipo==='all'||p.tipo===filtroTipo).map(p=>`<option value="${p.id}" ${filtroPlan===p.id?'selected':''}>${p.nombre}</option>`).join('')}
                     </select>
-                    <button onclick="openGenerationModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Generación</button>
+                    <button data-bx-click="a356" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Generación</button>
                 </div>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -11483,7 +11504,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     const plan = db.planes.find(p=>p.id===g.planId);
                     return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                         <div class="h-48 bg-slate-100 relative">
-                            ${g.image ? `<img src="${g.image}" class="w-full h-full object-cover" onerror="this.closest('.relative').classList.add('bg-slate-100'); this.style.display='none'">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-layer-group text-3xl text-slate-300"></i></div>`}
+                            ${g.image ? `<img loading="lazy" decoding="async" src="${g.image}" class="w-full h-full object-cover" data-bx-error="a357">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-layer-group text-3xl text-slate-300"></i></div>`}
                             <span class="absolute top-3 right-3 text-xs px-2 py-1 rounded-full backdrop-blur bg-white/80 ${g.status==='activa'?'text-emerald-700':'text-slate-600'}">${g.status||'planeada'}</span>
                         </div>
                         <div class="p-5">
@@ -11495,12 +11516,12 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             <span><i class="fas fa-user-graduate mr-1"></i> ${studentsCount} alumnos</span>
                         </div>
                         <div class="flex gap-2 mt-2">
-                            <button onclick="openGenerationDetail(${g.id})" class="flex-1 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1.5" title="Ver grupos y alumnos de la generación"><i class="fas fa-eye"></i> Ver Grupos y Alumnos (${groupsCount + studentsCount > 0 ? groupsCount + ' / ' + studentsCount : ''})</button>
-                            <button onclick="exportGeneracionCSV(${g.id})" class="px-3 py-2 text-sm border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg" title="Exportar alumnos a CSV"><i class="fas fa-file-csv"></i></button>
+                            <button data-bx-click="a358" data-p0="${bxE(function(){return g.id})}" class="flex-1 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1.5" title="Ver grupos y alumnos de la generación"><i class="fas fa-eye"></i> Ver Grupos y Alumnos (${groupsCount + studentsCount > 0 ? groupsCount + ' / ' + studentsCount : ''})</button>
+                            <button data-bx-click="a359" data-p0="${bxE(function(){return g.id})}" class="px-3 py-2 text-sm border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg" title="Exportar alumnos a CSV"><i class="fas fa-file-csv"></i></button>
                         </div>
                         <div class="flex gap-2 mt-2">
-                            <button onclick="openGenerationModal(${g.id})" class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
-                            <button onclick="deleteGeneration(${g.id})" class="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
+                            <button data-bx-click="a360" data-p0="${bxE(function(){return g.id})}" class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
+                            <button data-bx-click="a361" data-p0="${bxE(function(){return g.id})}" class="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
                         </div>
                         </div>
                     </div>`;
@@ -11516,11 +11537,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             return `<div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold">Formación Académica</h2>
                 <div class="flex items-center gap-3">
-                    <select onchange="window.filtroPlanTipo=this.value; navigateTo('formacion')" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a362" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="all" ${filtro==='all'?'selected':''}>Todos los tipos</option>
                         ${['Capacitación Comercial','Capacitación Administrativa','curso','certificacion','capacitacion','taller'].map(t=>`<option value="${t}" ${filtro===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
                     </select>
-                    <button onclick="openPlanModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Crear Plan</button>
+                    <button data-bx-click="a363" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Crear Plan</button>
                 </div>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -11528,20 +11549,20 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     const gensCount = db.generations.filter(g=>g.planId===p.id).length;
                     return `<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                         <div class="h-48 bg-slate-100 relative">
-                            ${p.image ? `<img src="${p.image}" class="w-full h-full object-cover" onerror="this.closest('.relative').classList.add('bg-slate-100'); this.style.display='none'">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-graduation-cap text-3xl text-slate-300"></i></div>`}
+                            ${p.image ? `<img loading="lazy" decoding="async" src="${p.image}" class="w-full h-full object-cover" data-bx-error="a357">` : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-graduation-cap text-3xl text-slate-300"></i></div>`}
                             <span class="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full backdrop-blur bg-white/80 text-indigo-700 font-medium">${p.tipo}</span>
                         </div>
                         <div class="p-5">
                             <div class="flex items-start justify-between mb-3">
                                 <h3 class="font-semibold text-lg">${p.nombre}</h3>
-                                <button onclick="deletePlan(${p.id})" class="text-slate-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
+                                <button data-bx-click="a364" data-p0="${bxE(function(){return p.id})}" class="text-slate-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
                             </div>
                             <p class="text-sm text-slate-600 mb-3 min-h-[40px]">${p.descripcion || 'Sin descripción'}</p>
                             <div class="flex items-center justify-between text-sm">
                                 <span class="text-slate-500"><i class="fas fa-clock mr-1"></i>${p.duracion || '-'}</span>
                                 <span class="text-slate-500"><i class="fas fa-layer-group mr-1"></i>${gensCount} generaciones</span>
                             </div>
-                            <button onclick="openPlanModal(${p.id})" class="mt-4 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
+                            <button data-bx-click="a365" data-p0="${bxE(function(){return p.id})}" class="mt-4 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
                         </div>
                     </div>`;
                 }).join('')}
@@ -11558,8 +11579,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div><label class="text-sm font-medium">Nombre</label><input id="plan-nombre" required value="${p?p.nombre:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div><label class="text-sm font-medium">Descripción</label><textarea id="plan-desc" rows="3" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${p?p.descripcion||'':''}</textarea></div>
                 <div><label class="text-sm font-medium">Duración</label><input id="plan-duracion" placeholder="ej. 2 años, 40 horas" value="${p?p.duracion||'':''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div><label class="text-sm font-medium">Imagen</label><input type="file" id="plan-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="plan-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${p?.image?`<img id="plan-image-preview" src="${p.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img id="plan-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                <div><label class="text-sm font-medium">Imagen</label><input type="file" id="plan-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="plan-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${p?.image?`<img loading="lazy" decoding="async" id="plan-image-preview" src="${p.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img loading="lazy" decoding="async" id="plan-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div>
+                <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const imageInput = document.getElementById('plan-image-input');
             const preview = document.getElementById('plan-image-preview');
@@ -11614,8 +11635,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div><label class="text-sm font-medium">Nombre</label><input id="gen-name" required value="${g?g.name:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Inicio</label><input type="date" id="gen-start" required value="${g?g.startDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm font-medium">Fin</label><input type="date" id="gen-end" required min="${g?g.startDate:''}" value="${g?g.endDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div></div>
                 <div><label class="text-sm font-medium">Estado</label><select id="gen-status" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="activa" ${g&&g.status==='activa'?'selected':''}>Activa</option><option value="finalizada" ${g&&g.status==='finalizada'?'selected':''}>Finalizada</option><option value="planeada" ${g&&g.status==='planeada'?'selected':''}>Planeada</option></select></div>
-                <div><label class="text-sm font-medium">Imagen de portada</label><input type="file" id="gen-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="gen-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${g?.image?`<img id="gen-image-preview" src="${g.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img id="gen-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                <div><label class="text-sm font-medium">Imagen de portada</label><input type="file" id="gen-image-input" accept="image/*" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="gen-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${g?.image?`<img loading="lazy" decoding="async" id="gen-image-preview" src="${g.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img loading="lazy" decoding="async" id="gen-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div>
+                <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const imageInput = document.getElementById('gen-image-input');
             const preview = document.getElementById('gen-image-preview');
@@ -11702,15 +11723,15 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 <div class="max-h-[60vh] overflow-y-auto pr-1">
                     <h4 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fas fa-users-rectangle text-slate-500"></i> Grupos de la generación</h4>
                     ${grupos.length ? `<div class="rounded-xl border border-slate-200 overflow-hidden mb-5"><table class="w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-3 py-2 text-left">Grupo</th><th class="px-3 py-2 text-left">Tutor</th><th class="px-3 py-2 text-left">Horario</th><th class="px-3 py-2 text-left">Alumnos</th><th class="px-3 py-2"></th></tr></thead><tbody class="divide-y divide-slate-100">
-                        ${grupos.map(gr=>{ const tutor = db.users.find(u=>u.id===gr.tutorId); const cnt = db.enrollments.filter(e2=>e2.groupId===gr.id).length; return `<tr class="hover:bg-slate-50"><td class="px-3 py-2 font-medium">${gr.name}</td><td class="px-3 py-2">${tutor?tutor.name:'-'}</td><td class="px-3 py-2">${gr.schedule||'-'}</td><td class="px-3 py-2">${cnt}</td><td class="px-3 py-2 text-right"><button onclick="openGroupDetail(${gr.id})" class="text-indigo-600 text-xs font-medium hover:underline">Gestionar</button></td></tr>`; }).join('')}
+                        ${grupos.map(gr=>{ const tutor = db.users.find(u=>u.id===gr.tutorId); const cnt = db.enrollments.filter(e2=>e2.groupId===gr.id).length; return `<tr class="hover:bg-slate-50"><td class="px-3 py-2 font-medium">${gr.name}</td><td class="px-3 py-2">${tutor?tutor.name:'-'}</td><td class="px-3 py-2">${gr.schedule||'-'}</td><td class="px-3 py-2">${cnt}</td><td class="px-3 py-2 text-right"><button data-bx-click="a366" data-p0="${bxE(function(){return gr.id})}" class="text-indigo-600 text-xs font-medium hover:underline">Gestionar</button></td></tr>`; }).join('')}
                     </tbody></table></div>` : `<p class="text-sm text-slate-500 mb-5 bg-slate-50 rounded-lg p-3">Sin grupos asignados todavía.</p>`}
                     <h4 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fas fa-user-graduate text-slate-500"></i> Alumnos inscritos</h4>
                     ${alumnos.length ? `<div class="space-y-2">${alumnos.map(r=>{ const gr = db.groups.find(x=>x.id===r.en.groupId); return `<div class="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2"><div class="flex items-center gap-3 min-w-0"><div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">${(r.u.name||'?').charAt(0).toUpperCase()}</div><div class="min-w-0"><p class="text-sm font-medium truncate">${r.u.name}</p><p class="text-xs text-slate-500 truncate">${r.u.email||''}</p></div></div><div class="text-right flex-shrink-0"><p class="text-xs text-slate-600">${gr?gr.name:'Sin grupo'}</p><p class="text-[10px] text-slate-400">${r.en.enrolledAt?new Date(r.en.enrolledAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'2-digit'}):''}</p></div></div>`; }).join('')}</div>` : `<p class="text-sm text-slate-500 bg-slate-50 rounded-lg p-3">Sin alumnos inscritos todavía.</p>`}
                 </div>
                 <div class="flex gap-3 pt-4">
-                    <button onclick="exportGeneracionCSV(${genId})" class="px-3 py-2.5 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar alumnos CSV</button>
-                    <button onclick="closeModal(); window.filtroGrupoGen='${genId}'; navigateTo('groups')" class="px-3 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm">Gestionar en Grupos</button>
-                    <button onclick="closeModal()" class="ml-auto px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm">Cerrar</button>
+                    <button data-bx-click="a367" data-p0="${bxE(function(){return genId})}" class="px-3 py-2.5 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"><i class="fas fa-file-csv"></i> Exportar alumnos CSV</button>
+                    <button data-bx-click="a368" data-p0="${bxE(function(){return genId})}" class="px-3 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm">Gestionar en Grupos</button>
+                    <button data-bx-click="a1" class="ml-auto px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm">Cerrar</button>
                 </div>
             </div>`);
         }
@@ -11750,15 +11771,15 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             return `<div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold">Grupos</h2>
                 <div class="flex items-center gap-3">
-                    <select onchange="window.filtroGrupoGen=this.value; navigateTo('groups')" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a369" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todas las generaciones</option>
                         ${db.generations.map(g=>`<option value="${g.id}" ${filtroGen===g.id?'selected':''}>${g.name}</option>`).join('')}
                     </select>
-                    <select onchange="window.filtroGrupoTutor=this.value; navigateTo('groups')" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                    <select data-bx-change="a370" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                         <option value="">Todos los tutores</option>
                         ${db.users.filter(u=>isTeacher(u)).map(m=>`<option value="${m.id}" ${filtroTutor===m.id?'selected':''}>${m.name}</option>`).join('')}
                     </select>
-                    ${canEdit?`<button onclick="openGroupModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nuevo Grupo</button>`:''}
+                    ${canEdit?`<button data-bx-click="a371" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nuevo Grupo</button>`:''}
                 </div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -11768,7 +11789,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const plan = db.planes.find(p=>p.id===gen?.planId);
                     const tutor = db.users.find(u=>u.id===gr.tutorId);
                     const count = db.enrollments.filter(e=>e.groupId===gr.id).length;
-                    return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium"><div class="flex items-center gap-3">${gr.image?`<img src="${gr.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0" onerror="this.style.display='none'">`:`<div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-users text-slate-400 text-xs"></i></div>`}<div><span>${gr.name}</span>${plan?`<div class="text-[10px] text-indigo-600">${plan.nombre}</div>`:''}</div></div></td><td class="px-4 py-3 text-sm">${gen?gen.name:'-'}</td><td class="px-4 py-3 text-sm">${tutor?tutor.name:'-'}</td><td class="px-4 py-3 text-sm">${count}</td><td class="px-4 py-3 text-sm">${gr.schedule||'-'}</td><td class="px-4 py-3 text-right"><div class="flex items-center justify-end gap-3"><button onclick="openGroupDetail(${gr.id})" class="text-indigo-600 text-sm font-medium hover:underline">Gestionar</button>${canEdit?`<button onclick="openGroupModal(${gr.id})" class="text-slate-400 hover:text-indigo-600" title="Editar"><i class="fas fa-pen text-xs"></i></button>`:''}${canEdit?`<button onclick="deleteGroup(${gr.id})" class="text-slate-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div></td></tr>`;
+                    return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium"><div class="flex items-center gap-3">${gr.image?`<img loading="lazy" decoding="async" src="${gr.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0" data-bx-error="a48">`:`<div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-users text-slate-400 text-xs"></i></div>`}<div><span>${gr.name}</span>${plan?`<div class="text-[10px] text-indigo-600">${plan.nombre}</div>`:''}</div></div></td><td class="px-4 py-3 text-sm">${gen?gen.name:'-'}</td><td class="px-4 py-3 text-sm">${tutor?tutor.name:'-'}</td><td class="px-4 py-3 text-sm">${count}</td><td class="px-4 py-3 text-sm">${gr.schedule||'-'}</td><td class="px-4 py-3 text-right"><div class="flex items-center justify-end gap-3"><button data-bx-click="a366" data-p0="${bxE(function(){return gr.id})}" class="text-indigo-600 text-sm font-medium hover:underline">Gestionar</button>${canEdit?`<button data-bx-click="a372" data-p0="${bxE(function(){return gr.id})}" class="text-slate-400 hover:text-indigo-600" title="Editar"><i class="fas fa-pen text-xs"></i></button>`:''}${canEdit?`<button data-bx-click="a373" data-p0="${bxE(function(){return gr.id})}" class="text-slate-400 hover:text-red-600" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>`:''}</div></td></tr>`;
                 }).join('')}</tbody></table>
                 ${grupos.length===0?'<div class="p-8 text-center text-slate-500">No hay grupos con ese filtro</div>':''}
             </div>`;
@@ -11782,7 +11803,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     <div>
                         <label class="text-sm font-medium">Imagen de portada</label>
                         <div id="gr-image-box" role="button" tabindex="0" aria-label="Subir o cambiar la imagen del grupo" title="Clic para elegir la imagen del grupo" class="group relative mt-1 w-full h-44 sm:h-48 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 overflow-hidden cursor-pointer transition hover:border-indigo-400 hover:bg-indigo-50/60 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                            <img id="gr-image-preview" src="${imgInicial}" class="absolute inset-0 w-full h-full object-cover ${imgInicial?'':'hidden'}">
+                            <img loading="lazy" decoding="async" id="gr-image-preview" src="${imgInicial}" class="absolute inset-0 w-full h-full object-cover ${imgInicial?'':'hidden'}">
                             <div id="gr-image-empty" class="absolute inset-0 flex flex-col items-center justify-center text-center px-3 ${imgInicial?'hidden':''}">
                                 <i class="fas fa-image text-3xl text-slate-300 mb-2"></i>
                                 <p class="text-xs font-bold text-slate-500">Subir imagen</p>
@@ -11802,7 +11823,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <div><label class="text-sm font-medium">Horario</label><input id="gr-schedule" value="${gr?gr.schedule||'':''}" placeholder="Lun-Vie 9:00-13:00" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                     </div>
                 </div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button id="gr-save-btn" type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">Guardar</button></div>
+                <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button id="gr-save-btn" type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed">Guardar</button></div>
             </form></div>`);
             /* La portada se ve al instante (blob local) y se guarda cuando termina
              * la subida a Storage. Antes no había ni vista previa inmediata ni
@@ -11932,11 +11953,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const gr = db.groups.find(g=>g.id===groupId);
             const enrolled = db.enrollments.filter(e=>e.groupId===groupId);
             const alumnos = db.users.filter(u=>isStudent(u));
-            showModal(`<div class="p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto"><div class="flex items-start justify-between mb-5"><div><h3 class="text-xl font-bold">${gr.name}</h3><p class="text-sm text-slate-500">${db.generations.find(g=>g.id===gr.generationId)?.name||''} • Tutor: ${db.users.find(u=>u.id===gr.tutorId)?.name||''}</p></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div>
+            showModal(`<div class="p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto"><div class="flex items-start justify-between mb-5"><div><h3 class="text-xl font-bold">${gr.name}</h3><p class="text-sm text-slate-500">${db.generations.find(g=>g.id===gr.generationId)?.name||''} • Tutor: ${db.users.find(u=>u.id===gr.tutorId)?.name||''}</p></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div>
                 ${renderGroupBoard(groupId)}
                 ${renderGroupChat(groupId)}
-                <div class="mb-6"><h4 class="font-medium mb-3">Alumnos inscritos (${enrolled.length})</h4><div class="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">${enrolled.map(e=>{const u=db.users.find(x=>x.id===e.userId);return u?`<div class="flex items-center justify-between py-1"><span class="text-sm">${u.name}</span><button onclick="removeFromGroup(${e.id})" class="text-xs text-red-600 hover:underline">Quitar</button></div>`:''}).join('')||'<p class="text-sm text-slate-500">Sin alumnos</p>'}</div></div>
-                <div><h4 class="font-medium mb-3">Agregar alumnos</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">${alumnos.filter(a=>!enrolled.find(e=>e.userId===a.id)).map(a=>`<label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded"><input type="checkbox" value="${a.id}" class="add-student bg-white text-slate-900 border border-slate-300"> <span class="text-sm">${a.name}</span></label>`).join('')}</div><button onclick="addStudentsToGroup(${groupId})" class="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Agregar seleccionados</button></div>
+                <div class="mb-6"><h4 class="font-medium mb-3">Alumnos inscritos (${enrolled.length})</h4><div class="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">${enrolled.map(e=>{const u=db.users.find(x=>x.id===e.userId);return u?`<div class="flex items-center justify-between py-1"><span class="text-sm">${u.name}</span><button data-bx-click="a374" data-p0="${bxE(function(){return e.id})}" class="text-xs text-red-600 hover:underline">Quitar</button></div>`:''}).join('')||'<p class="text-sm text-slate-500">Sin alumnos</p>'}</div></div>
+                <div><h4 class="font-medium mb-3">Agregar alumnos</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">${alumnos.filter(a=>!enrolled.find(e=>e.userId===a.id)).map(a=>`<label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded"><input type="checkbox" value="${a.id}" class="add-student bg-white text-slate-900 border border-slate-300"> <span class="text-sm">${a.name}</span></label>`).join('')}</div><button data-bx-click="a375" data-p0="${bxE(function(){return groupId})}" class="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Agregar seleccionados</button></div>
             </div>`); setTimeout(()=>initGroupChat(groupId), 50);
         }
 
@@ -11967,16 +11988,16 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const tutor = db.users.find(u=>u.id===group.tutorId);
             const compañeros = db.enrollments.filter(e=>e.groupId===group.id && e.userId!==currentUser.id).map(e=>db.users.find(u=>u.id===e.userId)).filter(Boolean);
             const myClasses = db.liveClasses.filter(c=>c.assignedTo.includes(currentUser.id) || (c.assignedToGroup && c.assignedToGroup===group.id)).sort((a,b)=>new Date(a.start)-new Date(b.start)).slice(0,5);
-            return `<div class="mb-6 flex items-center gap-4"><div class="flex -space-x-3">${gen?.image?`<img src="${gen.image}" class="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm">`:`<div class="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center"><i class="fas fa-layer-group text-slate-500"></i></div>`}${group?.image?`<img src="${group.image}" class="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm">`:`<div class="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center border-2 border-white"><i class="fas fa-users text-slate-400"></i></div>`}</div><div><h2 class="text-2xl font-bold leading-tight">Mi Aula</h2><p class="text-slate-500">${gen?.name} • ${group?.name}${plan ? ` • <span class='text-indigo-700 font-medium'>${plan.nombre}</span>` : ''}</p></div></div>
+            return `<div class="mb-6 flex items-center gap-4"><div class="flex -space-x-3">${gen?.image?`<img loading="lazy" decoding="async" src="${gen.image}" class="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm">`:`<div class="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center"><i class="fas fa-layer-group text-slate-500"></i></div>`}${group?.image?`<img loading="lazy" decoding="async" src="${group.image}" class="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm">`:`<div class="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center border-2 border-white"><i class="fas fa-users text-slate-400"></i></div>`}</div><div><h2 class="text-2xl font-bold leading-tight">Mi Aula</h2><p class="text-slate-500">${gen?.name} • ${group?.name}${plan ? ` • <span class='text-indigo-700 font-medium'>${plan.nombre}</span>` : ''}</p></div></div>
             <div class="grid lg:grid-cols-3 gap-5">
                 <div class="lg:col-span-2 space-y-5">
                     <div class="bg-white rounded-2xl p-6 border border-slate-200"><h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-users text-indigo-600"></i> Mi Grupo</h3><div class="flex items-center gap-4 mb-4"><img src="${tutor?.avatar}" class="w-12 h-12 rounded-full"><div><div class="font-medium">${tutor?.name}</div><div class="text-sm text-slate-500">Tutor • ${group?.schedule}</div></div></div><div class="flex flex-wrap gap-2">${compañeros.map(c=>`<span class="px-3 py-1.5 bg-slate-50 rounded-full text-sm flex items-center gap-2"><img src="${c.avatar}" class="w-5 h-5 rounded-full">${c.name}</span>`).join('')}</div></div>
-                    <div class="bg-white rounded-2xl p-6 border border-slate-200"><h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-video text-indigo-600"></i> Próximas Clases</h3><div class="space-y-3">${myClasses.length?myClasses.map(c=>{const s=new Date(c.start);return `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl"><div><div class="font-medium text-sm">${c.title}</div><div class="text-xs text-slate-500">${s.toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'})}</div></div><a href="${c.zoomUrl}" target="_blank" onclick="markAttendance(this.dataset.lesson||0)" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs">Unirse</a></div>`}).join(''):'<p class="text-sm text-slate-500">No hay clases programadas</p>'}</div></div>
+                    <div class="bg-white rounded-2xl p-6 border border-slate-200"><h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-video text-indigo-600"></i> Próximas Clases</h3><div class="space-y-3">${myClasses.length?myClasses.map(c=>{const s=new Date(c.start);return `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl"><div><div class="font-medium text-sm">${c.title}</div><div class="text-xs text-slate-500">${s.toLocaleString('es-MX',{dateStyle:'medium', timeStyle:'short'})}</div></div><a href="${c.zoomUrl}" target="_blank" data-bx-click="a376" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs">Unirse</a></div>`}).join(''):'<p class="text-sm text-slate-500">No hay clases programadas</p>'}</div></div>
                     ${renderGroupBoard(group.id)}
                     ${renderGroupChat(group.id)}
                 </div>
                 <div class="space-y-5">
-                    <div class="relative overflow-hidden rounded-2xl border border-slate-200">${gen?.image?`<img src="${gen.image}" class="w-full h-32 object-cover">`:`<div class="w-full h-32 bg-gradient-to-br from-indigo-600 to-indigo-700"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div><div class="absolute bottom-0 p-5 text-white"><div class="text-xs opacity-90 mb-1">${plan ? plan.tipo.toUpperCase() : 'Generación'}</div><div class="text-xl font-bold">${gen?.name}</div><div class="text-xs opacity-80 mt-1">${plan ? plan.nombre + ' • ' : ''}${gen?.startDate} - ${gen?.endDate}</div></div></div>
+                    <div class="relative overflow-hidden rounded-2xl border border-slate-200">${gen?.image?`<img loading="lazy" decoding="async" src="${gen.image}" class="w-full h-32 object-cover">`:`<div class="w-full h-32 bg-gradient-to-br from-indigo-600 to-indigo-700"></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div><div class="absolute bottom-0 p-5 text-white"><div class="text-xs opacity-90 mb-1">${plan ? plan.tipo.toUpperCase() : 'Generación'}</div><div class="text-xl font-bold">${gen?.name}</div><div class="text-xs opacity-80 mt-1">${plan ? plan.nombre + ' • ' : ''}${gen?.startDate} - ${gen?.endDate}</div></div></div>
                     <div class="bg-white rounded-2xl p-6 border border-slate-200"><h3 class="font-semibold mb-3">Mi Formación</h3><div class="mb-4 p-3 bg-indigo-50 rounded-xl"><div class="text-xs text-indigo-600 font-medium">${plan ? plan.tipo : 'Plan'}</div><div class="font-semibold text-indigo-900">${plan ? plan.nombre : 'Sin asignar'}</div><div class="text-xs text-slate-600 mt-1">${plan ? plan.duracion : ''}</div></div><h3 class="font-semibold mb-3">Mi Progreso</h3><div class="space-y-3"><div class="flex justify-between text-sm"><span>XP Total</span><span class="font-medium">${currentUser.xp||0}</span></div><div class="flex justify-between text-sm"><span>Nivel</span><span class="font-medium">${Math.floor((currentUser.xp||0)/300)+1}</span></div><div class="flex justify-between text-sm"><span>Compañeros</span><span class="font-medium">${compañeros.length+1}</span></div></div></div>
                 </div>
             </div>`;
@@ -11994,7 +12015,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const activeClasses = db.liveClasses.filter(c=>c.assignedToGroup===gr.id || c.assignedTo.some(id=>students.map(s=>s.id).includes(id))).length;
                 return `<div class="bg-white rounded-2xl p-6 border border-slate-200"><div class="flex items-start justify-between mb-4"><div><div class="flex items-center gap-2 mb-1">${plan ? `<span class='text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium'>${plan.tipo}</span>` : ''}</div><h3 class="font-semibold text-lg">${gr.name}</h3><p class="text-sm text-slate-500">${gen?.name}${plan ? ` • ${plan.nombre}` : ''} • ${gr.schedule}</p></div><span class="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full">${students.length} alumnos</span></div>
                     <div class="grid grid-cols-3 gap-3 mb-4">${[{label:'XP Promedio',value:avgXp,icon:'fa-bolt'},{label:'Clases',value:activeClasses,icon:'fa-video'},{label:'Activos',value:students.filter(s=>(s.xp||0)>0).length,icon:'fa-fire'}].map(m=>`<div class="text-center p-3 bg-slate-50 rounded-xl"><i class="fas ${m.icon} text-slate-400 text-xs mb-1"></i><div class="font-semibold">${m.value}</div><div class="text-[11px] text-slate-500">${m.label}</div></div>`).join('')}</div>
-                    <div class="flex gap-2"><button onclick="openGroupDetail(${gr.id})" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">Ver alumnos</button><button onclick="navigateTo('live-classes'); setTimeout(()=>openNewLiveClassModal(${gr.id}),100)" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Nueva clase</button></div></div>`;
+                    <div class="flex gap-2"><button data-bx-click="a366" data-p0="${bxE(function(){return gr.id})}" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">Ver alumnos</button><button data-bx-click="a377" data-p0="${bxE(function(){return gr.id})}" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Nueva clase</button></div></div>`;
             }).join('')}${myGroups.length===0?'<div class="col-span-full text-center py-12 text-slate-500">No tienes grupos asignados</div>':''}</div>`;
         }
 
@@ -12032,13 +12053,13 @@ function renderLiveClasses() {
                             <h2 class="text-2xl font-bold text-slate-800">Clases En Vivo</h2>
                             <p class="text-slate-500 text-sm mt-1">Calendario de sesiones por Zoom</p>
                         </div>
-                        ${isTeacher ? `<button onclick="openNewLiveClassModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
+                        ${isTeacher ? `<button data-bx-click="a378" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
                     </div>
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
                         <div class="w-16 h-16 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-4"><i class="fas fa-video text-indigo-600 text-2xl"></i></div>
                         <h3 class="text-lg font-bold text-slate-800 mb-1">${isTeacher ? 'Aún no has creado clases' : 'No tienes clases en vivo asignadas'}</h3>
                         <p class="text-slate-500 mb-5">${isTeacher ? 'Programa tu primera sesión en vivo' : 'Cuando un maestro te asigne una clase, aparecerá aquí'}</p>
-                        ${isTeacher ? `<button onclick="openNewLiveClassModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 inline-flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
+                        ${isTeacher ? `<button data-bx-click="a378" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 inline-flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
                     </div>
                 </div>
             `;
@@ -12080,7 +12101,7 @@ function renderLiveClasses() {
                             <h2 class="text-2xl font-bold text-slate-800">Clases En Vivo</h2>
                             <p class="text-slate-500 text-sm mt-1">Calendario de sesiones por Zoom</p>
                         </div>
-                        ${isTeacher ? `<button onclick="openNewLiveClassModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
+                        ${isTeacher ? `<button data-bx-click="a378" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-plus"></i> Nueva Clase</button>` : ''}
                     </div>
                     ${renderBannerEnVivo()}
                     ${(!isTeacher && myClasses.length) ? renderMisClasesCards(myClasses) : ''}
@@ -12093,17 +12114,17 @@ function renderLiveClasses() {
                         <div class="p-4 border-b flex items-center justify-between flex-wrap gap-3">
                             <h3 class="font-semibold text-slate-800 flex items-center gap-2"><i class="fas fa-history text-indigo-600"></i> Historial de Clases Impartidas</h3>
                             <div class="flex flex-wrap items-center gap-2">
-                                <select id="hist-periodo" onchange="lcHistSet('periodo', this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                <select id="hist-periodo" data-bx-change="a379" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                                     <option value="prox">Próximas</option>
                                     <option value="pasadas">Pasadas</option>
                                     <option value="todas">Todas</option>
                                 </select>
-                                <select id="hist-filter-instructor" onchange="lcHistSet('inst', this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
+                                <select id="hist-filter-instructor" data-bx-change="a380" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-900">
                                     <option value="">Todos los instructores</option>
                                     ${db.users.filter(u=>['desarrollador','admin','gm','capacitador','maestro','agencia'].includes(u.role)).map(u=>`<option value="${u.id}">${u.name} (${u.role.toUpperCase()})</option>`).join('')}
                                 </select>
-                                <input type="text" id="hist-search" placeholder="Buscar clase..." oninput="lcHistSet('search', this.value)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-40 bg-white text-slate-900">
-                                <button onclick="exportarHistorialClasesCSV()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> CSV</button>
+                                <input type="text" id="hist-search" placeholder="Buscar clase..." data-bx-input="a381" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm w-40 bg-white text-slate-900">
+                                <button data-bx-click="a382" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-file-csv"></i> CSV</button>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
@@ -12203,7 +12224,7 @@ function renderLiveClasses() {
             });
             if (!activas.length) return '';
             const c = activas[0];
-            return `<button onclick="unirseClaseEnVivo('${String(c.id)}')" class="w-full text-left p-4 rounded-xl bg-red-600 text-white shadow-md hover:bg-red-700 flex items-center justify-between gap-3 transition">
+            return `<button data-bx-click="a383" data-p0="${bxE(function(){return String(c.id)})}" class="w-full text-left p-4 rounded-xl bg-red-600 text-white shadow-md hover:bg-red-700 flex items-center justify-between gap-3 transition">
                 <div class="flex items-center gap-3">
                     <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
                     <div><div class="text-[11px] font-semibold uppercase tracking-wide opacity-80">Clase en vivo ahora</div><div class="font-semibold">${c.title}</div></div>
@@ -12229,7 +12250,7 @@ function renderLiveClasses() {
                         <div class="text-xs text-slate-500">Instructor: ${inst?inst.name:'-'}</div>
                         <div class="flex items-center justify-between mt-auto pt-2">
                             <span class="text-[11px] font-semibold px-2 py-1 rounded-full ${dias<=1?'bg-red-50 text-red-600':'bg-indigo-50 text-indigo-700'}">${esHoy?'¡Hoy!':(dias<=0?'En curso':'Faltan '+dias+' día'+(dias===1?'':'s'))}</span>
-                            <button onclick="unirseClaseEnVivo('${String(c.id)}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-video"></i> Unirme</button>
+                            <button data-bx-click="a383" data-p0="${bxE(function(){return String(c.id)})}" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 flex items-center gap-1.5"><i class="fas fa-video"></i> Unirme</button>
                         </div>
                     </div>`;
                 }).join('')}</div>
@@ -12378,8 +12399,8 @@ END:VCALENDAR`;
                             <p class="text-slate-500 text-sm mt-1">Define qué secciones ve cada rol. Solo GM.</p>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="resetRolePermissions()" class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 flex items-center gap-2"><i class="fas fa-rotate-left"></i> Restablecer</button>
-                            <button onclick="saveRolePermissions()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-save"></i> Guardar Cambios</button>
+                            <button data-bx-click="a384" class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 flex items-center gap-2"><i class="fas fa-rotate-left"></i> Restablecer</button>
+                            <button data-bx-click="a385" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-save"></i> Guardar Cambios</button>
                         </div>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
@@ -12468,11 +12489,11 @@ END:VCALENDAR`;
             const instructors = db.users.filter(u => ['desarrollador','admin','gm','capacitador','maestro','agencia'].includes(u.role));
             showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-5">Nueva Clase En Vivo</h3><form id="live-class-form" class="space-y-4"><div><label class="text-sm font-medium">Título</label><input type="text" id="lc-title" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div><div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Fecha y hora inicio</label><input type="datetime-local" id="lc-start" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div><div><label class="text-sm font-medium">Duración (min)</label><input type="number" id="lc-duration" value="60" min="15" step="15" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div></div><div><label class="text-sm font-medium">Link de Zoom</label><input type="url" id="lc-zoom" required placeholder="https://zoom.us/j/..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900"></div>
             <div><label class="text-sm font-medium">Instructor que imparte</label><select id="lc-instructor" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">${instructors.map(i=>`<option value="${i.id}" ${i.id===preselectInstructorId?"selected":(i.id===currentUser.id?"selected":"")}>${i.name} - ${i.role.toUpperCase()}</option>`).join('')}</select></div>
-            <div><label class="text-sm font-medium">Repetir semanalmente (opcional)</label><div class="flex items-center gap-2 mt-1 flex-wrap"><input type="checkbox" id="lc-recurr" onchange="document.getElementById('lc-recurr-n').classList.toggle('hidden', !this.checked)" class="w-4 h-4 bg-white text-slate-900 border-slate-300 rounded"><select id="lc-recurr-n" class="hidden px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm">${[2,3,4,5,6,8,12].map(n=>`<option value="${n}">${n} semanas</option>`).join('')}</select><span class="text-xs text-slate-400">Crea una clase por semana con el mismo horario</span></div></div>
-            <div><label class="text-sm font-medium mb-2 block">Asignar por</label><div class="flex gap-2 mb-3"><button type="button" id="tab-group" onclick="switchAssignTab('group')" class="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white">Grupo</button><button type="button" id="tab-individual" onclick="switchAssignTab('individual')" class="px-3 py-1.5 text-sm rounded-lg border">Individual</button></div>
+            <div><label class="text-sm font-medium">Repetir semanalmente (opcional)</label><div class="flex items-center gap-2 mt-1 flex-wrap"><input type="checkbox" id="lc-recurr" data-bx-change="a386" class="w-4 h-4 bg-white text-slate-900 border-slate-300 rounded"><select id="lc-recurr-n" class="hidden px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm">${[2,3,4,5,6,8,12].map(n=>`<option value="${n}">${n} semanas</option>`).join('')}</select><span class="text-xs text-slate-400">Crea una clase por semana con el mismo horario</span></div></div>
+            <div><label class="text-sm font-medium mb-2 block">Asignar por</label><div class="flex gap-2 mb-3"><button type="button" id="tab-group" data-bx-click="a387" class="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white">Grupo</button><button type="button" id="tab-individual" data-bx-click="a388" class="px-3 py-1.5 text-sm rounded-lg border">Individual</button></div>
             <div id="assign-group" class=""><select id="lc-group" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900"><option value="">Selecciona grupo</option>${groups.map(g=>`<option value="${g.id}" ${preselectGroupId===g.id?'selected':''}>${g.name} (${db.generations.find(gen=>gen.id===g.generationId)?.name||''})</option>`).join('')}</select></div>
             <div id="assign-individual" class="hidden max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2">${alumnos.map(a => `<label class="flex items-center gap-2"><input type="checkbox" value="${a.id}" class="lc-student bg-white text-slate-900 border border-slate-300"> <span class="text-sm">${a.name}</span></label>`).join('')}</div></div>
-            <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cancelar</button><button type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">Crear Clase</button></div></form></div>`);
+            <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg font-medium hover:bg-slate-50">Cancelar</button><button type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">Crear Clase</button></div></form></div>`);
             setTimeout(()=>document.getElementById('lc-title')?.focus(),0);
             window.switchAssignTab = (tab) => {
                 document.getElementById('assign-group').classList.toggle('hidden', tab!=='group');
@@ -12646,24 +12667,24 @@ END:VCALENDAR`;
             const pendingLessons = (db.lessons || []).filter(l => !(db.progress || []).some(p => String(p.userId) === String(currentUser.id) && String(p.lessonId) === String(l.id) && p.completed)).slice(0, 3);
             return `<div class="flex items-center justify-between mb-6">
                 <div><h2 class="text-2xl font-bold">Biblioteca</h2><p class="text-slate-500 text-sm">Material de apoyo por categorías y lecciones</p></div>
-                ${canUpload?`<button onclick="openLibraryModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Subir Material</button>`:''}
+                ${canUpload?`<button data-bx-click="a389" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Subir Material</button>`:''}
             </div>
             ${pendingLessons.length ? `<div class="mb-5 p-4 rounded-2xl border border-amber-200 bg-amber-50/60">
                 <div class="flex items-center justify-between mb-2">
                     <h4 class="text-xs font-bold uppercase text-amber-900 flex items-center gap-1.5"><i class="fas fa-sparkles text-amber-600"></i> Recomendado para ti (Lecciones pendientes por completar)</h4>
-                    <button onclick="navigateTo('lessons')" class="text-xs font-semibold text-amber-800 hover:underline">Ir a Lecciones →</button>
+                    <button data-bx-click="a390" class="text-xs font-semibold text-amber-800 hover:underline">Ir a Lecciones →</button>
                 </div>
                 <div class="grid sm:grid-cols-3 gap-2.5">
-                    ${pendingLessons.map(l => `<div onclick="navigateTo('lessons')" class="p-2.5 rounded-xl bg-white border border-amber-200/80 cursor-pointer hover:shadow-sm transition">
+                    ${pendingLessons.map(l => `<div data-bx-click="a390" class="p-2.5 rounded-xl bg-white border border-amber-200/80 cursor-pointer hover:shadow-sm transition">
                         <p class="text-xs font-bold text-slate-800 truncate">${psEscape(l.title)}</p>
                         <p class="text-[11px] text-slate-500 truncate">Continuar aprendizaje</p>
                     </div>`).join('')}
                 </div>
             </div>` : ''}
             <div class="mb-5 flex flex-wrap gap-3 items-center">
-                <select id="lib-filter-cat" onchange="renderBibliotecaFilter()" class="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><option value="">Todas las categorías</option>${db.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
-                <select id="lib-filter-lesson" onchange="renderBibliotecaFilter()" class="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><option value="">Todas las lecciones</option></select>
-                <input id="lib-search" oninput="renderBibliotecaFilter()" placeholder="Buscar..." class="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[200px] bg-white text-slate-900 border-slate-300">
+                <select id="lib-filter-cat" data-bx-change="a391" class="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><option value="">Todas las categorías</option>${db.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                <select id="lib-filter-lesson" data-bx-change="a391" class="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><option value="">Todas las lecciones</option></select>
+                <input id="lib-search" data-bx-input="a392" placeholder="Buscar..." class="px-3 py-2 border rounded-lg text-sm flex-1 min-w-[200px] bg-white text-slate-900 border-slate-300">
             </div>
             <div id="lib-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 ${materials.map(m => {
@@ -12677,12 +12698,12 @@ END:VCALENDAR`;
                                 <h3 class="font-semibold truncate">${m.title}</h3>
                                 <p class="text-xs text-slate-500 mt-0.5">${cat?cat.name:'General'}${lesson?' • '+lesson.title:''}</p>
                             </div>
-                            ${canUpload?`<button onclick="deleteLibraryItem(${m.id})" class="text-slate-400 hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>`:''}
+                            ${canUpload?`<button data-bx-click="a393" data-p0="${bxE(function(){return m.id})}" class="text-slate-400 hover:text-red-600"><i class="fas fa-trash text-xs"></i></button>`:''}
                         </div>
                         ${m.description?`<p class="text-sm text-slate-600 mt-3 line-clamp-2">${m.description}</p>`:''}
                         <div class="mt-4 flex items-center justify-between">
                             <span class="text-[11px] text-slate-400">${new Date(m.createdAt).toLocaleDateString('es-MX')}</span>
-                            ${isLink?`<button onclick="openLibraryPreview(${m.id})" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">Ver <i class="fas fa-eye ml-1"></i></button>`:`<button onclick="openLibraryPreview(${m.id})" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700">Ver</button>`}
+                            ${isLink?`<button data-bx-click="a394" data-p0="${bxE(function(){return m.id})}" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">Ver <i class="fas fa-eye ml-1"></i></button>`:`<button data-bx-click="a394" data-p0="${bxE(function(){return m.id})}" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700">Ver</button>`}
                         </div>
                     </div>`;
                 }).join('')}
@@ -12721,7 +12742,7 @@ END:VCALENDAR`;
                 <div><label class="text-sm font-medium">Tipo</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="lib-type" value="link" ${!m||m.type==='link'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace (Drive, Docs, etc.)</span></label><label class="flex items-center gap-2"><input type="radio" name="lib-type" value="file" ${m&&m.type==='file'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo (Storage / PDF / Doc)</span></label></div></div>
                 <div id="lib-link-wrap"><label class="text-sm font-medium">URL</label><input id="lib-url" type="url" placeholder="https://drive.google.com/..." value="${escapeHTML(m&&m.url?m.url:'')}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div id="lib-file-wrap" class="hidden"><label class="text-sm font-medium">Archivo (se subirá con Media.subir al Storage)</label><input id="lib-file" type="file" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage para no guardar base64 pesado en la base de datos.</p></div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button id="lib-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button id="lib-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const updateLessonOptions = () => {
                 const catId = document.getElementById('lib-cat').value;
@@ -12856,7 +12877,7 @@ END:VCALENDAR`;
             const isPdfFile = m.type==='file' && fileSrc && (lowerName.endsWith('.pdf') || /^data:application\/pdf/i.test(fileSrc));
             const isImageFile = m.type==='file' && fileSrc && (/\.(png|jpe?g|gif|webp|svg)$/i.test(lowerName) || /^data:image\//i.test(fileSrc));
             const isVideoFile = m.type==='file' && fileSrc && (/\.(mp4|webm|mov)$/i.test(lowerName) || /^data:video\//i.test(fileSrc));
-            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" onclick="markAttendance(this.dataset.lesson||0)" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen></iframe>` : isPdfFile ? `<iframe src="${escapeHTML(fileSrc)}" class="w-full h-full" frameborder="0"></iframe>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button onclick="downloadLibraryFile(${m.id})" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
+            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" data-bx-click="a376" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen></iframe>` : isPdfFile ? `<iframe src="${escapeHTML(fileSrc)}" class="w-full h-full" frameborder="0"></iframe>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button data-bx-click="a395" data-p0="${bxE(function(){return m.id})}" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
         }
 
         // --- TAREAS ---
@@ -12866,7 +12887,7 @@ END:VCALENDAR`;
                 const tasks = db.tasks.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
                 return `<div class="flex items-center justify-between mb-6">
                     <div><h2 class="text-2xl font-bold">Tareas</h2><p class="text-slate-500 text-sm">Crea y califica entregas vinculadas a lecciones</p></div>
-                    <button onclick="openTaskModal()" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Tarea</button>
+                    <button data-bx-click="a396" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Tarea</button>
                 </div>
                 <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                     <table class="w-full"><thead class="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">Tarea</th><th class="px-4 py-3">Lección</th><th class="px-4 py-3">Entregas</th><th class="px-4 py-3">Pendientes</th><th class="px-4 py-3"></th></tr></thead>
@@ -12875,7 +12896,7 @@ END:VCALENDAR`;
                         const cat = db.categories.find(c=>c.id===t.categoryId);
                         const subs = db.taskSubmissions.filter(s=>s.taskId===t.id);
                         const pendientes = subs.filter(s=>s.status==='entregado').length;
-                        return `<tr class="hover:bg-slate-50"><td class="px-4 py-3"><p class="font-medium">${t.title}</p><p class="text-xs text-slate-500">${cat?cat.name:''}</p></td><td class="px-4 py-3 text-sm">${lesson?lesson.title:'-'}</td><td class="px-4 py-3 text-sm">${subs.length}</td><td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full ${pendientes?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}">${pendientes}</span></td><td class="px-4 py-3 text-right"><button onclick="openTaskDetail(${t.id})" class="text-indigo-600 text-sm font-medium">Gestionar</button></td></tr>`;
+                        return `<tr class="hover:bg-slate-50"><td class="px-4 py-3"><p class="font-medium">${t.title}</p><p class="text-xs text-slate-500">${cat?cat.name:''}</p></td><td class="px-4 py-3 text-sm">${lesson?lesson.title:'-'}</td><td class="px-4 py-3 text-sm">${subs.length}</td><td class="px-4 py-3"><span class="px-2 py-1 text-xs rounded-full ${pendientes?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}">${pendientes}</span></td><td class="px-4 py-3 text-right"><button data-bx-click="a397" data-p0="${bxE(function(){return t.id})}" class="text-indigo-600 text-sm font-medium">Gestionar</button></td></tr>`;
                     }).join('')}</tbody></table>
                     ${tasks.length===0?'<div class="p-8 text-center text-slate-500">No hay tareas creadas</div>':''}
                 </div>`;
@@ -12891,7 +12912,7 @@ END:VCALENDAR`;
                     return `<div class="bg-white rounded-2xl border border-slate-200 p-5">
                         <div class="flex items-start justify-between"><div><h3 class="font-semibold">${t.title}</h3><p class="text-xs text-slate-500">${lesson?lesson.title:''} • Vence: ${t.dueDate?new Date(t.dueDate).toLocaleDateString('es-MX'):'Sin fecha'}</p></div><span class="px-2.5 py-1 text-xs rounded-full capitalize ${chip}">${status}</span></div>
                         <p class="text-sm text-slate-600 mt-3 line-clamp-2">${t.description||''}</p>
-                        <div class="mt-4 flex items-center justify-between">${sub && sub.grade!=null?`<span class="text-sm font-medium text-emerald-600">Calificación: ${sub.grade}/100</span>`:'<span></span>'}<button onclick="openTaskSubmit(${t.id})" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">${sub?'Ver entrega':'Entregar'}</button></div>
+                        <div class="mt-4 flex items-center justify-between">${sub && sub.grade!=null?`<span class="text-sm font-medium text-emerald-600">Calificación: ${sub.grade}/100</span>`:'<span></span>'}<button data-bx-click="a398" data-p0="${bxE(function(){return t.id})}" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm">${sub?'Ver entrega':'Entregar'}</button></div>
                     </div>`;
                 }).join('')}${tasks.length===0?'<div class="col-span-2 text-center py-12 text-slate-500">No tienes tareas asignadas</div>':''}</div>`;
             }
@@ -12908,7 +12929,7 @@ END:VCALENDAR`;
                     <div><label class="text-sm font-medium">Lección</label><select id="task-lesson" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Opcional</option></select></div>
                 </div>
                 <div><label class="text-sm font-medium">Fecha de entrega</label><input id="task-due" type="date" value="${t&&t.dueDate?t.dueDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
+                <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const updateLessons = ()=>{
                 const catId = document.getElementById('task-cat').value;
@@ -12928,12 +12949,12 @@ END:VCALENDAR`;
         function openTaskDetail(taskId) {
             const t = db.tasks.find(x=>x.id===taskId);
             const subs = db.taskSubmissions.filter(s=>s.taskId===taskId);
-            showModal(`<div class="p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto"><div class="flex items-start justify-between mb-5"><div><h3 class="text-xl font-bold">${t.title}</h3><p class="text-sm text-slate-500">${t.description||''}</p></div><button aria-label="Cerrar" onclick="closeModal()" class="text-slate-400"><i class="fas fa-times"></i></button></div>
+            showModal(`<div class="p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto"><div class="flex items-start justify-between mb-5"><div><h3 class="text-xl font-bold">${t.title}</h3><p class="text-sm text-slate-500">${t.description||''}</p></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400"><i class="fas fa-times"></i></button></div>
                 <div class="bg-white border rounded-xl overflow-hidden"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">Alumno</th><th class="px-4 py-2 text-left">Entrega</th><th class="px-4 py-2 text-left">Estado</th><th class="px-4 py-2 text-left">Calificación</th><th></th></tr></thead><tbody class="divide-y">${subs.map(s=>{
                     const alumno = db.users.find(u=>u.id===s.studentId);
-                    return `<tr><td class="px-4 py-2">${alumno?alumno.name:''}</td><td class="px-4 py-2">${s.type==='link'?`<a href="${s.content}" target="_blank" onclick="markAttendance(this.dataset.lesson||0)" class="text-indigo-600 underline">Ver link</a>`:s.type==='file'?`<button onclick="downloadSubmission(${s.id})" class="text-emerald-600 underline">Descargar</button>`:`<span class="text-slate-600">${(s.content||'').substring(0,40)}...</span>`}</td><td class="px-4 py-2 capitalize">${s.status}</td><td class="px-4 py-2">${s.grade!=null?s.grade:'-'}</td><td class="px-4 py-2 text-right"><button onclick="openGradeModal(${s.id})" class="text-indigo-600 text-xs">Calificar</button></td></tr>`;
+                    return `<tr><td class="px-4 py-2">${alumno?alumno.name:''}</td><td class="px-4 py-2">${s.type==='link'?`<a href="${s.content}" target="_blank" data-bx-click="a376" class="text-indigo-600 underline">Ver link</a>`:s.type==='file'?`<button data-bx-click="a399" data-p0="${bxE(function(){return s.id})}" class="text-emerald-600 underline">Descargar</button>`:`<span class="text-slate-600">${(s.content||'').substring(0,40)}...</span>`}</td><td class="px-4 py-2 capitalize">${s.status}</td><td class="px-4 py-2">${s.grade!=null?s.grade:'-'}</td><td class="px-4 py-2 text-right"><button data-bx-click="a400" data-p0="${bxE(function(){return s.id})}" class="text-indigo-600 text-xs">Calificar</button></td></tr>`;
                 }).join('')}${subs.length===0?'<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Sin entregas aún</td></tr>':''}</tbody></table></div>
-                <div class="mt-4 flex justify-end gap-2"><button onclick="openTaskModal(${t.id})" class="px-3 py-2 border rounded-lg text-sm">Editar tarea</button><button onclick="deleteTask(${t.id})" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm">Eliminar</button></div>
+                <div class="mt-4 flex justify-end gap-2"><button data-bx-click="a401" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 border rounded-lg text-sm">Editar tarea</button><button data-bx-click="a402" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm">Eliminar</button></div>
             </div>`);
         }
 
@@ -12947,7 +12968,7 @@ END:VCALENDAR`;
                 <div id="sub-file-wrap" class="hidden"><input id="sub-file-input" type="file" accept=".pdf,.doc,.docx,image/*" class="w-full px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage sin saturar la base de datos.</p>${existing&&existing.fileName?`<p class="text-xs text-slate-500 mt-1">Archivo actual: <strong>${escapeHTML(existing.fileName)}</strong></p>`:''}</div>
                 <div id="sub-text" class="hidden"><textarea id="sub-textarea" rows="4" placeholder="Escribe tu respuesta..." class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${escapeHTML(existing&&existing.type==='text'?existing.content:'')}</textarea></div>
                 ${existing && existing.feedback?`<div class="p-3 bg-amber-50 border border-amber-200 rounded-lg"><p class="text-xs font-medium text-amber-800">Retroalimentación del maestro:</p><p class="text-sm text-amber-900 mt-1">${escapeHTML(existing.feedback)}</p>${existing.grade!=null?`<p class="text-sm font-semibold mt-1">Calificación: ${existing.grade}/100</p>`:''}</div>`:''}
-                <div class="flex gap-3 pt-2"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cerrar</button>${!existing||existing.status!=='revisado'?`<button id="sub-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">${existing?'Actualizar':'Entregar'}</button>`:''}</div>
+                <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cerrar</button>${!existing||existing.status!=='revisado'?`<button id="sub-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">${existing?'Actualizar':'Entregar'}</button>`:''}</div>
             </form></div>`);
             const toggle = ()=>{
                 const type = document.querySelector('input[name="sub-type"]:checked').value;
@@ -13009,7 +13030,7 @@ END:VCALENDAR`;
             showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-lg font-bold mb-4">Calificar a ${alumno?alumno.name:''}</h3><form id="grade-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Calificación (0-100)</label><input id="grade-val" type="number" min="0" max="100" value="${s.grade!=null?s.grade:''}" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div><label class="text-sm font-medium">Comentario (rúbrica)</label><textarea id="grade-feedback" rows="3" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${s.feedback||''}</textarea></div>
-                <div class="flex gap-3"><button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg">Guardar</button></div>
+                <div class="flex gap-3"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             document.getElementById('grade-form').onsubmit = e=>{
                 e.preventDefault();
@@ -13050,7 +13071,7 @@ END:VCALENDAR`;
             const end = new Date(ev.end);
             const est = lcEstadoClase(ev);
             const puedeUnirse = est.key !== 'pasada';
-            showModal(`<div class="p-6 max-w-md w-full"><div class="flex items-start gap-4 mb-6"><div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0"><i class="fas fa-video text-indigo-600 text-xl" aria-hidden="true"></i></div><div class="flex-1"><div class="text-xs uppercase tracking-wide text-slate-500 font-medium">${start.toLocaleString('es-MX',{weekday:'short', day:'numeric', month:'short'})}</div><h3 class="text-xl font-semibold mt-1 leading-tight">${ev.title}</h3><p class="text-sm text-slate-500 mt-1">con ${creator ? creator.name : 'Maestro'} • ${start.toLocaleString('es-MX',{hour:'2-digit', minute:'2-digit'})}</p></div></div><div class="grid grid-cols-3 gap-3 mb-6 text-center"><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Duración</div><div class="font-medium mt-1">${Math.round((end-start)/60000)}m</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Alumnos</div><div class="font-medium mt-1">${ev.assignedTo.length}</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Estado</div><div class="font-medium mt-1 ${est.className.replace('bg-','text-').replace('-100','-600')}">${est.label}</div></div></div><div class="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200"><div class="flex items-center justify-between"><div><div class="text-xs font-medium text-blue-900 mb-1">Agregar a tu calendario</div><div class="text-[11px] text-blue-700">Guarda esta clase con el color de ${instructor?.name || 'instructor'}</div></div><div class="flex gap-2"><a href="${generateGoogleCalendarLink(ev)}" target="_blank" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-1.5"><i class="fab fa-google"></i> Google Calendar</a><button onclick="downloadICS(db.liveClasses.find(x=>x.id===${ev.id}))" class="px-3 py-1.5 border border-blue-300 bg-white text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 flex items-center gap-1.5"><i class="fas fa-download"></i> .ICS</button></div></div></div><div class="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-slate-100">${(currentUser.id===ev.createdBy || isAdmin(currentUser)) ? `<button onclick="editLiveClass(${ev.id});" class="px-3 py-2 text-sm text-slate-600 rounded-lg font-medium hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-pen" aria-hidden="true"></i> Editar</button>` : `${(String(currentUser.id)===String(ev.createdBy) || isAdmin(currentUser)) ? `<button onclick="recordarClase(${ev.id});" title="Volver a notificar a los asignados" class="px-3 py-2 text-sm text-indigo-600 rounded-lg font-medium hover:bg-indigo-50 flex items-center gap-1.5"><i class="fas fa-bell" aria-hidden="true"></i> Recordar</button>` : ''}`}${(isAdmin(currentUser) || isTeacher(currentUser)) ? `<button onclick="deleteLiveClass(${ev.id});" class="px-3 py-2 text-sm text-red-600 rounded-lg font-medium hover:bg-red-50 flex items-center gap-1.5"><i class="fas fa-trash" aria-hidden="true"></i> Eliminar</button>` : ''}${puedeUnirse ? `<a href="javascript:void(0)" onclick="unirseClaseEnVivo(${ev.id}); return false;" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm"><i class="fas fa-external-link-alt" aria-hidden="true"></i> Unirse</a>` : `<span class="px-4 py-2.5 bg-slate-200 text-slate-400 rounded-lg font-medium flex items-center gap-2 cursor-not-allowed" title="La clase ya finalizó"><i class="fas fa-ban" aria-hidden="true"></i> Finalizada</span>`}</div></div>`);
+            showModal(`<div class="p-6 max-w-md w-full"><div class="flex items-start gap-4 mb-6"><div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0"><i class="fas fa-video text-indigo-600 text-xl" aria-hidden="true"></i></div><div class="flex-1"><div class="text-xs uppercase tracking-wide text-slate-500 font-medium">${start.toLocaleString('es-MX',{weekday:'short', day:'numeric', month:'short'})}</div><h3 class="text-xl font-semibold mt-1 leading-tight">${ev.title}</h3><p class="text-sm text-slate-500 mt-1">con ${creator ? creator.name : 'Maestro'} • ${start.toLocaleString('es-MX',{hour:'2-digit', minute:'2-digit'})}</p></div></div><div class="grid grid-cols-3 gap-3 mb-6 text-center"><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Duración</div><div class="font-medium mt-1">${Math.round((end-start)/60000)}m</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Alumnos</div><div class="font-medium mt-1">${ev.assignedTo.length}</div></div><div class="p-3 bg-slate-50 rounded-xl"><div class="text-[11px] text-slate-500 uppercase">Estado</div><div class="font-medium mt-1 ${est.className.replace('bg-','text-').replace('-100','-600')}">${est.label}</div></div></div><div class="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200"><div class="flex items-center justify-between"><div><div class="text-xs font-medium text-blue-900 mb-1">Agregar a tu calendario</div><div class="text-[11px] text-blue-700">Guarda esta clase con el color de ${instructor?.name || 'instructor'}</div></div><div class="flex gap-2"><a href="${generateGoogleCalendarLink(ev)}" target="_blank" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 flex items-center gap-1.5"><i class="fab fa-google"></i> Google Calendar</a><button data-bx-click="a403" data-p0="${bxE(function(){return ev.id})}" class="px-3 py-1.5 border border-blue-300 bg-white text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-50 flex items-center gap-1.5"><i class="fas fa-download"></i> .ICS</button></div></div></div><div class="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-slate-100">${(currentUser.id===ev.createdBy || isAdmin(currentUser)) ? `<button data-bx-click="a404" data-p0="${bxE(function(){return ev.id})}" class="px-3 py-2 text-sm text-slate-600 rounded-lg font-medium hover:bg-slate-50 flex items-center gap-1.5"><i class="fas fa-pen" aria-hidden="true"></i> Editar</button>` : `${(String(currentUser.id)===String(ev.createdBy) || isAdmin(currentUser)) ? `<button data-bx-click="a405" data-p0="${bxE(function(){return ev.id})}" title="Volver a notificar a los asignados" class="px-3 py-2 text-sm text-indigo-600 rounded-lg font-medium hover:bg-indigo-50 flex items-center gap-1.5"><i class="fas fa-bell" aria-hidden="true"></i> Recordar</button>` : ''}`}${(isAdmin(currentUser) || isTeacher(currentUser)) ? `<button data-bx-click="a406" data-p0="${bxE(function(){return ev.id})}" class="px-3 py-2 text-sm text-red-600 rounded-lg font-medium hover:bg-red-50 flex items-center gap-1.5"><i class="fas fa-trash" aria-hidden="true"></i> Eliminar</button>` : ''}${puedeUnirse ? `<a href="javascript:void(0)" data-bx-click="a407" data-p0="${bxE(function(){return ev.id})}" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm"><i class="fas fa-external-link-alt" aria-hidden="true"></i> Unirse</a>` : `<span class="px-4 py-2.5 bg-slate-200 text-slate-400 rounded-lg font-medium flex items-center gap-2 cursor-not-allowed" title="La clase ya finalizó"><i class="fas fa-ban" aria-hidden="true"></i> Finalizada</span>`}</div></div>`);
         }
 
 
@@ -13104,11 +13125,11 @@ function agregarAgente(){
     const rolesAgente=['agente','agente_agencia','agente_desarrollo'];
     const disponibles = db.users.filter(u=>rolesAgente.includes(u.role) && !u.agenciaId && !u.parentId);
     if(!disponibles.length){
-        showModal(`<div class="p-6 max-w-sm text-center"><i class="fas fa-circle-info text-3xl text-slate-300"></i><h3 class="font-bold mt-2">Sin agentes disponibles</h3><p class="text-sm text-slate-500 mt-2">No hay agentes libres por asignar. Crea primero el agente en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia); solo aparecerán aquí los que aún no pertenezcan a una agencia.</p><div class="mt-4"><button onclick="closeModal()" class="px-4 py-2 border rounded-lg">Entendido</button></div></div>`);
+        showModal(`<div class="p-6 max-w-sm text-center"><i class="fas fa-circle-info text-3xl text-slate-300"></i><h3 class="font-bold mt-2">Sin agentes disponibles</h3><p class="text-sm text-slate-500 mt-2">No hay agentes libres por asignar. Crea primero el agente en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia); solo aparecerán aquí los que aún no pertenezcan a una agencia.</p><div class="mt-4"><button data-bx-click="a1" class="px-4 py-2 border rounded-lg">Entendido</button></div></div>`);
         return;
     }
     const opts = disponibles.map(u=>`<option value="${u.id}">${escapeHTML(u.name||u.nombre||'')} (${escapeHTML(u.email||'')})</option>`).join('');
-    showModal(`<form id="af" class="p-4 space-y-3"><h3 class="font-bold">Agregar agente a mi equipo</h3><p class="text-xs text-slate-500">Solo se listan agentes registrados en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia) que todavía no pertenecen a ninguna agencia. También puedes asignar la agencia desde <strong>Usuarios</strong> editando el agente.</p><select name="agenteId" required class="w-full border rounded px-2 py-2 bg-white text-slate-900 border-slate-300">${opts}</select><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Agregar</button></div></form>`);
+    showModal(`<form id="af" class="p-4 space-y-3"><h3 class="font-bold">Agregar agente a mi equipo</h3><p class="text-xs text-slate-500">Solo se listan agentes registrados en <strong>Usuarios</strong> (rol Agente en Desarrollo o Agente de Agencia) que todavía no pertenecen a ninguna agencia. También puedes asignar la agencia desde <strong>Usuarios</strong> editando el agente.</p><select name="agenteId" required class="w-full border rounded px-2 py-2 bg-white text-slate-900 border-slate-300">${opts}</select><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Agregar</button></div></form>`);
     document.getElementById('af').onsubmit=e=>{e.preventDefault();const id=Number(new FormData(e.target).get('agenteId'));const u=db.users.find(x=>x.id===id);if(u&&rolesAgente.includes(u.role)&&!u.agenciaId&&!u.parentId){u.agenciaId=currentUser.id;u.agencia=currentUser.id;u.parentId=currentUser.id;u.assignedTo=currentUser.id;saveDB();}closeModal();render();};
 }
 function quitarAgente(id){
@@ -13118,12 +13139,12 @@ function quitarAgente(id){
 
 function asignarMeta(id){
     const a=db.users.find(u=>u.id===id);
-    showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
 }
 function registrarVenta(id){
     const a=db.users.find(u=>u.id===id);
-    showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('vf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const v={id:Date.now(),agenteId:id,agenciaId:a.agenciaId,contratante:f.get('contratante'),fecha:f.get('fecha'),ramo:f.get('ramo'),compania:f.get('compania'),producto:f.get('producto'),prima:Number(f.get('prima'))};db.ventas=db.ventas||[];db.ventas.push(v); try{ const agente = db.users.find(u=>String(u.id)===String(v.agenteId)); if(agente) enviarAviso('ventas', [agente], {total: '$'+(v.prima||0).toLocaleString('es-MX'), mes: new Date(v.fecha).toLocaleDateString('es-MX',{month:'long'})}); }catch(e){} if(!db.notifications) db.notifications=[]; db.notifications.push({id:Date.now(),type:'venta',msg:'Nueva venta: '+(v.cliente||'Cliente')+' - $'+Number(v.prima).toLocaleString('es-MX'),agente:v.agente||currentUser.id,ts:new Date().toISOString(),readBy:[]}); saveDB();closeModal();render();};
 }
 
@@ -13133,6 +13154,6 @@ function borrarConv(id){
     saveDB(); render();
 }
 function openConv(){
-    showModal(`<form id="cf" class="p-4 space-y-2 max-w-md"><h3 class="font-bold">Nueva Convención</h3><input name="nombre" placeholder="Nombre" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="destino" placeholder="Destino" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="imagenFile" type="file" accept="image/*" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="grid grid-cols-2 gap-2"><input name="fechaInicio" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fechaFin" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual" selected>Anual</option></select><div class="grid grid-cols-2 gap-2"><input name="metaVIDA" type="number" placeholder="Meta VIDA" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaGMM" type="number" placeholder="Meta GMM" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaDANOS" type="number" placeholder="Meta DAÑOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaAUTOS" type="number" placeholder="Meta AUTOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV" type="number" placeholder="Meta INVERSIÓN" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV Elite" type="number" placeholder="Meta INVERSIÓN ELITE" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><div class="flex justify-end gap-2"><button type="button" onclick="closeModal()" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
+    showModal(`<form id="cf" class="p-4 space-y-2 max-w-md"><h3 class="font-bold">Nueva Convención</h3><input name="nombre" placeholder="Nombre" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="destino" placeholder="Destino" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="imagenFile" type="file" accept="image/*" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="grid grid-cols-2 gap-2"><input name="fechaInicio" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fechaFin" type="date" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual" selected>Anual</option></select><div class="grid grid-cols-2 gap-2"><input name="metaVIDA" type="number" placeholder="Meta VIDA" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaGMM" type="number" placeholder="Meta GMM" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaDANOS" type="number" placeholder="Meta DAÑOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaAUTOS" type="number" placeholder="Meta AUTOS" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV" type="number" placeholder="Meta INVERSIÓN" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="metaINV Elite" type="number" placeholder="Meta INVERSIÓN ELITE" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('cf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const file=f.get('imagenFile');const reader=new FileReader();reader.onload=()=>{const d={id:Date.now(),nombre:f.get('nombre'),destino:f.get('destino'),fechaInicio:f.get('fechaInicio'),fechaFin:f.get('fechaFin'),periodo:f.get('periodo'),imagen:reader.result,metas:{VIDA:Number(f.get('metaVIDA')||0),GMM:Number(f.get('metaGMM')||0),DAÑOS:Number(f.get('metaDANOS')||0),AUTOS:Number(f.get('metaAUTOS')||0),'INVERSIÓN':Number(f.get('metaINV')||0),'INVERSIÓN ELITE':Number(f.get('metaINV Elite')||0)},creadoPor:currentUser.id,agenciaId:(currentUser.role||'').toLowerCase()==='maestro'?currentUser.id:null};db.convenciones=db.convenciones||[];db.convenciones.push(d);saveDB();closeModal();render();}; if(file&&file.size){reader.readAsDataURL(file);}else{reader.onload();}};
 }

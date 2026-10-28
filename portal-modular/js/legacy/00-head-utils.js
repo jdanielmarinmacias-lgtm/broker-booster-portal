@@ -46,7 +46,7 @@ function editarVenta(id){
         const v = (db.ventas||[]).find(x=>String(x.id)===String(id));
         if(!v) return;
         const antes = JSON.parse(JSON.stringify(v));
-        showModal('<form id="editV" class="p-6 space-y-3"><h3 class="font-bold text-lg">Editar Venta</h3><input name="contratante" value="'+(v.contratante||'')+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300" placeholder="Contratante"><input name="fecha" type="date" value="'+(v.fecha||'')+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300">                        <option'+(v.ramo==='VIDA'?' selected':'')+'>VIDA</option><option'+(v.ramo==='GMM'?' selected':'')+'>GMM</option><option'+(v.ramo==='DAÑOS'?' selected':'')+'>DAÑOS</option><option'+(v.ramo==='AUTOS'?' selected':'')+'>AUTOS</option><option'+(v.ramo==='INVERSIÓN'?' selected':'')+'>INVERSIÓN</option><option'+(v.ramo==='INVERSIÓN ELITE'?' selected':'')+'>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"><option'+(v.compania==='AXA'?' selected':'')+'>AXA</option><option'+(v.compania==='PS'?' selected':'')+'>PS</option><option'+(v.compania==='MAPFRE'?' selected':'')+'>MAPFRE</option><option'+(v.compania==='HDI'?' selected':'')+'>HDI</option><option'+(v.compania==='QLTS'?' selected':'')+'>QLTS</option><option'+(v.compania==='OTROS'?' selected':'')+'>OTROS</option></select><input name="producto" value="'+(v.producto||'')+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300" placeholder="Producto"><input name="prima" type="number" value="'+(v.prima||0)+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"><div class="flex gap-2"><button type="button" onclick="closeModal()" class="flex-1 border py-2 rounded">Cancelar</button><button class="flex-1 bg-indigo-600 text-white py-2 rounded">Guardar</button></div></form>');
+        showModal('<form id="editV" class="p-6 space-y-3"><h3 class="font-bold text-lg">Editar Venta</h3><input name="contratante" value="'+(v.contratante||'')+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300" placeholder="Contratante"><input name="fecha" type="date" value="'+(v.fecha||'')+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300">                        <option'+(v.ramo==='VIDA'?' selected':'')+'>VIDA</option><option'+(v.ramo==='GMM'?' selected':'')+'>GMM</option><option'+(v.ramo==='DAÑOS'?' selected':'')+'>DAÑOS</option><option'+(v.ramo==='AUTOS'?' selected':'')+'>AUTOS</option><option'+(v.ramo==='INVERSIÓN'?' selected':'')+'>INVERSIÓN</option><option'+(v.ramo==='INVERSIÓN ELITE'?' selected':'')+'>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"><option'+(v.compania==='AXA'?' selected':'')+'>AXA</option><option'+(v.compania==='PS'?' selected':'')+'>PS</option><option'+(v.compania==='MAPFRE'?' selected':'')+'>MAPFRE</option><option'+(v.compania==='HDI'?' selected':'')+'>HDI</option><option'+(v.compania==='QLTS'?' selected':'')+'>QLTS</option><option'+(v.compania==='OTROS'?' selected':'')+'>OTROS</option></select><input name="producto" value="'+(v.producto||'')+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300" placeholder="Producto"><input name="prima" type="number" value="'+(v.prima||0)+'" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"><div class="flex gap-2"><button type="button" data-bx-click="a1" class="flex-1 border py-2 rounded">Cancelar</button><button class="flex-1 bg-indigo-600 text-white py-2 rounded">Guardar</button></div></form>');
         document.getElementById('editV').onsubmit = function(e){ e.preventDefault(); const f=new FormData(e.target); v.contratante=f.get('contratante'); v.fecha=f.get('fecha'); v.ramo=f.get('ramo'); v.compania=f.get('compania'); v.producto=f.get('producto'); v.prima=Number(f.get('prima')); db.auditoria=db.auditoria||[]; db.auditoria.push({id:Date.now(),tipo:'edicion_venta',ventaId:id,usuarioId:currentUser.id,usuarioNombre:currentUser.name,fecha:new Date().toISOString(),antes:antes,despues:JSON.parse(JSON.stringify(v))}); saveDB(); closeModal(); render(); if(window.showToast) showToast('Venta actualizada','success'); };
     }catch(e){ alert('Error: '+e.message); }
 }
@@ -85,9 +85,9 @@ function verAuditoriaVentas(){
         if (typeof db === 'undefined') { console.log('verAuditoriaVentas: db no disponible'); return; }
         if (Array.isArray(db.auditoria) && db.auditoria.length > 500) db.auditoria = db.auditoria.slice(-500);
     const logs=(db.auditoria||[]).slice(-100).reverse();
-    let html='<div class="p-6"><div class="flex items-center justify-between mb-3"><h3 class="font-bold text-lg">Auditoría (últimos '+logs.length+' de máx. 500)</h3><button onclick="exportarAuditoriaCSV()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold"><i class="fas fa-file-csv mr-1"></i>Exportar CSV</button></div><div class="max-h-96 overflow-auto"><table class="w-full text-xs"><thead><tr class="bg-slate-100"><th class="p-2 text-left">Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>';
+    let html='<div class="p-6"><div class="flex items-center justify-between mb-3"><h3 class="font-bold text-lg">Auditoría (últimos '+logs.length+' de máx. 500)</h3><button data-bx-click="a2" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold"><i class="fas fa-file-csv mr-1"></i>Exportar CSV</button></div><div class="max-h-96 overflow-auto"><table class="w-full text-xs"><thead><tr class="bg-slate-100"><th class="p-2 text-left">Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>';
     logs.forEach(l=>{ html+='<tr class="border-t"><td class="p-1">'+new Date(l.fecha).toLocaleString('es-MX')+'</td><td class="p-1">'+(l.usuarioNombre||'')+'</td><td class="p-1">'+l.tipo+'</td><td class="p-1">'+(l.antes?.contratante||l.clave||'')+' '+(l.antes?.prima?'$'+l.antes.prima:'')+'</td></tr>'; });
-    html+='</tbody></table></div><div class="text-right mt-3"><button aria-label="Cerrar" onclick="closeModal()" class="border px-3 py-1 rounded">Cerrar</button></div></div>';
+    html+='</tbody></table></div><div class="text-right mt-3"><button aria-label="Cerrar" data-bx-click="a1" class="border px-3 py-1 rounded">Cerrar</button></div></div>';
     showModal(html);
     }catch(e){ console.log('verAuditoriaVentas error', e); alert('Error auditoría: '+e.message); }
 }
@@ -198,7 +198,7 @@ window.instalarPWA = async function(){
                 </div>
             `}
             <div class="mt-5 flex justify-end">
-                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800">Entendido</button>
+                <button type="button" data-bx-click="a1" class="px-4 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold hover:bg-slate-800">Entendido</button>
             </div>
         </div>`);
     } else if (window.showToast) {
@@ -248,8 +248,8 @@ window.openGlobalSearch = function(){
     showModal(`<div class="p-5 max-w-2xl w-full">
         <div class="flex items-center gap-3 pb-3 border-b border-amber-200">
             <i class="fas fa-search text-amber-600 text-lg"></i>
-            <input id="global-search-input" type="text" oninput="renderGlobalSearchResults(this.value)" placeholder="Busca clientes, pólizas, folios de cotización, autos, propiedades, lecciones o usuarios..." class="flex-1 text-sm bg-transparent outline-none text-slate-900 font-medium" autofocus>
-            <button onclick="closeModal()" class="px-2 py-1 text-xs rounded bg-slate-100 text-slate-500 hover:bg-slate-200">ESC</button>
+            <input id="global-search-input" type="text" data-bx-input="a3" placeholder="Busca clientes, pólizas, folios de cotización, autos, propiedades, lecciones o usuarios..." class="flex-1 text-sm bg-transparent outline-none text-slate-900 font-medium" autofocus>
+            <button data-bx-click="a1" class="px-2 py-1 text-xs rounded bg-slate-100 text-slate-500 hover:bg-slate-200">ESC</button>
         </div>
         <div id="global-search-results" class="mt-3 max-h-[60vh] overflow-y-auto space-y-2"></div>
     </div>`);
@@ -274,7 +274,7 @@ window.renderGlobalSearchResults = function(rawQ){
                 icon: 'fa-address-book text-indigo-600',
                 title: (c.nombre || 'Cliente') + (c.poliza ? ' · Póliza ' + c.poliza : ''),
                 sub: (c.compania || '') + ' · ' + (c.ramo || '') + ' · $' + Number(c.primaTotal || 0).toLocaleString('es-MX'),
-                action: "closeModal(); window.filtroClienteQ='" + String(c.nombre || '').replace(/'/g, '') + "'; navigateTo('mis-clientes');"
+                run: function () { closeModal(); window.filtroClienteQ = String(c.nombre || '').replace(/'/g, ''); navigateTo('mis-clientes'); }
             });
         }
     });
@@ -287,7 +287,7 @@ window.renderGlobalSearchResults = function(rawQ){
                 icon: 'fa-file-signature text-emerald-600',
                 title: s.id + ' — ' + nom,
                 sub: (s.ramoNombre || '') + ' · ' + (s.compania || '') + ' · Estado: ' + (s.estado || ''),
-                action: "closeModal(); navigateTo('cotizaciones'); setTimeout(function(){ if(window.cotAbrir) cotAbrir('" + s.id + "'); }, 120);"
+                run: function () { closeModal(); navigateTo('cotizaciones'); setTimeout(function () { if (window.cotAbrir) cotAbrir(s.id); }, 120); }
             });
         }
     });
@@ -299,7 +299,7 @@ window.renderGlobalSearchResults = function(rawQ){
                 icon: 'fa-car-side text-amber-600',
                 title: (u.marca || '') + ' ' + (u.modelo || '') + ' ' + (u.anio || ''),
                 sub: '$' + Number(u.precio || 0).toLocaleString('es-MX') + ' · ' + (u.estado || 'Disponible'),
-                action: "closeModal(); navigateTo('auto-unidades');"
+                run: function () { closeModal(); navigateTo('auto-unidades'); }
             });
         }
     });
@@ -311,7 +311,7 @@ window.renderGlobalSearchResults = function(rawQ){
                 icon: 'fa-building text-teal-600',
                 title: p.titulo || 'Propiedad',
                 sub: (p.colonia || '') + ', ' + (p.ciudad || '') + ' · $' + Number(p.precio || 0).toLocaleString('es-MX'),
-                action: "closeModal(); navigateTo('inm-unidades');"
+                run: function () { closeModal(); navigateTo('inm-unidades'); }
             });
         }
     });
@@ -323,7 +323,7 @@ window.renderGlobalSearchResults = function(rawQ){
                 icon: 'fa-comments text-amber-700',
                 title: u.name || u.username,
                 sub: (u.role || '').toUpperCase() + ' · ' + (u.email || ''),
-                action: "closeModal(); navigateTo('messages'); setTimeout(function(){ if(window.openChat) openChat('" + u.id + "'); }, 120);"
+                run: function () { closeModal(); navigateTo('messages'); setTimeout(function () { if (window.openChat) openChat(u.id); }, 120); }
             });
         }
     });
@@ -335,7 +335,7 @@ window.renderGlobalSearchResults = function(rawQ){
                 icon: 'fa-book-open text-purple-600',
                 title: l.title,
                 sub: 'Ir a lección académica',
-                action: "closeModal(); navigateTo('lessons');"
+                run: function () { closeModal(); navigateTo('lessons'); }
             });
         }
     });
@@ -345,8 +345,8 @@ window.renderGlobalSearchResults = function(rawQ){
         box.innerHTML = '<p class="text-center text-sm text-slate-400 py-8">Sin resultados para "' + (rawQ || '') + '"</p>';
         return;
     }
-    box.innerHTML = top.map(function(h){
-        return `<div onclick="${h.action}" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-amber-400 hover:bg-amber-50/40 cursor-pointer transition">
+    box.innerHTML = top.map(function(h, i){
+        return `<div data-bx-hit="${i}" class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-amber-400 hover:bg-amber-50/40 cursor-pointer transition">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0"><i class="fas ${h.icon}"></i></div>
                 <div class="min-w-0">
@@ -357,6 +357,12 @@ window.renderGlobalSearchResults = function(rawQ){
             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 shrink-0 uppercase">${h.cat}</span>
         </div>`;
     }).join('');
+    box.onclick = function (e) {
+        var el = e.target && e.target.closest ? e.target.closest('[data-bx-hit]') : null;
+        if (!el || !box.contains(el)) return;
+        var h = top[Number(el.getAttribute('data-bx-hit'))];
+        if (h && typeof h.run === 'function') h.run();
+    };
 };
 
 document.addEventListener('keydown', function(e){
