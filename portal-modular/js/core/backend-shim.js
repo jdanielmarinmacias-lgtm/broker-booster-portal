@@ -22,25 +22,13 @@
     else alert(msg);
   }
 
-  /* IA del portal: pide la clave Groq al servidor CON sesión válida y la
-   * expone a Gu-IA (GUIA_KEY), el comparador y la práctica. Solo se siembra
-   * en localStorage si el usuario no tiene una propia (llamadas del legado). */
-  async function ensureIAKey() {
+  /* IA del portal: pregunta al servidor si hay IA disponible y cuánto cupo
+   * queda. La CLAVE ya no se descarga al navegador (antes /api/ia/key la
+   * entregaba y quedaba guardada en localStorage de cada usuario). */
+  async function ensureIAEstado() {
     try {
-      const res = await fetch('/api/ia/key', { credentials: 'same-origin' });
-      if (!res.ok) return;
-      const j = await res.json();
-      if (!j || !j.ok || !j.key) return;
-      window.IA_BROKER_KEY = j.key;
-      window.psAPIKey = window.psAPIKey || j.key;
-      try {
-        if (typeof window.IAKeyReady === 'function') window.IAKeyReady(j.key);
-      } catch (e) {}
-      try {
-        const local = (localStorage.getItem('groq_api_key') || '').trim();
-        if (!local.startsWith('gsk_')) localStorage.setItem('groq_api_key', j.key);
-      } catch (e) {}
-    } catch (e) { /* sin backend/red: las funciones de IA siguen con su clave local */ }
+      if (window.IA && typeof window.IA.estado === 'function') await window.IA.estado();
+    } catch (e) { /* sin red: la IA se ofrece igual y el error sale al usarla */ }
   }
 
   /* --- Flujo de entrada: espejo de login() del legacy (01-core ~línea 471) --- */
@@ -137,7 +125,7 @@
         // Entrar DE INMEDIATO a la interfaz tras validar credenciales (sin bloquear
         // ~10s esperando la descarga completa de todas las colecciones). El pull del
         // servidor corre en paralelo y refresca la vista en cuanto llega.
-        ensureIAKey();
+        ensureIAEstado();
         enterApp(r.user, finalDest);
         if (window.BackendSync) {
           window.BackendSync.pull().then((ok) => {
@@ -167,7 +155,7 @@
       const me = await window.Backend.me();
       if (me && me.user) {
         try { if (window.BackendSync) window.BackendSync.normUser(me.user); } catch (e) {}
-        ensureIAKey();
+        ensureIAEstado();
         enterApp(me.user, 'campus');
       }
     } catch (e) { /* sin sesión: se queda en portada/login */ }

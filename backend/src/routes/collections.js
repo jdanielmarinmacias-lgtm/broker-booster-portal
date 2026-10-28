@@ -12,7 +12,7 @@ const mw = require('../middleware');
 
 /* loginAttempts es estado interno del servidor (rate-limit de login): no debe
  * salir en el bundle ni volver por la API desde el navegador. */
-const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts']);
+const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts', 'iaUso']);
 /* Escaparate (portada) + promotoría (encargados) + escuela/chat: todo lo nuevo
  * avisa en vivo por public_feed. El frontend re-hace pull de estas + toast. */
 const FEED_COLLECTIONS = new Set([
@@ -307,14 +307,8 @@ module.exports = (store, config) => {
     } catch (e) { next(e); }
   });
 
-  /* IA embebida del portal: entrega la clave Groq SOLO a sesiones válidas.
-   * Nada de esta clave sale en archivos estáticos: el comparador, Gu-IA y la
-   * práctica la llaman con este valor tras autenticarse. */
-  r.get('/ia/key', mw.requireAuth, (req, res) => {
-    const key = config.groqApiKey || config.openaiApiKey || null;
-    if (!key) return res.status(503).json({ ok: false, error: 'IA no configurada' });
-    res.json({ ok: true, proveedor: 'groq', key });
-  });
+  /* La IA del portal vive en /api/ia (proxy con cupo). Aquí ya no se entrega
+   * ninguna clave: tenerla en el navegador permitía gastarla fuera del portal. */
 
   /* Config pública para el realtime del frontend (la ANON key es pública por
    * diseño; RLS solo le permite leer public_feed). */

@@ -2945,7 +2945,7 @@ CÓMO RESPONDES: SOLO como ese personaje, español mexicano natural, nunca como 
     .concat(s.mensajes.slice(-12).map(m=>({role: m.rol==='asesor'?'user':'assistant', content:m.texto})));
   if(esInicio) msgs.push({role:'user', content:'(La llamada apenas comienza: tú contestas el teléfono. Da tu saludo inicial en 1-2 frases, coherente con tu personalidad, ocupación y dificultad. Menciona si esperabas o no esta llamada y cómo la tomaste.)'});
   try{
-    const res = await fetch(window.psAPIUrl || PS_PROVEEDORES.groq.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+psKeyIA()}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages: msgs, max_tokens: 300, temperature: 1.0, presence_penalty: 0.6 }, window.psAPIExtra||{})) });
+    const res = await window.IA.completar(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages: msgs, max_tokens: 300, temperature: 1.0, presence_penalty: 0.6 }, window.psAPIExtra||{}), { url: window.psAPIUrl || PS_PROVEEDORES.groq.url });
     const j = await res.json();
     if(j.error) throw new Error(j.error.message||'API error');
     const txt = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
@@ -3188,7 +3188,7 @@ async function psAnalizarIA(){
   const sys = 'Eres un director de formación en ventas de seguros en México con 20 años de experiencia. Evalúas transcripciones de sesiones de práctica de asesores de Skandia. Responde EXCLUSIVAMENTE en JSON válido sin markdown: {"total":0-100,"claves":[{"key":"rapport","score":0-100,"nota":"1 frase","evidencia":"cita textual corta del ASESOR que sustenta el score, o vacía si no hubo"}], "fortalezas":["..."],"mejoras":["..."],"proximo":"1 frase"} usando las claves: rapport, descubrimiento, escucha, manejoObjeciones, propuestaValor, cierre. RÚBRICA: 0-30 si no aparece la conducta; 31-60 si aparece de forma básica; 61-85 si aparece con preguntas o argumentos concretos; 86-100 si el asesor la ejecuta de forma clara y sostenida. Cada score debe tener evidencia textual del ASESOR; sin evidencia el score no pasa de 30. No califiques por la longitud del texto ni por el tono del prospecto.';
   const trans = s.mensajes.map(m=>(m.rol==='asesor'?'ASESOR: ':'PROSPECTO: ')+m.texto).join('\n');
   try{
-    const res = await fetch(window.psAPIUrl || PS_PROVEEDORES.groq.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+psKeyIA()}, body: JSON.stringify(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages:[{role:'system',content:sys},{role:'user',content:'Transcripción:\n'+trans}], max_tokens: 1500, temperature: 0.3 }, window.psAPIExtra||{})) });
+    const res = await window.IA.completar(Object.assign({ model: window.psAPIModel||'openai/gpt-oss-120b', messages:[{role:'system',content:sys},{role:'user',content:'Transcripción:\n'+trans}], max_tokens: 1500, temperature: 0.3 }, window.psAPIExtra||{}), { url: window.psAPIUrl || PS_PROVEEDORES.groq.url });
     const j = await res.json();
     const txt = (j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'').replace(/```json|```/g,'').trim();
     const fb = JSON.parse(txt);
@@ -3478,7 +3478,7 @@ function psIniciarSesion(){
   };
   const apiCfg=(psGetDB().practicaConfig)||{};
   const kEl=document.getElementById('ps-api-key'); if(kEl){ apiCfg.apiKey=kEl.value.trim(); apiCfg.apiUrl=(document.getElementById('ps-api-url')||{}).value||apiCfg.apiUrl; apiCfg.apiModel=(document.getElementById('ps-api-model')||{}).value||apiCfg.apiModel; apiCfg.proveedor=psProvActual(); const d=psGetDB(); d.practicaConfig=apiCfg; psSaveDB(d); }
-  window.psAPIKey=apiCfg.apiKey||PS_DEFAULT_KEY||window.IA_BROKER_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
+  window.psAPIKey=apiCfg.apiKey||PS_DEFAULT_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
   if(!window.psDifSel) window.psDifSel='normal';
   window.psSesionActiva={ id:Date.now(), usuarioId:currentUser.id, usuarioNombre:currentUser.name, inicio:Date.now(), dificultad:window.psDifSel, escenario:window.psEscSel||'agendar', voz:(document.getElementById('ps-voz')||{}).value||'auto', personaje:{nombre,edad,ocupacion,estudios}, perfilExtra, memoria, mensajes:[], objeciones:[], micUsado:false, timerStart:Date.now(), timerInt:null };
   render();
@@ -3615,35 +3615,25 @@ window.psVerRubrica = psVerRubrica;
 
 /* ==================== GUIA ASISTENTE (FAB + chat flotante, 1 chat por usuario, documentos, agenda) ==================== */
 if(typeof db!=='undefined' && db){ db.guiaChats = db.guiaChats||{}; }
-/* La clave vive SOLO en el servidor: llega vía GET /api/ia/key con sesión
- * válida (backend-shim.ensureIAKey) y completa vía IAKeyReady. Sin sesión
- * activa la IA real queda desactivada; la práctica funciona con motor local. */
-let GUIA_KEY = '';
-window.IAKeyReady = function (k) {
-  try { GUIA_KEY = k || ''; if (k) window.IA_BROKER_KEY = k; } catch (e) {}
-};
-function psKeyIA() { return window.psAPIKey || window.IA_BROKER_KEY || ''; }
-/* Bootstrap propio de la clave: no depende del shim (que el navegador puede
- * tener cacheado). Si hay sesión válida pide la clave y la activa; sin sesión
- * o sin backend queda en no-op (401 → silencio). */
-(async function () {
+/* La clave del portal ya NO llega al navegador: las llamadas van por el proxy
+ * /api/ia/chat (cupo diario por usuario). Lo único que puede haber aquí es la
+ * clave propia del usuario, y con ella se llama directo al proveedor.
+ * `'servidor'` es un marcador —no una clave— que sólo responde «hay IA
+ * disponible», para que los interruptores que hacían `if(psKeyIA())` sigan
+ * funcionando sin exponer nada. */
+const MARCA_SERVIDOR = 'servidor';
+function iaHayServidor() { return !!(window.IA && window.IA.servidor); }
+function psKeyIA() {
   try {
-    const res = await fetch('/api/ia/key', { credentials: 'same-origin' });
-    if (!res.ok) return;
-    const j = await res.json();
-    if (j && j.ok && j.key && !window.IA_BROKER_KEY) window.IAKeyReady(j.key);
-  } catch (e) { /* sin backend/red: la IA pide clave a su manera */ }
-})();
-/* Comparador/Gu-IA: clave del servidor (sesión) o la que el usuario pegó en
- * el navegador. Así el módulo sirve aunque Vercel aún no tenga GROQ_API_KEY. */
-function guiaIAKey() {
-  try {
-    const pegada = localStorage.getItem('groq_api_key') || '';
-    const confPractica = ((psGetDB().practicaConfig || {}).apiKey) || '';
-    return GUIA_KEY || pegada || confPractica || '';
-  } catch (e) { return GUIA_KEY || ''; }
+    const propia = (window.IA && window.IA.clavePropia) ? window.IA.clavePropia() : (window.psAPIKey || '');
+    if (propia) return propia;
+  } catch (e) { /* sigue abajo */ }
+  return iaHayServidor() ? MARCA_SERVIDOR : '';
 }
-const GUIA_URL = 'https://api.groq.com/openai/v1/chat/completions';
+/* ¿Se puede usar IA? Con clave propia o con el proxy del servidor. */
+function guiaIAKey() { return psKeyIA(); }
+/* Ya no se llama al proveedor desde aquí: pasa por window.IA.completar, que
+ * usa la clave propia del usuario o el proxy del servidor. */
 const GUIA_MODEL = 'openai/gpt-oss-120b';
 const GUIA_SYS = [
 'Eres Gu-IA, la IA asesora del Portal de Desarrollo Comercial (promotoría de seguros en México).',
@@ -3735,7 +3725,7 @@ function lobbyProbar(){
     try{
       let web=''; if(guiaNecesitaWeb(q)) web=await guiaWebBloque(q);
       const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaBaseContexto(q)+web}].concat([{role:'user', content:q}]);
-      const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
+      const res=await window.IA.completar({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'});
       const j=await res.json();
       if(j.error) throw new Error(j.error.message||'API error');
       respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'(respuesta vacía)';
@@ -3934,7 +3924,7 @@ async function guiaSend(){
     guiaDocText='';
     const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaContexto(texto)+web}]
       .concat(arr.slice(-12).map((m,i,a)=>({role:m.rol==='user'?'user':'assistant', content:(m.doc&&i===a.length-1?(contenidoDoc+'\n'):'')+String(m.texto||'').slice(0,1500)})));
-    const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7},{reasoning_effort:'low'}))});
+    const res=await window.IA.completar({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'});
     const j=await res.json();
     if(j.error) throw new Error(j.error.message||'API error');
     respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'Me quedé sin palabras (respuesta vacía). Insiste o reformula.';
@@ -6527,7 +6517,7 @@ async function cpAnalizarIA(){
       '=== COTIZACIÓN A ===', tA.slice(0,20000),
       '=== COTIZACIÓN B ===', tB.slice(0,20000)
     ].join(NL);
-    const res=await fetch(GUIA_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+guiaIAKey()},body:JSON.stringify(Object.assign({model:GUIA_MODEL,messages:[{role:'user',content:prompt}],max_tokens:3000,temperature:0.2},{reasoning_effort:'low'}))});
+    const res=await window.IA.completar({model:GUIA_MODEL,messages:[{role:'user',content:prompt}],max_tokens:3000,temperature:0.2,reasoning_effort:'low'});
     if(!res.ok){ const t=await res.text(); throw new Error('Servicio IA '+res.status+': '+t.slice(0,140)); }
     const data=await res.json();
     const raw=(((data.choices||[])[0]||{}).message||{}).content||'';

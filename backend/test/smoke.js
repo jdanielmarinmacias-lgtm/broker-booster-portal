@@ -16,6 +16,8 @@ process.env.SUPABASE_SERVICE_KEY = '';
 // El suite hace >10 logins desde la misma IP: sube el tope (el limitador se
 // verifica aparte en producción con su default de 10).
 process.env.LOGIN_RATE_MAX = '100';
+// Cupo de IA pequeño: el test del proxy agota el límite y comprueba el 429.
+process.env.IA_DIARIO = '3';
 // Hermeticidad del reporte semanal: ningún test debe enviar correo real.
 process.env.RESEND_API_KEY = ''; // vacío ⇒ dry-run (solo registra, no envía)
 // Subidas locales de los tests a tmp (no ensucian el repo).
@@ -169,15 +171,12 @@ describe('paso 3: config pública y feed', () => {
     assert.equal(r.status, 200);
     assert.equal(r.json.portal.institutionName, 'Academia Fase4');
   });
-  it('IA key: 401 sin sesión; con sesión entrega clave gsk_ (no se loggea)', async () => {
+  it('la clave de IA ya NO se entrega al navegador (ruta retirada)', async () => {
     jar.cookie = null;
-    const anon = await api('GET', '/api/ia/key', null, false);
-    assert.equal(anon.status, 401);
     await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
     const r = await api('GET', '/api/ia/key');
-    assert.equal(r.status, 200);
-    assert.equal(r.json.ok, true);
-    assert.ok(String(r.json.key || '').startsWith('gsk_'), 'clave Groq con formato correcto');
+    assert.equal(r.status, 404, 'la ruta que exponía la clave ya no existe');
+    assert.ok(!JSON.stringify(r.json || {}).includes('gsk_'), 'nada de la respuesta contiene una clave');
   });
   it('publicar en escaparate genera item de feed (array: posts)', async () => {
     // autoHub/settings ahora son COLECCIONES-OBJETO (su POST mergea y
@@ -909,5 +908,110 @@ describe('rutas locales /uploads (guard de base compartida)', () => {
     assert.equal(doc.notas, '');
     assert.equal(doc.items[0].foto, 'https://cdn/migrados/viva.png');
     assert.equal(doc.otro, '/media/groups/x.png', 'las rutas /media no se tocan');
+  });
+});
+
+describe('IA por proxy con cupo (la clave no viaja al navegador)', () => {
+  const iaRoute = require('../src/routes/ia');
+  const mw = require('../src/middleware');
+
+  before(async () => {
+    // Nunca red en tests: el proveedor se sustituye.
+    iaRoute.__setProveedor(async (cuerpo) => ({
+      ok: true,
+      status: 200,
+      json: { choices: [{ message: { role: 'assistant', content: 'respuesta de prueba' } }], modelo: cuerpo.model },
+    }));
+    // La contraseña del suite ya cambió antes de llegar aquí.
+    await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false);
+  });
+
+  it('exige sesión (sin cookie: 401)', async () => {
+    const r = await api('POST', '/api/ia/chat', { messages: [{ role: 'user', content: 'hola' }] }, false);
+    assert.equal(r.status, 401);
+  });
+
+  it('rechaza un modelo fuera de la lista', async () => {
+    const r = await api('POST', '/api/ia/chat', { model: 'modelo-inventado', messages: [{ role: 'user', content: 'hola' }] });
+    assert.equal(r.status, 400);
+  });
+
+  it('devuelve la respuesta del proveedor y gasta cupo', async () => {
+    const antes = await api('GET', '/api/ia/estado');
+    assert.equal(antes.json && antes.json.disponible, true, 'estado: ' + JSON.stringify(antes));
+    const r = await api('POST', '/api/ia/chat', { messages: [{ role: 'user', content: 'hola' }] });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.choices[0].message.content, 'respuesta de prueba');
+    const despues = await api('GET', '/api/ia/estado');
+    assert.equal(despues.json.usados, antes.json.usados + 1);
+  });
+
+  it('corta al llegar al cupo diario (429 + Retry-After)', async () => {
+    let ultimo = null;
+    for (let i = 0; i < 6; i++) {
+      ultimo = await api('POST', '/api/ia/chat', { messages: [{ role: 'user', content: 'hola' }] });
+      if (ultimo.status === 429) break;
+    }
+    assert.equal(ultimo.status, 429);
+    const est = await api('GET', '/api/ia/estado');
+    assert.equal(est.json.restantes, 0);
+  });
+});
+
+describe('rate-limit de login compartido entre instancias', () => {
+  const mw = require('../src/middleware');
+
+  after(() => { mw.bindLoginStore(store); });
+
+  function resFalso() {
+    const out = { status: null, retry: null };
+    out.setHeader = (k, v) => { if (String(k).toLowerCase() === 'retry-after') out.retry = Number(v); };
+    out.status = (c) => { out.status = c; return { json: () => out }; };
+    return out;
+  }
+
+  it('guarda los fallos en el adaptador y bloquea a otra instancia', async () => {
+    const filas = new Map();
+    const adapterFalso = {
+      getEstado: async (col, key) => filas.get(col + ':' + key) || null,
+      putEstado: async (col, key, val) => { filas.set(col + ':' + key, val); },
+      pruneEstado: async () => {},
+    };
+    mw.bindLoginStore({ adapter: adapterFalso });
+
+    const req = { ip: '10.9.9.9', socket: {} };
+    req._rlIp = req.ip; // lo fija loginRateLimit en el flujo real
+    /* El suite corre con LOGIN_RATE_MAX=100, así que el escalón que aplica es
+     * el de 30 fallos/hora → 15 minutos de bloqueo. */
+    for (let i = 0; i < 30; i++) await mw.noteFailedLogin(req);
+    assert.ok(filas.size >= 1, 'el estado quedó en el adaptador compartido');
+
+    // "Otra instancia": memoria local vacía, mismo estado compartido.
+    mw.bindLoginStore({ adapter: adapterFalso });
+    const res = resFalso();
+    await mw.loginRateLimit(req, res, () => {});
+    assert.equal(res.status, 429, 'la segunda instancia ve el bloqueo');
+    assert.ok(res.retry >= 900, 'bloqueo de 15 minutos: ' + res.retry);
+  });
+
+  it('escala el castigo con muchos fallos en una hora', async () => {
+    const filas = new Map();
+    const adapterFalso = {
+      getEstado: async (col, key) => filas.get(col + ':' + key) || null,
+      putEstado: async (col, key, val) => { filas.set(col + ':' + key, val); },
+      pruneEstado: async () => {},
+    };
+    mw.bindLoginStore({ adapter: adapterFalso });
+    const req = { ip: '10.8.8.8', socket: {} };
+    req._rlIp = req.ip;
+    const ahora = Date.now();
+    /* 200 fallos repartidos en el día: escalón máximo → 1 hora de bloqueo. */
+    await adapterFalso.putEstado('loginAttempts',
+      require('crypto').createHash('sha256').update('login|' + req.ip).digest('hex').slice(0, 32),
+      { t: Array.from({ length: 200 }, (_, i) => ahora - i * 60000) });
+    const res = resFalso();
+    await mw.loginRateLimit(req, res, () => {});
+    assert.equal(res.status, 429);
+    assert.ok(res.retry >= 3600, 'el bloqueo sube a 1 hora: ' + res.retry);
   });
 });

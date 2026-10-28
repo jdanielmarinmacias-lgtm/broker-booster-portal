@@ -80,31 +80,66 @@ const requireRole = (...allowed) => (req, res, next) => {
   next();
 };
 
-/* Rate-limit en memoria para /login: N intentos FALLIDOS / LOGIN_RATE_MIN min por IP
- * (defaults: 10 fallos / 2 min; LOGIN_RATE_MAX y LOGIN_RATE_MIN lo ajustan;
- * los tests suben el tope). Solo cuentan los fallos: un login válido perdona
- * uno (los usuarios legítimos jamás se bloquean). */
+/* Rate-limit de /login COMPARTIDO entre instancias.
+ * Antes era un Map en memoria: en Vercel con N instancias el tope real era N×10
+ * y cualquier reinicio lo borraba, así que la fuerza bruta era viable. El estado
+ * vive en `documents` (colección loginAttempts, clave = hash de la IP), que ven
+ * todas las instancias. Si la base falla, queda el Map local como red de
+ * seguridad: un fallo de infraestructura nunca bloquea a un usuario legítimo.
+ *
+ * Escalado: 10 fallos/2 min → 2 min · 30/h → 15 min · 200/día → 1 h.
+ * Solo cuentan los fallos; un login válido perdona uno. */
 const attempts = new Map();
 const LOGIN_RATE_MAX = Number(process.env.LOGIN_RATE_MAX || 10);
 const LOGIN_RATE_MIN = Number(process.env.LOGIN_RATE_MIN || 2);
 const WINDOW_MS = LOGIN_RATE_MIN * 60 * 1000;
+const MINUTO = 60 * 1000;
+const HORA = 60 * MINUTO;
+const DIA = 24 * HORA;
+const TIERS = [
+  { ventana: WINDOW_MS, max: LOGIN_RATE_MAX, bloqueo: WINDOW_MS, texto: `${LOGIN_RATE_MIN} minutos` },
+  { ventana: HORA, max: Number(process.env.LOGIN_RATE_HORA || 30), bloqueo: 15 * MINUTO, texto: '15 minutos' },
+  { ventana: DIA, max: Number(process.env.LOGIN_RATE_DIA || 200), bloqueo: HORA, texto: '1 hora' },
+];
 
-/* Almacén compartido (en producción: tabla documents, colección `loginAttempts`).
- * Sin store compartido (local/tests) se usa el Map en memoria. El estado vive
- * en el store para que varias instancias serverless vean los mismos fallos. */
-function bindLoginStore(store) { void store; }
+let loginAdapter = null;
+function bindLoginStore(store) { loginAdapter = (store && store.adapter) || null; }
 
-const recentFails = (list, now) => (list || []).filter((t) => now - t < WINDOW_MS);
+/* Se guarda un hash, no la IP: el estado es compartido y no debe acumular PII. */
+const claveIp = (ip) => require('crypto').createHash('sha256').update('login|' + String(ip)).digest('hex').slice(0, 32);
 
-/* Contador en memoria por instancia: no toca Supabase en cada login. Guardar
- * en la base compartida (saveCollections de todo el documento) tardaba 20-40 s
- * y dejaba el inicio de sesión sin respuesta. */
+const vigentes = (list, now) => (list || []).filter((t) => Number.isFinite(Number(t)) && now - Number(t) < DIA);
+
 async function readFails(ip) {
-  return recentFails(attempts.get(ip), Date.now());
+  const now = Date.now();
+  if (loginAdapter && typeof loginAdapter.getEstado === 'function') {
+    try {
+      const doc = await loginAdapter.getEstado('loginAttempts', claveIp(ip));
+      const lista = vigentes(doc && doc.t, now);
+      attempts.set(ip, lista); // espejo local para el caso de caída
+      return lista;
+    } catch (e) { /* cae al Map local */ }
+  }
+  return vigentes(attempts.get(ip), now);
 }
 
 async function writeFails(ip, list) {
   attempts.set(ip, list);
+  if (loginAdapter && typeof loginAdapter.putEstado === 'function') {
+    try {
+      await loginAdapter.putEstado('loginAttempts', claveIp(ip), { t: list.slice(-500) });
+    } catch (e) { /* la memoria ya lo tiene: no se pierde el bloqueo local */ }
+  }
+}
+
+/* Una poda al día: los intentos de hace más de 24 h ya no puntúan. */
+let ultimaPoda = 0;
+function podarIntentos() {
+  if (!loginAdapter || typeof loginAdapter.pruneEstado !== 'function') return;
+  const ahora = Date.now();
+  if (ahora - ultimaPoda < DIA) return;
+  ultimaPoda = ahora;
+  loginAdapter.pruneEstado('loginAttempts', ahora - DIA).catch(() => {});
 }
 
 async function loginRateLimit(req, res, next) {
@@ -112,8 +147,17 @@ async function loginRateLimit(req, res, next) {
   req._rlIp = ip;
   try {
     const list = await readFails(ip);
-    if (list.length >= LOGIN_RATE_MAX) {
-      return res.status(429).json({ ok: false, error: `Demasiados intentos. Espera ${LOGIN_RATE_MIN} minutos.` });
+    const ahora = Date.now();
+    /* Gana el escalón MÁS DURO alcanzado: quien lleva 200 fallos en el día no
+     * debe salir con el castigo suave de 15 minutos. */
+    let castigo = null;
+    for (const t of TIERS) {
+      const cuantos = list.filter((x) => ahora - Number(x) < t.ventana).length;
+      if (cuantos >= t.max && (!castigo || t.bloqueo > castigo.bloqueo)) castigo = t;
+    }
+    if (castigo) {
+      res.setHeader('Retry-After', String(Math.ceil(castigo.bloqueo / 1000)));
+      return res.status(429).json({ ok: false, error: `Demasiados intentos. Espera ${castigo.texto}.` });
     }
   } catch (e) { /* nunca bloquear por fallo del contador */ }
   next();
@@ -124,6 +168,7 @@ async function noteFailedLogin(req) {
     const list = await readFails(req._rlIp);
     list.push(Date.now());
     await writeFails(req._rlIp, list);
+    podarIntentos();
   } catch (e) { /* nunca romper el login */ }
 }
 

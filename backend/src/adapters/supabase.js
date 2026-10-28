@@ -350,6 +350,32 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     }
   }
 
+  /* ---- Estado compartido de una fila (cuota de IA, intentos de login) ----
+   * Un documento por clave en `documents`: lo ven TODAS las instancias
+   * serverless, que es justo lo que un contador en memoria no consigue. */
+  async function getEstado(collection, docId) {
+    const { data, error } = await withRetry(() => sb.from('documents')
+      .select('data,updated_at').eq('collection', collection).eq('doc_id', String(docId)).maybeSingle());
+    if (error) throw new Error('Supabase estado: ' + error.message);
+    return data ? { ...(data.data || {}), _updatedAt: data.updated_at } : null;
+  }
+
+  async function putEstado(collection, docId, value) {
+    const { error } = await withRetry(() => sb.from('documents').upsert(
+      [{ collection, doc_id: String(docId), updated_at: new Date().toISOString(), data: value || {} }],
+      { onConflict: 'collection,doc_id' }));
+    if (error) throw new Error('Supabase estado (put): ' + error.message);
+  }
+
+  /* Poda best-effort de filas de estado viejas (no rompe nada si falla). */
+  async function pruneEstado(collection, antesDeMs) {
+    try {
+      await sb.from('documents').delete()
+        .eq('collection', collection)
+        .lt('updated_at', new Date(Number(antesDeMs) || 0).toISOString());
+    } catch (e) { /* best-effort */ }
+  }
+
   /* Acceso crudo para herramientas de mantenimiento (migraciones): leen y
    * escriben filas suelas, sin pasar por la caché del store. */
   async function loadRawDocuments() {
@@ -639,6 +665,9 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
       bucketReady = true;
     },
     externalizarUploadLocal,
+    getEstado,
+    putEstado,
+    pruneEstado,
     loadRawDocuments,
     putRawDocument,
     async signUpload(storagePath) {
