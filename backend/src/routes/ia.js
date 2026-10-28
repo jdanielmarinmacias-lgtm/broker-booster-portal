@@ -57,7 +57,13 @@ module.exports = (store, config) => {
       const disponible = !!config.groqApiKey;
       /* Mismo contador que usa /chat: adaptador compartido o memoria local. */
       const usados = disponible ? (await leerUso(req.user.id)).usuario : 0;
-      res.json({ ok: true, disponible, limite: LIMITE_USUARIO, usados, restantes: Math.max(0, LIMITE_USUARIO - usados) });
+      /* Huella (no la clave) para que el navegador pueda borrar copias viejas
+       * de la clave del portal que quedaron en localStorage con el código
+       * anterior. Doce hexadecimales no permiten recuperar la clave. */
+      const huella = config.groqApiKey
+        ? require('crypto').createHash('sha256').update(String(config.groqApiKey)).digest('hex').slice(0, 12)
+        : null;
+      res.json({ ok: true, disponible, limite: LIMITE_USUARIO, usados, restantes: Math.max(0, LIMITE_USUARIO - usados), huella });
     } catch (e) { next(e); }
   });
 

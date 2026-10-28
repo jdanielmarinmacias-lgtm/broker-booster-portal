@@ -44,8 +44,29 @@
         IA.limite = Number(j.limite) || 0;
         IA.usados = Number(j.usados) || 0;
         IA.restantes = Number(j.restantes) || 0;
+        if (j.huella) await IA.purgarCopiaServidor(j.huella);
         return j;
       } catch (e) { IA.servidor = false; return null; }
+    },
+
+    /* El código anterior descargaba la clave del portal a localStorage. Esas
+     * copias ya no sirven para nada (y no deberían estar ahí), así que se
+     * borran comparando su huella. La clave propia del usuario NO coincide con
+     * la del servidor y se conserva. */
+    purgarCopiaServidor: async function (huella) {
+      try {
+        var guardada = String(localStorage.getItem('groq_api_key') || '').trim();
+        if (!guardada || !window.crypto || !crypto.subtle || !crypto.subtle.digest) return;
+        var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(guardada));
+        var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
+          return ('0' + b.toString(16)).slice(-2);
+        }).join('').slice(0, huella.length);
+        if (hex === huella) {
+          localStorage.removeItem('groq_api_key');
+          try { if (window.psAPIKey === guardada) window.psAPIKey = ''; } catch (e0) {}
+          console.info('[IA] copia local de la clave del portal eliminada');
+        }
+      } catch (e) { /* sin WebCrypto: se deja como está */ }
     },
 
     /* Llamada al proxy: devuelve la Response cruda del servidor. */
