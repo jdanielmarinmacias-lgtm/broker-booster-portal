@@ -76,21 +76,22 @@
   ];
 
   /* Secciones del campus y módulos de pantalla, en el orden original. */
+  /* Viven en el servidor (/api/campus): solo se entregan con sesión válida. */
   var SECCIONES = [
-    'js/legacy/02-modulo-b.js',
-    'js/legacy/03-config-73l.js',
-    'js/legacy/04-modulo-d.js',
-    'js/legacy/05-modulo-e.js',
-    'js/legacy/06-modulo-f.js',
-    'js/legacy/07-modulo-g.js',
-    'js/legacy/08-snippet-h.js',
-    'js/legacy/09-modulo-i.js',
-    'js/legacy/10-modulo-j.js',
-    'js/modules/auth-custom.js',
-    'js/modules/dashboard.js',
-    'js/modules/chat.js',
-    'js/modules/ventas.js',
-    'js/modules/inventario.js',
+    'api/campus/legacy/02-modulo-b.js',
+    'api/campus/legacy/03-config-73l.js',
+    'api/campus/legacy/04-modulo-d.js',
+    'api/campus/legacy/05-modulo-e.js',
+    'api/campus/legacy/06-modulo-f.js',
+    'api/campus/legacy/07-modulo-g.js',
+    'api/campus/legacy/08-snippet-h.js',
+    'api/campus/legacy/09-modulo-i.js',
+    'api/campus/legacy/10-modulo-j.js',
+    'api/campus/modules/auth-custom.js',
+    'api/campus/modules/dashboard.js',
+    'api/campus/modules/chat.js',
+    'api/campus/modules/ventas.js',
+    'api/campus/modules/inventario.js',
   ];
 
   var conVersion = function (ruta) { return ruta + '?v=' + V; };
@@ -127,6 +128,12 @@
     });
     promesa = promesa.then(function (resultado) {
       configurarPdfWorker();
+      if (resultado.fallos.length) {
+        /* Sin sesión (401) o red caída: no dejar la promesa fallida en caché,
+         * así el siguiente intento (tras entrar) vuelve a pedir los archivos. */
+        promesa = null;
+        return resultado;
+      }
       terminado = true;
       return resultado;
     });
@@ -135,30 +142,12 @@
 
   /* --- Disparadores -------------------------------------------------------
    * El campus se pide cuando de verdad se va a usar, no antes:
-   *  1) al abrirse la pantalla de acceso (el visitante ya va a entrar),
-   *  2) si el navegador recuerda una sesión,
-   *  3) al llamar BBApp.cargar() explícitamente (backend-shim/sync).
-   * Así la portada sigue siendo la única visita que no paga los 19 archivos. */
-
-  function pantallaDeAccesoVisible() {
-    var el = document.getElementById('login-screen');
-    return !!(el && !el.classList.contains('hidden'));
-  }
-
-  /* Nota: NO se dispara por "la pantalla de acceso está visible" en el arranque:
-   * el HTML la trae a la vista y se cargaría el campus en cada visita a la
-   * portada. El MutationObserver sólo reacciona al CAMBIO (clic en Acceso). */
-
-  function observarAcceso() {
-    var el = document.getElementById('login-screen');
-    if (!el || !window.MutationObserver) return;
-    new MutationObserver(function () {
-      if (pantallaDeAccesoVisible()) cargar();
-    }).observe(el, { attributes: true, attributeFilter: ['class'] });
-  }
+   *  1) al entrar con sesión válida ya guardada en el navegador,
+   *  2) al completar el login (backend-shim o compuerta de initializeApp),
+   *  3) al llamar BBApp.cargar() explícitamente.
+   * Sin sesión no se pide nada: la portada no paga los 14 archivos. */
 
   function dispararSiHaceFalta() {
-    observarAcceso();
     try {
       if (sessionStorage.getItem('pepes_user') || localStorage.getItem('pepes_user')) cargar();
     } catch (e) { /* sin storage: el login dispara la carga igual */ }

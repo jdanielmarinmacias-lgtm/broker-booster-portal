@@ -187,7 +187,7 @@ async function startEnVivoCamera() {
     draw();
   } catch(e) {
     console.warn('Camera error', e);
-    alert('No se pudo acceder a cámara/mic. Verifica permisos.');
+    uiToast('No se pudo acceder a cámara/mic. Verifica permisos.');
   }
 }
 
@@ -342,7 +342,7 @@ function sendEnVivoEmoji(em) {
 }
 
 function downloadEnVivoParticipants() {
-  if (!enVivoState.isPresenter) { alert('Solo el equipo de Capacitación puede descargar participantes'); return; }
+  if (!enVivoState.isPresenter) { uiToast('Solo el equipo de Capacitación puede descargar participantes'); return; }
   const header = "Nombre,Email,Fecha,Hora Entrada,Duración,Rol\n";
   const rows = enVivoState.participants.map(p=>`${p.name},${p.email||''},${p.fecha},${p.entrada},${getDuracionEnVivo(p.entradaTs)},${p.role||p.rol||''}`).join("\n");
   const blob = new Blob([header+rows], {type:'text/csv;charset=utf-8;'});
@@ -375,7 +375,7 @@ function guardarComoCursoEnVivo(liveClassId) {
     }
   });
   saveDB();
-  alert('Curso guardado en Academia');
+  uiToast('Curso guardado en Academia');
   closeEnVivoModal();
   render();
 }

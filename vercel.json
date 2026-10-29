@@ -5,6 +5,11 @@
     { "source": "/media/:path*", "destination": "/api/media-file?p=:path*" },
     { "source": "/api/(.*)", "destination": "/api/index" }
   ],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "backend/campus-private/**"
+    }
+  },
   "crons": [
     {
       "path": "/api/report/weekly",

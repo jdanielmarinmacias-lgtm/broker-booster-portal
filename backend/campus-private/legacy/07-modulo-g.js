@@ -183,7 +183,7 @@
     
     window.guardarProspecto = function(){
         const nombre = document.getElementById('mp-nombre').value.trim();
-        if(!nombre){alert('Nombre requerido'); return;}
+        if(!nombre){uiToast('Nombre requerido'); return;}
         const p = {
             id: window.editandoId || 'p'+Date.now(),
             nombre,
@@ -265,12 +265,12 @@
         const list = getProspectos().map(p=>({...p, score: calcularScore(p)}));
         if(list.length<10){ if(!confirm('Tienes menos de 10 prospectos. ¿Continuar?')) return; }
         const tieneVerde = list.some(p=>p.score>=20);
-        if(!tieneVerde){ alert('Necesitas al menos 1 prospecto en VERDE (20+ puntos) para finalizar.'); return; }
+        if(!tieneVerde){ uiToast('Necesitas al menos 1 prospecto en VERDE (20+ puntos) para finalizar.'); return; }
         markProspectStep(currentUser.id,'agenda-prospectos',{total:list.length, fecha:new Date().toISOString()});
         if(!db.expedientesProspectos[currentUser.id]) db.expedientesProspectos[currentUser.id]={};
         db.expedientesProspectos[currentUser.id].completado = true;
         saveDB();
-        alert('¡Agenda completada! '+list.length+' prospectos guardados. Tu reclutador los revisará.');
+        uiToast('¡Agenda completada! '+list.length+' prospectos guardados. Tu reclutador los revisará.');
     };
 })();
 

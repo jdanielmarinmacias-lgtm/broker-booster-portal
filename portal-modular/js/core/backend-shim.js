@@ -19,7 +19,7 @@
   function loginError(msg) {
     const el = $('login-error');
     if (el) { el.textContent = msg; el.classList.remove('hidden'); }
-    else alert(msg);
+    else uiToast(msg);
   }
 
   /* IA del portal: pregunta al servidor si hay IA disponible y cuánto cupo
@@ -77,7 +77,7 @@
     const adminish = window.RolesService
       ? window.RolesService.isAdmin(user)
       : ['admin', 'gm', 'desarrollador'].includes((user.role || '').toLowerCase());
-    if (dest === 'admin' && !adminish) { alert('Acceso denegado. Solo administradores y editores.'); return null; }
+    if (dest === 'admin' && !adminish) { uiToast('Acceso denegado. Solo administradores y editores.'); return null; }
     return dest === 'admin' ? 'admin' : (adminish ? 'admin' : 'campus');
   }
 

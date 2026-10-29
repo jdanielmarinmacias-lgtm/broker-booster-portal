@@ -10,6 +10,16 @@ const { createStore, selectAdapter } = require('./store');
 const sessions = require('./sessions');
 const mw = require('./middleware');
 
+const path = require('path');
+const CAMPUS_DIR = path.join(__dirname, '..', 'campus-private');
+const CAMPUS_ARCHIVOS = new Set([
+  'legacy/02-modulo-b.js', 'legacy/03-config-73l.js', 'legacy/04-modulo-d.js',
+  'legacy/05-modulo-e.js', 'legacy/06-modulo-f.js', 'legacy/07-modulo-g.js',
+  'legacy/08-snippet-h.js', 'legacy/09-modulo-i.js', 'legacy/10-modulo-j.js',
+  'modules/auth-custom.js', 'modules/dashboard.js', 'modules/chat.js',
+  'modules/ventas.js', 'modules/inventario.js',
+]);
+
 function createApp(store) {
   const app = express();
   app.disable('x-powered-by');
@@ -54,6 +64,16 @@ function createApp(store) {
       maxAge: '30d',
     }));
   }
+
+  /* Campus privado: los scripts de las secciones solo salen con sesión válida.
+   * Fuera de /js/ para que el estático público no los sirva sin login. */
+  app.get(/^\/api\/campus\/((?:legacy|modules)\/[\w.-]+\.js)$/, mw.requireAuth, (req, res, next) => {
+    const rel = req.params[0];
+    if (!CAMPUS_ARCHIVOS.has(rel)) return res.status(404).end();
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.type('application/javascript');
+    res.sendFile(path.join(CAMPUS_DIR, rel), (err) => { if (err) next(err); });
+  });
 
   app.get('/api/salud', (req, res) => res.json({
     ok: true, backend: true, store: store.adapter.kind,

@@ -991,5 +991,5 @@ window.addEventListener('load', ()=>{
                 if (exp) { exp.completado = true; exp.agenda = data; }
                 saveDB();
                 showToast('Proceso finalizado', 'success');
-                setTimeout(()=>{ alert('Proceso finalizado. Tu reclutador te contactará en menos de 24h con los siguientes pasos.'); }, 400);
+                setTimeout(()=>{ uiToast('Proceso finalizado. Tu reclutador te contactará en menos de 24h con los siguientes pasos.'); }, 400);
             }

@@ -606,7 +606,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                         setTimeout(() => navigateTo((user.role||'').toLowerCase()==='gm' ? 'dashboard' : 'editor'), 100);
                         return true;
                     } else {
-                        alert('Acceso denegado. Solo administradores y editores.');
+                        uiToast('Acceso denegado. Solo administradores y editores.');
                         return false;
                     }
                 } else {
@@ -3660,7 +3660,7 @@ function psVerRubrica(){
   <div class="space-y-2 text-sm">${PS_RUBRICA.map(r=>`<div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5"><span class="font-medium">${r.label}</span><span class="text-slate-400 text-xs">0–100 pts</span></div>`).join('')}</div>
   <p class="text-xs text-slate-500 mt-3">El promedio de las 6 claves es tu calificación final. Con IA real, la evalúa un "director de formación" virtual; sin ella, un motor de reglas que detecta preguntas, validaciones, números, objeciones y cierre.</p>
   <div class="text-right mt-4"><button data-bx-click="a1" class="border px-4 py-2 rounded-xl">Cerrar</button></div></div>`;
-  if(typeof showModal==='function') showModal(h); else alert('Rúbrica: '+PS_RUBRICA.map(r=>r.label).join(', '));
+  if(typeof showModal==='function') showModal(h); else uiToast('Rúbrica: '+PS_RUBRICA.map(r=>r.label).join(', '));
 }
 function initPracticaSesiones(){ psLoadVoices(); if(window.psVoiceOn===undefined) window.psVoiceOn=true; if(!window.psProvSel){ window.psProvSel=(psGetDB().practicaConfig||{}).proveedor||'groq'; } setTimeout(()=>{ try{ psValidarKeySilencioso(); }catch(e){} },50); }
 
@@ -4344,7 +4344,7 @@ function guiaGuardarMensajes(){
     cmLog('Centro de mensajes','Editó plantillas', `${arr.length} plantillas (antes ${antes})`);
     saveDB(); closeModal(); showToast('Plantillas guardadas','success');
     render();
-  }catch(e){ alert('Error: '+e.message); }
+  }catch(e){ uiToast('Error: '+e.message); }
 }
 
 function guionPuedeEditar(){ return ['admin','gm','editor','capacitador','desarrollador'].includes((currentUser.role||'').toLowerCase()); }
@@ -4446,7 +4446,7 @@ function guionGuardar(){
     db.settings.guionLlamadas=arr;
     cmLog('Guion de llamadas','Editó el guion', `${arr.length} fases`);
     saveDB(); closeModal(); showToast('Guion guardado','success'); render();
-  }catch(e){ alert('Error: '+e.message); }
+  }catch(e){ uiToast('Error: '+e.message); }
 }
 
 function renderCasosExito(){
@@ -4532,7 +4532,7 @@ function guiaGuardarCasos(){
     db.settings.casosExito=arr;
     cmLog('Casos de éxito','Editó casos', `${arr.length} casos (antes ${antes})`);
     saveDB(); closeModal(); showToast('Casos guardados','success'); render();
-  }catch(e){ alert('Error: '+e.message); }
+  }catch(e){ uiToast('Error: '+e.message); }
 }
 const PUB_CATS = [['folleto','Folletos'],['imagen','Imagen corporativa'],['redes','Redes sociales'],['video','Videos'],['drive','Material Drive']];
 const PUB_RAMOS = ['VIDA','GMM','DAÑOS','AUTOS','INVERSIÓN','INVERSIÓN ELITE'];
@@ -4685,7 +4685,7 @@ function guardarPublicidad(idStr){
       }
     }
     else finalizar('','');
-  }catch(e){ alert('Error: '+e.message); }
+  }catch(e){ uiToast('Error: '+e.message); }
 }
 function borrarPublicidad(id){
   const p=(db.settings&&db.settings.publicidad||[]).find(x=>String(x.id)===String(id)); if(!p) return;
@@ -6721,7 +6721,7 @@ function cpGuardarEdit(idStr){
     c.notas=document.getElementById('cp-notas').value.trim();
     cmLog('Comparador de productos','Editó comparativa IA',titulo);
     saveDB(); closeModal(); showToast('Comparación guardada','success'); render();
-  }catch(e){ alert('Error: '+e.message); }
+  }catch(e){ uiToast('Error: '+e.message); }
 }
 function cpBorrarGuardada(id){
   const comps=(db.settings&&db.settings.comparadorProductos)||[];
@@ -7568,8 +7568,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const ponente = document.getElementById('cc-ponente').value.trim();
                 const invitado = document.getElementById('cc-invitado').value.trim();
                 const zoom = document.getElementById('cc-zoom').value.trim();
-                if(!ponente){ alert('El ponente es obligatorio'); return; }
-                if(!nuevaImagenData){ alert('La imagen es obligatoria - sube un archivo'); return; }
+                if(!ponente){ uiToast('El ponente es obligatorio'); return; }
+                if(!nuevaImagenData){ uiToast('La imagen es obligatoria - sube un archivo'); return; }
                 const participantes = Array.from(document.querySelectorAll('.cc-participante:checked')).map(cb => parseInt(cb.value));
                 item.tema = tema;
                 item.horario = horario;
@@ -8944,7 +8944,7 @@ function renderGlossary() {
                 const name = document.getElementById('cat-name').value.trim();
                 if (!name) return;
                 if (categories.find(function(c){ return c.name.toLowerCase() === name.toLowerCase(); })) {
-                    alert('Ya existe un ramo con ese nombre');
+                    uiToast('Ya existe un ramo con ese nombre');
                     return;
                 }
                 const newCat = { id: Date.now(), name: name };
@@ -9575,7 +9575,7 @@ function filterReports(){
 
         function openUserModal(id=null) {
             const user = id !== null && id !== undefined ? db.users.find(u => String(u.id) === String(id)) : null;
-            if(user && !canModifyUser(currentUser, user)){ alert('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
+            if(user && !canModifyUser(currentUser, user)){ uiToast('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
             const ubicActual = user ? (estadoDeUsuario(user) || user.ubicacion || '') : '';
             const estadosOpts = (typeof ESTADOS_MEX !== 'undefined' ? ESTADOS_MEX : []).map(e => `<option value="${escapeHTML(e.n)}" ${ubicActual===e.n?'selected':''}>${escapeHTML(e.n)}</option>`).join('');
             showModal(`<form id="user-form" autocomplete="off" class="p-6"><h3 class="text-xl font-bold mb-4">${user?'Editar':'Nuevo'} Usuario</h3><div class="space-y-4">
@@ -9650,8 +9650,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const dup = (db.users || []).some(u => String(u.id) !== String(user?.id || '') && String(u.username || '').toLowerCase() === data.username.toLowerCase());
                 if (dup) { showToast('Ese nombre de usuario ya está en uso, elige otro', 'error'); return; }
                 if (!user && !rawPass) { showToast('Ingresa una contraseña para el nuevo usuario', 'error'); return; }
-                if (user && !canModifyUser(currentUser, user)) { alert('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
-                if (data.role === 'gm' && !isGM(currentUser)) { const pass = prompt('Crear GM requiere contraseña maestra:'); if (pass !== 'GUIA-GM-2025') { alert('Contraseña incorrecta. No se puede crear GM.'); return; } }
+                if (user && !canModifyUser(currentUser, user)) { uiToast('Las cuentas GM están protegidas: solo el propio GM puede editar su cuenta.'); return; }
+                if (data.role === 'gm' && !isGM(currentUser)) { const pass = prompt('Crear GM requiere contraseña maestra:'); if (pass !== 'GUIA-GM-2025') { uiToast('Contraseña incorrecta. No se puede crear GM.'); return; } }
                 const rolesAgenteU = ['agente', 'agente_agencia', 'agente_desarrollo'];
                 if (rolesAgenteU.includes(data.role)) {
                     if (data.agenciaId) {
@@ -9709,10 +9709,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             inp.type = 'text';
             if(typeof showToast === 'function') showToast('Contraseña generada: ' + pass, 'info');
         }
-        function deleteUser(id){ const target=db.users.find(u=>String(u.id)===String(id)); if(target && isGM(target)){ alert('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ alert('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>String(u.id)!==String(id)); saveDB(); navigateTo('users'); } }
+        function deleteUser(id){ const target=db.users.find(u=>String(u.id)===String(id)); if(target && isGM(target)){ uiToast('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ uiToast('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>String(u.id)!==String(id)); saveDB(); navigateTo('users'); } }
 
         function openCategoryModal(id=null){
-            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             const cat = id ? db.categories.find(c=>c.id===id) : null;
             showModal(`<form id="cat-form" class="p-6"><h3 class="text-xl font-bold mb-4">${cat?'Editar':'Nueva'} Categoría</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${cat?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Descripción</label><textarea name="description" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${cat?.description||''}</textarea></div><div><label class="text-sm">Formación Académica</label><select name="planId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${cat?.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div><div><label class="text-sm">Imagen de portada</label><input type="file" id="cat-image-input" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="cat-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${cat?.image?`<img loading="lazy" decoding="async" id="cat-image-preview" src="${cat.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img loading="lazy" decoding="async" id="cat-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
             const imageInput = document.getElementById('cat-image-input');
@@ -10053,7 +10053,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             };
         }
         function deleteLesson(id){ if(confirm('¿Eliminar lección?')){ db.lessons=db.lessons.filter(l=>l.id!==id); saveDB(); navigateTo('lessons'); } }
-        function deleteCategory(id){ if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos'); if(confirm('¿Eliminar categoría? Se borrarán también sus lecciones.')){ db.categories=db.categories.filter(c=>c.id!==id); db.lessons=db.lessons.filter(l=>l.categoryId!==id); saveDB(); navigateTo('categories'); } }
+        function deleteCategory(id){ if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos'); if(confirm('¿Eliminar categoría? Se borrarán también sus lecciones.')){ db.categories=db.categories.filter(c=>c.id!==id); db.lessons=db.lessons.filter(l=>l.categoryId!==id); saveDB(); navigateTo('categories'); } }
 
         // --- QUIZ CON TIPO ---
         function openQuizModal(lessonId){
@@ -10098,7 +10098,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     options = ['Verdadero', 'Falso'];
                 } else {
                     options = [0,1,2,3].map(i => document.getElementById('opt'+i).value).filter(v=>v);
-                    if(options.length < 2) return alert('Mínimo 2 opciones');
+                    if(options.length < 2) return uiToast('Mínimo 2 opciones');
                 }
                 lesson.quiz.push({ question, options, correct, type: type==='vf'?'vf':'multiple' });
                 saveDB(); openQuizModal(lessonId);
@@ -10599,7 +10599,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const question = document.getElementById('eq-text').value;
                 const correct = parseInt(document.getElementById('eq-correct').value);
                 let options = type === 'vf' ? ['Verdadero', 'Falso'] : [0,1,2,3].map(i => document.getElementById('eq'+i).value).filter(v=>v);
-                if (type !== 'vf' && options.length < 2) return alert('Mínimo 2 opciones');
+                if (type !== 'vf' && options.length < 2) return uiToast('Mínimo 2 opciones');
                 exam.questions.push({ question, options, correct, type: type==='vf'?'vf':'multiple' });
                 saveDB(); openExamModal(exam.id);
             };
@@ -10621,7 +10621,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             exam.duration = parseInt(document.getElementById('ex-duration').value);
             exam.passPercent = parseInt(document.getElementById('ex-pass').value);
             exam.exemptPercent = parseInt(document.getElementById('ex-exempt').value);
-            if (exam.questions.length === 0) return alert('Agrega al menos 1 pregunta');
+            if (exam.questions.length === 0) return uiToast('Agrega al menos 1 pregunta');
             saveDB(); closeModal(); navigateTo('exams');
         }
 
@@ -10664,7 +10664,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function startExam(examId) {
             const exam = db.exams.find(e => e.id === examId);
             if (!exam) return;
-            if (!exam.questions || exam.questions.length === 0) { alert('Este examen aún no tiene preguntas.'); return; }
+            if (!exam.questions || exam.questions.length === 0) { uiToast('Este examen aún no tiene preguntas.'); return; }
             exam._shuffled = prepararPreguntasExamen(exam);
             showModal(`<div class="p-6 text-center"><div class="w-16 h-16 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-4"><i class="fas fa-clipboard-check text-indigo-600 text-2xl"></i></div>
                 <h3 class="text-xl font-bold mb-2">${exam.title}</h3><p class="text-slate-600 mb-4">${exam.description||''}</p>
@@ -11806,7 +11806,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function openPlanModal(id=null) {
-            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             const p = id ? db.planes.find(x=>x.id===id) : null;
             showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-5">${p?'Editar':'Crear'} Plan</h3><form id="plan-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Tipo</label><select id="plan-tipo" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">
@@ -11858,7 +11858,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function deletePlan(id) {
-            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Eliminar plan? Se desvinculará de las generaciones.')) return;
             db.planes = db.planes.filter(p=>p.id!==id);
             db.generations.forEach(g=>{ if(g.planId===id) g.planId=null; });
@@ -11866,7 +11866,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function openGenerationModal(id=null) {
-            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             const g = id ? db.generations.find(x=>x.id===id) : null;
             showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-5">${g?'Editar':'Nueva'} Generación</h3><form id="gen-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Plan de Formación</label><select id="gen-plan" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${g&&g.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div>
@@ -11923,9 +11923,9 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 if (genImgPendiente) { if (window.showToast) showToast('La imagen sigue subiendo, espera unos segundos e intenta de nuevo', 'warning'); return; }
                 const startDate = document.getElementById('gen-start').value;
                 const endDate = document.getElementById('gen-end').value;
-                if (!fechaValida(startDate)) { alert('Fecha de inicio inválida. Se espera el calendario (día y mes) AAAA-MM-DD.'); return; }
-                if (!fechaValida(endDate)) { alert('Fecha de fin inválida. Se espera AAAA-MM-DD.'); return; }
-                if (new Date(endDate + 'T00:00:00').getTime() < new Date(startDate + 'T00:00:00').getTime()) { alert('La fecha de fin no puede ser anterior a la de inicio.'); return; }
+                if (!fechaValida(startDate)) { uiToast('Fecha de inicio inválida. Se espera el calendario (día y mes) AAAA-MM-DD.'); return; }
+                if (!fechaValida(endDate)) { uiToast('Fecha de fin inválida. Se espera AAAA-MM-DD.'); return; }
+                if (new Date(endDate + 'T00:00:00').getTime() < new Date(startDate + 'T00:00:00').getTime()) { uiToast('La fecha de fin no puede ser anterior a la de inicio.'); return; }
                 const dias = Math.round((new Date(endDate + 'T00:00:00') - new Date(startDate + 'T00:00:00')) / 86400000);
                 if (dias > 3650 && !confirm('La generación dura ' + dias + ' días (más de 10 años). ¿Continuar igual?')) return;
                 const data = { name: document.getElementById('gen-name').value.trim(), startDate: startDate, endDate: endDate, status: document.getElementById('gen-status').value, image: imageData, planId: parseInt(document.getElementById('gen-plan').value) || null };
@@ -11935,7 +11935,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function deleteGeneration(id) {
-            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Eliminar generación? Se eliminarán grupos asociados.')) return;
             db.generations = db.generations.filter(g=>g.id!==id);
             db.groups = db.groups.filter(gr=>gr.generationId!==id);
@@ -11982,7 +11982,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 if (!gen) return;
                 const insc = db.enrollments.filter(e=>e.generationId===genId);
                 const alumnos = insc.map(en=>({ en: en, u: db.users.find(x=>x.id===en.userId) })).filter(r=>r.u);
-                if (!alumnos.length) { alert('Esta generación aún no tiene alumnos inscritos.'); return; }
+                if (!alumnos.length) { uiToast('Esta generación aún no tiene alumnos inscritos.'); return; }
                 const esc = v => '"' + String(v==null?'':v).replace(/"/g,'""') + '"';
                 let csv = '\ufeffNombre,Email,WhatsApp,Grupo,Tutor,Fecha de inscripción\n';
                 alumnos.forEach(r => {
@@ -12193,7 +12193,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function deleteGroup(id) {
-            if (!puedeGestionarAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Eliminar grupo? Se borrarán inscripciones, posts y mensajes del grupo.')) return;
             db.groups = db.groups.filter(g=>g.id!==id);
             db.enrollments = db.enrollments.filter(e=>e.groupId!==id);
@@ -12217,7 +12217,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function addStudentsToGroup(groupId) {
-            if (!puedeGestionarAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarAcademia(currentUser)) return uiToast('Sin permisos');
             const gr = db.groups.find(g=>g.id===groupId);
             document.querySelectorAll('.add-student:checked').forEach(cb=>{
                 const uid = parseInt(cb.value);
@@ -12230,7 +12230,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function removeFromGroup(enrollmentId) {
-            if (!puedeGestionarAcademia(currentUser)) return alert('Sin permisos');
+            if (!puedeGestionarAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Quitar alumno del grupo?')) return;
             db.enrollments = db.enrollments.filter(e=>e.id!==enrollmentId);
             saveDB(); closeModal(); navigateTo('groups');
@@ -12777,7 +12777,7 @@ END:VCALENDAR`;
                 const startDate = new Date(start);
                 const endDate = new Date(startDate.getTime() + duration * 60000);
                 const err = validarDatosClase(title, start, duration, zoomUrl, assignedTo, false);
-                if (err) { alert(err); return; }
+                if (err) { uiToast(err); return; }
                 const instructorId = parseInt(document.getElementById('lc-instructor').value);
                 const groupId = lcGroup && lcGroup.value ? parseInt(lcGroup.value) : null;
                 const recurrN = document.getElementById('lc-recurr').checked ? parseInt(document.getElementById('lc-recurr-n').value) : 1;
@@ -12832,7 +12832,7 @@ END:VCALENDAR`;
                     const endDate = new Date(startDate.getTime() + duration * 60000);
                     // v6.9: misma validación que el alta (una clase ya impartida conserva su fecha pasada)
                     const err = validarDatosClase(title, start, duration, zoomUrl, assignedTo, true);
-                    if (err) { alert(err); return; }
+                    if (err) { uiToast(err); return; }
                     // v6.9: detectar cambios reales para avisar solo cuando aplica
                     const cambios = [];
                     if (ev.title !== title) cambios.push('título');
@@ -12987,7 +12987,7 @@ END:VCALENDAR`;
         }
 
         function openLibraryModal(id=null) {
-            if (!['admin','gm','desarrollador','maestro','capacitador','agencia'].includes(currentUser.role)) return alert('Sin permisos');
+            if (!['admin','gm','desarrollador','maestro','capacitador','agencia'].includes(currentUser.role)) return uiToast('Sin permisos');
             const m = id ? db.library.find(x=>x.id===id) : null;
             showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-5">${m?'Editar':'Subir'} Material</h3><form id="lib-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Título</label><input id="lib-title" required value="${m?m.title:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
@@ -13033,11 +13033,11 @@ END:VCALENDAR`;
                 };
                 if (data.type==='link') {
                     data.url = document.getElementById('lib-url').value.trim();
-                    if (!data.url) return alert('Ingresa la URL');
+                    if (!data.url) return uiToast('Ingresa la URL');
                     finalizeSave(data);
                 } else {
                     const file = document.getElementById('lib-file').files[0];
-                    if (!m && !file) return alert('Selecciona un archivo');
+                    if (!m && !file) return uiToast('Selecciona un archivo');
                     if (file) {
                         data.fileName = file.name;
                         try {
@@ -13267,13 +13267,13 @@ END:VCALENDAR`;
                     saveDB(); closeModal(); navigateTo('tareas');
                 };
                 if (type==='link') {
-                    const url = document.getElementById('sub-url').value.trim(); if(!url) return alert('Ingresa URL'); save({ content: url, fileUrl: url });
+                    const url = document.getElementById('sub-url').value.trim(); if(!url) return uiToast('Ingresa URL'); save({ content: url, fileUrl: url });
                 } else if (type==='text') {
-                    const txt = document.getElementById('sub-textarea').value.trim(); if(!txt) return alert('Escribe respuesta'); save({ content: txt });
+                    const txt = document.getElementById('sub-textarea').value.trim(); if(!txt) return uiToast('Escribe respuesta'); save({ content: txt });
                 } else {
                     const fileInput = document.getElementById('sub-file-input');
                     const file = fileInput && fileInput.files && fileInput.files[0];
-                    if(!existing && !file) return alert('Selecciona archivo');
+                    if(!existing && !file) return uiToast('Selecciona archivo');
                     if (file) {
                         try {
                             if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Subiendo...'; }
@@ -13392,7 +13392,7 @@ END:VCALENDAR`;
 
         // --- INIT ---
         loadDB();
-        document.addEventListener("visibilitychange", ()=>{ if(window._inExam && document.hidden){ window._examTabSwitches=(window._examTabSwitches||0)+1; if(window._examTabSwitches>2){ alert("Cambio de pestaña detectado. Examen finalizado."); if(typeof submitExam==="function") submitExam(); } } });
+        document.addEventListener("visibilitychange", ()=>{ if(window._inExam && document.hidden){ window._examTabSwitches=(window._examTabSwitches||0)+1; if(window._examTabSwitches>2){ uiToast("Cambio de pestaña detectado. Examen finalizado."); if(typeof submitExam==="function") submitExam(); } } });
         applyBranding();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', checkSession);

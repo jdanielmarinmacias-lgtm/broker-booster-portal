@@ -332,16 +332,16 @@
                     const comPorPoliza = esInv ? ((c.prima||0) * 12 * (c.plazo||10)) * ((c.com||0)/100) : (c.prima||0) * ((c.com||0)/100);
                     const trailAnual = (esInv && parseFloat(c.trail)>0) ? ((c.prima||0)*12) * (parseFloat(c.trail)/100) : 0;
                     const bonoMes = simBono(c.bonoMensual, c.prima) + simBono(c.bonoTrimestral, c.prima)/3;
-                    const ingresoPorPoliza = comPorPoliza + trailAnual + bonoMes;
-                    const polizas = ingresoPorPoliza > 0 ? Math.ceil(meta / ingresoPorPoliza) : 0;
-                    const ingresoEst = polizas * ingresoPorPoliza;
+                    const ingresoPorPoliza = comPorPoliza + trailAnual;
+                    const polizas = ingresoPorPoliza > 0 ? Math.ceil(Math.max(0, meta - bonoMes) / ingresoPorPoliza) : 0;
+                    const ingresoEst = polizas * ingresoPorPoliza + bonoMes;
                     row.querySelector('.sim-comtotal').textContent = '$' + Math.round(comPorPoliza).toLocaleString('es-MX');
                     row.querySelector('.sim-polizas').textContent = polizas || '-';
                     row.querySelector('.sim-ingreso').textContent = '$' + Math.round(ingresoEst).toLocaleString('es-MX');
                     resumen.push({nombre:SIM_RAMOS_INFO[key].nombre, polizas, ingresoPorPoliza, bonoMes});
                 });
                 const resHTML = resumen.map(r=>`${r.polizas} póliza${r.polizas===1?'':'s'} de ${r.nombre}`).join(' · ');
-                document.getElementById('sim-resumen').innerHTML = `<b>Para ganar $${meta.toLocaleString('es-MX')} al mes necesitas aprox:</b><br>${resHTML}<br><span class="text-xs text-slate-500">Comisión por póliza + trail (solo INVERSIÓN) + bonos (mensual + trimestral ÷ 3) promediados en el mes.</span>`;
+                document.getElementById('sim-resumen').innerHTML = `<b>Para ganar $${meta.toLocaleString('es-MX')} al mes necesitas aprox:</b><br>${resHTML}<br><span class="text-xs text-slate-500">Pólizas = (meta − bonos del mes) ÷ (comisión por póliza + trail, solo INVERSIÓN). Los bonos (mensual + trimestral ÷ 3) se suman una vez al mes, no por póliza.</span>`;
             };
             tbody.addEventListener('input', recalc);
             document.getElementById('sim-meta')?.addEventListener('input', recalc);
@@ -359,7 +359,7 @@
                 }
                 cmLog('Simulador','Editó configuración', 'Primas/comisiones/bonos actualizados');
                 saveDB(); showToast('Configuración guardada para toda la promotoría','success');
-            }catch(e){ alert('Error: '+e.message); }
+            }catch(e){ uiToast('Error: '+e.message); }
         }
 
         
@@ -1142,7 +1142,7 @@ function exportarMonitoreoCSV(){
         const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
         const url = URL.createObjectURL(blob);
         const a=document.createElement('a'); a.href=url; a.download=`monitoreo_${st.anio}_${st.periodo}.csv`; a.click(); URL.revokeObjectURL(url);
-    }catch(e){ alert('Error exportando: '+e.message); }
+    }catch(e){ uiToast('Error exportando: '+e.message); }
 }
 
 // === MIS CLIENTES - IMPLEMENTACIÓN AISLADA ===
@@ -1204,7 +1204,7 @@ function gfGuardarCompania(){
         lista.push(nom);
         cmLog('Mis Clientes','Agregó compañía',nom);
         saveDB(); showToast('Compañía agregada: '+nom,'success'); render(); setTimeout(function(){ try{ openGestionarCompanias(); }catch(e){} },80);
-    }catch(e){ alert('Error: '+e.message); }
+    }catch(e){ uiToast('Error: '+e.message); }
 }
 function gfBorrarCompania(nombre){
     try{
@@ -1218,7 +1218,7 @@ function gfBorrarCompania(nombre){
         const cfg=gfColores(); if(cfg.compania) delete cfg.compania[n];
         cmLog('Mis Clientes','Eliminó compañía',n);
         saveDB(); showToast('Compañía eliminada: '+n,'success'); render(); setTimeout(function(){ try{ openGestionarCompanias(); }catch(e){} },80);
-    }catch(e){ alert('Error: '+e.message); }
+    }catch(e){ uiToast('Error: '+e.message); }
 }
 /* ==================== SINIESTROS Y CANCELACIONES (ligado a Mis Clientes) ==================== */
 function sinDB(){
@@ -3922,7 +3922,7 @@ function gfGuardarColores(){
         });
         cmLog('Gráficas','Editó colores', n+' colores actualizados');
         saveDB(); closeModal(); showToast('Colores actualizados','success'); render();
-    }catch(e){ alert('Error: '+e.message); }
+    }catch(e){ uiToast('Error: '+e.message); }
 }
 
 /* Estatus de la póliza: sustituye las etapas libres del Kanban por un ciclo
@@ -4143,7 +4143,7 @@ function renderMisClientes(){
                     <h3 class="font-semibold text-lg">Listado de Clientes (${clientes.length})</h3>
                     <div class="flex rounded-xl border border-amber-300 bg-white overflow-hidden">
                         <button data-bx-click="a590" class="px-3 py-1.5 text-xs font-semibold ${(window.vistaMisClientes||'tabla')==='tabla'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-table mr-1"></i>Tabla</button>
-                        <button data-bx-click="a589" class="px-3 py-1.5 text-xs font-semibold ${window.vistaMisClientes==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban CRM (#23)</button>
+                        <button data-bx-click="a589" class="px-3 py-1.5 text-xs font-semibold ${window.vistaMisClientes==='kanban'?'bg-slate-900 text-amber-300':'text-slate-600 hover:bg-slate-50'}"><i class="fas fa-columns mr-1"></i>Kanban</button>
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -4195,7 +4195,7 @@ function renderMisClientes(){
                                     const inactivo = diasInactivo > 7 && est === 'Propuesta';
                                     return `<div class="bg-white rounded-xl border ${inactivo ? 'border-amber-400' : 'border-slate-200'} p-3 shadow-sm">
                                         <div class="flex items-center justify-between gap-1 mb-1">
-                                            <span class="font-bold text-xs text-slate-900 truncate">${escapeHTML(c.nombre)}</span>
+                                            <span class="flex items-center gap-1.5 min-w-0">${c.fotoCliente ? `<img loading="lazy" decoding="async" src="${c.fotoCliente}" class="w-6 h-6 rounded-full object-cover border shrink-0">` : `<span class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center shrink-0"><i class="fas fa-user text-[10px] text-slate-400"></i></span>`}<span class="font-bold text-xs text-slate-900 truncate">${escapeHTML(c.nombre)}</span></span>
                                             ${inactivo ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Días sin actividad"><i class="fas fa-clock mr-0.5"></i>${diasInactivo}d</span>` : ''}
                                         </div>
                                         <p class="text-[11px] text-slate-500 truncate">${escapeHTML(c.compania || '')} · ${escapeHTML(c.ramo || '')} · $${Number(c.primaTotal||0).toLocaleString('es-MX')}</p>
@@ -4826,7 +4826,7 @@ function borrarCliente(id){
         if(!c) return;
         const puedeVerTodos = ['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
         const puede = puedeVerTodos || String(c.agenteId)===String(currentUser.id);
-        if(!puede){ alert('Sin permisos'); return; }
+        if(!puede){ uiToast('Sin permisos'); return; }
         if(!confirm('¿Borrar este cliente?')) return;
         db.clientes = db.clientes.filter(x=>x.id!==id);
         db.auditoria = db.auditoria||[];
@@ -4835,7 +4835,7 @@ function borrarCliente(id){
         closeModal();
         render();
         if(window.showToast) showToast('Cliente borrado','success');
-    }catch(e){ alert('Error: '+e.message); }
+    }catch(e){ uiToast('Error: '+e.message); }
 }
 
 function editarCliente(id){
@@ -4843,7 +4843,7 @@ function editarCliente(id){
     if(!c) return;
     const puedeVerTodos = ['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
     const puede = puedeVerTodos || String(c.agenteId)===String(currentUser.id);
-    if(!puede){ alert('Sin permisos'); return; }
+    if(!puede){ uiToast('Sin permisos'); return; }
     const antes = JSON.parse(JSON.stringify(c));
     const companias = [...companiasClientes()]; if(!companias.includes('OTROS')) companias.push('OTROS');
     showModal(`<form id="editCliente" class="p-6 space-y-3 max-w-2xl max-h-[90vh] overflow-y-auto"><h3 class="font-bold text-lg">Modificar Cliente</h3>
@@ -4936,7 +4936,7 @@ function exportarClientesCSV(){
         const url = URL.createObjectURL(blob);
         const a=document.createElement('a'); a.href=url; a.download=`mis_clientes_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
         if(window.showToast) showToast('CSV exportado','success');
-    }catch(e){ alert('Error exportando: '+e.message); }
+    }catch(e){ uiToast('Error exportando: '+e.message); }
 }
 
 

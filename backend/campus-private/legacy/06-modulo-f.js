@@ -83,12 +83,12 @@
                 motivo: document.getElementById('exp-motivo')?.value.trim()||''
             };
             if (!data.experiencia_laboral || !data.perspectiva_ingresos || !data.equipo_ventas || !data.oficina || !data.motivo) {
-                alert('Completa los 5 campos obligatorios'); return;
+                uiToast('Completa los 5 campos obligatorios'); return;
             }
             markProspectStep(currentUser.id, 'mi-experiencia', data);
             if (window.showToast) showToast('Guardado', 'success');
             setTimeout(()=>navigateTo('oferta-valor'), 500);
-        } catch(e){ alert('Error: '+e.message); }
+        } catch(e){ uiToast('Error: '+e.message); }
     };
 
     // SECCIÓN 3 - Plan de Carrera (CORREGIDA)
@@ -168,9 +168,9 @@
             db.expedientesProspectos[currentUser.id].nombre = currentUser.name;
             db.expedientesProspectos[currentUser.id].email = currentUser.email;
             saveDB();
-            alert('Proceso finalizado');
+            uiToast('Proceso finalizado');
             if (window.showToast) showToast('Expediente completado','success');
-        } catch(e){ alert('Error: '+e.message); }
+        } catch(e){ uiToast('Error: '+e.message); }
     };
 
     // Asegurar navigateTo maneje plan-carrera

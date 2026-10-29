@@ -489,10 +489,10 @@
                     }
                     
                     saveDB();
-                    if (window.showToast) showToast('Editor guardado correctamente','success'); else alert('Guardado');
+                    if (window.showToast) showToast('Editor guardado correctamente','success'); else uiToast('Guardado');
                 } catch(e) {
                     console.error(e);
-                    alert('Error al guardar: '+e.message);
+                    uiToast('Error al guardar: '+e.message);
                 }
             };
 
@@ -833,7 +833,7 @@
             });
             
             saveDB();
-            alert('¡Portal actualizado correctamente!');
+            uiToast('¡Portal actualizado correctamente!');
             renderPublicPortal();
         }
 

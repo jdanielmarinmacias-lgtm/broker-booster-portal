@@ -20,7 +20,9 @@ const VERCEL = path.join(RAIZ, 'vercel.json');
 const MODAL_WIDTH = path.join(RAIZ, 'portal-modular', 'js', 'core', 'modal-width.js');
 const LEGACY = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '01-core-db-roles-portal.js');
 const INDEX = path.join(RAIZ, 'portal-modular', 'index.html');
-const JS_DIRS = ['legacy', 'modules', 'core'].map((d) => path.join(RAIZ, 'portal-modular', 'js', d));
+/* El campus privado vive en backend/campus-private (se sirve con sesión). */
+const JS_DIRS = ['legacy', 'modules', 'core'].map((d) => path.join(RAIZ, 'portal-modular', 'js', d))
+  .concat([path.join(RAIZ, 'backend', 'campus-private', 'legacy'), path.join(RAIZ, 'backend', 'campus-private', 'modules')]);
 const roles = require(path.join(RAIZ, 'backend', 'src', 'roles.js'));
 
 /* ---- utilidades ------------------------------------------------------- */
@@ -218,7 +220,7 @@ describe('permisos de grupos', () => {
 /* ---- 5) Mis Clientes: estatus, comisiones y evidencia ---------------- */
 
 describe('Mis Clientes', () => {
-  const MODULO_D = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '04-modulo-d.js');
+  const MODULO_D = path.join(RAIZ, 'backend', 'campus-private', 'legacy', '04-modulo-d.js');
   const src = fs.readFileSync(MODULO_D, 'utf8');
 
   it('el alta y el kanban usan los cinco estatus de la póliza', () => {
@@ -414,7 +416,7 @@ describe('secretos fuera del bundle (Fase 0)', () => {
 /* ---- 10) Teo: presupuesto para el razonamiento ----------------------- */
 
 describe('Teo con el modelo de razonamiento', () => {
-  const teo = fs.readFileSync(path.join(RAIZ, 'portal-modular', 'js', 'legacy', '05-modulo-e.js'), 'utf8');
+  const teo = fs.readFileSync(path.join(RAIZ, 'backend', 'campus-private', 'legacy', '05-modulo-e.js'), 'utf8');
 
   it('reserva tokens y pide esfuerzo bajo para no devolver texto vacío', () => {
     const desde = teo.indexOf('async function callGroq');
