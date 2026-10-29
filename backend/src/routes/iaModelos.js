@@ -8,7 +8,7 @@
  * ========================================================================== */
 const express = require('express');
 const mw = require('../middleware');
-const { MODELOS_PERMITIDOS, revisar } = require('../iaCatalogo');
+const { MODELOS_PERMITIDOS, revisar, enviarAlerta } = require('../iaCatalogo');
 
 const DIRECCION = new Set(['admin', 'gm', 'desarrollador']);
 const esDireccion = (user) => !!user && DIRECCION.has(String(user.role || '').toLowerCase());
@@ -61,6 +61,24 @@ module.exports = function iaModelosRoutes(store, config) {
         cron: 'diario 07:15 America/Mexico_City (13:15 UTC)',
         correoConfigurado: !!(process.env.RESEND_API_KEY && (process.env.IA_ALERT_RECIPIENTS || process.env.REPORT_RECIPIENTS)),
       });
+    } catch (e) { next(e); }
+  });
+
+  /* Prueba real de Resend con el asunto de prueba (dirección). No altera la
+   * allowlist ni crea una notificación de modelo retirado. */
+  router.post('/probar-correo', mw.requireAuth, async (req, res, next) => {
+    try {
+      if (!esDireccion(req.user)) {
+        return res.status(403).json({ ok: false, error: 'Solo dirección puede probar el correo' });
+      }
+      const correo = await enviarAlerta(
+        { checkedAt: new Date().toISOString(), faltantes: [] },
+        { prueba: true }
+      );
+      if (!correo.sent) {
+        return res.status(correo.dryRun ? 503 : 502).json({ ok: false, correo });
+      }
+      res.json({ ok: true, correo });
     } catch (e) { next(e); }
   });
 

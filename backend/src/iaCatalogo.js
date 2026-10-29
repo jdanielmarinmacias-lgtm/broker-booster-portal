@@ -105,17 +105,26 @@ async function enviarAlerta(resultado, opciones) {
     return { sent: false, dryRun: true, motivo: 'Sin IA_ALERT_RECIPIENTS ni REPORT_RECIPIENTS' };
   }
 
+  const esPrueba = !!opts.prueba;
   const modelos = (resultado.faltantes || []).map((m) => '<li><code>' + escaparHtml(m) + '</code></li>').join('');
   const fecha = new Date(resultado.checkedAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
-  const subject = '[Portal] Modelo de IA no disponible: ' + (resultado.faltantes || []).join(', ');
+  const subject = esPrueba
+    ? '[Portal] Prueba de alertas de IA'
+    : '[Portal] Modelo de IA no disponible: ' + (resultado.faltantes || []).join(', ');
+  const color = esPrueba ? '#0a2540' : '#7f1d1d';
+  const titulo = esPrueba ? 'Prueba de alertas de IA' : 'Modelo de IA no disponible';
+  const cuerpo = esPrueba
+    ? '<p style="margin:0 0 12px;font-size:14px;color:#334155">Este es un correo de prueba enviado desde el portal.</p>'
+      + '<p style="margin:0 0 14px;font-size:14px;color:#0f172a">Si lo recibes, Resend y el destinatario de las alertas están configurados correctamente.</p>'
+    : '<p style="margin:0 0 12px;font-size:14px;color:#334155">La comprobación del catálogo de Groq ya no encuentra estos modelos permitidos:</p>'
+      + '<ul style="margin:0 0 14px 18px;padding:0;font-size:14px;color:#0f172a">' + modelos + '</ul>'
+      + '<p style="margin:0 0 10px;font-size:13px;color:#475569">Suele significar que Groq los retiró o los movió al plan Enterprise. La IA del portal fallará si siguen en la allowlist.</p>';
   const html = '<div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto">'
-    + '<div style="background:#7f1d1d;color:#fff;padding:18px 20px;border-radius:12px 12px 0 0">'
+    + '<div style="background:' + color + ';color:#fff;padding:18px 20px;border-radius:12px 12px 0 0">'
     + '<p style="margin:0;font-size:12px;letter-spacing:1px;opacity:.8">PORTAL BROKER BOOSTER</p>'
-    + '<p style="margin:4px 0 0;font-size:20px;font-weight:700">Modelo de IA no disponible</p></div>'
+    + '<p style="margin:4px 0 0;font-size:20px;font-weight:700">' + titulo + '</p></div>'
     + '<div style="background:#fff;border:1px solid #e2e8f0;padding:18px 20px">'
-    + '<p style="margin:0 0 12px;font-size:14px;color:#334155">La comprobación del catálogo de Groq ya no encuentra estos modelos permitidos:</p>'
-    + '<ul style="margin:0 0 14px 18px;padding:0;font-size:14px;color:#0f172a">' + modelos + '</ul>'
-    + '<p style="margin:0 0 10px;font-size:13px;color:#475569">Suele significar que Groq los retiró o los movió al plan Enterprise. La IA del portal fallará si siguen en la allowlist.</p>'
+    + cuerpo
     + '<p style="margin:0;font-size:13px;color:#475569">Revisa <code>backend/src/iaCatalogo.js</code> y el estado en <code>/api/ia/modelos/estado</code>.</p>'
     + '<p style="margin:16px 0 0;font-size:11px;color:#94a3b8">Comprobado: ' + escaparHtml(fecha) + '</p>'
     + '</div></div>';

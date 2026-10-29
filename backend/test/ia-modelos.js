@@ -6,7 +6,7 @@
  * como resuelta cuando el modelo vuelve y no confunde un fallo de consulta con
  * un retiro.
  */
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.RESEND_API_KEY = '';
@@ -17,6 +17,7 @@ const {
   MODELOS_PERMITIDOS,
   consultarCatalogo,
   evaluarCatalogo,
+  enviarAlerta,
   revisar,
 } = require('../src/iaCatalogo');
 const { createStore } = require('../src/store');
@@ -135,5 +136,80 @@ describe('alertas del catálogo de IA', () => {
     assert.equal(r.alertasNuevas, 0);
     assert.equal(store.get().notifications.length, 0);
     assert.equal(store.get().settings.iaModelos.error, 'sin red');
+  });
+});
+
+describe('correo de Resend', () => {
+  let previo;
+
+  beforeEach(() => {
+    previo = {
+      key: process.env.RESEND_API_KEY,
+      to: process.env.IA_ALERT_RECIPIENTS,
+      from: process.env.MAIL_FROM,
+    };
+    process.env.RESEND_API_KEY = 're_test_key_no_real';
+    process.env.IA_ALERT_RECIPIENTS = 'alertas@example.com';
+    process.env.MAIL_FROM = 'Alertas <onboarding@resend.dev>';
+  });
+
+  afterEach(() => {
+    const restaurar = (clave, valor) => {
+      if (valor === undefined) delete process.env[clave];
+      else process.env[clave] = valor;
+    };
+    restaurar('RESEND_API_KEY', previo.key);
+    restaurar('IA_ALERT_RECIPIENTS', previo.to);
+    restaurar('MAIL_FROM', previo.from);
+  });
+
+  it('envía a los destinatarios configurados con Resend', async () => {
+    let peticion = null;
+    const r = await enviarAlerta(
+      { checkedAt: '2026-10-29T20:00:00.000Z', faltantes: [MODELO] },
+      {
+        fetchImpl: async (url, opts) => {
+          peticion = { url, opts };
+          return { ok: true, status: 200, text: async () => JSON.stringify({ id: 'email_123' }) };
+        },
+      }
+    );
+
+    assert.equal(r.sent, true);
+    assert.equal(r.id, 'email_123');
+    assert.equal(r.destinatarios, 1);
+    assert.match(peticion.url, /api\.resend\.com\/emails/);
+    const body = JSON.parse(peticion.opts.body);
+    assert.deepEqual(body.to, ['alertas@example.com']);
+    assert.match(body.subject, /Modelo de IA no disponible/);
+    assert.match(body.html, /openai\/gpt-oss-120b/);
+    assert.equal(body.from, 'Alertas <onboarding@resend.dev>');
+  });
+
+  it('la prueba usa un asunto distinto y no simula un modelo retirado', async () => {
+    let peticion = null;
+    const r = await enviarAlerta(
+      { checkedAt: '2026-10-29T20:00:00.000Z', faltantes: [] },
+      {
+        prueba: true,
+        fetchImpl: async (url, opts) => {
+          peticion = { url, opts };
+          return { ok: true, status: 200, text: async () => JSON.stringify({ id: 'email_test' }) };
+        },
+      }
+    );
+
+    assert.equal(r.sent, true);
+    const body = JSON.parse(peticion.opts.body);
+    assert.equal(body.subject, '[Portal] Prueba de alertas de IA');
+    assert.match(body.html, /correo de prueba/);
+  });
+
+  it('sin RESEND_API_KEY queda en dry-run', async () => {
+    delete process.env.RESEND_API_KEY;
+    const r = await enviarAlerta({ checkedAt: new Date().toISOString(), faltantes: [MODELO] });
+    assert.equal(r.sent, false);
+    assert.equal(r.dryRun, true);
+    assert.match(r.motivo, /RESEND_API_KEY/);
   });
 });
