@@ -9,6 +9,10 @@
     {
       "path": "/api/report/weekly",
       "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/ia/modelos",
+      "schedule": "15 13 * * *"
     }
   ],
   "headers": [

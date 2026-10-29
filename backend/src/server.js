@@ -34,6 +34,9 @@ function createApp(store) {
   app.use('/api/auth', mw.noStorePrivate, require('./routes/auth')(store));
   /* IA por proxy: la clave del portal se queda en el servidor y cada usuario
    * tiene cupo diario. Sustituye a /api/ia/key, que la entregaba al navegador. */
+  /* Comprobación periódica del catálogo: va antes de /api/ia para que
+   * /api/ia/modelos no caiga en el router del proxy. */
+  app.use('/api/ia/modelos', mw.noStorePrivate, require('./routes/iaModelos')(store, config));
   app.use('/api/ia', mw.noStorePrivate, require('./routes/ia')(store, config));
   app.use('/api/users', mw.noStorePrivate, require('./routes/users')(store));
   app.use('/api', mw.noStorePrivate, require('./routes/collections')(store, config));

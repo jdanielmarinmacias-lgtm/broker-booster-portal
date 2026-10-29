@@ -14,6 +14,7 @@
 const express = require('express');
 const mw = require('../middleware');
 const { construirContexto, inyectarContexto } = require('../guiaContext');
+const { MODELOS_PERMITIDOS } = require('../iaCatalogo');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MAX_CHARS = 120000;      // conversación completa (≈ 30k tokens)
@@ -27,8 +28,9 @@ const LIMITE_MINUTO_TOTAL = Number(process.env.IA_MINUTO_TOTAL || 120);
 
 /* Groq movió Llama 3.1 8B y 3.3 70B al plan Enterprise: en esta cuenta ya no
  * se sirven y el proxy los convertía en un 502. Solo se permite el modelo
- * estable que usa el portal y que está verificado en producción. */
-const MODELOS = ['openai/gpt-oss-120b'];
+ * estable que usa el portal y que está verificado en producción. La lista
+ * vive en iaCatalogo.js para que el cron vigile exactamente la misma. */
+const MODELOS = MODELOS_PERMITIDOS;
 
 /* Proveedor real. Los tests lo sustituyen para no salir a la red. */
 let proveedor = async function llamarGroq(cuerpo, apiKey) {
