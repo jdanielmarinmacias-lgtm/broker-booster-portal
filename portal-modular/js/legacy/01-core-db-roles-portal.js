@@ -8413,7 +8413,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
 
         function renderCategories() {
             // PATCH GM 2026-10: GM tiene acceso total a Academia (mismos permisos que maestro/capacitador)
-            const canEdit = hasRole(currentUser, ['admin', 'maestro', 'gm', 'capacitador']);
+            const canEdit = puedeGestionarCatalogoAcademia(currentUser);
             const filtroTipo = window.filtroCatTipo || 'all';
             const filtroPlan = window.filtroCatPlan ? parseInt(window.filtroCatPlan) : null;
             const filtroGen = window.filtroCatGen ? parseInt(window.filtroCatGen) : null;
@@ -9627,6 +9627,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function deleteUser(id){ const target=db.users.find(u=>String(u.id)===String(id)); if(target && isGM(target)){ alert('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ alert('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>String(u.id)!==String(id)); saveDB(); navigateTo('users'); } }
 
         function openCategoryModal(id=null){
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
             const cat = id ? db.categories.find(c=>c.id===id) : null;
             showModal(`<form id="cat-form" class="p-6"><h3 class="text-xl font-bold mb-4">${cat?'Editar':'Nueva'} Categoría</h3><div class="space-y-4"><div><label class="text-sm">Nombre</label><input name="name" value="${cat?.name||''}" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div><div><label class="text-sm">Descripción</label><textarea name="description" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300">${cat?.description||''}</textarea></div><div><label class="text-sm">Formación Académica</label><select name="planId" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${cat?.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div><div><label class="text-sm">Imagen de portada</label><input type="file" id="cat-image-input" accept="image/*" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><span id="cat-image-status" class="hidden mt-1 block text-xs text-indigo-600"></span><div class="mt-2">${cat?.image?`<img loading="lazy" decoding="async" id="cat-image-preview" src="${cat.image}" class="w-full h-40 object-cover rounded-lg border">`:`<img loading="lazy" decoding="async" id="cat-image-preview" class="w-full h-40 object-cover rounded-lg border hidden">`}</div></div></div><div class="flex justify-end gap-3 mt-6"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cancelar</button><button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">Guardar</button></div></form>`);
             const imageInput = document.getElementById('cat-image-input');
@@ -9967,7 +9968,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             };
         }
         function deleteLesson(id){ if(confirm('¿Eliminar lección?')){ db.lessons=db.lessons.filter(l=>l.id!==id); saveDB(); navigateTo('lessons'); } }
-        function deleteCategory(id){ if(confirm('¿Eliminar categoría? Se borrarán también sus lecciones.')){ db.categories=db.categories.filter(c=>c.id!==id); db.lessons=db.lessons.filter(l=>l.categoryId!==id); saveDB(); navigateTo('categories'); } }
+        function deleteCategory(id){ if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos'); if(confirm('¿Eliminar categoría? Se borrarán también sus lecciones.')){ db.categories=db.categories.filter(c=>c.id!==id); db.lessons=db.lessons.filter(l=>l.categoryId!==id); saveDB(); navigateTo('categories'); } }
 
         // --- QUIZ CON TIPO ---
         function openQuizModal(lessonId){
@@ -11523,6 +11524,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         
         // --- FASE 1: COHORTES ---
         function renderGenerations() {
+            const canEdit = puedeGestionarCatalogoAcademia(currentUser);
             const filtroTipo = window.filtroGenTipo || 'all';
             const filtroPlan = window.filtroGenPlan ? parseInt(window.filtroGenPlan) : null;
             let gens = db.generations;
@@ -11546,7 +11548,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <option value="">Todas las formaciones</option>
                         ${db.planes.filter(p=>filtroTipo==='all'||p.tipo===filtroTipo).map(p=>`<option value="${p.id}" ${filtroPlan===p.id?'selected':''}>${p.nombre}</option>`).join('')}
                     </select>
-                    <button data-bx-click="a356" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Generación</button>
+                    ${canEdit?`<button data-bx-click="a356" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Nueva Generación</button>`:''}
                 </div>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -11571,10 +11573,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             <button data-bx-click="a358" data-p0="${bxE(function(){return g.id})}" class="flex-1 px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1.5" title="Ver grupos y alumnos de la generación"><i class="fas fa-eye"></i> Ver Grupos y Alumnos (${groupsCount + studentsCount > 0 ? groupsCount + ' / ' + studentsCount : ''})</button>
                             <button data-bx-click="a359" data-p0="${bxE(function(){return g.id})}" class="px-3 py-2 text-sm border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg" title="Exportar alumnos a CSV"><i class="fas fa-file-csv"></i></button>
                         </div>
-                        <div class="flex gap-2 mt-2">
+                        ${canEdit?`<div class="flex gap-2 mt-2">
                             <button data-bx-click="a360" data-p0="${bxE(function(){return g.id})}" class="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
                             <button data-bx-click="a361" data-p0="${bxE(function(){return g.id})}" class="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
-                        </div>
+                        </div>`:''}
                         </div>
                     </div>`;
                 }).join('')}
@@ -11584,6 +11586,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
         
         function renderFormacion() {
+            const canEdit = puedeGestionarCatalogoAcademia(currentUser);
             const filtro = window.filtroPlanTipo || 'all';
             const planesFiltrados = filtro === 'all' ? db.planes : db.planes.filter(p => p.tipo === filtro);
             return `<div class="flex items-center justify-between mb-6">
@@ -11593,7 +11596,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <option value="all" ${filtro==='all'?'selected':''}>Todos los tipos</option>
                         ${['Capacitación Comercial','Capacitación Administrativa','curso','certificacion','capacitacion','taller'].map(t=>`<option value="${t}" ${filtro===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
                     </select>
-                    <button data-bx-click="a363" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Crear Plan</button>
+                    ${canEdit?`<button data-bx-click="a363" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2"><i class="fas fa-plus"></i> Crear Plan</button>`:''}
                 </div>
             </div>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -11607,14 +11610,14 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <div class="p-5">
                             <div class="flex items-start justify-between mb-3">
                                 <h3 class="font-semibold text-lg">${p.nombre}</h3>
-                                <button data-bx-click="a364" data-p0="${bxE(function(){return p.id})}" class="text-slate-400 hover:text-red-600"><i class="fas fa-trash"></i></button>
+                                ${canEdit?`<button data-bx-click="a364" data-p0="${bxE(function(){return p.id})}" class="text-slate-400 hover:text-red-600"><i class="fas fa-trash"></i></button>`:''}
                             </div>
                             <p class="text-sm text-slate-600 mb-3 min-h-[40px]">${p.descripcion || 'Sin descripción'}</p>
                             <div class="flex items-center justify-between text-sm">
                                 <span class="text-slate-500"><i class="fas fa-clock mr-1"></i>${p.duracion || '-'}</span>
                                 <span class="text-slate-500"><i class="fas fa-layer-group mr-1"></i>${gensCount} generaciones</span>
                             </div>
-                            <button data-bx-click="a365" data-p0="${bxE(function(){return p.id})}" class="mt-4 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>
+                            ${canEdit?`<button data-bx-click="a365" data-p0="${bxE(function(){return p.id})}" class="mt-4 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">Editar</button>`:''}
                         </div>
                     </div>`;
                 }).join('')}
@@ -11623,6 +11626,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function openPlanModal(id=null) {
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
             const p = id ? db.planes.find(x=>x.id===id) : null;
             showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-5">${p?'Editar':'Crear'} Plan</h3><form id="plan-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Tipo</label><select id="plan-tipo" required class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">
@@ -11674,6 +11678,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function deletePlan(id) {
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
             if (!confirm('¿Eliminar plan? Se desvinculará de las generaciones.')) return;
             db.planes = db.planes.filter(p=>p.id!==id);
             db.generations.forEach(g=>{ if(g.planId===id) g.planId=null; });
@@ -11681,6 +11686,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function openGenerationModal(id=null) {
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
             const g = id ? db.generations.find(x=>x.id===id) : null;
             showModal(`<div class="p-6 max-w-md w-full"><h3 class="text-xl font-bold mb-5">${g?'Editar':'Nueva'} Generación</h3><form id="gen-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Plan de Formación</label><select id="gen-plan" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Sin asignar</option>${db.planes.map(p=>`<option value="${p.id}" ${g&&g.planId===p.id?'selected':''}>${p.nombre} (${p.tipo})</option>`).join('')}</select></div>
@@ -11749,6 +11755,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
 
         function deleteGeneration(id) {
+            if (!puedeGestionarCatalogoAcademia(currentUser)) return alert('Sin permisos');
             if (!confirm('¿Eliminar generación? Se eliminarán grupos asociados.')) return;
             db.generations = db.generations.filter(g=>g.id!==id);
             db.groups = db.groups.filter(gr=>gr.generationId!==id);
@@ -11817,6 +11824,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
          * agencia/desarrollador aunque la tabla les ocultara las acciones. */
         function puedeGestionarAcademia(u) {
             return hasRole(u, ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia']);
+        }
+        /* Catálogo académico: generaciones, planes y categorías. Una agencia
+         * gestiona sus grupos pero no define la formación de toda la escuela. */
+        function puedeGestionarCatalogoAcademia(u) {
+            return hasRole(u, ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador']);
         }
         function renderGroups() {
             // PATCH GM 2026-10: GM tiene acceso total a Academia (mismos permisos que maestro/capacitador)

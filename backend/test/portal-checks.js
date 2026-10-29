@@ -179,6 +179,19 @@ describe('permisos de grupos', () => {
     });
   });
 
+  it('Academia: el catálogo (generaciones, planes, categorías) es de docencia y staff', () => {
+    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'].forEach((role) => {
+      ['generations', 'planes', 'categories'].forEach((col) => {
+        assert.equal(roles.canWrite({ role }, col), true, role + ' debería escribir ' + col);
+      });
+    });
+    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto', 'editor', 'agencia'].forEach((role) => {
+      ['generations', 'planes', 'categories'].forEach((col) => {
+        assert.equal(roles.canWrite({ role }, col), false, role + ' no debería escribir ' + col);
+      });
+    });
+  });
+
   it('Mensajes: los grupos del equipo no los crea cualquier rol', () => {
     ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'].forEach((role) => {
       assert.equal(roles.canWrite({ role }, 'chatGroups'), true, role + ' debería crear grupos del equipo');

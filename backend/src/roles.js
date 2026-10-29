@@ -54,6 +54,12 @@ const COLLECTION_RULES = {
   /* Inscripciones: las mueve quien gestiona el grupo (mismos roles). Antes
    * cualquier alumno podía inscribirse o quitar compañeros por la API. */
   enrollments:  { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'] },
+  /* Catálogo académico (generaciones, planes y categorías de lecciones). Sin
+   * regla propia, cualquier rol autenticado podía crearlos o borrarlos por la
+   * API aunque el portal le ocultara los botones. */
+  generations:  { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
+  planes:       { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
+  categories:   { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
   /* Mensajes: «Nuevo grupo» es para agencia/GM/maestro/capacitador (mismo
    * reparto que puedeCrearGrupoEquipo en el portal). El borrado se limita a
    * GM dentro del handler DELETE, porque depende del grupo concreto. */

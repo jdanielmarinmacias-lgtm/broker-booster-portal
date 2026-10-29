@@ -173,6 +173,34 @@ describe('permisos de grupos (Mensajes y Academia)', () => {
   });
 });
 
+describe('permisos del catálogo de Academia', () => {
+  async function como(usuario, clave) {
+    jar.cookie = null;
+    const r = await api('POST', '/api/auth/login', { username: usuario, password: clave }, false);
+    assert.equal(r.status, 200, 'login ' + usuario);
+  }
+
+  it('un alumno no crea generaciones ni borra categorías (403)', async () => {
+    await como('alumno', 'Test1234*');
+    const g = await api('POST', '/api/data/generations', { name: 'Generación pirata' });
+    assert.equal(g.status, 403);
+    const c = await api('DELETE', '/api/data/categories/1');
+    assert.equal(c.status, 403);
+  });
+
+  it('un maestro crea y borra su plan y su categoría (201/200)', async () => {
+    await como('maestro', 'Test1234*');
+    const cat = await api('POST', '/api/data/categories', { name: 'Categoría temporal' });
+    assert.equal(cat.status, 201);
+    const delCat = await api('DELETE', '/api/data/categories/' + cat.json.item.id);
+    assert.equal(delCat.status, 200);
+    const plan = await api('POST', '/api/data/planes', { nombre: 'Plan temporal', tipo: 'curso' });
+    assert.equal(plan.status, 201);
+    const delPlan = await api('DELETE', '/api/data/planes/' + plan.json.item.id);
+    assert.equal(delPlan.status, 200);
+  });
+});
+
 describe('salud pública (regressión: ningún router la debe 401-izar)', () => {
   it('/api/salud responde sin sesión', async () => {
     const r = await api('GET', '/api/salud', null, false);
