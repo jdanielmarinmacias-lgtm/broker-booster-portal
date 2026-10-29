@@ -5147,7 +5147,7 @@ function borrarPublicidad(id){
             try{ const c=cotCfg(); if(!c.ia) c.ia={proveedor:'gemini', modelo:'', key:'', url:''}; return c.ia; }catch(e){ return {proveedor:'gemini', modelo:'', key:'', url:''}; }
         }
         function cotIaEndpoint(prov, cfg){
-            const modelos = { gemini:'gemini-2.0-flash', openai:'gpt-4o-mini', groq:'llama-3.3-70b-versatile', openrouter:'google/gemini-2.0-flash-001' };
+            const modelos = { gemini:'gemini-2.0-flash', openai:'gpt-4o-mini', groq:'openai/gpt-oss-120b', openrouter:'google/gemini-2.0-flash-001' };
             const modelo = cfg.modelo || modelos[prov];
             if(prov==='gemini') return { url:'https://generativelanguage.googleapis.com/v1beta/models/'+modelo+':generateContent', modelo, estilo:'gemini' };
             if(prov==='openai') return { url:'https://api.openai.com/v1/chat/completions', modelo, estilo:'openai' };
@@ -15010,7 +15010,7 @@ $('btnTestGroq')?.addEventListener('click', async ()=>{
     const resp = await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
       headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
-      body: JSON.stringify({model:'llama-3.3-70b-versatile', max_tokens:5, messages:[{role:'user',content:'hola'}]})
+      body: JSON.stringify({model:'openai/gpt-oss-120b', max_tokens:5, messages:[{role:'user',content:'hola'}]})
     });
     if(resp.ok){ toast('Groq OK'); updateGroqStatus(); } else { const t=await resp.text(); toast('Error: '+t.slice(0,60)); }
   }catch(e){ toast('Error de red'); }
@@ -15308,7 +15308,7 @@ async function callGroq(history){
     method:'POST',
     headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
     body: JSON.stringify({
-      model:'llama-3.3-70b-versatile',
+      model:'openai/gpt-oss-120b',
       temperature:0.85,
       max_tokens:120,
       messages: history

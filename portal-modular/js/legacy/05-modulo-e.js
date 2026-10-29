@@ -118,7 +118,7 @@ $('btnTestGroq')?.addEventListener('click', async ()=>{
     const resp = await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
       headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
-      body: JSON.stringify({model:'llama-3.3-70b-versatile', max_tokens:5, messages:[{role:'user',content:'hola'}]})
+      body: JSON.stringify({model:'openai/gpt-oss-120b', max_tokens:5, messages:[{role:'user',content:'hola'}]})
     });
     if(resp.ok){ toast('Groq OK'); updateGroqStatus(); } else { const t=await resp.text(); toast('Error: '+t.slice(0,60)); }
   }catch(e){ toast('Error de red'); }
@@ -416,7 +416,7 @@ async function callGroq(history){
     method:'POST',
     headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
     body: JSON.stringify({
-      model:'llama-3.3-70b-versatile',
+      model:'openai/gpt-oss-120b',
       temperature:0.85,
       max_tokens:120,
       messages: history

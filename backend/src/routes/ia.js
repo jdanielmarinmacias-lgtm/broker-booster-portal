@@ -25,9 +25,10 @@ const LIMITE_TOTAL = Number(process.env.IA_DIARIO_TOTAL || 3000);
 const LIMITE_MINUTO = Number(process.env.IA_MINUTO || 10);
 const LIMITE_MINUTO_TOTAL = Number(process.env.IA_MINUTO_TOTAL || 120);
 
-const MODELOS = String(process.env.IA_MODELOS ||
-  'openai/gpt-oss-120b,llama-3.3-70b-versatile,llama-3.1-8b-instant')
-  .split(',').map((s) => s.trim()).filter(Boolean);
+/* Groq movió Llama 3.1 8B y 3.3 70B al plan Enterprise: en esta cuenta ya no
+ * se sirven y el proxy los convertía en un 502. Solo se permite el modelo
+ * estable que usa el portal y que está verificado en producción. */
+const MODELOS = ['openai/gpt-oss-120b'];
 
 /* Proveedor real. Los tests lo sustituyen para no salir a la red. */
 let proveedor = async function llamarGroq(cuerpo, apiKey) {

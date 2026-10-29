@@ -5820,7 +5820,7 @@ function borrarPublicidad(id){
             try{ const c=cotCfg(); if(!c.ia) c.ia={proveedor:'gemini', modelo:'', key:'', url:''}; return c.ia; }catch(e){ return {proveedor:'gemini', modelo:'', key:'', url:''}; }
         }
         function cotIaEndpoint(prov, cfg){
-            const modelos = { gemini:'gemini-2.0-flash', openai:'gpt-4o-mini', groq:'llama-3.3-70b-versatile', openrouter:'google/gemini-2.0-flash-001' };
+            const modelos = { gemini:'gemini-2.0-flash', openai:'gpt-4o-mini', groq:'openai/gpt-oss-120b', openrouter:'google/gemini-2.0-flash-001' };
             const modelo = cfg.modelo || modelos[prov];
             if(prov==='gemini') return { url:'https://generativelanguage.googleapis.com/v1beta/models/'+modelo+':generateContent', modelo, estilo:'gemini' };
             if(prov==='openai') return { url:'https://api.openai.com/v1/chat/completions', modelo, estilo:'openai' };

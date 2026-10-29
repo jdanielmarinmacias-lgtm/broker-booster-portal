@@ -1148,11 +1148,23 @@ describe('IA por proxy con cupo (la clave no viaja al navegador)', () => {
     assert.equal(r.status, 400);
   });
 
+  it('rechaza los modelos legacy que Groq retiró, sin gastar cupo', async () => {
+    const antes = (await api('GET', '/api/ia/estado')).json.usados;
+    for (const model of ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']) {
+      const r = await api('POST', '/api/ia/chat', { model, messages: [{ role: 'user', content: 'hola' }] });
+      assert.equal(r.status, 400, model + ' debe rechazarse');
+      assert.match(r.json.error, /no permitido/i);
+    }
+    const despues = (await api('GET', '/api/ia/estado')).json.usados;
+    assert.equal(despues, antes, 'los modelos retirados no consumen cupo');
+  });
+
   it('devuelve la respuesta del proveedor y gasta cupo', async () => {
     const antes = await api('GET', '/api/ia/estado');
     assert.equal(antes.json && antes.json.disponible, true, 'estado: ' + JSON.stringify(antes));
     const r = await api('POST', '/api/ia/chat', { messages: [{ role: 'user', content: 'hola' }] });
     assert.equal(r.status, 200);
+    assert.equal(r.json.modelo, 'openai/gpt-oss-120b', 'el modelo por defecto debe ser el disponible');
     assert.equal(r.json.choices[0].message.content, 'respuesta de prueba');
     const despues = await api('GET', '/api/ia/estado');
     assert.equal(despues.json.usados, antes.json.usados + 1);
