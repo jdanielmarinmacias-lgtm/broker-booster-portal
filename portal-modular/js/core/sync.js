@@ -15,10 +15,12 @@
 (function () {
   'use strict';
 
-  /* loginAttempts: colección interna del servidor (rate-limit de login). El
-   * frontend la recibía en el bundle y la devolvía en cada push, donde el
-   * servidor respondía 401/404. Nunca debe viajar desde el navegador. */
-  var SKIP = { users: 1, sessions: 1, auditoria: 1, loginAttempts: 1 };
+  /* Colecciones que el navegador NO debe empujar al servidor:
+   * - loginAttempts/iaUso: estado interno del servidor.
+   * - guiaBase: se gestiona con endpoints dedicados desde AI Lobby (GM).
+   * - practicaConfig: configuración local del simulador; la clave propia vive
+   *   solo en localStorage y nunca en la base compartida. */
+  var SKIP = { users: 1, sessions: 1, auditoria: 1, loginAttempts: 1, iaUso: 1, guiaBase: 1, practicaConfig: 1 };
   var SHOWCASE = ['inmPublica', 'autoHub', 'posts', 'carruselCirculares', 'media'];
   /* Promotoría + escuela + chat: si otro equipo publica, el encargado lo ve
    * en vivo (el backend espeja estas al public_feed). */
@@ -63,8 +65,8 @@
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
   /* Colecciones-OBJETO: settings, autoHub, inmPublica, carruselCirculares,
-   * prospectos, expedientesProspectos, rolePermissions, guiaBase, guiaChats,
-   * practicaConfig, oferta_valor. */
+   * prospectos, expedientesProspectos, rolePermissions, guiaChats, oferta_valor.
+   * guiaBase y practicaConfig quedan fuera del sync (ver SKIP). */
   function isPlain(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
 
   /* El legacy vive en mundo numérico (id: 1, students: [3], === estricto) pero

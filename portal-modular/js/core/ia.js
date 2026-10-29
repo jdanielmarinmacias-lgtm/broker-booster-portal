@@ -13,17 +13,22 @@
   'use strict';
 
   var PROVEEDOR_POR_DEFECTO = 'https://api.groq.com/openai/v1/chat/completions';
+  var LEGACY_KEY = 'groq_api_key';
+  var PROPIA_KEY = 'bb_api_key_propia';
 
-  /* Clave del propio usuario: la que pegó en Config IA o guardó en el navegador.
-   * La del portal ya no se descarga nunca, así que lo que haya aquí es suya. */
+  /* Clave del propio usuario. La nueva vive SOLO en este navegador
+   * (bb_api_key_propia): nunca en la base compartida ni en `practicaConfig`.
+   * `groq_api_key` se conserva como compatibilidad para Teo y para claves
+   * propias capturadas antes de la rotación; la copia de la clave DEL PORTAL
+   * se elimina con purgarCopiaServidor cuando su huella coincide. */
   function clavePropia() {
     try {
-      var guardada = String(localStorage.getItem('groq_api_key') || '').trim();
-      if (/^gsk_[A-Za-z0-9_-]{20,}$/.test(guardada)) return guardada;
-      if (window.psAPIKey) return String(window.psAPIKey);
-      var db = (typeof psGetDB === 'function') ? psGetDB() : null;
-      var conf = (db && db.practicaConfig) || {};
-      return String(conf.apiKey || '');
+      var propia = String(localStorage.getItem(PROPIA_KEY) || '').trim();
+      if (propia) return propia;
+      var legacy = String(localStorage.getItem(LEGACY_KEY) || '').trim();
+      if (legacy) return legacy;
+      if (window.psAPIKey) return String(window.psAPIKey).trim();
+      return '';
     } catch (e) { return ''; }
   }
 
@@ -49,20 +54,19 @@
       } catch (e) { IA.servidor = false; return null; }
     },
 
-    /* El código anterior descargaba la clave del portal a localStorage. Esas
-     * copias ya no sirven para nada (y no deberían estar ahí), así que se
-     * borran comparando su huella. La clave propia del usuario NO coincide con
-     * la del servidor y se conserva. */
+    /* El código anterior descargaba la clave del portal a localStorage. Se
+     * borra si su huella coincide con la del servidor; así no se toca una
+     * clave propia del usuario que viva en el mismo slot legado. */
     purgarCopiaServidor: async function (huella) {
       try {
-        var guardada = String(localStorage.getItem('groq_api_key') || '').trim();
+        var guardada = String(localStorage.getItem(LEGACY_KEY) || '').trim();
         if (!guardada || !window.crypto || !crypto.subtle || !crypto.subtle.digest) return;
         var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(guardada));
         var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
           return ('0' + b.toString(16)).slice(-2);
         }).join('').slice(0, huella.length);
         if (hex === huella) {
-          localStorage.removeItem('groq_api_key');
+          localStorage.removeItem(LEGACY_KEY);
           try { if (window.psAPIKey === guardada) window.psAPIKey = ''; } catch (e0) {}
           console.info('[IA] copia local de la clave del portal eliminada');
         }

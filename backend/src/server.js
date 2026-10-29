@@ -22,7 +22,7 @@ function createApp(store) {
   app.use(express.json({ limit: '10mb' }));
   app.use(mw.loadSession(store));
   // NOTA: No montar refreshCache global en /api: rutas rápidas como /api/auth/me,
-  // /api/auth/login, /api/public/config y /api/ia/key no necesitan recargar
+  // /api/auth/login, /api/public/config y /api/ia/estado no necesitan recargar
   // toda la tabla documents. Las rutas de datos invocan store.refreshIfStale()
   // o store.refreshForWrite(collections) explícitamente.
 

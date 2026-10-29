@@ -27,7 +27,7 @@ module.exports = {
   cookieSecure: String(process.env.COOKIE_SECURE || 'false') === 'true',
   /* IA del portal (Groq). Viene de GROQ_API_KEY (env en Vercel o .env local).
    * NUNCA se escribe la clave en el código (GitHub Push Protection) ni en
-   * estáticos: solo viaja por GET /api/ia/key con sesión válida. */
+   * estáticos: solo la usa el proxy /api/ia/chat en el servidor. */
   groqApiKey: process.env.GROQ_API_KEY || null,
   cookieName: 'bb_session',
   // Sirve ../portal-modular como frontend

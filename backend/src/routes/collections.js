@@ -13,6 +13,11 @@ const mw = require('../middleware');
 /* loginAttempts es estado interno del servidor (rate-limit de login): no debe
  * salir en el bundle ni volver por la API desde el navegador. */
 const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts', 'iaUso']);
+/* Contenido que NUNCA viaja en el bundle inicial, ni siquiera para dirección:
+ * son documentos grandes/config y el cliente los pide solo cuando abre su
+ * pantalla (AI Lobby). Así una sesión normal no recibe la base de conocimiento
+ * completa ni una eventual clave de Práctica. */
+const EXCLUDE_FROM_BUNDLE = new Set(['guiaBase', 'practicaConfig']);
 /* Escaparate (portada) + promotoría (encargados) + escuela/chat: todo lo nuevo
  * avisa en vivo por public_feed. El frontend re-hace pull de estas + toast. */
 const FEED_COLLECTIONS = new Set([
@@ -85,13 +90,71 @@ function puedeContactarDirecto(root, a, b) {
   return (Array.isArray(root.groups) ? root.groups : []).some((g) => g && enGrupo(g, a) && enGrupo(g, b));
 }
 
+/* ===== CHAT DE GRUPO DE ACADEMIA (groupMessages) =====
+ * `groupId` apunta a `groups` (aula), no a chatGroups. El alumno entra por
+ * inscripción (`enrollments`) o por la lista `students`; el tutor por tutorId. */
+function grupoAcademia(root, id) {
+  return (Array.isArray(root.groups) ? root.groups : [])
+    .find((g) => g && String(g.id) === String(id)) || null;
+}
+function esMiembroAcademia(root, grupo, user) {
+  if (!grupo || !user) return false;
+  const uid = String(user.id);
+  if (String(grupo.tutorId) === uid) return true;
+  if ([].concat(grupo.students || []).map(String).includes(uid)) return true;
+  return (Array.isArray(root.enrollments) ? root.enrollments : []).some(
+    (e) => e && String(e.groupId) === String(grupo.id) && String(e.userId) === uid
+  );
+}
+/* Docencia/staff que administra el aula. `isTeacher` es exactamente el mismo
+ * reparto que puede gestionar grupos, así que ve el chat en el detalle de
+ * cualquier grupo (no solo el suyo); el alumno sigue limitado a su aula. */
+const esStaffAula = (user) => roles.isTeacher(user);
+
 /* ===== LECTURA: filtro por propietario ===== 
  * Antes, cualquier sesión leía ventas/cotizaciones/siniestros/mensajes de todos
  * (y bundle las devolvía enteras). Ahora el personal con visión completa ve
  * todo; el resto solo ve lo suyo. */
 const FULL_READ_ROLES = ['admin', 'gm', 'desarrollador', 'agencia', 'maestro', 'capacitador', 'editor'];
 const OWNED_COLLECTIONS = new Set(['ventas', 'cotizaciones', 'siniestros']);
-const RESTRICTED_OBJECTS = new Set(['prospectos', 'expedientesProspectos']);
+/* Objetos { [userId]: … } donde cada quien escribe y lee SOLO su clave. Antes
+ * un alumno podía sobrescribir la agenda o el historial de Gu-IA de otro con
+ * un PUT a /api/data/agendas/<id ajeno>. */
+const RESTRICTED_OBJECTS = new Set(['prospectos', 'expedientesProspectos', 'agendas', 'guiaAgenda', 'guiaChats']);
+/* Registros personales: cada fila pertenece a un usuario. El dueño (y la
+ * autoridad de su área) puede escribirla; nadie más, aunque conozca el id. */
+const CARTERA_AUTORIDAD = (u) => roles.hasRole(u, ['admin', 'gm', 'desarrollador', 'agencia']);
+const OWNED_RECORD_FIELDS = {
+  taskSubmissions: 'studentId',
+  progress: 'userId',
+  examAttempts: 'userId',
+  practicaSesiones: 'usuarioId',
+  clientes: 'agenteId',
+  autoCartera: 'agenteId',
+  finCartera: 'agenteId',
+  inmCartera: 'agenteId',
+};
+const REGISTRO_AUTORIDAD = {
+  taskSubmissions: (u) => roles.isTeacher(u),
+  progress: (u) => roles.isTeacher(u),
+  examAttempts: (u) => roles.isTeacher(u),
+  practicaSesiones: (u) => roles.isTeacher(u),
+  clientes: CARTERA_AUTORIDAD,
+  autoCartera: CARTERA_AUTORIDAD,
+  finCartera: CARTERA_AUTORIDAD,
+  inmCartera: CARTERA_AUTORIDAD,
+};
+function campoDueno(collection) { return OWNED_RECORD_FIELDS[collection] || null; }
+function administraRegistros(collection, user) {
+  const f = REGISTRO_AUTORIDAD[collection];
+  return !!f && f(user);
+}
+function esRegistroAjeno(collection, rec, user) {
+  const campo = campoDueno(collection);
+  if (!campo || !rec) return false;
+  if (administraRegistros(collection, user)) return false;
+  return String(rec[campo]) !== String(user && user.id);
+}
 const canReadAll = (user) => FULL_READ_ROLES.includes(String((user && user.role) || '').toLowerCase());
 
 /* Objetos privados por usuario (prospectos/expedientesProspectos se guardan
@@ -164,6 +227,9 @@ function filtrarLectura(user, collection, items, root) {
   }
   if (canReadAll(user)) return items;
   const uid = String(user.id);
+  /* Avance, entregas, intentos y cartera: el alumno/agente ve solo lo suyo. */
+  const campo = campoDueno(collection);
+  if (campo) return items.filter((x) => x && String(x[campo]) === uid);
   if (OWNED_COLLECTIONS.has(collection)) {
     /* cotizaciones guarda al solicitante en `creadoPor.id` (no en agenteId):
      * sin leer esa ruta, un agente que pedía una cotización no la volvía a ver
@@ -174,7 +240,7 @@ function filtrarLectura(user, collection, items, root) {
       || String((x.creadoPor && x.creadoPor.id) ?? '') === uid
     ));
   }
-  if (collection === 'messages' || collection === 'groupMessages') {
+  if (collection === 'messages') {
     return items.filter((m) => {
       if (!m) return false;
       if (String(m.fromId ?? '') === uid || String(m.toId ?? '') === uid) return true;
@@ -185,6 +251,15 @@ function filtrarLectura(user, collection, items, root) {
       }
       return false;
     });
+  }
+  /* Chat de aula: el alumno ve los mensajes del grupo al que está inscrito.
+   * Antes se comparaba fromId/toId y groupMessages guarda authorId/groupId:
+   * el alumno no veía NINGÚN mensaje de su grupo. */
+  if (collection === 'groupMessages') {
+    return items.filter((m) => m && (
+      String(m.authorId ?? '') === uid
+      || esMiembroAcademia(root, grupoAcademia(root, m.groupId), user)
+    ));
   }
   return items;
 }
@@ -227,6 +302,21 @@ const KNOWN_OBJECTS = new Set([
   'guiaAgenda', // agenda del prospecto (Gu-IA)
 ]);
 const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/* `practicaConfig` es configuración LOCAL del simulador (proveedor, URL,
+ * modelo). Las claves de API jamás deben guardarse en la base compartida: si
+ * un cliente viejo las manda, se descartan antes de persistir y nunca se
+ * devuelven en una lectura. */
+const CAMPOS_SECRETOS_CONFIG = /^(apiKey|api_key|secret|token|password|authorization)$/i;
+function sinSecretosConfig(obj) {
+  if (!isPlain(obj)) return { valor: obj, quitados: 0 };
+  const out = { ...obj };
+  let quitados = 0;
+  for (const k of Object.keys(out)) {
+    if (CAMPOS_SECRETOS_CONFIG.test(k)) { delete out[k]; quitados++; }
+  }
+  return { valor: out, quitados };
+}
 
 module.exports = (store, config) => {
   const r = express.Router();
@@ -361,6 +451,7 @@ module.exports = (store, config) => {
       for (const k of KNOWN_OBJECTS) if (!FORBIDDEN.has(k)) set.add(k);
       const bundle = {};
       for (const col of set) {
+        if (EXCLUDE_FROM_BUNDLE.has(col)) continue;
         if (!roles.canRead(req.user, col)) continue;
         if (isPlain(data[col])) {
           bundle[col] = {
@@ -415,6 +506,11 @@ module.exports = (store, config) => {
       if (typeof store.refreshCollections === 'function') await store.refreshCollections(deps);
       else await store.refreshIfStale();
       const root = store.get();
+      /* Configuración de Práctica: se entrega saneada y solo a dirección
+       * (roles.canRead ya lo exige arriba). Nunca incluye apiKey/token. */
+      if (collection === 'practicaConfig') {
+        return res.json({ ok: true, object: sinSecretosConfig(root[collection]).valor || {} });
+      }
       // Objeto: NUNCA pasar por db.collection (coaccionaría a []).
       if (RESTRICTED_OBJECTS.has(collection) && !canReadAll(req.user)) {
         return res.json({ ok: true, object: filtrarObjetoPrivado(req.user, root[collection]) });
@@ -455,7 +551,15 @@ module.exports = (store, config) => {
        * entrada con adapter.pushAudit (ver store.persistCollections). */
       await store.refreshForWrite([collection]);
       const root = store.get();
-      const body = req.body || {};
+      let body = req.body || {};
+      /* Nunca persistir claves de API en la configuración compartida. */
+      if (collection === 'practicaConfig') {
+        const limpio = sinSecretosConfig(body);
+        if (limpio.quitados && !Object.keys(limpio.valor || {}).length) {
+          return res.status(400).json({ ok: false, error: 'No se guardan claves de API en la configuración compartida' });
+        }
+        body = limpio.valor;
+      }
       /* Guardas de comunidad Mensajes (chatGroups + mensajes a grupos). */
       if (collection === 'chatGroups' && !isStaffComunicacion(req.user)) {
         const existente = chatGroupById(root, body.id);
@@ -490,6 +594,46 @@ module.exports = (store, config) => {
           if (fromU && toU && !isStaffComunicacion(req.user) && !puedeContactarDirecto(root, fromU, toU)) {
             return res.status(403).json({ ok: false, error: 'Solo puedes escribir a los usuarios asignados' });
           }
+        }
+      }
+      /* Chat del aula: solo miembros (o staff) publican; el autor SIEMPRE es
+       * la sesión. Sin esto cualquier alumno escribía en el grupo de otro. */
+      if (collection === 'groupMessages') {
+        const existente = body.id !== undefined && body.id !== null
+          ? (Array.isArray(root.groupMessages) ? root.groupMessages : [])
+            .find((x) => x && String(x.id) === String(body.id))
+          : null;
+        const grupo = grupoAcademia(root, body.groupId);
+        if (!grupo && !existente) {
+          return res.status(403).json({ ok: false, error: 'Grupo no encontrado' });
+        }
+        if (!esStaffAula(req.user)) {
+          if (existente) {
+            if (String(existente.authorId) !== String(req.user.id)) {
+              return res.status(403).json({ ok: false, error: 'Solo el autor puede editar este mensaje' });
+            }
+          } else if (!esMiembroAcademia(root, grupo, req.user)) {
+            return res.status(403).json({ ok: false, error: 'No eres miembro de este grupo' });
+          }
+        }
+        // El autor de un mensaje nuevo siempre es la sesión (nadie lo suplanta).
+        if (!existente) body.authorId = req.user.id;
+      }
+      /* Registros personales: el dueño sale de la sesión, no del cuerpo. */
+      const campoRegistro = campoDueno(collection);
+      if (campoRegistro) {
+        const existente = body.id !== undefined && body.id !== null
+          ? (Array.isArray(root[collection]) ? root[collection] : [])
+            .find((x) => x && String(x.id) === String(body.id))
+          : null;
+        if (esRegistroAjeno(collection, existente, req.user)) {
+          return res.status(403).json({ ok: false, error: 'Solo puedes escribir tus propios registros' });
+        }
+        if (!administraRegistros(collection, req.user)) {
+          if (body[campoRegistro] !== undefined && String(body[campoRegistro]) !== String(req.user.id)) {
+            return res.status(403).json({ ok: false, error: 'Solo puedes escribir tus propios registros' });
+          }
+          body[campoRegistro] = req.user.id;
         }
       }
       // Objeto: merge por claves top-level (protege el objeto; jamás []).
@@ -577,10 +721,15 @@ module.exports = (store, config) => {
         if (!('value' in (req.body || {}))) {
           return res.status(400).json({ ok: false, error: 'Se espera { value }' });
         }
+        if (collection === 'practicaConfig' && CAMPOS_SECRETOS_CONFIG.test(String(id))) {
+          return res.status(400).json({ ok: false, error: 'No se guardan claves de API en la configuración compartida' });
+        }
         if (RESTRICTED_OBJECTS.has(collection) && !soloSuyaLaClave(req.user, id)) {
           return res.status(403).json({ ok: false, error: 'Solo puedes editar tu propio expediente' });
         }
-        root[collection][id] = req.body.value === null ? null : req.body.value;
+        let valor = req.body.value === null ? null : req.body.value;
+        if (collection === 'practicaConfig') valor = sinSecretosConfig(valor).valor;
+        root[collection][id] = valor;
         db.audit(store.get(), `edicion_${collection}`, req.user, { clave: id });
         await store.persistCollections([collection, 'auditoria']);
         if (FEED_COLLECTIONS.has(collection)) {
@@ -591,6 +740,22 @@ module.exports = (store, config) => {
       const col = db.collection(store.get(), collection);
       const rec = db.byId(col, id);
       if (!rec) return res.status(404).json({ ok: false, error: 'No encontrado' });
+      // groupMessages: editar solo el autor o staff.
+      if (collection === 'groupMessages' && !esStaffAula(req.user)
+        && String(rec.authorId) !== String(req.user.id)) {
+        return res.status(403).json({ ok: false, error: 'Solo el autor puede editar este mensaje' });
+      }
+      // Registros personales: no se transfiere el dueño ni se edita el ajeno.
+      const campoRegistroPut = campoDueno(collection);
+      if (campoRegistroPut) {
+        if (esRegistroAjeno(collection, rec, req.user)) {
+          return res.status(403).json({ ok: false, error: 'Solo puedes escribir tus propios registros' });
+        }
+        if (!administraRegistros(collection, req.user)) {
+          req.body = req.body || {};
+          req.body[campoRegistroPut] = req.user.id;
+        }
+      }
       // chatGroups: editar solo creador/admins/grupo staff.
       if (collection === 'chatGroups' && !isStaffComunicacion(req.user) && !isGroupAdmin(rec, req.user)) {
         return res.status(403).json({ ok: false, error: 'Solo admins del grupo pueden modificarlo' });
@@ -639,6 +804,27 @@ module.exports = (store, config) => {
         db.audit(data, `borrado_${collection}`, req.user, { clave: id });
         await store.persistCollections([collection, 'auditoria']);
         return res.json({ ok: true });
+      }
+      /* Chat del aula: el tutor puede limpiar mensajes al borrar su grupo; el
+       * alumno solo los propios. Sin esto, cualquiera borraba el chat ajeno. */
+      if (collection === 'groupMessages') {
+        const msg = (data.groupMessages || []).find((x) => x && String(x.id) === String(id));
+        if (msg && !esStaffAula(req.user)
+          && String(msg.authorId) !== String(req.user.id)) {
+          const grupo = grupoAcademia(data, msg.groupId);
+          const esTutor = grupo && String(grupo.tutorId) === String(req.user.id);
+          if (!esTutor) {
+            return res.status(403).json({ ok: false, error: 'Solo el autor o el tutor puede borrar este mensaje' });
+          }
+        }
+      }
+      // Registros personales: borrar solo lo propio (o con autoridad del área).
+      if (campoDueno(collection)) {
+        const recDel = (data[collection] || []).find((x) => x && String(x.id) === String(id));
+        if (!recDel) return res.status(404).json({ ok: false, error: 'No encontrado' });
+        if (esRegistroAjeno(collection, recDel, req.user)) {
+          return res.status(403).json({ ok: false, error: 'Solo puedes borrar tus propios registros' });
+        }
       }
       const before = (data[collection] || []).length;
       /* chatGroups: el portal solo ofrece la papelera a un GM (regla de

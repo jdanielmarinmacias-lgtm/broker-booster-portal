@@ -9,10 +9,13 @@
     "dev": "node --watch src/server.js",
     "seed": "node src/seed.js",
     "import": "node src/import.js",
-    "test": "node --test test/smoke.js",
+    "test": "node --test test/smoke.js test/permissions.js test/rate-limit.js test/guia-context.js",
     "storage:inventario": "node tools/storage-inventory.js",
     "storage:optimizar": "node tools/optimize-storage.js",
-    "uploads:migrar": "node scripts/migrate-uploads.js"
+    "uploads:migrar": "node scripts/migrate-uploads.js",
+    "db:backup": "node scripts/backup.js",
+    "db:backup:verify": "node scripts/backup.js --verify",
+    "db:scrub-keys": "node scripts/scrub-keys.js"
   },
   "engines": {
     "node": ">=20"

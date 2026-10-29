@@ -18,6 +18,6 @@
   },
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i portal-modular/css/tailwind.src.css -o portal-modular/css/tailwind.min.css --minify",
-    "test": "node --test backend/test/portal-checks.js backend/test/smoke.js"
+    "test": "node --test backend/test/portal-checks.js backend/test/smoke.js backend/test/permissions.js backend/test/rate-limit.js backend/test/guia-context.js"
   }
 }

@@ -6,6 +6,10 @@ function createMemoryAdapter(initial) {
   let docs = initial ? JSON.parse(JSON.stringify(initial)) : {};
   const sessions = new Map();
   const feed = [];
+  /* Estado efímero compartido (cuota IA / intentos de login). En memoria no
+   * hay concurrencia real: el evento de Node es el punto de serialización. */
+  const estados = new Map();
+  const claveEstado = (col, id) => String(col) + '∅' + String(id);
   if (!Array.isArray(docs.users)) docs.users = [];
   return {
     kind: 'memory',
@@ -33,6 +37,31 @@ function createMemoryAdapter(initial) {
       else docs.users.push(JSON.parse(JSON.stringify(row)));
     },
     async deleteUser(id) { docs.users = (docs.users || []).filter((x) => String(x.id) !== String(id)); },
+    async getEstado(collection, docId) {
+      const v = estados.get(claveEstado(collection, docId));
+      return v ? JSON.parse(JSON.stringify(v)) : null;
+    },
+    async putEstado(collection, docId, value) {
+      const next = JSON.parse(JSON.stringify(value || {}));
+      next._t = Date.now();
+      estados.set(claveEstado(collection, docId), next);
+    },
+    async bumpEstado(collection, docId, field, delta) {
+      const k = claveEstado(collection, docId);
+      const cur = estados.get(k) || {};
+      const next = Math.max(0, Number(cur[field] || 0) + Number(delta || 0));
+      estados.set(k, { ...cur, [field]: next, _t: Date.now() });
+      return next;
+    },
+    async pruneEstado(collection, antesDeMs) {
+      const limite = Number(antesDeMs) || 0;
+      let removed = 0;
+      for (const [k, v] of estados) {
+        if (!k.startsWith(String(collection) + '∅')) continue;
+        if (Number(v && v._t) < limite) { estados.delete(k); removed++; }
+      }
+      return removed;
+    },
     async getSession(token) { return sessions.get(token) || null; },
     async setSession(token, s) { sessions.set(token, s); },
     async deleteSession(token) { sessions.delete(token); },

@@ -13,12 +13,17 @@
  * ========================================================================== */
 const express = require('express');
 const mw = require('../middleware');
+const { construirContexto, inyectarContexto } = require('../guiaContext');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MAX_CHARS = 120000;      // conversación completa (≈ 30k tokens)
 const MAX_TOKENS = 4000;       // tope por respuesta
 const LIMITE_USUARIO = Number(process.env.IA_DIARIO || 300);
 const LIMITE_TOTAL = Number(process.env.IA_DIARIO_TOTAL || 3000);
+/* Rate-limit por minuto: frena ráfagas (script, doble clic, reintentos) sin
+ * castigar el uso normal. El cupo diario sigue siendo el techo económico. */
+const LIMITE_MINUTO = Number(process.env.IA_MINUTO || 10);
+const LIMITE_MINUTO_TOTAL = Number(process.env.IA_MINUTO_TOTAL || 120);
 
 const MODELOS = String(process.env.IA_MODELOS ||
   'openai/gpt-oss-120b,llama-3.3-70b-versatile,llama-3.1-8b-instant')
@@ -45,7 +50,9 @@ let proveedor = async function llamarGroq(cuerpo, apiKey) {
 };
 
 const dia = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+const minuto = () => new Date().toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm (UTC)
 const claveUso = (quien) => String(quien) + ':' + dia();
+const claveMinuto = (quien) => String(quien) + ':' + minuto();
 
 module.exports = (store, config) => {
   const r = express.Router();
@@ -63,7 +70,12 @@ module.exports = (store, config) => {
       const huella = config.groqApiKey
         ? require('crypto').createHash('sha256').update(String(config.groqApiKey)).digest('hex').slice(0, 12)
         : null;
-      res.json({ ok: true, disponible, limite: LIMITE_USUARIO, usados, restantes: Math.max(0, LIMITE_USUARIO - usados), huella });
+      res.json({
+        ok: true, disponible,
+        limite: LIMITE_USUARIO, usados, restantes: Math.max(0, LIMITE_USUARIO - usados),
+        limiteMinuto: LIMITE_MINUTO,
+        huella,
+      });
     } catch (e) { next(e); }
   });
 
@@ -102,28 +114,39 @@ module.exports = (store, config) => {
         if (body[k] !== undefined) cuerpo[k] = body[k];
       });
 
-      /* Cupo: se cobra ANTES de llamar (dos peticiones simultáneas no se cuelan).
-       * Si el proveedor falla por red/5xx se devuelve, para no castigar al usuario. */
-      const uso = await leerUso(req.user.id);
-      if (uso.total >= LIMITE_TOTAL) {
-        res.setHeader('Retry-After', '3600');
-        return res.status(429).json({ ok: false, error: 'La IA del portal alcanzó su límite diario. Intenta mañana.' });
-      }
-      if (uso.usuario >= LIMITE_USUARIO) {
-        res.setHeader('Retry-After', '3600');
+      /* Base de conocimiento server-side: `guiaBase` ya no viaja en el bundle.
+       * Se eligen los 3 documentos más relevantes y se inyectan en el prompt.
+       * Si la colección no está disponible, se responde con el prompt del
+       * cliente (degradación limpia, sin bloquear la IA). */
+      try {
+        if (typeof store.refreshCollections === 'function') {
+          await store.refreshCollections(['guiaBase']);
+        }
+        const ultimo = [...mensajes].reverse().find((m) => m && m.role === 'user');
+        const consulta = ultimo
+          ? (typeof ultimo.content === 'string' ? ultimo.content : JSON.stringify(ultimo.content))
+          : '';
+        const contexto = construirContexto((store.get() || {}).guiaBase, consulta);
+        if (contexto) cuerpo.messages = inyectarContexto(cuerpo.messages, contexto);
+      } catch (e) { /* sin base: se conserva el prompt original */ }
+
+      /* Cupo: se reserva ANTES de llamar con incrementos atómicos. Si el
+       * proveedor falla por red/5xx, se devuelve para no castigar al usuario. */
+      const cupo = await reservarCupo(req.user.id);
+      if (!cupo.ok) {
+        res.setHeader('Retry-After', String(cupo.retryAfter || 60));
         return res.status(429).json({
           ok: false,
-          error: 'Alcanzaste tu límite diario de IA (' + LIMITE_USUARIO + '). Se renueva a medianoche.',
-          limite: LIMITE_USUARIO,
+          error: cupo.error,
+          ...(cupo.limite ? { limite: cupo.limite } : {}),
         });
       }
-      await sumarUso(req.user.id, 1, 1);
 
       let salida;
       try {
         salida = await proveedor(cuerpo, config.groqApiKey);
       } catch (e) {
-        await sumarUso(req.user.id, -1, -1).catch(() => {});
+        await devolverCupo(cupo.reservas);
         if (e && e.name === 'AbortError') {
           return res.status(504).json({ ok: false, error: 'La IA tardó demasiado en responder' });
         }
@@ -133,7 +156,7 @@ module.exports = (store, config) => {
       if (!salida.ok) {
         /* 401/403 del proveedor = clave inválida o revocada: no es culpa del
          * usuario y no debe consumirle cupo. */
-        await sumarUso(req.user.id, -1, -1).catch(() => {});
+        await devolverCupo(cupo.reservas);
         if (salida.status === 401 || salida.status === 403) {
           console.error('[ia] el proveedor rechazó la clave:', salida.status);
           return res.status(503).json({ ok: false, error: 'IA no disponible: la clave del servidor no es válida' });
@@ -141,43 +164,113 @@ module.exports = (store, config) => {
         const detalle = (salida.json && salida.json.error && salida.json.error.message) || ('HTTP ' + salida.status);
         return res.status(502).json({ ok: false, error: 'La IA respondió con error: ' + String(detalle).slice(0, 200) });
       }
-      if (!salida.json) return res.status(502).json({ ok: false, error: 'Respuesta ilegible de la IA' });
+      if (!salida.json) {
+        await devolverCupo(cupo.reservas);
+        return res.status(502).json({ ok: false, error: 'Respuesta ilegible de la IA' });
+      }
       res.json(salida.json);
     } catch (e) { next(e); }
   });
 
-  /* Contador compartido. Si no hay adaptador con estado (memoria/json), el cupo
-   * se lleva en proceso: suficiente para desarrollo, y el login sigue protegido. */
+  /* Contador compartido. Si el adaptador no tiene estado, se lleva en proceso:
+   * suficiente para desarrollo, y el login sigue protegido por su propio Map. */
   const memoria = new Map();
-  async function leerUso(userId) {
+  const claveMemoria = (collection, key) => String(collection) + '∅' + String(key);
+
+  async function leerEstado(collection, key) {
     if (typeof store.adapter.getEstado === 'function') {
-      try {
-        const [u, g] = await Promise.all([
-          store.adapter.getEstado('iaUso', claveUso(userId)),
-          store.adapter.getEstado('iaUso', claveUso('global')),
-        ]);
-        return { usuario: Number((u && u.n) || 0), total: Number((g && g.n) || 0) };
-      } catch (e) { /* cae a memoria */ }
+      try { return await store.adapter.getEstado(collection, key); } catch (e) { /* memoria */ }
     }
-    return { usuario: memoria.get(claveUso(userId)) || 0, total: memoria.get(claveUso('global')) || 0 };
+    return memoria.get(claveMemoria(collection, key)) || null;
   }
-  async function sumarUso(userId, deltaUsuario, deltaGlobal) {
-    const k = claveUso(userId);
-    const kg = claveUso('global');
-    if (typeof store.adapter.getEstado === 'function') {
-      const [u, g] = await Promise.all([
-        store.adapter.getEstado('iaUso', k),
-        store.adapter.getEstado('iaUso', kg),
-      ]);
-      await Promise.all([
-        store.adapter.putEstado('iaUso', k, { id: k, n: Math.max(0, Number((u && u.n) || 0) + deltaUsuario) }),
-        store.adapter.putEstado('iaUso', kg, { id: kg, n: Math.max(0, Number((g && g.n) || 0) + deltaGlobal) }),
-      ]);
-      podar();
-      return;
+
+  async function escribirEstado(collection, key, value) {
+    if (typeof store.adapter.putEstado === 'function') {
+      try { await store.adapter.putEstado(collection, key, value); return; } catch (e) { /* memoria */ }
     }
-    memoria.set(k, Math.max(0, (memoria.get(k) || 0) + deltaUsuario));
-    memoria.set(kg, Math.max(0, (memoria.get(kg) || 0) + deltaGlobal));
+    memoria.set(claveMemoria(collection, key), { ...(value || {}) });
+  }
+
+  /* Incremento atómico si el adaptador lo soporta (Supabase con la migración
+   * rate_limit, o los adaptadores locales); si no, GET+PUT como fallback. */
+  async function bump(collection, key, field, delta) {
+    if (typeof store.adapter.bumpEstado === 'function') {
+      try { return await store.adapter.bumpEstado(collection, key, field, delta); }
+      catch (e) { /* fallback */ }
+    }
+    const cur = await leerEstado(collection, key);
+    const next = Math.max(0, Number((cur && cur[field]) || 0) + Number(delta || 0));
+    await escribirEstado(collection, key, { ...(cur || {}), [field]: next });
+    return next;
+  }
+
+  async function leerUso(userId) {
+    const [u, g] = await Promise.all([
+      leerEstado('iaUso', claveUso(userId)),
+      leerEstado('iaUso', claveUso('global')),
+    ]);
+    return { usuario: Number((u && u.n) || 0), total: Number((g && g.n) || 0) };
+  }
+
+  /* Reserva los cuatro topes en orden. Si uno falla, devuelve TODO lo
+   * reservado: un rechazo no debe consumir cuota. */
+  async function reservarCupo(userId) {
+    /* Pre-chequeo barato: si ya está agotado, no se hacen 4 escrituras por
+     * cada reintento. El bump atómico de abajo sigue siendo la autoridad. */
+    const [minU, minG, uso] = await Promise.all([
+      leerEstado('iaUso', claveMinuto(userId)),
+      leerEstado('iaUso', claveMinuto('global')),
+      leerUso(userId),
+    ]);
+    if (Number((minU && minU.n) || 0) >= LIMITE_MINUTO) {
+      return { ok: false, retryAfter: 30, limite: LIMITE_MINUTO,
+        error: 'Vas muy rápido: máximo ' + LIMITE_MINUTO + ' mensajes por minuto. Espera unos segundos.' };
+    }
+    if (Number((minG && minG.n) || 0) >= LIMITE_MINUTO_TOTAL) {
+      return { ok: false, retryAfter: 30, limite: LIMITE_MINUTO_TOTAL,
+        error: 'La IA está recibiendo muchas solicitudes. Reintenta en unos segundos.' };
+    }
+    if (uso.total >= LIMITE_TOTAL) {
+      return { ok: false, retryAfter: 3600,
+        error: 'La IA del portal alcanzó su límite diario. Intenta mañana.' };
+    }
+    if (uso.usuario >= LIMITE_USUARIO) {
+      return { ok: false, retryAfter: 3600, limite: LIMITE_USUARIO,
+        error: 'Alcanzaste tu límite diario de IA (' + LIMITE_USUARIO + '). Se renueva a medianoche.' };
+    }
+
+    const reservas = [];
+    const pasos = [
+      { key: claveMinuto(userId), limite: LIMITE_MINUTO, retryAfter: 30,
+        error: 'Vas muy rápido: máximo ' + LIMITE_MINUTO + ' mensajes por minuto. Espera unos segundos.' },
+      { key: claveMinuto('global'), limite: LIMITE_MINUTO_TOTAL, retryAfter: 30,
+        error: 'La IA está recibiendo muchas solicitudes. Reintenta en unos segundos.' },
+      { key: claveUso(userId), limite: LIMITE_USUARIO, retryAfter: 3600,
+        error: 'Alcanzaste tu límite diario de IA (' + LIMITE_USUARIO + '). Se renueva a medianoche.' },
+      { key: claveUso('global'), limite: LIMITE_TOTAL, retryAfter: 3600,
+        error: 'La IA del portal alcanzó su límite diario. Intenta mañana.' },
+    ];
+    try {
+      for (const p of pasos) {
+        const n = await bump('iaUso', p.key, 'n', 1);
+        reservas.push(p.key);
+        if (n > p.limite) {
+          await devolverCupo(reservas);
+          return { ok: false, error: p.error, retryAfter: p.retryAfter, limite: p.limite };
+        }
+      }
+    } catch (e) {
+      await devolverCupo(reservas);
+      throw e;
+    }
+    podar();
+    return { ok: true, reservas };
+  }
+
+  async function devolverCupo(claves) {
+    for (let i = (claves || []).length - 1; i >= 0; i--) {
+      await bump('iaUso', claves[i], 'n', -1).catch(() => {});
+    }
   }
 
   /* Una poda al día por instancia: las filas de días pasados no sirven. */

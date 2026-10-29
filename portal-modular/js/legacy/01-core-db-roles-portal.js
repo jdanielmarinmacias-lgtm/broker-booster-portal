@@ -4,6 +4,22 @@
         let db = {};
         let currentUser = null;
 
+        /* --- PDF.js: API y worker del propio portal -----------------------
+         * Los dos se sirven desde js/vendor/ (3.11.174) y lazy-app.js fija
+         * GlobalWorkerOptions.workerSrc a esa copia local. Nunca se apunta el
+         * worker a un CDN: `worker-src 'self' blob:` lo bloquea y PDF.js cae
+         * al "fake worker" del hilo principal, que avisa en consola y bloquea
+         * la página con PDFs grandes. Todas las lecturas de PDF pasan por
+         * aquí para reutilizar ese único punto de configuración. */
+        async function pdfJsListo(){
+            if(window.pdfjsLib){
+                if(window.BBApp && window.BBApp.pdf) window.BBApp.pdf.configurar();
+                return window.pdfjsLib;
+            }
+            if(window.BBApp && window.BBApp.pdf) return window.BBApp.pdf.cargar();
+            throw new Error('el lector de PDF no cargó');
+        }
+
         const defaultDB = {
             ventas: [],
             metas: [],
@@ -2712,9 +2728,24 @@ const PS_RUBRICA = [
 ];
 
 /* ==================== PERSISTENCIA (usa el objeto db global de la app para no ser pisado por saveDB) ==================== */
+/* Rotación de claves: la configuración de Práctica es local y NUNCA debe
+ * conservar `apiKey`. Si una versión anterior la dejó en el objeto o en
+ * localStorage, se elimina aquí (una sola vez, cuando aparece). */
+function psScrubApiKey(container){
+  try{
+    if(container && container.practicaConfig && container.practicaConfig.apiKey !== undefined){
+      delete container.practicaConfig.apiKey;
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function psClavePropiaLocal(){
+  try{ return String(localStorage.getItem('bb_api_key_propia')||'').trim(); }catch(e){ return ''; }
+}
 function psGetDB(){
-  try{ if(typeof db!=='undefined' && db){ db.practicaSesiones=db.practicaSesiones||[]; db.practicaPerfilesGuardados=db.practicaPerfilesGuardados||[]; db.practicaConfig=db.practicaConfig||{}; if(db.practicaConfig.apiModel==='llama-3.3-70b-versatile'){ db.practicaConfig.apiModel='openai/gpt-oss-120b'; } return db; } }catch(e){}
-  try{ const d = JSON.parse(localStorage.getItem('pepes_v3_db')||'{}'); d.practicaSesiones=d.practicaSesiones||[]; d.practicaPerfilesGuardados=d.practicaPerfilesGuardados||[]; d.practicaConfig=d.practicaConfig||{}; return d; }catch(e){ return { practicaSesiones:[], practicaPerfilesGuardados:[], practicaConfig:{} }; }
+  try{ if(typeof db!=='undefined' && db){ db.practicaSesiones=db.practicaSesiones||[]; db.practicaPerfilesGuardados=db.practicaPerfilesGuardados||[]; db.practicaConfig=db.practicaConfig||{}; if(db.practicaConfig.apiModel==='llama-3.3-70b-versatile'){ db.practicaConfig.apiModel='openai/gpt-oss-120b'; } if(psScrubApiKey(db)){ try{ localStorage.setItem('pepes_v3_db', JSON.stringify(db)); }catch(e){} } return db; } }catch(e){}
+  try{ const d = JSON.parse(localStorage.getItem('pepes_v3_db')||'{}'); d.practicaSesiones=d.practicaSesiones||[]; d.practicaPerfilesGuardados=d.practicaPerfilesGuardados||[]; d.practicaConfig=d.practicaConfig||{}; if(psScrubApiKey(d)){ try{ localStorage.setItem('pepes_v3_db', JSON.stringify(d)); }catch(e){} } return d; }catch(e){ return { practicaSesiones:[], practicaPerfilesGuardados:[], practicaConfig:{} }; }
 }
 function psSaveDB(d){ try{ if(typeof db!=='undefined' && d===db){ saveDB(); return; } localStorage.setItem('pepes_v3_db', JSON.stringify(d)); }catch(e){ showToast('No se pudo guardar (almacenamiento lleno)','warning'); } }
 function psSesionesUsuario(){ const d=psGetDB(); const uid=currentUser.id; return d.practicaSesiones.filter(s=>String(s.usuarioId)===String(uid)).sort((a,b)=>b.inicio-a.inicio); }
@@ -3370,7 +3401,7 @@ function psRenderConfig(){
             </div>
             <p id="ps-api-hint" class="text-[11px] text-slate-500 mt-1">${psEscape(prov.nota)}${prov.consola?' Consigue tu key en: '+psEscape(prov.consola):''}</p>
           </div>
-          <input id="ps-api-key" type="password" value="${psEscape(api.apiKey||PS_DEFAULT_KEY)}" data-bx-input="a73" placeholder="Pega tu API key (${psEscape(prov.keyHint)}) — se guarda solo en tu navegador" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono bg-white text-slate-900">
+          <input id="ps-api-key" type="password" value="${psEscape(psClavePropiaLocal())}" data-bx-input="a73" placeholder="Pega tu API key (${psEscape(prov.keyHint)}) — se guarda solo en tu navegador" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono bg-white text-slate-900">
           <div class="flex gap-2 items-center">
             <input id="ps-api-url" value="${psEscape(api.apiUrl||prov.url)}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono bg-white text-slate-900">
             <button id="ps-btn-probar" data-bx-click="a74" disabled class="px-3 py-2 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium whitespace-nowrap">⚡ Probar conexión</button>
@@ -3490,8 +3521,19 @@ function psIniciarSesion(){
     decision:(document.getElementById('ps-decision')||{}).value||''
   };
   const apiCfg=(psGetDB().practicaConfig)||{};
-  const kEl=document.getElementById('ps-api-key'); if(kEl){ apiCfg.apiKey=kEl.value.trim(); apiCfg.apiUrl=(document.getElementById('ps-api-url')||{}).value||apiCfg.apiUrl; apiCfg.apiModel=(document.getElementById('ps-api-model')||{}).value||apiCfg.apiModel; apiCfg.proveedor=psProvActual(); const d=psGetDB(); d.practicaConfig=apiCfg; psSaveDB(d); }
-  window.psAPIKey=apiCfg.apiKey||PS_DEFAULT_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
+  const kEl=document.getElementById('ps-api-key');
+  if(kEl){
+    const key=kEl.value.trim();
+    /* La clave del usuario vive SOLO en este navegador. Nunca se guarda en
+     * `practicaConfig` (base compartida) ni se sincroniza a otros equipos. */
+    try{ if(key) localStorage.setItem('bb_api_key_propia', key); else localStorage.removeItem('bb_api_key_propia'); }catch(e){}
+    delete apiCfg.apiKey;
+    apiCfg.apiUrl=(document.getElementById('ps-api-url')||{}).value||apiCfg.apiUrl;
+    apiCfg.apiModel=(document.getElementById('ps-api-model')||{}).value||apiCfg.apiModel;
+    apiCfg.proveedor=psProvActual();
+    const d=psGetDB(); d.practicaConfig=apiCfg; psSaveDB(d);
+  }
+  window.psAPIKey=psClavePropiaLocal()||PS_DEFAULT_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
   if(!window.psDifSel) window.psDifSel='normal';
   window.psSesionActiva={ id:Date.now(), usuarioId:currentUser.id, usuarioNombre:currentUser.name, inicio:Date.now(), dificultad:window.psDifSel, escenario:window.psEscSel||'agendar', voz:(document.getElementById('ps-voz')||{}).value||'auto', personaje:{nombre,edad,ocupacion,estudios}, perfilExtra, memoria, mensajes:[], objeciones:[], micUsado:false, timerStart:Date.now(), timerInt:null };
   render();
@@ -3670,12 +3712,43 @@ function guiaContexto(texto){
     const clases=(db.liveClasses||[]).filter(c=>(c.assignedTo||[]).includes(currentUser.id)&&new Date(c.end)>=new Date()).length;
     const sesiones=(db.practicaSesiones||[]).filter(s=>String(s.usuarioId)===String(currentUser.id));
     const prom=sesiones.length?Math.round(sesiones.reduce((a,s)=>a+((s.feedback&&s.feedback.total)||0),0)/sesiones.length):null;
-    return `Contexto en vivo de ${currentUser.name} (rol ${currentUser.role}): ${misVentas.length} ventas registradas, aportación acumulada $${primas.toLocaleString('es-MX')}, ${clases} clases próximas, ${sesiones.length} sesiones de práctica${prom!==null?' (promedio '+prom+'/100)':''}. Usa estos datos si son relevantes; no los listes si no aportan.`+guiaBaseContexto(texto||'');
+    /* La base de conocimiento ya NO se arma en el cliente: /api/ia/chat la
+     * selecciona e inyecta en el servidor. En modo local (sin backend) se
+     * agrega abajo, solo para no perder la función offline. */
+    return `Contexto en vivo de ${currentUser.name} (rol ${currentUser.role}): ${misVentas.length} ventas registradas, aportación acumulada $${primas.toLocaleString('es-MX')}, ${clases} clases próximas, ${sesiones.length} sesiones de práctica${prom!==null?' (promedio '+prom+'/100)':''}. Usa estos datos si son relevantes; no los listes si no aportan.`;
   }catch(e){ return ''; }
 }
 /* ==================== AI LOBBY: base de conocimiento de Gu-IA (solo GM) ==================== */
+/* `guiaBase` ya no viaja en el bundle. AI Lobby la pide bajo demanda y la
+ * guarda por un endpoint dedicado; el sync general la ignora para que un
+ * equipo sin permiso no la borre ni la reescriba. */
+let guiaBaseCargada = false;
+let guiaBaseCargando = null;
+function guiaBaseCargar(){
+  if(guiaBaseCargada) return Promise.resolve();
+  if(guiaBaseCargando) return guiaBaseCargando;
+  guiaBaseCargando = (async function(){
+    try{
+      if(window.Backend && window.Backend.available && typeof window.Backend.api==='function'){
+        const r = await window.Backend.api('/api/data/guiaBase');
+        if(typeof db!=='undefined' && db) db.guiaBase = (r && r.object) || {docs:[]};
+      }
+    }catch(e){ /* sin permiso o modo local: se conserva lo que haya */ }
+    finally { guiaBaseCargada = true; guiaBaseCargando = null; }
+  })();
+  return guiaBaseCargando;
+}
 function guiaBaseGet(){ try{ if(!db.guiaBase || !Array.isArray(db.guiaBase.docs)) db.guiaBase={docs:[]}; return db.guiaBase; }catch(e){ return {docs:[]}; } }
-function guiaBaseGuardar(d){ db.guiaBase=d; saveDB(); }
+function guiaBaseGuardar(d){
+  try{ if(typeof db!=='undefined' && db) db.guiaBase=d; }catch(e){}
+  if(window.Backend && window.Backend.available && isGM(currentUser)){
+    window.Backend.api('/api/data/guiaBase/docs', { method:'PUT', body:{ value:(d&&d.docs)||[] } })
+      .then(function(){ try{ saveDB(); }catch(e){} })
+      .catch(function(e){ showToast('No se pudo guardar la base en el servidor: '+((e&&e.message)||'error'),'error'); });
+  } else {
+    try{ saveDB(); }catch(e){}
+  }
+}
 function guiaBaseTokens(t){ return String(t||'').toLowerCase().replace(/[^a-záéíóúñü0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>3); }
 function guiaBaseContexto(texto){
   try{
@@ -3694,9 +3767,9 @@ function guiaBaseLeerArchivo(file){
   (async()=>{ try{
     let text='';
     if(/\.pdf$/i.test(name)){
-      if(!window.pdfjsLib){ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; await new Promise((res,rej)=>{sc.onload=res;sc.onerror=rej;document.head.appendChild(sc);}); pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }
+      const pdfjs=await pdfJsListo();
       const buf=await file.arrayBuffer();
-      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      const pdf=await pdfjs.getDocument({data:buf}).promise;
       const pags=Math.min(pdf.numPages,30);
       for(let i=1;i<=pags;i++){ const page=await pdf.getPage(i); const c=await page.getTextContent(); text+=c.items.map(it=>it.str).join(' ')+'\n'; }
     } else { text=await file.text(); }
@@ -3737,8 +3810,11 @@ function lobbyProbar(){
     let respuesta='';
     try{
       let web=''; if(guiaNecesitaWeb(q)) web=await guiaWebBloque(q);
-      const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaBaseContexto(q)+web}].concat([{role:'user', content:q}]);
-      const res=await window.IA.completar({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'});
+      const usarServidor=!!(window.Backend && window.Backend.available);
+      const baseLocal=usarServidor?'':guiaBaseContexto(q);
+      const msgs=[{role:'system', content:GUIA_SYS+'\n'+baseLocal+web}].concat([{role:'user', content:q}]);
+      const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'};
+      const res=usarServidor ? await window.IA.chat(payload) : await window.IA.completar(payload);
       const j=await res.json();
       if(j.error) throw new Error(j.error.message||'API error');
       respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'(respuesta vacía)';
@@ -3748,6 +3824,15 @@ function lobbyProbar(){
 }
 function renderLobby(){
   if(!isGM(currentUser)){ navigateTo('dashboard'); return; }
+  if(!guiaBaseCargada){
+    guiaBaseCargar().then(function(){
+      if(window.lastPage==='ai-lobby'){
+        const c=document.getElementById('main-content');
+        if(c) c.innerHTML=renderLobby();
+      }
+    });
+    return '<div class="max-w-4xl mx-auto py-12 text-center text-sm text-slate-400"><i class="fas fa-circle-notch fa-spin mr-2"></i>Cargando base de conocimiento…</div>';
+  }
   const d=guiaBaseGet();
   const filas=d.docs.map(x=>{
     const c=x.activo===false?'bg-slate-50 border-slate-200':'bg-white border-slate-200';
@@ -3895,10 +3980,11 @@ async function guiaLeerDocumento(file){
   try{
     let text='';
     if(/\.pdf$/i.test(name)){
-      if(!window.pdfjsLib){ showToast('No pude leer el PDF (pdf.js no cargó)','error'); return; }
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      let pdfjs;
+      try{ pdfjs=await pdfJsListo(); }
+      catch(e){ showToast('No pude leer el PDF (el lector no cargó)','error'); return; }
       const buf=await file.arrayBuffer();
-      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      const pdf=await pdfjs.getDocument({data:buf}).promise;
       const paginas=Math.min(pdf.numPages,20);
       for(let i=1;i<=paginas;i++){ const page=await pdf.getPage(i); const c=await page.getTextContent(); text+=c.items.map(it=>it.str).join(' ')+'\n'; }
       text='(PDF "'+name+'", '+paginas+' páginas)\n'+text;
@@ -3935,9 +4021,12 @@ async function guiaSend(){
     if(guiaNecesitaWeb(texto)){ web=await guiaWebBloque(texto); }
     const contenidoDoc=tieneDoc?('\n\n=== CONTENIDO DEL DOCUMENTO ADJUNTO ===\n'+guiaDocText+'\n=== FIN DEL DOCUMENTO ==='):'';
     guiaDocText='';
-    const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaContexto(texto)+web}]
+    const usarServidor=!!(window.Backend && window.Backend.available);
+    const baseLocal=usarServidor?'':guiaBaseContexto(texto);
+    const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaContexto(texto)+baseLocal+web}]
       .concat(arr.slice(-12).map((m,i,a)=>({role:m.rol==='user'?'user':'assistant', content:(m.doc&&i===a.length-1?(contenidoDoc+'\n'):'')+String(m.texto||'').slice(0,1500)})));
-    const res=await window.IA.completar({model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'});
+    const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'};
+    const res=usarServidor ? await window.IA.chat(payload) : await window.IA.completar(payload);
     const j=await res.json();
     if(j.error) throw new Error(j.error.message||'API error');
     respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'Me quedé sin palabras (respuesta vacía). Insiste o reformula.';
@@ -5136,6 +5225,7 @@ function borrarPublicidad(id){
                 let texto = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
                 if(/pdf/i.test(file.type||'') || /\.pdf$/i.test(file.name||'')){
                     if(window.pdfjsLib){
+                        await pdfJsListo();
                         const buf = await file.arrayBuffer();
                         const pdf = await window.pdfjsLib.getDocument({data:buf}).promise;
                         let acc = '';
@@ -5792,10 +5882,7 @@ function borrarPublicidad(id){
             if(info) info.textContent = 'Leyendo «'+f.name+'»…';
             try{
                 if(/pdf/i.test(f.type||'') || /\.pdf$/i.test(f.name||'')){
-                    if(!window.pdfjsLib){
-                        await new Promise((res, rej)=>{ const sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
-                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-                    }
+                    await pdfJsListo();
                     const buf = await f.arrayBuffer();
                     const pdf = await window.pdfjsLib.getDocument({data:buf}).promise;
                     let out = '';
@@ -5817,14 +5904,7 @@ function borrarPublicidad(id){
             const q = s.cotizacion; if(!q || !q.archivo || !q.archivo.dataURL) return txt;
             if(!/pdf/i.test(q.archivo.tipo||'') && !/\.pdf$/i.test(q.archivo.nombre||'')) return txt;
             try{
-                if(!window.pdfjsLib){
-                    await new Promise((res, rej)=>{
-                        const sc = document.createElement('script');
-                        sc.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
-                        sc.onload = res; sc.onerror = rej; document.head.appendChild(sc);
-                    });
-                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-                }
+                await pdfJsListo();
                 const base64 = q.archivo.dataURL.split(',')[1]; if(!base64) return txt;
                 const bytes = Uint8Array.from(atob(base64), c=>c.charCodeAt(0));
                 const pdf = await window.pdfjsLib.getDocument({data:bytes}).promise;
@@ -6423,10 +6503,9 @@ async function cpLeerArchivo(lado, input){
     cpEstado('Leyendo '+file.name+'…');
     let text='';
     if(file.name.toLowerCase().slice(-4)==='.pdf'){
-      if(!window.pdfjsLib) throw new Error('el lector de PDF no cargó (revisa tu conexión)');
-      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const pdfjs=await pdfJsListo();
       const buf=await file.arrayBuffer();
-      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      const pdf=await pdfjs.getDocument({data:buf}).promise;
       const paginas=Math.min(pdf.numPages,20);
       for(let i=1;i<=paginas;i++){ const page=await pdf.getPage(i); const c=await page.getTextContent(); text+=c.items.map(it=>it.str).join(' ')+NL; }
       if(!text.trim()) throw new Error('el PDF no tiene texto extraíble (parece escaneado); pega el texto a mano');
@@ -11083,12 +11162,23 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const last = gm[gm.length - 1];
                 const gear = (esGroupAdminPortal(gr)) ? `<button role="button" aria-label="Editar grupo" title="Editar grupo" data-bx-click="a337" data-p0="${bxE(function(){return String(gr.id)})}" class="shrink-0 w-6 h-6 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center justify-center"><i class="fas fa-gear text-[10px]"></i></button>` : '';
                 const borrar = (puedeBorrar && !String(gr.id).startsWith('canal:')) ? `<button role="button" aria-label="Borrar grupo" title="Borrar grupo" data-bx-click="a661" data-p0="${bxE(function(){return String(gr.id)})}" class="shrink-0 w-6 h-6 rounded-md bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center"><i class="fas fa-trash-can text-[10px]"></i></button>` : '';
-                return `<div data-bx-click="a338" data-p0="${bxE(function(){return String(gr.id)})}" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-start justify-between gap-2 mb-1">
+                /* Portada compacta: una banda de 56 px con el nombre encima. Si
+                 * el grupo no tiene imagen, se queda la cabecera de siempre. */
+                const portada = String(gr.portada || '').trim();
+                const cabecera = portada
+                    ? `<div class="relative -mx-3.5 -mt-3.5 mb-2 h-14 overflow-hidden rounded-t-xl bg-slate-200">
+                            <img src="${psEscape(portada)}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/75 via-slate-900/20 to-transparent"></div>
+                            <span class="absolute left-2.5 right-11 bottom-1.5 font-bold text-xs text-white flex items-center gap-1.5 truncate drop-shadow"><i class="fas ${gr.icon || 'fa-users'} text-amber-300"></i> ${psEscape(gr.nombre || 'Grupo')}</span>
+                            <span class="absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-white/60 text-slate-800 font-semibold">${gm.length}</span>
+                        </div>`
+                    : `<div class="flex items-start justify-between gap-2 mb-1">
                             <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5"><i class="fas ${gr.icon || 'fa-users'} text-amber-600"></i> ${psEscape(gr.nombre || 'Grupo')}</span>
                             <span class="text-[10px] px-1.5 py-0.5 rounded bg-white border border-amber-200 text-amber-800 font-semibold">${gm.length}</span>
-                        </div>
+                        </div>`;
+                return `<div data-bx-click="a338" data-p0="${bxE(function(){return String(gr.id)})}" class="p-3.5 rounded-xl border border-amber-300/70 bg-amber-50/40 hover:bg-amber-50 active:scale-[0.99] hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                    <div>
+                        ${cabecera}
                         <p class="text-[11px] text-slate-500 line-clamp-1">${last ? psEscape((last.fromName || 'Equipo') + ': ' + last.text) : psEscape(gr.desc || 'Grupo del equipo')}</p>
                     </div>
                     <div class="flex items-center justify-between gap-2 mt-1">
@@ -11108,6 +11198,9 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         }
         window._grupoUsuariosSel = {};
         window._grupoEditId = null;
+        window._grupoPortada = '';
+        window._grupoPortadaFile = null;
+        window._grupoPortadaPreviewUrl = '';
         function openGrupoModal(editId) {
             try {
                 /* Crear es de agencia/GM/maestro/capacitador (el botón ya se
@@ -11123,6 +11216,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 if (grp && !esStaffComunicacion(currentUser) && String(grp.creadoPorId) !== String(currentUser && currentUser.id) && !(grp.adminIds || []).map(toIdVal).some(x => String(x) === String(currentUser.id))) { showToast('Solo el creador o admins del grupo pueden editarlo', 'warning'); return; }
                 const usuarios = (db.users || []).filter(u => u && String(u.id) !== String(currentUser.id));
                 const selIds = new Set(grp ? (grp.memberIds || []).map(toIdVal).map(String) : []);
+                window._grupoPortada = grp ? String(grp.portada || '') : '';
+                window._grupoPortadaFile = null;
+                if (window._grupoPortadaPreviewUrl) { try { URL.revokeObjectURL(window._grupoPortadaPreviewUrl); } catch (e) {} }
+                window._grupoPortadaPreviewUrl = '';
                 window._grupoUsuariosSel = {};
                 usuarios.forEach(u => { window._grupoUsuariosSel[String(u.id)] = selIds.has(String(u.id)); });
                 const adminIds = grp ? (grp.adminIds || []).map(toIdVal).map(String) : [];
@@ -11141,6 +11238,22 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             <div>
                                 <p class="text-[11px] font-bold text-slate-500 uppercase mb-1.5">Descripción corta</p>
                                 <input id="grupo-desc" type="text" maxlength="70" value="${grp ? psEscape(grp.desc || '') : ''}" placeholder="De qué trata el grupo" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <p class="text-[11px] font-bold text-slate-500 uppercase">Portada <span class="text-slate-400 font-normal normal-case">(opcional)</span></p>
+                                    <button type="button" id="grupo-portada-quitar" class="text-[11px] font-semibold text-rose-600 hover:text-rose-700 ${grp && grp.portada ? '' : 'hidden'}">Quitar</button>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div id="grupo-portada-preview" class="w-20 h-12 rounded-lg border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center shrink-0">
+                                        ${grp && grp.portada ? `<img src="${psEscape(grp.portada)}" alt="" class="w-full h-full object-cover">` : '<i class="fas fa-image text-slate-300"></i>'}
+                                    </div>
+                                    <label class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-indigo-400 cursor-pointer text-xs font-semibold text-slate-600 flex items-center justify-center gap-2 transition">
+                                        <i class="fas fa-upload text-indigo-500"></i> Subir imagen
+                                        <input type="file" id="grupo-portada-input" accept="image/*" class="hidden">
+                                    </label>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1">Se ve pequeña en la tarjeta del grupo y en la cabecera del chat.</p>
                             </div>
                             <div>
                                 <div class="flex items-center justify-between mb-1.5">
@@ -11175,6 +11288,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const mc = document.getElementById('modal-container');
                 if (mc) mc.insertAdjacentHTML('beforeend', html);
                 else showModal(html);
+                const portadaInput = document.getElementById('grupo-portada-input');
+                if (portadaInput) portadaInput.onchange = function () { window.elegirPortadaGrupo(this); };
+                const quitarPortada = document.getElementById('grupo-portada-quitar');
+                if (quitarPortada) quitarPortada.onclick = function () { window.quitarPortadaGrupo(); };
             } catch (e) { console.error('[openGrupoModal]', e); showToast('No se pudo abrir el editor de grupos', 'error'); }
         }
         window.toggleGrupoMiembro = function (uid) {
@@ -11201,8 +11318,47 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const btn = document.querySelector(`button[data-admin-btn="${uid}"]`);
             if (btn) { btn.classList.toggle('bg-amber-100'); btn.classList.toggle('text-amber-700'); btn.classList.toggle('bg-slate-50'); btn.classList.toggle('text-slate-400'); }
         };
-        window.closeGrupoModal = function () { const m = document.getElementById('grupo-modal'); if (m) m.remove(); window._grupoEditId = null; };
-        window.saveGrupoModal = function () {
+        window.closeGrupoModal = function () {
+            const m = document.getElementById('grupo-modal'); if (m) m.remove();
+            window._grupoEditId = null;
+            window._grupoPortadaFile = null;
+            if (window._grupoPortadaPreviewUrl) { try { URL.revokeObjectURL(window._grupoPortadaPreviewUrl); } catch (e) {} }
+            window._grupoPortadaPreviewUrl = '';
+        };
+        /* La imagen se elige sin subir: el archivo se queda en memoria y se sube
+         * al pulsar Guardar. Así cerrar el modal no deja archivos huérfanos. */
+        window.elegirPortadaGrupo = function (input) {
+            const file = input && input.files && input.files[0];
+            if (!file) return;
+            if (!/^image\//i.test(file.type || '')) {
+                input.value = '';
+                return showToast('Elige una imagen (JPG, PNG o WebP)', 'warning');
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                input.value = '';
+                return showToast('La portada no puede superar 5 MB', 'warning');
+            }
+            if (window._grupoPortadaPreviewUrl) { try { URL.revokeObjectURL(window._grupoPortadaPreviewUrl); } catch (e) {} }
+            window._grupoPortadaFile = file;
+            window._grupoPortadaPreviewUrl = URL.createObjectURL(file);
+            const prev = document.getElementById('grupo-portada-preview');
+            if (prev) prev.innerHTML = '<img src="' + window._grupoPortadaPreviewUrl + '" alt="" class="w-full h-full object-cover">';
+            const quitar = document.getElementById('grupo-portada-quitar');
+            if (quitar) quitar.classList.remove('hidden');
+        };
+        window.quitarPortadaGrupo = function () {
+            if (window._grupoPortadaPreviewUrl) { try { URL.revokeObjectURL(window._grupoPortadaPreviewUrl); } catch (e) {} }
+            window._grupoPortadaPreviewUrl = '';
+            window._grupoPortadaFile = null;
+            window._grupoPortada = '';
+            const prev = document.getElementById('grupo-portada-preview');
+            if (prev) prev.innerHTML = '<i class="fas fa-image text-slate-300"></i>';
+            const quitar = document.getElementById('grupo-portada-quitar');
+            if (quitar) quitar.classList.add('hidden');
+            const inp = document.getElementById('grupo-portada-input');
+            if (inp) inp.value = '';
+        };
+        window.saveGrupoModal = async function () {
             try {
                 const nombre = ((document.getElementById('grupo-nombre') || {}).value || '').trim();
                 const desc = ((document.getElementById('grupo-desc') || {}).value || '').trim() || 'Grupo del equipo';
@@ -11210,6 +11366,16 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 if (!nombre) return showToast('Escribe un nombre para el grupo', 'warning');
                 const sel = Object.entries(window._grupoUsuariosSel || {}).filter(([, v]) => v).map(([k]) => toIdVal(k));
                 const adminUids = [...document.querySelectorAll('button[data-admin-btn]')].filter(b => String(b.className).includes('bg-amber-100') && String(b.className).includes('text-amber-700')).map(b => toIdVal(b.getAttribute('data-admin-btn')));
+                /* Portada: se sube al guardar. Solo se acepta una URL; nunca un
+                 * dataURL, que engordaría cada tarjeta del grupo. */
+                let portada = String(window._grupoPortada || '');
+                if (window._grupoPortadaFile) {
+                    if (!window.Media || typeof window.Media.subir !== 'function') return showToast('No se pudo subir la portada', 'error');
+                    showToast('Subiendo portada…', 'info');
+                    const item = await window.Media.subir(window._grupoPortadaFile, { scope: 'messages', title: 'portada-grupo' });
+                    portada = (item && item.url) ? String(item.url) : '';
+                    if (!portada || /^data:/i.test(portada)) return showToast('No se pudo subir la portada. Prueba con otra imagen.', 'error');
+                }
                 const editId = window._grupoEditId;
                 let grp = editId ? ensureChatGrupos().find(g => String(g.id) === editId) : null;
                 if (editId && !grp) return closeGrupoModal();
@@ -11222,13 +11388,18 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 }
                 grp.nombre = nombre;
                 grp.desc = desc;
+                grp.portada = portada;
                 grp.onlyAdminsPost = !!soloAdmins;
                 grp.memberIds = sel;
                 grp.adminIds = adminUids;
-                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) window.BackendSync.pushCollectionsImmediate(['chatGroups']);
+                /* Se espera el push: así el render posterior pinta la portada ya
+                 * confirmada y un pull entrante no la revierte un instante. */
+                if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                    await window.BackendSync.pushCollectionsImmediate(['chatGroups']);
+                }
                 saveDB();
                 closeGrupoModal();
-                showToast(edit ? 'Grupo "' + nombre + '" actualizado ✅' : 'Grupo "' + nombre + '" creado 🎉', 'success');
+                showToast(editId ? 'Grupo "' + nombre + '" actualizado ✅' : 'Grupo "' + nombre + '" creado 🎉', 'success');
                 render();
             } catch (e) { console.error('[saveGrupoModal]', e); showToast('No se pudo guardar el grupo', 'error'); }
         };
@@ -11360,7 +11531,10 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const subtitulo = !esMiembro ? 'No eres miembro de este grupo (vista de solo lectura)' : grp.onlyAdminsPost ? 'Solo los admins del grupo pueden compartir información' : 'Chat grupal del equipo Broker Booster';
             const readonly = grp.onlyAdminsPost && !esAdminGrupo;
             const esCanalLegacy = String(grp.id).startsWith('canal:');
-            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0"><div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas ${grp.icon || 'fa-hashtag'}"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(grp.nombre)}</h3><p class="text-xs text-slate-500 truncate">${readonly ? '🔒 Solo lectura — los admins comparten la información' : psEscape(subtitulo)}${esAdminGrupo && grp.onlyAdminsPost ? ' · <span class="text-indigo-600 font-bold">Eres admin 👑</span>' : ''}</p></div>${!esCanalLegacy && esAdminGrupo ? `<button aria-label="Editar grupo" data-bx-click="a350" data-p0="${bxE(function(){return String(grp.id)})}" class="w-9 h-9 flex items-center justify-center text-amber-700 hover:bg-amber-100 rounded-xl shrink-0" title="Editar grupo"><i class="fas fa-gear"></i></button>` : ''}<button aria-label="Cerrar" data-bx-click="a347" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div>${readonly ? `<div class="p-3 sm:p-4 border-t bg-white rounded-b-2xl text-center text-xs text-slate-500 bg-slate-50"><i class="fas fa-lock text-indigo-500 mr-1"></i> Solo los admins de "${psEscape(grp.nombre)}" pueden publicar aquí</div>` : `<form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" data-bx-change="a351" data-p0="${bxE(function(){return String(grp.id)})}"></label><button type="button" data-bx-click="a352" data-p0="${bxE(function(){return String(grp.id)})}" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo en la conversación"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe al grupo ${psEscape(grp.nombre)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form>`}`);
+            const avatarGrupo = grp.portada
+                ? `<img src="${psEscape(grp.portada)}" alt="" class="w-10 h-10 rounded-xl object-cover border border-amber-300 shrink-0">`
+                : `<div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0"><i class="fas ${grp.icon || 'fa-hashtag'}"></i></div>`;
+            showModal(`<div class="chat-modal-shell flex flex-col h-[85dvh] sm:h-[80vh] max-w-2xl w-full"><div class="px-4 sm:px-5 py-3.5 border-b bg-slate-50 rounded-t-2xl flex items-center gap-3 shrink-0">${avatarGrupo}<div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 truncate">${psEscape(grp.nombre)}</h3><p class="text-xs text-slate-500 truncate">${readonly ? '🔒 Solo lectura — los admins comparten la información' : psEscape(subtitulo)}${esAdminGrupo && grp.onlyAdminsPost ? ' · <span class="text-indigo-600 font-bold">Eres admin 👑</span>' : ''}</p></div>${!esCanalLegacy && esAdminGrupo ? `<button aria-label="Editar grupo" data-bx-click="a350" data-p0="${bxE(function(){return String(grp.id)})}" class="w-9 h-9 flex items-center justify-center text-amber-700 hover:bg-amber-100 rounded-xl shrink-0" title="Editar grupo"><i class="fas fa-gear"></i></button>` : ''}<button aria-label="Cerrar" data-bx-click="a347" class="w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-slate-200 rounded-xl shrink-0"><i class="fas fa-times"></i></button></div><div id="chat-messages" class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-slate-50 space-y-3 overscroll-contain"></div><div id="chat-ai-suggestions" class="hidden px-4 py-2 bg-amber-50 border-t border-amber-200 space-y-1.5 max-h-40 overflow-y-auto shrink-0"></div>${readonly ? `<div class="p-3 sm:p-4 border-t bg-white rounded-b-2xl text-center text-xs text-slate-500 bg-slate-50"><i class="fas fa-lock text-indigo-500 mr-1"></i> Solo los admins de "${psEscape(grp.nombre)}" pueden publicar aquí</div>` : `<form id="chat-form" class="p-3 sm:p-4 border-t bg-white rounded-b-2xl shrink-0"><div class="flex gap-2 items-center"><label class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl cursor-pointer transition shrink-0" title="Adjuntar imagen o documento (o pega con Ctrl+V)"><i class="fas fa-paperclip"></i><input type="file" id="chat-file-input" class="hidden" data-bx-change="a351" data-p0="${bxE(function(){return String(grp.id)})}"></label><button type="button" data-bx-click="a352" data-p0="${bxE(function(){return String(grp.id)})}" class="h-10 px-2.5 text-amber-700 hover:bg-amber-100 bg-amber-50 border border-amber-200 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0" title="Gu-IA: pide que te explique algo en la conversación"><i class="fas fa-wand-magic-sparkles"></i><span class="hidden sm:inline">Gu-IA</span></button><input id="chat-input" type="text" placeholder="Escribe al grupo ${psEscape(grp.nombre)}..." class="flex-1 min-w-0 px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white text-slate-900" required><button type="submit" class="h-10 px-4 sm:px-5 bg-slate-900 text-amber-300 rounded-xl font-medium hover:bg-slate-800 shrink-0 flex items-center justify-center"><i class="fas fa-paper-plane"></i></button></div></form>`}`);
             renderChannelConversationBox(channelGroupId, grp.nombre);
             startChatLive(channelGroupId, grp.nombre);
             if (!readonly) {
@@ -12950,6 +13124,19 @@ END:VCALENDAR`;
             return { src: u, embebible: false };
         }
 
+        /* Los PDF de Biblioteca no se incrustan en un <iframe>: el visor nativo
+         * bloquea el hilo de la página y, si el archivo vive en Storage, el
+         * iframe termina apuntando a Supabase y la CSP (frame-src) lo rechaza
+         * en cada apertura. Se pinta con PDF.js en canvas, igual que la
+         * evidencia de clientes. */
+        function previsualizarPdfMaterial(src, cont, nombre){
+            if(typeof renderEvidenciaPdf === 'function'){
+                renderEvidenciaPdf(src, cont, nombre);
+                return;
+            }
+            cont.innerHTML = '<div class="w-full text-center text-slate-200 p-8"><i class="fas fa-file-pdf text-4xl text-slate-400"></i><p class="text-sm font-semibold mt-3">Vista previa no disponible</p><a href="' + escapeHTML(src) + '" target="_blank" rel="noopener noreferrer" class="inline-block mt-4 px-4 py-2 bg-emerald-600 rounded-lg text-sm">Abrir PDF</a></div>';
+        }
+
         function openLibraryPreview(id) {
             const m = db.library.find(x=>x.id===id);
             if (!m) return;
@@ -12966,7 +13153,11 @@ END:VCALENDAR`;
             const isPdfFile = m.type==='file' && fileSrc && (lowerName.endsWith('.pdf') || /^data:application\/pdf/i.test(fileSrc));
             const isImageFile = m.type==='file' && fileSrc && (/\.(png|jpe?g|gif|webp|svg)$/i.test(lowerName) || /^data:image\//i.test(fileSrc));
             const isVideoFile = m.type==='file' && fileSrc && (/\.(mp4|webm|mov)$/i.test(lowerName) || /^data:video\//i.test(fileSrc));
-            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" data-bx-click="a376" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' && embebible ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>` : m.type==='link' ? `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-globe text-4xl mb-4 opacity-50"></i><p class="mb-4 max-w-md">Este sitio no permite mostrarse dentro del portal porque bloquea su incrustación. Ábrelo en una pestaña nueva.</p><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-emerald-600 rounded-lg font-semibold">Abrir en nueva pestaña</a></div>` : isPdfFile ? `<iframe src="${escapeHTML(fileSrc)}" class="w-full h-full" frameborder="0"></iframe>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button data-bx-click="a395" data-p0="${bxE(function(){return m.id})}" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
+            showModal(`<div class="p-0 max-w-5xl w-full h-[85vh] flex flex-col"><div class="flex items-center justify-between px-5 py-3 border-b"><h3 class="font-semibold truncate">${escapeHTML(title)}</h3><div class="flex items-center gap-2">${fileSrc?`<a href="${escapeHTML(fileSrc)}" target="_blank" rel="noopener noreferrer" data-bx-click="a376" class="text-xs text-slate-500 hover:text-indigo-600">Abrir en nueva pestaña</a>`:''}<button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div></div><div class="flex-1 bg-slate-900 flex items-center justify-center overflow-auto">${m.type==='link' && embebible ? `<iframe src="${escapeHTML(embedUrl)}" class="w-full h-full" frameborder="0" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>` : m.type==='link' ? `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-globe text-4xl mb-4 opacity-50"></i><p class="mb-4 max-w-md">Este sitio no permite mostrarse dentro del portal porque bloquea su incrustación. Ábrelo en una pestaña nueva.</p><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-emerald-600 rounded-lg font-semibold">Abrir en nueva pestaña</a></div>` : isPdfFile ? `<div id="library-pdf-preview" class="w-full h-full overflow-auto bg-slate-800 p-3 flex flex-col items-center gap-3"><div class="text-slate-300 text-center py-16"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="text-xs mt-2">Preparando vista previa…</p></div></div>` : isImageFile ? `<img src="${escapeHTML(fileSrc)}" class="max-h-full max-w-full object-contain p-4">` : isVideoFile ? `<video src="${escapeHTML(fileSrc)}" controls class="max-h-full max-w-full"></video>` : `<div class="h-full flex flex-col items-center justify-center text-white p-8 text-center"><i class="fas fa-file-alt text-4xl mb-4 opacity-50"></i><p class="mb-4">Vista previa directa no disponible para este formato</p><button data-bx-click="a395" data-p0="${bxE(function(){return m.id})}" class="px-4 py-2 bg-emerald-600 rounded-lg">Descargar ${escapeHTML(m.fileName||'archivo')}</button></div>`}</div></div>`);
+            if(isPdfFile){
+                const cont = document.getElementById('library-pdf-preview');
+                if(cont) previsualizarPdfMaterial(fileSrc, cont, m.fileName || m.title || 'documento');
+            }
         }
 
         // --- TAREAS ---

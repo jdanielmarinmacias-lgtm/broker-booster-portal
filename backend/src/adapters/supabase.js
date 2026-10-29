@@ -367,6 +367,41 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     if (error) throw new Error('Supabase estado (put): ' + error.message);
   }
 
+  /* Incremento ATÓMICO de un contador (cuota IA / rate-limit).
+   * La función SQL `bump_document_number` hace el UPSERT en una sola
+   * sentencia, así Postgres serializa la fila y dos instancias no se pisan.
+   * Si la migración no está aplicada, cae al GET+PUT de siempre: funciona,
+   * pero bajo concurrencia puede perder incrementos. */
+  let bumpRpcReady = null;
+  async function bumpEstado(collection, docId, field, delta) {
+    const n = Number(delta) || 0;
+    if (bumpRpcReady !== false) {
+      try {
+        const { data, error } = await withRetry(() => sb.rpc('bump_document_number', {
+          p_collection: collection,
+          p_doc_id: String(docId),
+          p_field: String(field),
+          p_delta: n,
+        }));
+        if (error) throw new Error(error.message);
+        bumpRpcReady = true;
+        const row = Array.isArray(data) ? data[0] : data;
+        return Number((row && row[field]) || 0);
+      } catch (e) {
+        if (bumpRpcReady === null) {
+          console.warn('[backend] contador atómico no disponible; aplica supabase/migration_rate_limit.sql —', e.message);
+        }
+        bumpRpcReady = false;
+      }
+    }
+    const cur = await getEstado(collection, docId);
+    const base = { ...(cur || {}) };
+    delete base._updatedAt;
+    const next = Math.max(0, Number(base[field] || 0) + n);
+    await putEstado(collection, docId, { ...base, [field]: next });
+    return next;
+  }
+
   /* Poda best-effort de filas de estado viejas (no rompe nada si falla). */
   async function pruneEstado(collection, antesDeMs) {
     try {
@@ -667,6 +702,7 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     externalizarUploadLocal,
     getEstado,
     putEstado,
+    bumpEstado,
     pruneEstado,
     loadRawDocuments,
     putRawDocument,

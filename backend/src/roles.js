@@ -40,6 +40,13 @@ function canModifyUser(actor, target) {
 const ALL_ROLES = ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador', 'agencia', 'agente_agencia', 'agente_desarrollo', 'alumno', 'prospecto'];
 const STAFF = ['admin', 'gm', 'desarrollador', 'agencia', 'maestro'];
 const TEACHERS = ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'];
+/* Docencia con acceso al aula (mismo reparto que renderTareas en el portal). */
+const ACADEMIA = ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'];
+/* Contenido institucional (portada, convenciones, publicidad, academia). */
+const CONTENT_WRITE = ['admin', 'gm', 'desarrollador', 'editor', 'capacitador', 'maestro', 'agencia'];
+/* Carteras comerciales (clientes y verticales auto/financiera/inmobiliaria):
+ * el agente/alumno conserva SU cartera; la propiedad se valida en el handler. */
+const CARTERA_WRITE = [...STAFF, 'editor', 'capacitador', 'agente_agencia', 'agente_desarrollo', 'alumno'];
 const COLLECTION_RULES = {
   ventas:       { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
   metas:        { read: null, write: STAFF },
@@ -60,6 +67,30 @@ const COLLECTION_RULES = {
   generations:  { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
   planes:       { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
   categories:   { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
+  /* Tareas de Academia: la tarea la crea docencia. La entrega, el avance y el
+   * intento los escribe el propio alumno; el handler limita cada fila a su
+   * dueño (sin regla, un alumno reescribía el avance de sus compañeros). */
+  tasks:        { read: null, write: ACADEMIA },
+  taskSubmissions: { read: null, write: [...ACADEMIA, 'alumno', 'agente_agencia', 'agente_desarrollo'] },
+  progress:     { read: null, write: [...ACADEMIA, 'alumno', 'agente_agencia', 'agente_desarrollo'] },
+  examAttempts: { read: null, write: [...ACADEMIA, 'alumno', 'agente_agencia', 'agente_desarrollo'] },
+  /* Práctica con prospecto: cada usuario guarda sus sesiones; el handler
+   * limita cada fila a su dueño (usuarioId). */
+  practicaSesiones: { read: null, write: ALL_ROLES },
+  /* Glosario de la escuela: lo mantiene docencia (la UI ya ocultaba los
+   * botones a los alumnos, pero la API los aceptaba). */
+  glossaryCategories: { read: null, write: ACADEMIA },
+  glossaryConcepts:   { read: null, write: ACADEMIA },
+  /* Contenido institucional: convenciones y concursos los publica el equipo
+   * que ve esa sección; antes cualquier alumno los creaba o borraba por API. */
+  convenciones: { read: null, write: CONTENT_WRITE },
+  concursos:    { read: null, write: CONTENT_WRITE },
+  /* Cartera: el alumno/agente conserva su alta, pero solo de SUS clientes.
+   * La propiedad se valida en el handler (OWNED_RECORD_FIELDS). */
+  clientes:     { read: null, write: CARTERA_WRITE },
+  autoCartera:  { read: null, write: CARTERA_WRITE },
+  finCartera:   { read: null, write: CARTERA_WRITE },
+  inmCartera:   { read: null, write: CARTERA_WRITE },
   /* Mensajes: «Nuevo grupo» es para agencia/GM/maestro/capacitador (mismo
    * reparto que puedeCrearGrupoEquipo en el portal). El borrado se limita a
    * GM dentro del handler DELETE, porque depende del grupo concreto. */
@@ -69,7 +100,6 @@ const COLLECTION_RULES = {
 /* Colecciones de configuración del portal (lo que ve el público y la matriz de
  * permisos): solo staff puede escribirlas. Antes caían en DEFAULT_RULE y
  * cualquier alumno podía reescribirlas por la API genérica. */
-const CONTENT_WRITE = ['admin', 'gm', 'desarrollador', 'editor', 'capacitador', 'maestro', 'agencia'];
 const CONFIG_WRITE = ['admin', 'gm', 'desarrollador', 'editor'];
 const CONFIG_RULES = {
   rolePermissions: { read: null, write: ['admin', 'gm', 'desarrollador'] },
@@ -77,8 +107,12 @@ const CONFIG_RULES = {
   autoHub:         { read: null, write: CONTENT_WRITE },
   inmPublica:      { read: null, write: CONTENT_WRITE },
   carruselCirculares: { read: null, write: CONFIG_WRITE },
-  guiaBase:        { read: null, write: CONFIG_WRITE },
-  practicaConfig:  { read: null, write: CONFIG_WRITE },
+  /* Base de conocimiento y configuración de Práctica: NO se entregan a
+   * cualquier sesión. Antes el bundle las mandaba completas a todos, incluida
+   * una eventual `apiKey`. Solo dirección las lee para gestionarlas; Gu-IA las
+   * usa en el servidor y la clave propia del usuario vive en su navegador. */
+  guiaBase:        { read: ['gm', 'admin', 'desarrollador'], write: CONFIG_WRITE },
+  practicaConfig:  { read: ['admin', 'gm', 'desarrollador'], write: CONFIG_WRITE },
   oferta_valor:    { read: null, write: CONFIG_WRITE },
   guiaChats:       { read: null, write: ALL_ROLES }, // cada usuario guarda su historial
   prospectos:      { read: null, write: [...CONTENT_WRITE, 'agente_agencia', 'agente_desarrollo'] },

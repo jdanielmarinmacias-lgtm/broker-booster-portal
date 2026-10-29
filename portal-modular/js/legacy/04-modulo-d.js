@@ -3925,6 +3925,28 @@ function gfGuardarColores(){
     }catch(e){ alert('Error: '+e.message); }
 }
 
+/* Estatus de la póliza: sustituye las etapas libres del Kanban por un ciclo
+ * claro. Los registros viejos con etapaKanban Prospecto/Contactado se mapean
+ * a «Propuesta» para no perder tarjetas al cambiar de tablero. */
+const ESTATUS_CLIENTE = ['Propuesta','Emitido','Pagado','Siniestrado','Cancelado'];
+function estatusCliente(c){
+    const valor = String((c && (c.estatus || c.etapaKanban)) || '');
+    if(ESTATUS_CLIENTE.includes(valor)) return valor;
+    if(valor === 'Prospecto' || valor === 'Contactado') return 'Propuesta';
+    return 'Emitido';
+}
+function estatusBadgeCliente(c){
+    const e = estatusCliente(c);
+    const color = {
+        Propuesta: 'bg-amber-100 text-amber-800',
+        Emitido: 'bg-indigo-100 text-indigo-800',
+        Pagado: 'bg-emerald-100 text-emerald-800',
+        Siniestrado: 'bg-orange-100 text-orange-800',
+        Cancelado: 'bg-rose-100 text-rose-800'
+    }[e] || 'bg-slate-100 text-slate-700';
+    return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${color}">${e}</span>`;
+}
+
 function renderMisClientes(){
     if(!db.clientes) db.clientes = [];
     const puedeCargar = ['alumno','agente_desarrollo','agente_agencia'].includes((currentUser.role||'').toLowerCase());
@@ -4012,6 +4034,12 @@ function renderMisClientes(){
                 </select>
             </div>
             <div>
+                <label class="text-sm font-medium text-slate-700 mb-1 block">Estatus</label>
+                <select id="estatus-cliente" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
+                    ${ESTATUS_CLIENTE.map(e=>`<option value="${e}" ${e==='Emitido'?'selected':''}>${e}</option>`).join('')}
+                </select>
+            </div>
+            <div>
                 <label class="text-sm font-medium text-slate-700 mb-1 block">Fecha de emisión</label>
                 <input type="date" id="emision-cliente" value="${new Date().toISOString().slice(0,10)}" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-slate-900">
                 <p class="text-[11px] text-slate-400 mt-1">Ancla la cobranza: cada pago vence el mismo día de cada periodo. Ej. emitida 29-sep-2026: mensual → 29-oct-2026, trimestral → 29-dic-2026, semestral → 29-mar-2027, anual → 29-sep-2027 (plazo máximo).</p>
@@ -4041,7 +4069,7 @@ function renderMisClientes(){
                 const evidenciaFile = document.getElementById('evidencia-cliente').files[0];
                 const readFile = (file)=> new Promise(res=>{ if(!file) return res(null); const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); });
                 const fotoBase64 = await readFile(fotoFile);
-                const evidenciaBase64 = await readFile(evidenciaFile);
+                const evidencia = await prepararEvidenciaCliente(evidenciaFile);
                 
                 const nuevo = {
                     id: Date.now(),
@@ -4059,10 +4087,11 @@ function renderMisClientes(){
                     plazoContratacion: parseInt(document.getElementById('plazo-cliente').value)||0,
                     aportacionTotal: parseFloat(document.getElementById('aportacion-cliente').value)||0,
                     periodo: document.getElementById('periodo-cliente').value,
+                    estatus: document.getElementById('estatus-cliente').value,
                     fechaEmision: document.getElementById('emision-cliente').value ? new Date(document.getElementById('emision-cliente').value+'T00:00:00').toISOString() : '',
                     whatsapp: document.getElementById('whatsapp-cliente').value.trim(),
-                    evidencia: evidenciaBase64,
-                    evidenciaNombre: evidenciaFile ? evidenciaFile.name : ''
+                    evidencia: evidencia.url,
+                    evidenciaNombre: evidencia.nombre
                 };
                 db.clientes.push(nuevo);
                 db.auditoria = db.auditoria||[];
@@ -4095,7 +4124,7 @@ function renderMisClientes(){
             const ahora = Date.now();
             const sinSeguimiento = clientes.filter(c => {
                 const ult = new Date(c.ultimaActividad || c.fecha || 0).getTime();
-                return ult > 0 && (ahora - ult) > 7 * 86400000 && (c.etapaKanban || 'Emitido') !== 'Emitido';
+                return ult > 0 && (ahora - ult) > 7 * 86400000 && estatusCliente(c) === 'Propuesta';
             });
             return sinSeguimiento.length ? `<div class="p-4 rounded-2xl border border-amber-300 bg-amber-50/80 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -4150,10 +4179,10 @@ function renderMisClientes(){
                 </div>
             </div>
             ${window.vistaMisClientes === 'kanban' ? (() => {
-                const etapas = ['Prospecto', 'Contactado', 'Propuesta', 'Emitido'];
-                return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                const etapas = ESTATUS_CLIENTE;
+                return `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                     ${etapas.map(et => {
-                        const colItems = clientes.filter(c => (c.etapaKanban || 'Emitido') === et);
+                        const colItems = clientes.filter(c => estatusCliente(c) === et);
                         return `<div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 min-h-[260px] flex flex-col">
                             <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200">
                                 <span class="text-xs font-bold uppercase text-slate-700">${et}</span>
@@ -4162,15 +4191,17 @@ function renderMisClientes(){
                             <div class="space-y-2.5 flex-1">
                                 ${colItems.map(c => {
                                     const diasInactivo = Math.floor((Date.now() - new Date(c.ultimaActividad || c.fecha || Date.now()).getTime()) / 86400000);
-                                    return `<div class="bg-white rounded-xl border ${diasInactivo > 7 && et !== 'Emitido' ? 'border-amber-400' : 'border-slate-200'} p-3 shadow-sm">
+                                    const est = estatusCliente(c);
+                                    const inactivo = diasInactivo > 7 && est === 'Propuesta';
+                                    return `<div class="bg-white rounded-xl border ${inactivo ? 'border-amber-400' : 'border-slate-200'} p-3 shadow-sm">
                                         <div class="flex items-center justify-between gap-1 mb-1">
                                             <span class="font-bold text-xs text-slate-900 truncate">${escapeHTML(c.nombre)}</span>
-                                            ${diasInactivo > 7 && et !== 'Emitido' ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Días sin actividad"><i class="fas fa-clock mr-0.5"></i>${diasInactivo}d</span>` : ''}
+                                            ${inactivo ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Días sin actividad"><i class="fas fa-clock mr-0.5"></i>${diasInactivo}d</span>` : ''}
                                         </div>
                                         <p class="text-[11px] text-slate-500 truncate">${escapeHTML(c.compania || '')} · ${escapeHTML(c.ramo || '')} · $${Number(c.primaTotal||0).toLocaleString('es-MX')}</p>
                                         <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
                                             <select data-bx-change="a599" data-p0="${bxE(function(){return c.id})}" class="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 bg-slate-50 text-slate-700">
-                                                ${etapas.map(opt => `<option value="${opt}" ${(c.etapaKanban||'Emitido')===opt?'selected':''}>${opt}</option>`).join('')}
+                                                ${etapas.map(opt => `<option value="${opt}" ${est===opt?'selected':''}>${opt}</option>`).join('')}
                                             </select>
                                             <button data-bx-click="a600" data-p0="${bxE(function(){return c.id})}" class="text-xs text-amber-600 hover:text-amber-800 px-1.5" title="Seguimiento / Cobranza"><i class="fab fa-whatsapp"></i></button>
                                         </div>
@@ -4198,6 +4229,7 @@ function renderMisClientes(){
                                 <div class="text-right shrink-0">
                                     <p class="font-bold text-slate-900 text-sm">$${Number(c.primaTotal||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</p>
                                     <div class="flex items-center justify-end gap-1 mt-0.5"><span class="text-[11px] text-slate-500">${escapeHTML(c.periodo||'')}</span>${cbzBadge(c)}</div>
+                                    <div class="flex justify-end mt-1">${estatusBadgeCliente(c)}</div>
                                 </div>
                             </div>
                             <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100">
@@ -4227,6 +4259,7 @@ function renderMisClientes(){
                             <th class="p-3 font-medium">Prima Total</th>
                             <th class="p-3 font-medium">Aportación Total</th>
                             <th class="p-3 font-medium">Periodo</th>
+                            <th class="p-3 font-medium">Estatus</th>
                             <th class="p-3 font-medium">Agente</th>
                             <th class="p-3 font-medium">Fecha</th>
                             <th class="p-3 font-medium">Emisión</th>
@@ -4246,13 +4279,14 @@ function renderMisClientes(){
                                 <td class="p-3 font-semibold">$${Number(c.primaTotal||0).toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
                                 <td class="p-3">${Number(c.aportacionTotal||0)>0 ? `<span class="font-semibold">$${Number(c.aportacionTotal).toLocaleString('es-MX',{minimumFractionDigits:2})}</span>${c.plazoContratacion?` <span class="text-xs text-slate-400">(${c.plazoContratacion} años)</span>`:''}` : '<span class="text-slate-400 text-xs">-</span>'}</td>
                                 <td class="p-3"><div class="flex items-center gap-1.5">${escapeHTML(c.periodo||'')}${cbzBadge(c)}</div></td>
+                                <td class="p-3">${estatusBadgeCliente(c)}</td>
                                 <td class="p-3 text-xs">${escapeHTML(c.agenteNombre)}</td>
                                 <td class="p-3 text-xs text-slate-500">${new Date(c.fecha).toLocaleDateString('es-MX')}</td>
                                 <td class="p-3 text-xs ${c.fechaEmision?'text-slate-600':'text-slate-300'}">${c.fechaEmision?new Date(c.fechaEmision).toLocaleDateString('es-MX'):'—'}</td>
                                 <td class="p-3">${c.evidencia ? `<button data-bx-click="a601" data-p0="${bxE(function(){return c.id})}" class="text-indigo-600 hover:text-indigo-800 text-xs"><i class="fas fa-eye mr-1"></i>Ver</button>` : '<span class="text-slate-400 text-xs">-</span>'}</td>
                                 <td class="p-3">${puedeEditar ? `<div class="flex gap-2"><button data-bx-click="a602" data-p0="${bxE(function(){return c.id})}" class="text-teal-600 hover:text-teal-800" title="Expediente 360° y Venta Cruzada (#6)"><i class="fas fa-id-card-clip"></i></button><button data-bx-click="a600" data-p0="${bxE(function(){return c.id})}" class="text-amber-500 hover:text-amber-700" title="Cobranza / recordatorio de pago"><i class="fas fa-hand-holding-dollar"></i></button><button data-bx-click="a603" data-p0="${bxE(function(){return c.id})}" class="text-orange-500 hover:text-orange-700" title="Siniestro / Cancelación"><i class="fas fa-file-shield"></i></button><button data-bx-click="a604" data-p0="${bxE(function(){return c.id})}" class="text-slate-500 hover:text-indigo-600" title="Modificar"><i class="fas fa-pen"></i></button><button data-bx-click="a605" data-p0="${bxE(function(){return c.id})}" class="text-slate-500 hover:text-red-600" title="Borrar"><i class="fas fa-trash"></i></button></div>` : ''}</td>
                             </tr>`;
-                        }).join('') || `<tr><td colspan="12" class="p-8 text-center text-slate-500">No hay clientes registrados</td></tr>`}
+                        }).join('') || `<tr><td colspan="13" class="p-8 text-center text-slate-500">No hay clientes registrados</td></tr>`}
                     </tbody>
                 </table>
                 </div>
@@ -4263,8 +4297,9 @@ function renderMisClientes(){
 
 function cambiarEtapaKanbanCliente(id, etapa){
     const c = (db.clientes || []).find(x => String(x.id) === String(id));
-    if(!c) return;
-    c.etapaKanban = etapa;
+    if(!c || !ESTATUS_CLIENTE.includes(etapa)) return;
+    c.estatus = etapa;
+    c.etapaKanban = etapa; // compatibilidad con registros/versiones previas
     c.ultimaActividad = new Date().toISOString();
     saveDB();
     if(window.showToast) showToast('Cliente movido a ' + etapa, 'success');
@@ -4517,7 +4552,37 @@ function openExpediente360(clienteId){
     </div>`);
 }
 
-// === FASE 2 (#13 y #5): ESTADO DE CUENTA DE COMISIONES, BONOS Y CONCILIACIÓN ===
+// === ESTADO DE CUENTA DE COMISIONES, BONOS Y CONCILIACIÓN ===
+/* Porcentajes elegibles por póliza (0–50 en pasos de 1%). «Auto» deja el
+ * tabulador del ramo; cualquier otro valor se guarda en el cliente y manda
+ * sobre el tabulador en todos los cálculos. */
+const PCT_COMISION_OPCIONES = Array.from({length: 51}, (_, i) => i);
+
+function pctComisionCliente(c, tasaRamo){
+    const manual = Number(c && c.comisionPct);
+    if(c && c.comisionPct !== undefined && c.comisionPct !== null && c.comisionPct !== ''
+        && Number.isFinite(manual) && manual >= 0 && manual <= 100){
+        return { pct: manual / 100, manual: manual };
+    }
+    return { pct: tasaRamo(c && c.ramo), manual: null };
+}
+
+function cambiarComisionCliente(id){
+    const c = (db.clientes||[]).find(x=>String(x.id)===String(id));
+    if(!c) return;
+    const valor = (this && this.value !== undefined) ? String(this.value) : '';
+    if(valor === ''){
+        /* null se sincroniza; `delete` no borra la clave en el servidor porque
+         * el PUT hace merge del registro y la volvería a traer en el pull. */
+        c.comisionPct = null;
+    } else {
+        const n = Number(valor);
+        if(Number.isFinite(n) && n >= 0 && n <= 100) c.comisionPct = n;
+    }
+    saveDB();
+    openEstadoCuentaComisiones();
+}
+
 function openEstadoCuentaComisiones(){
     const puedeVerTodos=['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
     const lista=puedeVerTodos?[...(db.clientes||[])]:[...(db.clientes||[])].filter(c=>String(c.agenteId)===String(currentUser.id));
@@ -4530,8 +4595,11 @@ function openEstadoCuentaComisiones(){
     };
     let primaTotalCartera=0, comisionProyectada=0, comisionDevengada=0;
     const filas=lista.map(c=>{
-        const prima=Number(c.primaNeta||c.primaTotal||0);
-        const pct=tasaRamo(c.ramo);
+        /* Sobre la PRIMA TOTAL (lo que paga el cliente). La prima neta queda
+         * solo como respaldo para registros viejos sin total capturado. */
+        const prima=Number(c.primaTotal)||Number(c.primaNeta)||0;
+        const tasa=pctComisionCliente(c, tasaRamo);
+        const pct=tasa.pct;
         const comAnual=prima*pct;
         const pagado=Boolean(c.fechaCobranza) || (c.recibosConciliados||0)>0;
         primaTotalCartera+=prima;
@@ -4539,18 +4607,26 @@ function openEstadoCuentaComisiones(){
         if(pagado) comisionDevengada+=comAnual;
         return `<tr class="border-t text-xs">
             <td class="p-2 font-semibold">${escapeHTML(c.nombre)}</td>
-            <td class="p-2">${escapeHTML(c.ramo||'General')} (${Math.round(pct*100)}%)</td>
+            <td class="p-2">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-slate-600">${escapeHTML(c.ramo||'General')}</span>
+                    <select data-bx-change="g:cambiarComisionCliente" data-p0="${bxE(function(){return c.id})}" title="Porcentaje de comisión sobre la prima total" class="border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-900 text-xs">
+                        <option value="" ${tasa.manual===null?'selected':''}>Auto (${Math.round(tasaRamo(c.ramo)*100)}%)</option>
+                        ${PCT_COMISION_OPCIONES.map(n=>`<option value="${n}" ${tasa.manual===n?'selected':''}>${n}%</option>`).join('')}
+                    </select>
+                </div>
+            </td>
             <td class="p-2">$${prima.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
             <td class="p-2 font-bold text-amber-800">$${comAnual.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
             <td class="p-2">${pagado?'<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Conciliado</span>':'<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">Por conciliar</span>'}</td>
         </tr>`;
     }).join('');
     const bonoMeta = lista.length >= 10 ? 5000 : (lista.length >= 5 ? 2000 : 0);
-    showModal(`<div class="p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+    showModal(`<div class="modal-large p-6 max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-coins text-amber-600"></i> Estado de Cuenta de Comisiones y Conciliación (#13 y #5)</h3>
-                <p class="text-xs text-slate-500">Cálculo automático sobre prima neta/total según tabulador por ramo y recibos conciliados.</p>
+                <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-coins text-amber-600"></i> Estado de Cuenta de Comisiones y Conciliación</h3>
+                <p class="text-xs text-slate-500">Cálculo automático sobre la prima total con el porcentaje que elijas por póliza; «Auto» usa el tabulador del ramo y los recibos conciliados marcan lo devengado.</p>
             </div>
             <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
@@ -4562,7 +4638,7 @@ function openEstadoCuentaComisiones(){
         </div>
         <div class="overflow-x-auto max-h-[45vh] border border-slate-200 rounded-xl">
             <table class="w-full text-left">
-                <thead class="bg-slate-50 text-[11px] uppercase text-slate-500"><tr><th class="p-2">Cliente</th><th class="p-2">Ramo (% Com.)</th><th class="p-2">Prima Base</th><th class="p-2">Comisión</th><th class="p-2">Estatus Recibo</th></tr></thead>
+                <thead class="bg-slate-50 text-[11px] uppercase text-slate-500"><tr><th class="p-2">Cliente</th><th class="p-2">Ramo (% Com.)</th><th class="p-2">Prima Total</th><th class="p-2">Comisión</th><th class="p-2">Estatus Recibo</th></tr></thead>
                 <tbody>${filas || '<tr><td colspan="5" class="p-6 text-center text-xs text-slate-400">Sin pólizas registradas</td></tr>'}</tbody>
             </table>
         </div>
@@ -4596,12 +4672,152 @@ function openCobranzaPeriodo(){
   </div>`);
 }
 
-function verEvidenciaCliente(id){
-    const c = (db.clientes||[]).find(x=>x.id===id);
-    if(!c || !c.evidencia) return;
-    const isPdf = (c.evidenciaNombre||'').toLowerCase().endsWith('.pdf') || c.evidencia.startsWith('data:application/pdf');
-    const content = isPdf ? `<iframe src="${c.evidencia}" class="w-full h-[70vh] border-0"></iframe>` : `<img src="${c.evidencia}" class="max-w-full max-h-[70vh] mx-auto">`;
-    showModal(`<div class="p-4 max-w-4xl"><div class="flex justify-between items-center mb-3"><h3 class="font-bold">Evidencia - ${escapeHTML(c.nombre)}</h3><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-500 hover:text-slate-700"><i class="fas fa-times"></i></button></div>${content}<div class="text-right mt-3"><a href="${c.evidencia}" download="${c.evidenciaNombre||'evidencia'}" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm">Descargar</a></div></div>`);
+/* La evidencia se guardaba como base64 dentro del JSON del cliente. Al
+ * migrarla al Storage, algunos registros quedaron con la URL sin la extensión
+ * final («…-1.») aunque el objeto sí se guardó como «…-1.pdf»: el proxy
+ * responde 400 y el visor no tenía nada que pintar. Las subidas nuevas ya van
+ * directas al Storage con su extensión; estas dos funciones curan lo viejo. */
+function archivoADataUrl(file){
+    return new Promise(res=>{
+        if(!file) return res('');
+        const r = new FileReader();
+        r.onload = ()=>res(String(r.result||''));
+        r.onerror = ()=>res('');
+        r.readAsDataURL(file);
+    });
+}
+
+async function prepararEvidenciaCliente(file){
+    if(!file) return {url:'', nombre:''};
+    const nombre = file.name || 'evidencia';
+    try{
+        if(window.Media && typeof window.Media.subir === 'function'){
+            const item = await window.Media.subir(file, {scope:'clientes', title:nombre});
+            if(item && item.url) return {url:item.url, nombre:nombre};
+        }
+    }catch(e){ /* sin sesión/backend: se conserva base64 como respaldo */ }
+    return {url: await archivoADataUrl(file), nombre:nombre};
+}
+
+function urlEvidenciaConExtension(url, ext){
+    const s = String(url||'');
+    const corte = s.search(/[?#]/);
+    const base = corte === -1 ? s : s.slice(0, corte);
+    const cola = corte === -1 ? '' : s.slice(corte);
+    if(base.toLowerCase().endsWith(ext)) return s;
+    return base + (base.endsWith('.') ? ext.slice(1) : ext) + cola;
+}
+
+async function resolverUrlEvidencia(c){
+    const guardada = String((c && c.evidencia) || '');
+    if(!guardada || /^data:/i.test(guardada)) return guardada;
+    const nombre = String((c && c.evidenciaNombre) || '');
+    const m = nombre.match(/\.(pdf|jpe?g|png|webp|gif|bmp|avif)$/i);
+    if(!m) return guardada;
+    const ext = m[0].toLowerCase();
+    if(!/^(?:https?:|\/)/i.test(guardada)) return guardada;
+    const base = guardada.split(/[?#]/)[0].toLowerCase();
+    if(base.endsWith(ext)) return guardada;
+    const candidatos = [guardada, urlEvidenciaConExtension(guardada, ext)];
+    if(candidatos[1] === guardada) return guardada;
+    for(const url of candidatos){
+        try{
+            const r = await fetch(url, {method:'HEAD', credentials:'same-origin'});
+            if(r.ok){
+                if(url !== guardada){
+                    c.evidencia = url;
+                    try{ if(typeof saveDB === 'function') saveDB(); }catch(e){ /* la vista sigue funcionando */ }
+                }
+                return url;
+            }
+        }catch(e){ /* se prueba el siguiente candidato */ }
+    }
+    return guardada;
+}
+
+async function verEvidenciaCliente(id){
+    const c = (db.clientes||[]).find(x=>String(x.id)===String(id));
+    if(!c) return;
+    if(!c.evidencia){ if(window.showToast) showToast('Este cliente no tiene evidencia cargada','warning'); return; }
+    const nombre = c.evidenciaNombre || 'evidencia';
+    const src = await resolverUrlEvidencia(c);
+    /* El PDF NO va en un <iframe>: el visor nativo bloquea el hilo de la página
+     * (y en algunos equipos no pinta nada). Se renderiza con PDF.js, que ya
+     * usa la biblioteca del portal, en un canvas. */
+    const esPdf = /\.pdf(?:$|[?#])/i.test(nombre) || /\.pdf(?:$|[?#])/i.test(src) || /^data:application\/pdf/i.test(src);
+    showModal(`<div class="modal-large p-4 w-full max-w-4xl">
+        <div class="flex justify-between items-center gap-3 mb-3">
+            <div class="min-w-0"><h3 class="font-bold truncate">Evidencia · ${escapeHTML(c.nombre||'Cliente')}</h3><p class="text-[11px] text-slate-500 truncate">${escapeHTML(nombre)}</p></div>
+            <button aria-label="Cerrar" data-bx-click="a1" class="text-slate-500 hover:text-slate-700 shrink-0"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="evidencia-preview" class="rounded-xl border border-slate-200 bg-slate-100 min-h-[220px] max-h-[70vh] overflow-auto flex items-start justify-center">
+            <div class="text-center text-slate-500 py-16"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="text-xs mt-2">Preparando vista previa…</p></div>
+        </div>
+        <div class="flex justify-end items-center gap-2 mt-3">
+            <a href="${escapeHTML(src)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 border border-slate-300 text-slate-700 rounded text-sm hover:bg-slate-50"><i class="fas fa-up-right-from-square mr-1"></i>Abrir</a>
+            <a href="${escapeHTML(src)}" download="${escapeHTML(nombre)}" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"><i class="fas fa-download mr-1"></i>Descargar</a>
+        </div>
+    </div>`);
+    const cont = document.getElementById('evidencia-preview');
+    if(!cont) return;
+    if(esPdf){ renderEvidenciaPdf(src, cont, nombre); return; }
+    const esImagen = /^data:image\//i.test(src) || /\.(png|jpe?g|gif|webp|bmp|avif)(?:$|[?#])/i.test(src);
+    if(esImagen){
+        cont.innerHTML = `<img src="${escapeHTML(src)}" alt="Evidencia de ${escapeHTML(c.nombre||'cliente')}" class="max-w-full max-h-[70vh] object-contain bg-white">`;
+        return;
+    }
+    cont.innerHTML = evidenciaFallbackHtml(src, nombre);
+}
+
+function evidenciaFallbackHtml(src, nombre){
+    return `<div class="w-full text-center text-slate-600 p-8"><i class="fas fa-file-lines text-4xl text-slate-400"></i><p class="text-sm font-semibold mt-3">Vista previa no disponible</p><p class="text-xs text-slate-500 mt-1 truncate max-w-md mx-auto">${escapeHTML(nombre||'Documento')}</p><a href="${escapeHTML(src)}" target="_blank" rel="noopener noreferrer" class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Abrir documento</a></div>`;
+}
+
+function evidenciaDataUrlBuffer(dataUrl){
+    const base64 = String(dataUrl).split(',')[1] || '';
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+}
+
+async function renderEvidenciaPdf(src, cont, nombre){
+    try{
+        if(!window.pdfjsLib) throw new Error('lector de PDF no disponible');
+        let buf;
+        if(/^data:/i.test(src)){
+            buf = evidenciaDataUrlBuffer(src);
+        } else {
+            const resp = await fetch(src, { credentials: 'same-origin' });
+            if(!resp.ok) throw new Error('HTTP ' + resp.status);
+            buf = await resp.arrayBuffer();
+        }
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        if(!document.body.contains(cont)) return;
+        const maxPaginas = Math.min(pdf.numPages, 4);
+        cont.innerHTML = '<div class="w-full p-3 space-y-3"></div>';
+        const paginas = cont.firstElementChild;
+        for(let n=1; n<=maxPaginas; n++){
+            const page = await pdf.getPage(n);
+            const vp = page.getViewport({ scale: 1.35 });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.floor(vp.width));
+            canvas.height = Math.max(1, Math.floor(vp.height));
+            canvas.className = 'mx-auto max-w-full h-auto bg-white rounded-lg shadow-sm';
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+            if(!document.body.contains(cont)) return;
+            paginas.appendChild(canvas);
+        }
+        if(pdf.numPages > maxPaginas){
+            const aviso = document.createElement('p');
+            aviso.className = 'text-center text-[11px] text-slate-500 py-1';
+            aviso.textContent = 'Vista previa de ' + maxPaginas + ' de ' + pdf.numPages + ' páginas. Abre o descarga el documento para verlo completo.';
+            paginas.appendChild(aviso);
+        }
+    }catch(e){
+        if(!document.body.contains(cont)) return;
+        cont.innerHTML = evidenciaFallbackHtml(src, nombre);
+    }
 }
 
 function borrarCliente(id){
@@ -4642,6 +4858,7 @@ function editarCliente(id){
             <div><label class="text-sm">Plazo de contratación (años)</label><input name="plazoContratacion" id="edit-plazo" type="number" min="1" max="30" step="1" value="${c.plazoContratacion||''}" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"></div>
             <div><label class="text-sm">Aportación Total (prima total × plazo)</label><input name="aportacionTotal" id="edit-aportacion" type="number" step="0.01" value="${c.aportacionTotal||0}" readonly class="w-full border px-3 py-2 rounded bg-slate-50 text-slate-900 border-slate-300"></div>
             <div><label class="text-sm">Periodo</label><select name="periodo" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300">${['Mensual','Trimestral','Semestral','Anual','Único'].map(p=>`<option ${c.periodo===p?'selected':''}>${p}</option>`).join('')}</select></div>
+            <div><label class="text-sm">Estatus</label><select name="estatus" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300">${ESTATUS_CLIENTE.map(e=>`<option ${estatusCliente(c)===e?'selected':''}>${e}</option>`).join('')}</select></div>
             <div><label class="text-sm">Fecha de emisión</label><input name="emision" type="date" value="${c.fechaEmision?new Date(c.fechaEmision).toISOString().slice(0,10):''}" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"></div>
             <div><label class="text-sm">WhatsApp (cobranza)</label><input name="whatsapp" type="tel" value="${escapeHTML(c.whatsapp||'')}" placeholder="52 664 123 4567" class="w-full border px-3 py-2 rounded bg-white text-slate-900 border-slate-300"></div>
             <div><label class="text-sm">Nueva foto (opcional)</label><input type="file" id="edit-foto" accept="image/*" class="w-full text-sm border p-1 rounded bg-white text-slate-900 border-slate-300"></div>
@@ -4674,6 +4891,8 @@ function editarCliente(id){
         c.plazoContratacion = parseInt(f.get('plazoContratacion'))||0;
         c.aportacionTotal = parseFloat(f.get('aportacionTotal'))||0;
         c.periodo = f.get('periodo');
+        const estatusSel = String(f.get('estatus')||'');
+        if(ESTATUS_CLIENTE.includes(estatusSel)){ c.estatus = estatusSel; c.etapaKanban = estatusSel; }
         c.fechaEmision = f.get('emision') ? new Date(f.get('emision')+'T00:00:00').toISOString() : '';
         c.whatsapp = (f.get('whatsapp')||'').trim();
         const _pt = c.primaTotal, _pl = c.plazoContratacion;
@@ -4682,7 +4901,7 @@ function editarCliente(id){
         const evidFile = document.getElementById('edit-evidencia').files[0];
         const readFile = (file)=> new Promise(res=>{ if(!file) return res(null); const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); });
         if(fotoFile){ c.fotoCliente = await readFile(fotoFile); }
-        if(evidFile){ c.evidencia = await readFile(evidFile); c.evidenciaNombre = evidFile.name; }
+        if(evidFile){ const ev = await prepararEvidenciaCliente(evidFile); c.evidencia = ev.url; c.evidenciaNombre = ev.nombre; }
         db.auditoria = db.auditoria||[];
         db.auditoria.push({id:Date.now(),tipo:'edicion_cliente',clienteId:id,usuarioId:currentUser.id,usuarioNombre:currentUser.name,fecha:new Date().toISOString(),antes:antes,despues:JSON.parse(JSON.stringify(c))});
         saveDB(); closeModal(); render(); if(window.showToast) showToast('Cliente actualizado','success');

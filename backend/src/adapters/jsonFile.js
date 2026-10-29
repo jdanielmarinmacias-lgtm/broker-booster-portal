@@ -7,6 +7,10 @@ const path = require('path');
 function createJsonFileAdapter(dataDir) {
   const DB_FILE = path.join(dataDir, 'db.json');
   const SES_FILE = path.join(dataDir, 'sessions.json');
+  /* Estado efímero del proceso (cuota IA / intentos de login). No se mezcla con
+   * db.json: son contadores internos, no colecciones del portal. */
+  const estados = new Map();
+  const claveEstado = (col, id) => String(col) + '∅' + String(id);
   const ensure = () => fs.mkdirSync(dataDir, { recursive: true });
   const read = (f, fb) => {
     try { return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : fb; }
@@ -41,6 +45,31 @@ function createJsonFileAdapter(dataDir) {
     async listUsers() { return (read(DB_FILE, {}).users || []).slice(); },
     async upsertUser() { /* el write-through de documents ya persiste users */ },
     async deleteUser() { /* idem */ },
+    async getEstado(collection, docId) {
+      const v = estados.get(claveEstado(collection, docId));
+      return v ? JSON.parse(JSON.stringify(v)) : null;
+    },
+    async putEstado(collection, docId, value) {
+      const next = JSON.parse(JSON.stringify(value || {}));
+      next._t = Date.now();
+      estados.set(claveEstado(collection, docId), next);
+    },
+    async bumpEstado(collection, docId, field, delta) {
+      const k = claveEstado(collection, docId);
+      const cur = estados.get(k) || {};
+      const next = Math.max(0, Number(cur[field] || 0) + Number(delta || 0));
+      estados.set(k, { ...cur, [field]: next, _t: Date.now() });
+      return next;
+    },
+    async pruneEstado(collection, antesDeMs) {
+      const limite = Number(antesDeMs) || 0;
+      let removed = 0;
+      for (const [k, v] of estados) {
+        if (!k.startsWith(String(collection) + '∅')) continue;
+        if (Number(v && v._t) < limite) { estados.delete(k); removed++; }
+      }
+      return removed;
+    },
     async getSession(token) { return read(SES_FILE, {})[token] || null; },
     async setSession(token, s) {
       const all = read(SES_FILE, {});

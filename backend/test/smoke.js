@@ -201,6 +201,154 @@ describe('permisos del catálogo de Academia', () => {
   });
 });
 
+describe('colecciones que caían en la regla por defecto', () => {
+  async function como(usuario, clave) {
+    jar.cookie = null;
+    const r = await api('POST', '/api/auth/login', { username: usuario, password: clave }, false);
+    assert.equal(r.status, 200, 'login ' + usuario);
+  }
+
+  it('un alumno no crea tareas, convenciones ni concursos (403); docencia sí', async () => {
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('POST', '/api/data/tasks', { title: 'Tarea pirata' })).status, 403);
+    assert.equal((await api('POST', '/api/data/convenciones', { nombre: 'Convención pirata' })).status, 403);
+    assert.equal((await api('POST', '/api/data/concursos', { nombre: 'Concurso pirata' })).status, 403);
+
+    await como('maestro', 'Test1234*');
+    const t = await api('POST', '/api/data/tasks', { title: 'Tarea temporal', categoryId: 1 });
+    assert.equal(t.status, 201);
+    const c = await api('POST', '/api/data/convenciones', { nombre: 'Convención temporal' });
+    assert.equal(c.status, 201);
+    const k = await api('POST', '/api/data/concursos', { nombre: 'Concurso temporal' });
+    assert.equal(k.status, 201);
+    for (const [col, id] of [['tasks', t.json.item.id], ['convenciones', c.json.item.id], ['concursos', k.json.item.id]]) {
+      const d = await api('DELETE', '/api/data/' + col + '/' + id);
+      assert.equal(d.status, 200, 'borra ' + col);
+    }
+  });
+
+  it('el alumno solo escribe su propio avance, entrega e intento (403 en los ajenos)', async () => {
+    await como('admin', 'NuevaClave99');
+    const p = await api('POST', '/api/data/progress', { id: 994101, userId: 2, lessonId: 1, completed: true });
+    assert.equal(p.status, 201);
+    const s = await api('POST', '/api/data/taskSubmissions', { id: 994102, taskId: 1, studentId: 2, status: 'entregado' });
+    assert.equal(s.status, 201);
+    const a = await api('POST', '/api/data/examAttempts', { id: 994103, examId: 1, userId: 2, score: 100 });
+    assert.equal(a.status, 201);
+
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('PUT', '/api/data/progress/994101', { completed: true })).status, 403);
+    assert.equal((await api('PUT', '/api/data/taskSubmissions/994102', { grade: 100 })).status, 403);
+    assert.equal((await api('PUT', '/api/data/examAttempts/994103', { score: 100 })).status, 403);
+    assert.equal((await api('DELETE', '/api/data/taskSubmissions/994102')).status, 403);
+
+    const propio = await api('POST', '/api/data/progress', { id: 994104, lessonId: 1, completed: true });
+    assert.equal(propio.status, 201);
+    assert.equal(String(propio.json.item.userId), '3', 'el dueño sale de la sesión');
+    const lista = await api('GET', '/api/data/progress');
+    assert.ok(lista.json.items.every((x) => String(x.userId) === '3'), 'solo ve su avance');
+    const entregas = await api('GET', '/api/data/taskSubmissions');
+    assert.ok(entregas.json.items.every((x) => String(x.studentId) === '3'), 'solo ve sus entregas');
+
+    await como('admin', 'NuevaClave99');
+    for (const [col, id] of [['progress', 994101], ['taskSubmissions', 994102], ['examAttempts', 994103], ['progress', 994104]]) {
+      assert.equal((await api('DELETE', '/api/data/' + col + '/' + id)).status, 200, 'limpia ' + col);
+    }
+  });
+
+  it('la cartera se limita al dueño: el alumno no toca la de otro (403)', async () => {
+    await como('admin', 'NuevaClave99');
+    const c = await api('POST', '/api/data/clientes', { id: 994201, agenteId: 2, agenteNombre: 'Prof. García', nombre: 'Cliente ajeno' });
+    assert.equal(c.status, 201);
+
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('PUT', '/api/data/clientes/994201', { nombre: 'robado' })).status, 403);
+    assert.equal((await api('DELETE', '/api/data/clientes/994201')).status, 403);
+    const lista = await api('GET', '/api/data/clientes');
+    assert.ok(!lista.json.items.some((x) => String(x.id) === '994201'), 'no ve la cartera ajena');
+    const propio = await api('POST', '/api/data/clientes', { id: 994202, nombre: 'Mi cliente' });
+    assert.equal(propio.status, 201);
+    assert.equal(String(propio.json.item.agenteId), '3', 'no puede asignar el alta a otro');
+    assert.equal((await api('POST', '/api/data/clientes', { id: 994203, agenteId: 2, nombre: 'x' })).status, 403);
+
+    await como('admin', 'NuevaClave99');
+    assert.equal((await api('DELETE', '/api/data/clientes/994201')).status, 200);
+    assert.equal((await api('DELETE', '/api/data/clientes/994202')).status, 200);
+  });
+
+  it('glosario y carteras de verticales: docencia y dueño, nunca el alumno ajeno', async () => {
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('POST', '/api/data/glossaryConcepts', { term: 'Pirata', definition: 'x' })).status, 403);
+    const propio = await api('POST', '/api/data/autoCartera', { cliente: 'Mi prospecto', precio: 1000 });
+    assert.equal(propio.status, 201);
+    assert.equal(String(propio.json.item.agenteId), '3', 'la cartera propia se asigna a la sesión');
+
+    await como('admin', 'NuevaClave99');
+    const ajeno = await api('POST', '/api/data/autoCartera', { id: 994401, agenteId: 2, cliente: 'Cartera ajena', precio: 2000 });
+    assert.equal(ajeno.status, 201);
+
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('PUT', '/api/data/autoCartera/994401', { cliente: 'robado' })).status, 403);
+    assert.equal((await api('DELETE', '/api/data/autoCartera/994401')).status, 403);
+    const lista = await api('GET', '/api/data/autoCartera');
+    assert.ok(lista.json.items.every((x) => String(x.agenteId) === '3'), 'solo ve su cartera');
+
+    await como('maestro', 'Test1234*');
+    const g = await api('POST', '/api/data/glossaryConcepts', { term: 'Temporal', definition: 'x', categoryId: 1 });
+    assert.equal(g.status, 201);
+    assert.equal((await api('DELETE', '/api/data/glossaryConcepts/' + g.json.item.id)).status, 200);
+
+    await como('admin', 'NuevaClave99');
+    assert.equal((await api('DELETE', '/api/data/autoCartera/994401')).status, 200);
+    assert.equal((await api('DELETE', '/api/data/autoCartera/' + propio.json.item.id)).status, 200);
+  });
+
+  it('el chat del aula solo lo escriben sus miembros; el tutor puede limpiarlo', async () => {
+    await como('maestro', 'Test1234*');
+    const g = await api('POST', '/api/data/groups', { id: 994301, generationId: 1, name: 'Grupo temporal', tutorId: 2 });
+    assert.equal(g.status, 201);
+    const otro = await api('POST', '/api/data/groups', { id: 994302, generationId: 1, name: 'Grupo ajeno', tutorId: 5 });
+    assert.equal(otro.status, 201);
+
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('POST', '/api/data/groupMessages', { id: 994303, groupId: 994302, content: 'hola ajeno' })).status, 403);
+    assert.equal((await api('POST', '/api/data/groupMessages', { id: 994304, groupId: 994301, content: 'hola' })).status, 403, 'sin inscripción no entra');
+
+    await como('maestro', 'Test1234*');
+    const e = await api('POST', '/api/data/enrollments', { id: 994305, userId: 3, groupId: 994301, generationId: 1 });
+    assert.equal(e.status, 201);
+
+    await como('alumno', 'Test1234*');
+    const m = await api('POST', '/api/data/groupMessages', { id: 994304, groupId: 994301, content: 'hola', authorId: 2 });
+    assert.equal(m.status, 201);
+    assert.equal(String(m.json.item.authorId), '3', 'authorId sale de la sesión');
+    const chat = await api('GET', '/api/data/groupMessages');
+    assert.ok(chat.json.items.every((x) => String(x.groupId) === '994301' || String(x.authorId) === '3'), 'solo ve el chat de su aula');
+
+    await como('maestro', 'Test1234*');
+    assert.equal((await api('DELETE', '/api/data/groupMessages/994304')).status, 200, 'el tutor limpia el chat');
+    assert.equal((await api('DELETE', '/api/data/enrollments/994305')).status, 200);
+    assert.equal((await api('DELETE', '/api/data/groups/994301')).status, 200);
+    assert.equal((await api('DELETE', '/api/data/groups/994302')).status, 200);
+  });
+
+  it('la agenda y el historial de Gu-IA son solo de su dueño', async () => {
+    await como('admin', 'NuevaClave99');
+    assert.equal((await api('PUT', '/api/data/agendas/2', { value: 'nota del maestro' })).status, 200);
+
+    await como('alumno', 'Test1234*');
+    assert.equal((await api('PUT', '/api/data/agendas/2', { value: 'secuestrada' })).status, 403);
+    assert.equal((await api('PUT', '/api/data/guiaChats/2', { value: ['x'] })).status, 403);
+    assert.equal((await api('PUT', '/api/data/agendas/3', { value: 'mi nota' })).status, 200);
+    const obj = await api('GET', '/api/data/agendas');
+    assert.deepEqual(Object.keys(obj.json.object), ['3']);
+
+    await como('admin', 'NuevaClave99');
+    assert.equal((await api('DELETE', '/api/data/agendas/2')).status, 200);
+    assert.equal((await api('DELETE', '/api/data/agendas/3')).status, 200);
+  });
+});
+
 describe('salud pública (regressión: ningún router la debe 401-izar)', () => {
   it('/api/salud responde sin sesión', async () => {
     const r = await api('GET', '/api/salud', null, false);

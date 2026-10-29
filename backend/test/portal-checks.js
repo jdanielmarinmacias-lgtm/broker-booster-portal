@@ -214,3 +214,199 @@ describe('permisos de grupos', () => {
     });
   });
 });
+
+/* ---- 5) Mis Clientes: estatus, comisiones y evidencia ---------------- */
+
+describe('Mis Clientes', () => {
+  const MODULO_D = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '04-modulo-d.js');
+  const src = fs.readFileSync(MODULO_D, 'utf8');
+
+  it('el alta y el kanban usan los cinco estatus de la póliza', () => {
+    const m = src.match(/const ESTATUS_CLIENTE = \[([^\]]+)\]/);
+    assert.ok(m, 'no se encontró ESTATUS_CLIENTE en Mis Clientes');
+    const etapas = m[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''));
+    assert.deepEqual(etapas, ['Propuesta', 'Emitido', 'Pagado', 'Siniestrado', 'Cancelado']);
+    assert.ok(/id="estatus-cliente"/.test(src), 'el alta debe incluir el selector de estatus');
+    assert.ok(/const etapas = ESTATUS_CLIENTE/.test(src), 'el kanban debe pintar una columna por estatus');
+  });
+
+  it('la comisión se calcula sobre la prima total con porcentaje elegible por póliza', () => {
+    assert.ok(!src.includes('(#13 y #5)'), 'quedó el texto (#13 y #5) en el estado de cuenta');
+    assert.ok(/const prima=Number\(c\.primaTotal\)\|\|Number\(c\.primaNeta\)\|\|0;/.test(src), 'la comisión debe partir de la prima total');
+    assert.ok(/const comAnual=prima\*pct;/.test(src), 'la comisión debe multiplicar la prima por el porcentaje elegido');
+    assert.ok(/PCT_COMISION_OPCIONES/.test(src), 'falta el selector de porcentaje de comisión');
+    assert.ok(/cambiarComisionCliente/.test(src), 'el selector debe guardar el porcentaje por póliza');
+  });
+
+  it('la evidencia repara la URL sin extensión y se pinta sin iframe', () => {
+    assert.ok(/async function resolverUrlEvidencia/.test(src), 'falta la reparación de URLs de evidencia');
+    assert.ok(/urlEvidenciaConExtension/.test(src), 'falta el candidato con extensión');
+    const inicio = src.indexOf('async function verEvidenciaCliente(id)');
+    assert.ok(inicio > -1, 'verEvidenciaCliente debe poder esperar a la URL reparada');
+    const fin = src.indexOf('function borrarCliente', inicio);
+    const bloque = src.slice(inicio, fin > inicio ? fin : inicio + 6000);
+    assert.ok(!/<iframe\s/.test(bloque), 'la evidencia debe previsualizarse sin iframe');
+    assert.ok(/renderEvidenciaPdf/.test(bloque), 'los PDF deben pintarse con PDF.js en canvas');
+  });
+
+  it('la evidencia nueva se sube a Storage en vez de guardarse como base64', () => {
+    assert.ok(/async function prepararEvidenciaCliente/.test(src));
+    assert.ok(/Media\.subir\(file, \{scope:'clientes'/.test(src), 'la evidencia debe subir al Storage con su extensión');
+  });
+});
+
+/* ---- 6) PDFs de Biblioteca sin iframe -------------------------------- */
+
+describe('PDFs de Biblioteca', () => {
+  const CORE = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '01-core-db-roles-portal.js');
+  const core = fs.readFileSync(CORE, 'utf8');
+
+  it('no incrusta el PDF de Storage en un iframe (CSP frame-src / Supabase)', () => {
+    /* El iframe nativo bloquea el hilo de la página y, al redirigir /media al
+     * Storage, la CSP lo rechaza y llena la consola. Debe pintarse con PDF.js. */
+    const marca = core.indexOf('isPdfFile ?');
+    assert.ok(marca > -1, 'no se encontró la rama de PDF de Biblioteca');
+    assert.ok(!/<iframe/.test(core.slice(marca, marca + 600)), 'el PDF de Biblioteca volvió a usar iframe');
+    assert.ok(/id="library-pdf-preview"/.test(core), 'falta el contenedor de la vista previa PDF');
+    assert.ok(/previsualizarPdfMaterial/.test(core), 'falta el render de PDF con PDF.js');
+  });
+});
+
+/* ---- 7) Worker de PDF.js del mismo origen ---------------------------- */
+
+describe('worker de PDF.js', () => {
+  const LAZY = path.join(RAIZ, 'portal-modular', 'js', 'core', 'lazy-app.js');
+  const API = path.join(RAIZ, 'portal-modular', 'js', 'vendor', 'pdf.min.js');
+  const WORKER = path.join(RAIZ, 'portal-modular', 'js', 'vendor', 'pdf.worker.min.js');
+  const lazy = fs.readFileSync(LAZY, 'utf8');
+
+  it('se sirve desde el portal y coincide con la versión de la API', () => {
+    assert.ok(/GlobalWorkerOptions\.workerSrc/.test(lazy), 'falta configurar GlobalWorkerOptions.workerSrc');
+    assert.ok(/js\/vendor\/pdf\.worker\.min\.js/.test(lazy), 'el worker debe apuntar a /js/vendor/');
+    assert.ok(!/cdnjs[^"']*pdf\.worker/.test(lazy), 'el worker no debe apuntar al CDN');
+    assert.ok(/js\/vendor\/pdf\.min\.js\?v=/.test(lazy), 'la API de PDF.js también debe ser local y versionada');
+    assert.ok(fs.existsSync(API), 'falta portal-modular/js/vendor/pdf.min.js');
+    assert.ok(fs.existsSync(WORKER), 'falta portal-modular/js/vendor/pdf.worker.min.js');
+    assert.ok(fs.statSync(WORKER).size > 500000, 'worker local vacío o truncado');
+    assert.ok(fs.readFileSync(API, 'utf8').includes('3.11.174'), 'la API local no es la versión esperada');
+    assert.ok(fs.readFileSync(WORKER, 'utf8').includes('3.11.174'), 'el worker no coincide con la versión de la API');
+  });
+
+  it('la CSP sigue sin abrir worker-src a un CDN', () => {
+    const csp = directivasCsp(cabeceraGlobal('Content-Security-Policy'));
+    assert.deepEqual(csp['worker-src'], ["'self'", 'blob:']);
+  });
+
+  it('ningún lector del portal vuelve a pedir PDF.js al CDN', () => {
+    /* El legacy apuntaba GlobalWorkerOptions.workerSrc a cdnjs/jsdelivr en
+     * cada apertura de PDF, pisando la configuración local. Con
+     * `worker-src 'self' blob:` el worker remoto se bloquea y PDF.js cae al
+     * fake worker: aviso en consola y página bloqueada con PDFs grandes. */
+    const CDN_PDF = /https?:\/\/[^\s'"`]*(?:pdf\.min\.js|pdf\.worker[^\s'"`]*|pdfjs-dist)/;
+    const fallos = [];
+    JS_DIRS.forEach((dir) => {
+      fs.readdirSync(dir).filter((f) => f.endsWith('.js')).forEach((f) => {
+        const s = fs.readFileSync(path.join(dir, f), 'utf8');
+        if (CDN_PDF.test(s)) fallos.push(f);
+      });
+    });
+    assert.deepEqual(fallos, [], 'estos archivos siguen cargando PDF.js desde un CDN');
+
+    const legacy = fs.readFileSync(LEGACY, 'utf8');
+    assert.ok(/async function pdfJsListo\(\)/.test(legacy), 'falta el punto único pdfJsListo()');
+    const usos = (legacy.match(/pdfJsListo\(\)/g) || []).length;
+    assert.ok(usos >= 6, 'los lectores de PDF del legacy deben usar pdfJsListo() (hay ' + usos + ')');
+    assert.ok(/pdf:\s*\{\s*api:\s*PDF_API,\s*worker:\s*PDF_WORKER,\s*configurar:\s*configurarPdfWorker,\s*cargar:\s*cargarPdf\s*\}/.test(lazy),
+      'BBApp debe exponer la API y el worker locales para el legacy');
+    assert.ok(/function cargarPdf\(\)/.test(lazy), 'falta la carga bajo demanda de la API local');
+  });
+});
+
+/* ---- 8) Portada de los grupos de Mensajes ---------------------------- */
+
+describe('portada de grupos', () => {
+  const core = fs.readFileSync(LEGACY, 'utf8');
+
+  it('el editor ofrece una vista previa pequeña y sube la imagen al guardar', () => {
+    ['id="grupo-portada-input"', 'id="grupo-portada-preview"', 'w-20 h-12',
+      'elegirPortadaGrupo', 'quitarPortadaGrupo', 'grp.portada = portada'].forEach((s) => {
+      assert.ok(core.includes(s), 'falta ' + s + ' en el editor de grupos');
+    });
+    assert.ok(core.includes("Media.subir(window._grupoPortadaFile"), 'la portada debe subirse al Storage al guardar');
+    assert.ok(core.includes('/^data:/i.test(portada)'), 'la portada nunca debe guardarse como dataURL');
+  });
+
+  it('la tarjeta y la cabecera del chat la muestran en tamaño compacto', () => {
+    assert.ok(core.includes('const portada = String(gr.portada'), 'la tarjeta no lee gr.portada');
+    assert.ok(core.includes('-mx-3.5 -mt-3.5 mb-2 h-14'), 'la banda de la tarjeta debe medir 56 px');
+    assert.ok(core.includes('const avatarGrupo = grp.portada'), 'la cabecera del chat no usa la portada');
+  });
+
+  it('guardar el grupo repinta sin variables sin declarar', () => {
+    /* `edit` no existía en saveGrupoModal: el ReferenceError llegaba después de
+     * guardar y antes de render(), así que la portada no se veía hasta el
+     * siguiente repintado y saltaba un aviso de error. */
+    const desde = core.indexOf('window.saveGrupoModal = async function');
+    const hasta = core.indexOf('window.eliminarGrupo', desde);
+    assert.ok(desde > -1 && hasta > desde, 'no se encontró saveGrupoModal');
+    const bloque = core.slice(desde, hasta);
+    assert.ok(!/\bedit\b/.test(bloque), 'saveGrupoModal usa "edit" sin declararla');
+    assert.ok(/showToast\(editId \?/.test(bloque), 'el aviso debe decidir con editId');
+  });
+});
+
+/* ---- 9) Fase 0: secretos fuera del bundle ---------------------------- */
+
+describe('secretos fuera del bundle (Fase 0)', () => {
+  /* Formatos reales de claves de proveedor: si alguna vez se pega una en el
+   * portal, el despliegue se corta aquí en vez de publicarla al mundo. */
+  const CLAVE = /\b(?:gsk_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|hf_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/;
+
+  function fuentesServidas() {
+    const out = [path.join(RAIZ, 'portal.html'), path.join(RAIZ, 'portal-modular', 'index.html')];
+    const recorrer = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
+        if (e.name === 'vendor' || e.name === 'node_modules' || e.name === 'test') return;
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) recorrer(p);
+        else if (/\.(?:js|html)$/i.test(e.name)) out.push(p);
+      });
+    };
+    recorrer(path.join(RAIZ, 'portal-modular'));
+    /* El servidor también se despliega: una clave pegada en backend/src o en
+     * la función de Vercel quedaría en el repositorio igual que en el portal. */
+    recorrer(path.join(RAIZ, 'backend', 'src'));
+    recorrer(path.join(RAIZ, 'api'));
+    return out;
+  }
+
+  it('ningún archivo desplegado incrusta una clave de proveedor', () => {
+    const fallos = [];
+    fuentesServidas().forEach((file) => {
+      const lineas = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+      lineas.forEach((linea, i) => {
+        if (CLAVE.test(linea)) fallos.push(path.relative(RAIZ, file) + ':' + (i + 1));
+      });
+    });
+    assert.deepEqual(fallos, [], 'hay una clave real incrustada en el portal');
+  });
+
+  it('guiaBase y practicaConfig no viajan en el bundle inicial', () => {
+    const src = fs.readFileSync(path.join(RAIZ, 'backend', 'src', 'routes', 'collections.js'), 'utf8');
+    const linea = src.split(/\r?\n/).find((l) => l.includes('EXCLUDE_FROM_BUNDLE')) || '';
+    assert.ok(linea.includes("'guiaBase'") && linea.includes("'practicaConfig'"),
+      'EXCLUDE_FROM_BUNDLE debe excluir guiaBase y practicaConfig');
+  });
+
+  it('solo dirección puede leer la guía y la configuración de Práctica', () => {
+    ['alumno', 'maestro', 'capacitador', 'agencia', 'prospecto'].forEach((role) => {
+      assert.equal(roles.canRead({ role }, 'guiaBase'), false, role + ' no debe leer guiaBase');
+      assert.equal(roles.canRead({ role }, 'practicaConfig'), false, role + ' no debe leer practicaConfig');
+    });
+    ['gm', 'admin', 'desarrollador'].forEach((role) => {
+      assert.equal(roles.canRead({ role }, 'guiaBase'), true, role + ' sí debe leer guiaBase');
+      assert.equal(roles.canRead({ role }, 'practicaConfig'), true, role + ' sí debe leer practicaConfig');
+    });
+  });
+});

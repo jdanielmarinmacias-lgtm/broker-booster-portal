@@ -17,13 +17,60 @@
 (function () {
   'use strict';
 
-  var V = '20261048a';
+  var V = '20261054a';
 
-  /* Librerías de terceros: se piden primero, como estaban en el <head>. */
+  /* El worker de PDF.js debe ser EXACTAMENTE la misma versión que la API
+   * (3.11.174) y se sirve desde el propio dominio. Así la CSP sigue en
+   * `worker-src 'self' blob:` —sin abrirla a cdnjs— y el lector usa un worker
+   * real en vez del "fake worker" del hilo principal, que avisa en consola y
+   * bloquea la página con PDFs grandes. La marca ?v= evita que el worker
+   * quede cacheado tras un despliegue. */
+  var PDF_API = 'js/vendor/pdf.min.js?v=' + V;
+  var PDF_WORKER = 'js/vendor/pdf.worker.min.js?v=' + V;
+  var promesaPdf = null;
+
+  function configurarPdfWorker() {
+    try {
+      if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(PDF_WORKER, document.baseURI).href;
+      }
+    } catch (e) { /* PDF.js aún no cargó: se configura al terminar la carga */ }
+  }
+
+  /* Carga la API local cuando alguien pide un PDF antes de que el campus
+   * termine de cargar (Gu-IA, cotizador, comparador). Es el mismo archivo de
+   * js/vendor/ que ya trae LIBRERIAS: una sola versión (3.11.174) para API y
+   * worker, sin tocar el CDN. */
+  function cargarPdf() {
+    if (window.pdfjsLib) {
+      configurarPdfWorker();
+      return Promise.resolve(window.pdfjsLib);
+    }
+    if (promesaPdf) return promesaPdf;
+    promesaPdf = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = new URL(PDF_API, document.baseURI).href;
+      s.onload = function () {
+        configurarPdfWorker();
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = function () {
+        promesaPdf = null;
+        reject(new Error('no se pudo cargar el lector de PDF'));
+      };
+      document.head.appendChild(s);
+    });
+    return promesaPdf;
+  }
+
+  /* Librerías de terceros: se piden primero, como estaban en el <head>. La
+   * API de PDF.js va con el worker local, ambos 3.11.174: si la API viniera
+   * del CDN y el worker del portal, una diferencia de build podía dejar el
+   * render de páginas esperando al worker. */
   var LIBRERIAS = [
     'https://cdn.jsdelivr.net/npm/chart.js',
     'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+    PDF_API,
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
   ];
@@ -79,6 +126,7 @@
       });
     });
     promesa = promesa.then(function (resultado) {
+      configurarPdfWorker();
       terminado = true;
       return resultado;
     });
@@ -139,6 +187,10 @@
 
   window.BBApp = {
     cargar: cargar,
+    /* Único punto que fija el worker de PDF.js: la API y el worker salen de
+     * js/vendor/ (mismo origen y misma versión). Las lecturas de PDF del
+     * legacy llaman a BBApp.pdf.cargar() en vez de cargar el CDN. */
+    pdf: { api: PDF_API, worker: PDF_WORKER, configurar: configurarPdfWorker, cargar: cargarPdf },
     rutas: listaCompleta.slice(),
     /* ¿Ya está todo ejecutado? (la compuerta lo usa para no esperar de más) */
     listo: function () { return terminado; },
@@ -150,6 +202,7 @@
    * cuando el núcleo llama a checkSession → initializeApp(). Este listener se
    * registra antes que el del núcleo, así que la compuerta está puesta. */
   function instalar() {
+    configurarPdfWorker();
     ponerCompuerta();
     dispararSiHaceFalta();
   }

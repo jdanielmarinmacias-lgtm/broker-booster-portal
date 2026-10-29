@@ -38,7 +38,7 @@ npm run import -- ./respaldo.json          # hashea claves en claro, conserva to
 - Reglas en servidor: alumno recibe 403 al listar usuarios o escribir ventas;
   cuentas GM no las borra nadie (verificado en tests).
 - Ninguna respuesta API incluye contraseñas ni hashes.
-- Rate-limit de login (10 intentos FALLIDOS/10 min/IP; el éxito perdona: los
+- Rate-limit de login (10 intentos FALLIDOS/2 min/IP; el éxito perdona: los
   usuarios legítimos jamás se bloquean), auditoría server-side, escritura
   atómica del `db.json`, cabeceras duras (`nosniff`, `DENY` frame, `no-store` en API).
 - Sin backend (doble clic al `index.html`, otro hosting estático), el portal sigue
@@ -98,7 +98,8 @@ sale del servidor (solo `process.env` / Vercel env).
    `{"store":"supabase","realtime":true}`.
 
 Notas serverless: sin estado en memoria (sesiones y datos en Supabase), caché de
-colecciones con TTL 10s, rate-limit de login por instancia (suficiente + auditoría).
+colecciones con TTL 10s, rate-limit de login compartido en `documents` (lo ven
+todas las instancias) y auditoría server-side.
 
 ## Realtime verificado (diseño)
 
@@ -176,6 +177,66 @@ Reglas que mantienen el problema resuelto (ya en el código):
 - El adaptador recorta textos/archivos de la auditoría al guardarla
   (`compactAudit`) y lee como máximo `AUDIT_KEEP` (300) filas.
 - Los archivos viven en Storage: `Media.desbase64` los mueve antes de cada push.
+
+## Respaldo verificable (Fase 0)
+
+```bash
+cd backend
+npm run db:backup                 # backups/backup-<fecha>.json + .sha256
+npm run db:backup -- --dry        # solo cuenta y muestra el destino
+npm run db:backup -- --keep 30    # retención de 30 respaldos
+npm run db:backup:verify          # verifica el más reciente
+npm run db:backup -- --verify backups/backup-2026-....json
+```
+
+El respaldo de Supabase guarda `documents` completo, `app_users` (incluye
+hashes de contraseña) y las últimas 1,000 filas de `public_feed`. El local
+guarda `data/db.json`. `verify` comprueba formato, conteos y checksum SHA-256.
+
+**Trátalo como material sensible:** `backend/backups/` está en `.gitignore`.
+Antes de una migración grande: `npm run db:backup`, copia el `.json` fuera del
+proyecto y prueba restaurarlo en un entorno de staging.
+
+## Rotación de claves y contenido sensible (Fase 0)
+
+- `guiaBase` y `practicaConfig` **ya no viajan en `/api/data/bundle`**. AI Lobby
+  pide `guiaBase` bajo demanda (solo GM/admin) y `/api/ia/chat` inyecta los
+  fragmentos relevantes en el servidor.
+- `practicaConfig` es configuración local: el servidor descarta `apiKey` en
+  cualquier escritura y nunca la devuelve. La clave propia del usuario vive
+  solo en `localStorage` (`bb_api_key_propia`) y no se sincroniza.
+- `scripts/scrub-keys.js` limpia restos de claves en `practicaConfig`,
+  `settings` y documentos con patrones `gsk_`, `sk-`, `AIza`, `hf_`, `xox…`.
+
+```bash
+cd backend
+npm run db:scrub-keys              # simulación
+npm run db:scrub-keys -- --apply   # limpia la base
+```
+
+**Rotación real del proveedor:** revoca la clave anterior en Groq/OpenAI,
+crea una nueva y actualiza `GROQ_API_KEY` en las variables de Vercel. Después
+redeploy. Una clave que estuvo en el navegador debe considerarse comprometida
+(aunque `/api/ia/key` ya no exista). Si sospechas de una sesión robada:
+
+```bash
+npm run db:scrub-keys -- --apply --revoke-sessions
+```
+
+Eso cierra **todas** las sesiones y obliga a re-login.
+
+## Rate-limit de IA por minuto (Fase 0)
+
+Además del cupo diario (`IA_DIARIO`, `IA_DIARIO_TOTAL`), el proxy corta ráfagas:
+
+- `IA_MINUTO` (default `10`): mensajes por usuario por minuto.
+- `IA_MINUTO_TOTAL` (default `120`): mensajes globales por minuto.
+
+El contador se comparte entre instancias. Para que el incremento sea **atómico**
+bajo concurrencia, ejecuta una vez
+[`supabase/migration_rate_limit.sql`](supabase/migration_rate_limit.sql). Sin esa
+migración el backend usa GET+PUT (funciona, pero dos peticiones simultáneas
+pueden perder un incremento).
 
 ## Ticker realtime entre equipos (`collection_versions`)
 
