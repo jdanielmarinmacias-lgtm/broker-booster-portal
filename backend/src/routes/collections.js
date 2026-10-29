@@ -641,11 +641,15 @@ module.exports = (store, config) => {
         return res.json({ ok: true });
       }
       const before = (data[collection] || []).length;
-      // chatGroups: borrar solo creador/admins del grupo o staff.
-      if (collection === 'chatGroups' && !isStaffComunicacion(req.user)) {
-        const rec = chatGroupById(data, id);
-        if (rec && !isGroupAdmin(rec, req.user)) {
-          return res.status(403).json({ ok: false, error: 'Solo admins del grupo pueden eliminarlo' });
+      /* chatGroups: el portal solo ofrece la papelera a un GM (regla de
+       * producto). Antes el servidor aceptaba el borrado de cualquier staff o
+       * del creador/admin del grupo: la UI lo ocultaba pero la API no. */
+      if (collection === 'chatGroups') {
+        if (String(id).startsWith('canal:')) {
+          return res.status(400).json({ ok: false, error: 'Los canales base del equipo no se pueden eliminar' });
+        }
+        if (!roles.isGM(req.user)) {
+          return res.status(403).json({ ok: false, error: 'Solo un GM puede eliminar grupos' });
         }
       }
       data[collection] = (data[collection] || []).filter((x) => String(x.id) !== String(id));

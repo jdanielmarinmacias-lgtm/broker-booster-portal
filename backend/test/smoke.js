@@ -141,6 +141,38 @@ describe('roles en servidor', () => {
   });
 });
 
+describe('permisos de grupos (Mensajes y Academia)', () => {
+  async function como(usuario, clave) {
+    jar.cookie = null;
+    const r = await api('POST', '/api/auth/login', { username: usuario, password: clave }, false);
+    assert.equal(r.status, 200, 'login ' + usuario);
+  }
+
+  it('un alumno no puede crear grupos de Academia (403)', async () => {
+    await como('alumno', 'Test1234*');
+    const r = await api('POST', '/api/data/groups', { name: 'Curso pirata', generationId: 1, tutorId: 2 });
+    assert.equal(r.status, 403);
+  });
+
+  it('un maestro crea un grupo del equipo pero no puede borrarlo (403)', async () => {
+    await como('maestro', 'Test1234*');
+    const c = await api('POST', '/api/data/chatGroups', { nombre: 'Temporal maestro' });
+    assert.equal(c.status, 201);
+    const d = await api('DELETE', '/api/data/chatGroups/' + c.json.item.id);
+    assert.equal(d.status, 403);
+  });
+
+  it('solo un GM borra grupos y los canales base quedan protegidos', async () => {
+    await como('gmmarin', 'Test1234*');
+    const c = await api('POST', '/api/data/chatGroups', { nombre: 'Temporal GM' });
+    assert.equal(c.status, 201);
+    const d = await api('DELETE', '/api/data/chatGroups/' + c.json.item.id);
+    assert.equal(d.status, 200);
+    const canal = await api('DELETE', '/api/data/chatGroups/' + encodeURIComponent('canal:general'));
+    assert.equal(canal.status, 400);
+  });
+});
+
 describe('salud pública (regressión: ningún router la debe 401-izar)', () => {
   it('/api/salud responde sin sesión', async () => {
     const r = await api('GET', '/api/salud', null, false);
@@ -426,11 +458,15 @@ describe('promotoría+escuela: matriz y persist quirúrgico', () => {
     await api('DELETE', '/api/data/ventas/991006');
   });
   it('solicitud nueva genera item de feed (realtime encargado)', async () => {
+    /* /api/public/feed devuelve como máximo 20 elementos: cuando el feed ya
+     * está lleno, una publicación más no alarga la lista. Se comprueba el
+     * tope y que la nueva quede arriba. */
+    const TOPE = 20;
     const n0 = (await api('GET', '/api/public/feed', null, false)).json.items.length;
     const s = await api('POST', '/api/data/solicitudes', { id: 991007, cliente: 'Feed test' });
     assert.equal(s.status, 201);
     const feed = await api('GET', '/api/public/feed', null, false);
-    assert.equal(feed.json.items.length, n0 + 1);
+    assert.equal(feed.json.items.length, Math.min(TOPE, n0 + 1));
     assert.equal(feed.json.items[0].kind, 'solicitudes');
     await api('DELETE', '/api/data/solicitudes/991007');
   });

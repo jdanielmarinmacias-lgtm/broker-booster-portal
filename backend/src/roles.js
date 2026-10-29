@@ -48,6 +48,16 @@ const COLLECTION_RULES = {
   siniestros:   { read: null, write: [...STAFF, 'agente_agencia', 'agente_desarrollo', 'editor', 'capacitador'] },
   lessons:      { read: null, write: TEACHERS },
   exams:        { read: null, write: TEACHERS },
+  /* Academia: crear/editar/borrar grupos es de docencia y staff. Sin regla
+   * propia caía en DEFAULT_RULE y un alumno podía reescribirlos por la API. */
+  groups:       { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'] },
+  /* Inscripciones: las mueve quien gestiona el grupo (mismos roles). Antes
+   * cualquier alumno podía inscribirse o quitar compañeros por la API. */
+  enrollments:  { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'] },
+  /* Mensajes: «Nuevo grupo» es para agencia/GM/maestro/capacitador (mismo
+   * reparto que puedeCrearGrupoEquipo en el portal). El borrado se limita a
+   * GM dentro del handler DELETE, porque depende del grupo concreto. */
+  chatGroups:   { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'] },
   auditoria:    { read: ['admin', 'gm', 'desarrollador'], write: [] }, // solo el servidor escribe
 };
 /* Colecciones de configuración del portal (lo que ve el público y la matriz de

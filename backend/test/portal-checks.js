@@ -20,6 +20,8 @@ const VERCEL = path.join(RAIZ, 'vercel.json');
 const MODAL_WIDTH = path.join(RAIZ, 'portal-modular', 'js', 'core', 'modal-width.js');
 const LEGACY = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '01-core-db-roles-portal.js');
 const INDEX = path.join(RAIZ, 'portal-modular', 'index.html');
+const JS_DIRS = ['legacy', 'modules', 'core'].map((d) => path.join(RAIZ, 'portal-modular', 'js', d));
+const roles = require(path.join(RAIZ, 'backend', 'src', 'roles.js'));
 
 /* ---- utilidades ------------------------------------------------------- */
 
@@ -126,5 +128,59 @@ describe('lector de lecciones', () => {
     assert.ok(helper > -1, 'index.html no carga modal-width.js');
     assert.ok(core > -1, 'index.html no carga el core del portal');
     assert.ok(helper < core, 'modal-width.js debe cargarse antes del legacy (showModal lo usa)');
+  });
+});
+
+/* ---- 3) Una sola X por modal ------------------------------------------ */
+
+describe('una sola X por modal', () => {
+  /* showModal añade su X flotante cuando el contenido NO trae un botón de
+   * cierre accionable etiquetado "Cerrar". Los cierres propios sin etiqueta
+   * producían dos X (la del modal y la flotante). */
+  const BOTON_X = /<button\b([^>]*)>\s*<i class="[^"]*fa-(?:times(?![\w-])|xmark)[^"]*text-(?:lg|xl)[^"]*"[^>]*>\s*<\/i>\s*<\/button>/gi;
+
+  function cierresSinEtiqueta() {
+    const fallos = [];
+    JS_DIRS.forEach((dir) => {
+      fs.readdirSync(dir).filter((f) => f.endsWith('.js')).forEach((f) => {
+        const s = fs.readFileSync(path.join(dir, f), 'utf8');
+        let m;
+        BOTON_X.lastIndex = 0;
+        while ((m = BOTON_X.exec(s))) {
+          if (!/(?:aria-label|title)=["'][^"']*cerrar/i.test(m[1])) {
+            fallos.push(f + ':' + (s.slice(0, m.index).split('\n').length));
+          }
+        }
+      });
+    });
+    return fallos;
+  }
+
+  it('todo cierre propio de modal está etiquetado (si no, showModal añade otra X)', () => {
+    assert.deepEqual(cierresSinEtiqueta(), [], 'cierres de modal sin aria-label/title="Cerrar"');
+  });
+});
+
+/* ---- 4) Permisos de grupos (Mensajes y Academia) ---------------------- */
+
+describe('permisos de grupos', () => {
+  it('Academia: solo docencia y staff escriben grupos e inscripciones', () => {
+    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'].forEach((role) => {
+      assert.equal(roles.canWrite({ role }, 'groups'), true, role + ' debería gestionar grupos de Academia');
+      assert.equal(roles.canWrite({ role }, 'enrollments'), true, role + ' debería inscribir alumnos');
+    });
+    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto', 'editor'].forEach((role) => {
+      assert.equal(roles.canWrite({ role }, 'groups'), false, role + ' no debería escribir grupos de Academia');
+      assert.equal(roles.canWrite({ role }, 'enrollments'), false, role + ' no debería inscribir ni quitar alumnos');
+    });
+  });
+
+  it('Mensajes: los grupos del equipo no los crea cualquier rol', () => {
+    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'].forEach((role) => {
+      assert.equal(roles.canWrite({ role }, 'chatGroups'), true, role + ' debería crear grupos del equipo');
+    });
+    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto'].forEach((role) => {
+      assert.equal(roles.canWrite({ role }, 'chatGroups'), false, role + ' no debería crear grupos del equipo');
+    });
   });
 });

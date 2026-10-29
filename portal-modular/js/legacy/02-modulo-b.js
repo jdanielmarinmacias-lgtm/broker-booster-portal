@@ -894,7 +894,7 @@
                             </div>
                             <div>
                                 <label class="text-sm font-medium text-slate-700 mb-1 block">WhatsApp</label>
-                                <input required id="sol-whatsapp" type="tel" class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none bg-white text-slate-900 border border-slate-300" placeholder="664 364 0670">
+                                <input required id="sol-whatsapp" type="tel" class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none bg-white text-slate-900 border border-slate-300" placeholder="667 461 1808">
                             </div>
                         </div>
                         <div>

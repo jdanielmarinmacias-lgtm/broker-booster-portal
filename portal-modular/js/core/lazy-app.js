@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var V = '20261037a';
+  var V = '20261047a';
 
   /* Librerías de terceros: se piden primero, como estaban en el <head>. */
   var LIBRERIAS = [

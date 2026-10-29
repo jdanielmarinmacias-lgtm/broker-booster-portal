@@ -2171,7 +2171,7 @@ function auCompartirFichaModal(id){
                 <h3 class="text-xl font-bold text-slate-900 mt-1">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
                 <p class="text-xs text-slate-500">Comparte esta unidad con tu cliente por WhatsApp, enlace directo o vista pública imprimible.</p>
             </div>
-            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
             ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-car text-slate-400"></i></div>`}
@@ -2253,7 +2253,7 @@ function auFicha(id, startIdx){
                 <h3 class="text-2xl font-bold text-slate-900">${psEscape(u.marca||'')} ${psEscape(u.modelo||'')} ${psEscape(String(u.anio||''))}</h3>
                 <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(u.sucursal||'')} · ${psEscape(u.entidad||'')}</p>
             </div>
-            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         ${fotos[0]?`<div class="relative rounded-xl overflow-hidden border bg-slate-50">
             <img loading="lazy" decoding="async" id="au-ficha-principal" src="${fotos[window._auFichaIdx]}" class="w-full h-80 object-cover">
@@ -2635,7 +2635,7 @@ function auDetalleCliente(id){
                 <h3 class="text-xl font-bold mt-1">${psEscape(c.nombre)}</h3>
                 <p class="text-xs text-slate-500">${psEscape(c.tel||'sin teléfono')} · Agente: ${psEscape(c.agenteNombre||'')}</p>
             </div>
-            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="mb-3">
             <h4 class="text-xs font-semibold uppercase text-slate-400 mb-1">Progreso</h4>
@@ -3573,7 +3573,7 @@ function inmCompartirFichaModal(id){
                 <h3 class="text-xl font-bold text-slate-900 mt-1">${psEscape(p.titulo||'Propiedad')}</h3>
                 <p class="text-xs text-slate-500">Comparte esta propiedad con tu cliente por WhatsApp, enlace directo o vista pública imprimible.</p>
             </div>
-            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
             ${fotos[0]?`<img loading="lazy" decoding="async" src="${fotos[0]}" class="w-20 h-14 object-cover rounded-lg border">`:`<div class="w-20 h-14 rounded-lg bg-slate-200 flex items-center justify-center"><i class="fas fa-house text-slate-400"></i></div>`}
@@ -3651,7 +3651,7 @@ function inmFicha(id, startIdx){
                 <h3 class="text-2xl font-bold text-slate-900">${psEscape(p.titulo||'Propiedad')}</h3>
                 <p class="text-sm text-slate-500"><i class="fas fa-location-dot mr-1"></i>${psEscape(p.colonia||'')} · ${psEscape(p.ciudad||'')}</p>
             </div>
-            <button data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-lg"></i></button>
         </div>
         ${fotos[0]?`<div class="relative rounded-xl overflow-hidden border bg-slate-50">
             <img loading="lazy" decoding="async" id="inm-ficha-principal" src="${fotos[window._inmFichaIdx]}" class="w-full h-80 object-cover">
