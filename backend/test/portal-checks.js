@@ -410,3 +410,19 @@ describe('secretos fuera del bundle (Fase 0)', () => {
     });
   });
 });
+
+/* ---- 10) Teo: presupuesto para el razonamiento ----------------------- */
+
+describe('Teo con el modelo de razonamiento', () => {
+  const teo = fs.readFileSync(path.join(RAIZ, 'portal-modular', 'js', 'legacy', '05-modulo-e.js'), 'utf8');
+
+  it('reserva tokens y pide esfuerzo bajo para no devolver texto vacío', () => {
+    const desde = teo.indexOf('async function callGroq');
+    const hasta = teo.indexOf('function addMessage', desde);
+    assert.ok(desde > -1 && hasta > desde, 'no se encontró callGroq');
+    const bloque = teo.slice(desde, hasta);
+    const max = bloque.match(/max_tokens:\s*(\d+)/);
+    assert.ok(max && Number(max[1]) >= 400, 'max_tokens debe dejar espacio para la respuesta');
+    assert.match(bloque, /reasoning_effort:\s*'low'/);
+  });
+});

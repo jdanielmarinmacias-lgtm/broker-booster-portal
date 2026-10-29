@@ -418,7 +418,8 @@ async function callGroq(history){
     body: JSON.stringify({
       model:'openai/gpt-oss-120b',
       temperature:0.85,
-      max_tokens:120,
+      max_tokens:400,
+      reasoning_effort:'low',
       messages: history
     })
   });
