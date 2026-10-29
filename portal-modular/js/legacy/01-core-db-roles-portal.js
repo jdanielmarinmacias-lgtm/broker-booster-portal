@@ -726,7 +726,7 @@ function pubAbrirComparador(tipo){
         const items = auPublicas().filter(u => ids.includes(u.id));
         if(!items.length) return;
         showModal(`<div class="p-6 max-w-4xl w-full">
-            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Unidades Automotrices (#10)</h3><button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
+            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Unidades Automotrices (#10)</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
             <div class="grid ${gridCols3(items.length)} gap-4">
                 ${items.map(u => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
                     ${(u.fotos||[])[0]?`<img loading="lazy" decoding="async" src="${u.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
@@ -747,7 +747,7 @@ function pubAbrirComparador(tipo){
         const items = inmPubLista().filter(p => ids.includes(p.id));
         if(!items.length) return;
         showModal(`<div class="p-6 max-w-4xl w-full">
-            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Propiedades (#10)</h3><button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
+            <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-scale-balanced text-amber-600"></i> Comparador de Propiedades (#10)</h3><button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times"></i></button></div>
             <div class="grid ${gridCols3(items.length)} gap-4">
                 ${items.map(p => `<div class="border border-slate-200 rounded-2xl p-4 bg-white">
                     ${(p.fotos||[])[0]?`<img loading="lazy" decoding="async" src="${p.fotos[0]}" class="w-full h-36 object-cover rounded-xl mb-3">`:''}
@@ -4118,7 +4118,7 @@ function cmAbrirBroadcast(){
   showModal(`<div class="p-6 max-w-lg w-full">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-bullhorn text-amber-600"></i> Difusión / Anuncio al equipo</h3>
-      <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+      <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
     </div>
     <p class="text-sm text-slate-500 mb-4">Envía un comunicado directo al buzón de Mensajes de todos los usuarios o de un rol específico.</p>
     <div class="space-y-3">
@@ -5401,7 +5401,7 @@ function borrarPublicidad(id){
                         <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">Herramientas por Ramo</span>
                         <h3 class="text-xl font-bold text-slate-900 mt-0.5"><i class="fas fa-calculator text-amber-600 mr-1.5"></i>Simuladores Técnicos y Financieros</h3>
                     </div>
-                    <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+                    <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
                 </div>
                 <div class="flex flex-wrap gap-1.5 mb-5 pb-3 border-b border-slate-200">
                     ${tabs.map(t=>`<button type="button" data-bx-click="a172" data-p0="${bxE(function(){return t.id})}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition ${tab===t.id?'bg-slate-900 text-amber-300 shadow':'bg-slate-100 text-slate-600 hover:bg-slate-200'}"><i class="fas ${t.icon} mr-1"></i>${t.lbl}</button>`).join('')}

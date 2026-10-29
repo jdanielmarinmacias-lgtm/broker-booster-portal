@@ -4440,7 +4440,7 @@ function openRenovacionesMotor(){
     showModal(`<div class="p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-rotate text-amber-600"></i> Motor de Renovaciones Anuales (60 / 30 / 15 días)</h3>
-            <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
         <div class="grid grid-cols-3 gap-2.5 mb-4 text-center text-xs">
             <div class="p-3 rounded-xl bg-red-50 border border-red-200"><div class="text-2xl font-black text-red-600">${b15}</div>Urgentes (≤15 días)</div>
@@ -4498,7 +4498,7 @@ function openExpediente360(clienteId){
                 <h3 class="text-xl font-bold text-slate-900 mt-1">${escapeHTML(c.nombre)}</h3>
                 <p class="text-xs text-slate-500">WhatsApp: ${escapeHTML(c.whatsapp||'—')} · Asesor: ${escapeHTML(c.agenteNombre||'—')}</p>
             </div>
-            <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
             <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Pólizas Activas</p><p class="text-xl font-bold text-slate-900">${polizas.length}</p></div>
@@ -4552,7 +4552,7 @@ function openEstadoCuentaComisiones(){
                 <h3 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-coins text-amber-600"></i> Estado de Cuenta de Comisiones y Conciliación (#13 y #5)</h3>
                 <p class="text-xs text-slate-500">Cálculo automático sobre prima neta/total según tabulador por ramo y recibos conciliados.</p>
             </div>
-            <button data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
+            <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100"><i class="fas fa-times text-slate-500"></i></button>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><p class="text-[11px] text-slate-500">Prima en Cartera</p><p class="text-lg font-bold text-slate-900">$${Math.round(primaTotalCartera).toLocaleString('es-MX')}</p></div>

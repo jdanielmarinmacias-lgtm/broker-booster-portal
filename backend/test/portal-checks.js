@@ -137,7 +137,11 @@ describe('una sola X por modal', () => {
   /* showModal añade su X flotante cuando el contenido NO trae un botón de
    * cierre accionable etiquetado "Cerrar". Los cierres propios sin etiqueta
    * producían dos X (la del modal y la flotante). */
-  const BOTON_X = /<button\b([^>]*)>\s*<i class="[^"]*fa-(?:times(?![\w-])|xmark)[^"]*text-(?:lg|xl)[^"]*"[^>]*>\s*<\/i>\s*<\/button>/gi;
+  /* Dos formas de cierre propio: la X de cabecera grande (text-lg/xl) y
+   * cualquier X que dispare closeModal (data-bx-click="a1"), que es la que
+   * usan los modales de ficha/estado de cuenta. Ambas deben ir etiquetadas. */
+  const BOTON_X = /<button\b([^>]*)>\s*<i class="[^"]*fa-(?:times(?![\w-])|xmark)[^"]*"[^>]*>\s*<\/i>\s*<\/button>/gi;
+  const esCierre = (attrs, html) => /data-bx-click="a1"/.test(attrs) || /text-(?:lg|xl)/.test(html);
 
   function cierresSinEtiqueta() {
     const fallos = [];
@@ -147,7 +151,7 @@ describe('una sola X por modal', () => {
         let m;
         BOTON_X.lastIndex = 0;
         while ((m = BOTON_X.exec(s))) {
-          if (!/(?:aria-label|title)=["'][^"']*cerrar/i.test(m[1])) {
+          if (esCierre(m[1], m[0]) && !/(?:aria-label|title)=["'][^"']*cerrar/i.test(m[1])) {
             fallos.push(f + ':' + (s.slice(0, m.index).split('\n').length));
           }
         }
