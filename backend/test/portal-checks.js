@@ -192,6 +192,19 @@ describe('permisos de grupos', () => {
     });
   });
 
+  it('el rol maestro ve Grupos, Generaciones y Formación en el menú', () => {
+    const legacy = fs.readFileSync(LEGACY, 'utf8');
+    const paginas = ['formacion', 'generations', 'groups'];
+    const porDefecto = legacy.match(/maestro:\s*\['dashboard'([^\]]*)\]/);
+    assert.ok(porDefecto, 'no se encontró la lista por defecto de maestro');
+    paginas.forEach((p) => assert.ok(porDefecto[1].includes("'" + p + "'"), 'falta ' + p + ' en defaultPerms.maestro'));
+    const desde = legacy.indexOf('const maestroItems');
+    const hasta = legacy.indexOf('const alumnoItems');
+    assert.ok(desde > -1 && hasta > desde, 'no se encontraron las listas de navegación');
+    const bloque = legacy.slice(desde, hasta);
+    paginas.forEach((p) => assert.ok(bloque.includes("id: '" + p + "'"), 'falta ' + p + ' en maestroItems'));
+  });
+
   it('Mensajes: los grupos del equipo no los crea cualquier rol', () => {
     ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'].forEach((role) => {
       assert.equal(roles.canWrite({ role }, 'chatGroups'), true, role + ' debería crear grupos del equipo');

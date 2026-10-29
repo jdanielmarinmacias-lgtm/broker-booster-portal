@@ -392,7 +392,10 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                 admin: ['dashboard','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','mi-equipo','convenciones','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
                 gm: ['dashboard','reportes-progreso','leaderboard','carrusel-circulares','users','monitoreo','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','reports','glossary','personalizar','solicitudes','oferta-valor','editor','control-accesos','mi-equipo','convenciones','mis-clientes','siniestros','ai-lobby','auto-cartera','fin-cartera','inm-cartera','mi-agenda', 'resultados-prospectos','centro-mensajes','guion-llamadas','casos-exito','publicidad','comparador-productos'],
                 desarrollador: ['dashboard','leaderboard','carrusel-circulares','my-groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera', 'resultados-prospectos','guion-llamadas'],
-                maestro: ['dashboard','leaderboard','carrusel-circulares','my-groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mi-equipo','convenciones','monitoreo','guion-llamadas','centro-mensajes'],
+                /* Maestro: además de su aula y contenido, gestiona la Academia que
+                 * ya podía escribir por API (grupos, generaciones y formación). El
+                 * menú debe reflejar esa capacidad, no esconderla. */
+                maestro: ['dashboard','leaderboard','carrusel-circulares','my-groups','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mi-equipo','convenciones','monitoreo','guion-llamadas','centro-mensajes'],
                 capacitador: ['dashboard','leaderboard','carrusel-circulares','my-groups','tareas','biblioteca','live-classes','exams'],
                 agencia: ['dashboard','leaderboard','carrusel-circulares','my-groups','tareas','biblioteca','live-classes','exams','messages','mi-equipo','monitoreo','convenciones','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','centro-mensajes'],
                 editor: ['dashboard','leaderboard','carrusel-circulares','editor','oferta-valor','personalizar','casos-exito','guion-llamadas','publicidad','comparador-productos'],
@@ -6815,6 +6818,9 @@ function initializeApp() {
                 { id: 'monitoreo', label: 'Monitoreo Agencias', icon: 'fa-chart-line' },
                 { id: 'convenciones', label: 'Convenciones', icon: 'fa-plane' },
                 { id: 'my-groups', label: 'Mis Grupos', icon: 'fa-chalkboard-teacher' },
+                { id: 'formacion', label: 'Formación Académica', icon: 'fa-graduation-cap' },
+                { id: 'generations', label: 'Generaciones', icon: 'fa-layer-group' },
+                { id: 'groups', label: 'Grupos', icon: 'fa-users-rectangle' },
                 { id: 'categories', label: 'Categorías', icon: 'fa-folder' },
                 { id: 'lessons', label: 'Lecciones', icon: 'fa-book-open' },
                 { id: 'tareas', label: 'Tareas', icon: 'fa-tasks' },
