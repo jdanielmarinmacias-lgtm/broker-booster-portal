@@ -368,6 +368,25 @@
 
 
 // === FUNCIONES AGENCIAS V17 ===
+function misMetasEquipo(){
+    const roles=['agente','agente_agencia','agente_desarrollo'];
+    const todos=(db.users||[]).filter(u=>roles.includes((u.role||'').toLowerCase()));
+    if(isAdmin(currentUser)||isGM(currentUser)) return todos;
+    return todos.filter(u=>String(u.agenciaId)===String(currentUser.agenciaId));
+}
+function misMetasSeleccionar(valor){
+    const v=String(valor||'').trim().toLowerCase();
+    const u=misMetasEquipo().find(e=>String(e.id)===String(valor)||String(e.nombre||e.name||'').trim().toLowerCase()===v);
+    if(!u) return;
+    localStorage.setItem('metaAgenteId',u.id);
+    render();
+}
+function irAsignarMeta(){
+    const id=localStorage.getItem('metaAgenteId');
+    if(!id){ uiToast('Selecciona un agente'); return; }
+    navigateTo('mi-equipo');
+    setTimeout(()=>asignarMeta(id),350);
+}
 function renderMisMetas(){
     try{
         db.ventas=db.ventas||[]; db.metas=db.metas||[];
@@ -378,7 +397,7 @@ function renderMisMetas(){
         let agenteId = currentUser.id;
         let agenteSel = null;
         if(isAgencia){
-            const equipo = db.users.filter(u=>u.agenciaId===currentUser.agenciaId && u.role==='agente');
+            const equipo = misMetasEquipo();
             agenteId = localStorage.getItem('metaAgenteId') || (equipo[0]?.id || currentUser.id);
             agenteSel = equipo.find(e=>String(e.id)===String(agenteId)) || null;
         }
@@ -409,11 +428,11 @@ function renderMisMetas(){
         const ventasFiltradas = ramoFilter==='Todos' ? ventasPeriodo : ventasPeriodo.filter(v=>v.ramo===ramoFilter);
         const totalPrima = ventasFiltradas.reduce((s,v)=>s+Number(v.prima||0),0);
 
-        const equipo = isAgencia ? db.users.filter(u=>u.agenciaId===currentUser.agenciaId && u.role==='agente') : [];
+        const equipo = isAgencia ? misMetasEquipo() : [];
+        const agenteSelNombre = agenteSel ? (agenteSel.nombre||agenteSel.name||'') : '';
         const selectorAgencia = isAgencia ? `<div class="flex gap-2 items-center">
-            <select data-bx-change="a431" class="border rounded-lg px-3 py-1.5 text-sm bg-white text-slate-900 border-slate-300">
-                ${equipo.map(e=>`<option value="${e.id}" ${String(e.id)===String(agenteId)?'selected':''}>${e.nombre}</option>`).join('')}
-            </select>
+            <input list="mis-metas-agentes" value="${psEscape(agenteSelNombre)}" placeholder="Buscar agente" data-bx-change="a431" class="border rounded-lg px-3 py-1.5 text-sm bg-white text-slate-900 border-slate-300 w-56">
+            <datalist id="mis-metas-agentes">${equipo.map(e=>`<option value="${psEscape(e.nombre||e.name||'')}"></option>`).join('')}</datalist>
             <button data-bx-click="a432" class="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-black">Asignar meta</button>
         </div>` : '';
 
@@ -751,16 +770,17 @@ function quitarAgente(id){
 }
 
 function asignarMeta(id){
-    const a=db.users.find(u=>u.id===id);
+    const a=db.users.find(u=>String(u.id)===String(id));
+    if(!a){ uiToast('Agente no encontrado'); return; }
     showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
-    document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
+    document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=a.id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(String(m.agenteId)===String(a.id)&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
 }
 function registrarVenta(id){
     const a=db.users.find(u=>u.id===id);
     showModal(`<form id="vf" class="p-4 space-y-2"><h3 class="font-bold">Registrar venta - ${a.name}</h3><input name="contratante" placeholder="Contratante" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="fecha" type="date" required value="${new Date().toISOString().split('T')[0]}" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><select name="compania" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>AXA</option><option>PS</option><option>MAPFRE</option><option>HDI</option><option>QLTS</option><option>SKANDIA</option><option>OTROS</option></select><input name="producto" placeholder="Producto" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="prima" type="number" placeholder="Prima neta" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-emerald-600 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
     document.getElementById('vf').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const v={id:Date.now(),agenteId:id,agenciaId:a.agenciaId,contratante:f.get('contratante'),fecha:f.get('fecha'),ramo:f.get('ramo'),compania:f.get('compania'),producto:f.get('producto'),prima:Number(f.get('prima'))};db.ventas=db.ventas||[];db.ventas.push(v); try{ const agente = db.users.find(u=>String(u.id)===String(v.agenteId)); if(agente) enviarAviso('ventas', [agente], {total: '$'+(v.prima||0).toLocaleString('es-MX'), mes: new Date(v.fecha).toLocaleDateString('es-MX',{month:'long'})}); }catch(e){} if(!db.notifications) db.notifications=[]; db.notifications.push({id:Date.now(),type:'venta',msg:'Nueva venta: '+(v.cliente||'Cliente')+' - $'+Number(v.prima).toLocaleString('es-MX'),agente:v.agente||currentUser.id,ts:new Date().toISOString(),readBy:[]}); saveDB();closeModal();render();};
 }
-function asignarMeta(id){const a=db.users.find(u=>u.id===id);showModal('<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para '+a.name+'</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="'+new Date().getFullYear()+'" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>AUTOS</option><option>DAÑOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Monto" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-indigo-600 text-white px-3 py-1 rounded">Guardar</button></div></form>');document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio&&m.mes===d.mes&&m.trimestre===d.trimestre));db.metas.push(d);saveDB();closeModal();render();};}
+function asignarMeta(id){const a=db.users.find(u=>u.id===id);showModal('<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para '+a.name+'</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="'+new Date().getFullYear()+'" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>AUTOS</option><option>DAÑOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Monto" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-indigo-600 text-white px-3 py-1 rounded">Guardar</button></div></form>');document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=a.id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(String(m.agenteId)===String(a.id)&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio&&m.mes===d.mes&&m.trimestre===d.trimestre));db.metas.push(d);saveDB();closeModal();render();};}
 
 function borrarConv(id){
     if(!confirm('¿Borrar convención?')) return;
@@ -785,9 +805,10 @@ function quitarAgente(id){
 }
 
 function asignarMeta(id){
-    const a=db.users.find(u=>u.id===id);
+    const a=db.users.find(u=>String(u.id)===String(id));
+    if(!a){ uiToast('Agente no encontrado'); return; }
     showModal(`<form id="mf" class="p-4 space-y-2"><h3 class="font-bold">Meta para ${a.name}</h3><select name="periodo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option value="mensual">Mensual</option><option value="trimestral">Trimestral</option><option value="anual">Anual</option></select><div class="grid grid-cols-3 gap-2"><input name="anio" type="number" value="${new Date().getFullYear()}" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="mes" type="number" placeholder="Mes" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><input name="trimestre" type="number" placeholder="Trim" class="border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"></div><select name="ramo" class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><option>VIDA</option><option>GMM</option><option>DAÑOS</option><option>AUTOS</option><option>INVERSIÓN</option><option>INVERSIÓN ELITE</option></select><input name="objetivo" type="number" placeholder="Prima neta objetivo" required class="w-full border rounded px-2 py-1 bg-white text-slate-900 border-slate-300"><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="border px-3 py-1 rounded">Cancelar</button><button class="bg-slate-900 text-white px-3 py-1 rounded">Guardar</button></div></form>`);
-    document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(m.agenteId===id&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
+    document.getElementById('mf').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));d.id=Date.now();d.agenteId=a.id;d.agenciaId=a.agenciaId;d.objetivo=Number(d.objetivo);d.anio=Number(d.anio);d.mes=d.mes?Number(d.mes):null;d.trimestre=d.trimestre?Number(d.trimestre):null;db.metas=db.metas||[];db.metas=db.metas.filter(m=>!(String(m.agenteId)===String(a.id)&&m.periodo===d.periodo&&m.ramo===d.ramo&&m.anio===d.anio));db.metas.push(d);saveDB();closeModal();render();};
 }
 function registrarVenta(id){
     const a=db.users.find(u=>u.id===id);

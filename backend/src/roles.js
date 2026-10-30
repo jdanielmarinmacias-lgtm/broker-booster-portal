@@ -57,20 +57,20 @@ const COLLECTION_RULES = {
   exams:        { read: null, write: TEACHERS },
   /* Academia: crear/editar/borrar grupos es de docencia y staff. Sin regla
    * propia caía en DEFAULT_RULE y un alumno podía reescribirlos por la API. */
-  groups:       { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'] },
+  groups:       { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador', 'agencia'] },
   /* Inscripciones: las mueve quien gestiona el grupo (mismos roles). Antes
    * cualquier alumno podía inscribirse o quitar compañeros por la API. */
-  enrollments:  { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'] },
+  enrollments:  { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador', 'agencia'] },
   /* Catálogo académico (generaciones, planes y categorías de lecciones). Sin
    * regla propia, cualquier rol autenticado podía crearlos o borrarlos por la
    * API aunque el portal le ocultara los botones. */
-  generations:  { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
-  planes:       { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
-  categories:   { read: null, write: ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'] },
+  generations:  { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'] },
+  planes:       { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'] },
+  categories:   { read: null, write: ['admin', 'gm', 'desarrollador', 'editor', 'maestro', 'capacitador'] },
   /* Tareas de Academia: la tarea la crea docencia. La entrega, el avance y el
    * intento los escribe el propio alumno; el handler limita cada fila a su
    * dueño (sin regla, un alumno reescribía el avance de sus compañeros). */
-  tasks:        { read: null, write: ACADEMIA },
+  tasks:        { read: null, write: [...ACADEMIA, 'editor'] },
   taskSubmissions: { read: null, write: [...ACADEMIA, 'alumno', 'agente_agencia', 'agente_desarrollo'] },
   progress:     { read: null, write: [...ACADEMIA, 'alumno', 'agente_agencia', 'agente_desarrollo'] },
   examAttempts: { read: null, write: [...ACADEMIA, 'alumno', 'agente_agencia', 'agente_desarrollo'] },

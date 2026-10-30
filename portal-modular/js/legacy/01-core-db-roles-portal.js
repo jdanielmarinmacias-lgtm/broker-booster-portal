@@ -414,7 +414,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                 maestro: ['dashboard','leaderboard','carrusel-circulares','my-groups','formacion','generations','groups','categories','lessons','tareas','biblioteca','live-classes','exams','messages','mi-equipo','convenciones','monitoreo','guion-llamadas','centro-mensajes'],
                 capacitador: ['dashboard','leaderboard','carrusel-circulares','my-groups','tareas','biblioteca','live-classes','exams'],
                 agencia: ['dashboard','leaderboard','carrusel-circulares','my-groups','tareas','biblioteca','live-classes','exams','messages','mi-equipo','monitoreo','convenciones','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','centro-mensajes'],
-                editor: ['dashboard','leaderboard','carrusel-circulares','editor','oferta-valor','personalizar','casos-exito','guion-llamadas','publicidad','comparador-productos'],
+                editor: ['dashboard','leaderboard','carrusel-circulares','editor','oferta-valor','personalizar','casos-exito','guion-llamadas','publicidad','comparador-productos','convenciones','formacion','generations','groups','categories','lessons','tareas','biblioteca'],
                 alumno: ['dashboard','leaderboard','carrusel-circulares','my-aula','my-courses','tareas','biblioteca','live-classes','my-progress','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','casos-exito'],
                 agente_desarrollo: ['dashboard','leaderboard','carrusel-circulares','my-aula','my-courses','tareas','biblioteca','live-classes','my-progress','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','casos-exito','centro-mensajes'],
                 agente_agencia: ['dashboard','leaderboard','carrusel-circulares','my-aula','my-courses','tareas','biblioteca','live-classes','my-progress','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','casos-exito','centro-mensajes'],
@@ -433,7 +433,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             // PATCH 2026-06-18: forzar permisos de monitoreo y mi-equipo para agencia/maestro
             if(db.rolePermissions){
                 // Migración: secciones nuevas visibles en Control de Accesos desde el arranque
-                const migracionSecciones = { admin:['centro-mensajes','guion-llamadas','casos-exito'], gm:['centro-mensajes','guion-llamadas','casos-exito'], maestro:['guion-llamadas','centro-mensajes'], agencia:['guion-llamadas','centro-mensajes'], desarrollador:['guion-llamadas'], editor:['casos-exito'], alumno:['guion-llamadas','casos-exito'], agente_desarrollo:['guion-llamadas','casos-exito','centro-mensajes'], agente_agencia:['guion-llamadas','casos-exito','centro-mensajes'] };
+                const migracionSecciones = { admin:['centro-mensajes','guion-llamadas','casos-exito'], gm:['centro-mensajes','guion-llamadas','casos-exito'], maestro:['guion-llamadas','centro-mensajes'], agencia:['guion-llamadas','centro-mensajes'], desarrollador:['guion-llamadas'], editor:['casos-exito','convenciones','formacion','generations','groups','categories','lessons','tareas','biblioteca'], alumno:['guion-llamadas','casos-exito'], agente_desarrollo:['guion-llamadas','casos-exito','centro-mensajes'], agente_agencia:['guion-llamadas','casos-exito','centro-mensajes'] };
                 // Migración: Publicidad + Comparador de Productos (auditoría 2026-09)
                 const migracionF5 = { admin:['publicidad','comparador-productos'], gm:['publicidad','comparador-productos'], editor:['publicidad','comparador-productos','guion-llamadas','casos-exito'], desarrollador:['publicidad','comparador-productos'], maestro:['comparador-productos'], agencia:['comparador-productos'], capacitador:['comparador-productos'], alumno:['comparador-productos'], agente_desarrollo:['comparador-productos'], agente_agencia:['comparador-productos'] };
                 Object.keys(migracionF5).forEach(r => { if(db.rolePermissions[r]){ migracionF5[r].forEach(s => { if(!db.rolePermissions[r].includes(s)) db.rolePermissions[r].push(s); }); } });
@@ -9982,6 +9982,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                         <input id="lesson-video-url" name="videoUrl" value="${escapeHTML(lesson?.videoUrl||'')}" placeholder="https://..." class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300 text-sm">
                         <p id="video-url-hint" class="text-xs text-slate-500 mt-1">Se reproducirá directamente dentro del modal de la lección.</p>
                     </div>
+                    <div>
+                        <label class="text-sm font-medium">Materiales de la lección (fotos, PDF, PowerPoint, documentos)</label>
+                        <input id="lesson-materials-file" type="file" multiple accept="image/*,application/pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt,.csv,.md" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300">
+                        <div id="lesson-materials-list" class="mt-2 space-y-1">${(lesson?.materials||[]).map(m=>`<p class="text-xs text-slate-600"><i class="fas fa-paperclip mr-1"></i>${escapeHTML(m.name||'archivo')}</p>`).join('')}</div>
+                    </div>
                     <div id="video-upload-field" class="${videoType!=='upload'?'hidden':''}">
                         <label class="text-sm font-medium">Subir archivo de video (Media.subir / Storage)</label>
                         <input id="lesson-video-file" type="file" accept="video/mp4,video/webm,video/quicktime" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300">
@@ -10044,10 +10049,22 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     if (!videoUrl && lesson && lesson.videoUrl) videoUrl = lesson.videoUrl;
                 }
 
+                const materials = (lesson && lesson.materials) ? lesson.materials.slice() : [];
+                const matInput = document.getElementById('lesson-materials-file');
+                const matFiles = matInput && matInput.files ? Array.from(matInput.files) : [];
+                for (const f of matFiles) {
+                    try {
+                        const up = await window.Media.subir(f, { scope: 'lessons', title: f.name });
+                        if (up && up.url) materials.push({ name: f.name, url: up.url, mime: f.type || '' });
+                    } catch (err) {
+                        if (window.showToast) showToast('No se pudo subir ' + f.name + ' (' + (err.message || 'error') + ')', 'warning');
+                    }
+                }
+
                 if(lesson) {
-                    Object.assign(lesson, { title: data.title, categoryId: data.categoryId, content: data.content, videoType: type, videoUrl, videoData });
+                    Object.assign(lesson, { title: data.title, categoryId: data.categoryId, content: data.content, videoType: type, videoUrl, videoData, materials });
                 } else {
-                    db.lessons.push({ id: Date.now(), title: data.title, categoryId: data.categoryId, content: data.content, videoType: type, videoUrl, videoData, quiz: [], flashcards: [], views: [] });
+                    db.lessons.push({ id: Date.now(), title: data.title, categoryId: data.categoryId, content: data.content, videoType: type, videoUrl, videoData, materials, quiz: [], flashcards: [], views: [] });
                 }
                 saveDB(); closeModal(); navigateTo('lessons');
             };
@@ -10306,6 +10323,21 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
 
         // --- STUDENT VIEW ---
+        /* Materiales de una lección o tarea: las imágenes se ven en la propia
+         * vista; PDF, PowerPoint y documentos se abren en pestaña nueva, porque
+         * la CSP (frame-src) no permite incrustarlos desde Storage. */
+        function renderMaterialsSection(materials){
+            const list = Array.isArray(materials) ? materials.filter(m=>m && m.url) : [];
+            if(!list.length) return '';
+            const esImagen = m => /^image\//.test(m.mime||'') || /\.(png|jpe?g|gif|webp|svg)$/i.test(m.name||'');
+            const imgs = list.filter(esImagen);
+            const otros = list.filter(m=>!esImagen(m));
+            return `<div class="mt-6"><h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-paperclip text-indigo-600"></i> Materiales</h4>
+                ${imgs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${imgs.map(m=>`<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(m.url)}" alt="${escapeHTML(m.name||'')}" class="rounded-xl border border-slate-200 w-full object-contain bg-white"></a>`).join('')}</div>`:''}
+                ${otros.length?`<ul class="space-y-2">${otros.map(m=>`<li><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white hover:bg-slate-50 text-sm text-indigo-700"><i class="fas fa-file-alt"></i>${escapeHTML(m.name||'archivo')}</a></li>`).join('')}</ul>`:''}
+            </div>`;
+        }
+
         function openLesson(lessonId) {
             const lesson = db.lessons.find(l=>l.id===lessonId);
             if (!lesson) return;
@@ -10340,6 +10372,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const hasQuiz = lesson.quiz && lesson.quiz.length > 0;
             const videoEmbedHtml = renderLessonVideoEmbed(lesson);
             const formattedContentHtml = formatLessonContent(lesson.content);
+            const materialsHtml = renderMaterialsSection(lesson.materials);
             
             const actionsHtml = (hasVideo || hasFlashcards || hasQuiz) ? `
                 <div class="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -10360,6 +10393,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             showModal(`<div class="p-6 modal-large max-w-5xl w-full max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-4"><div class="flex items-center gap-3">${catCoverBox(lesson.categoryId,'w-16 h-16')}<div><h3 class="text-2xl font-bold text-slate-900">${escapeHTML(lesson.title)}</h3><p class="text-slate-500 text-sm">${escapeHTML(db.categories.find(c=>c.id===lesson.categoryId)?.name || 'General')}</p></div></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button></div>
                 ${videoEmbedHtml}
                 <div class="prose max-w-none bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">${formattedContentHtml}</div>
+                ${materialsHtml}
                 ${actionsHtml}
                 ${flashcardsHtml}
                 <div class="mt-8 pt-6 border-t flex justify-between items-center"><div>${lesson.quiz.length>0?`<span class="text-sm text-slate-600"><i class="fas fa-question-circle mr-1"></i>${lesson.quiz.length} preguntas en el quiz</span>`:''}</div><div class="flex gap-3"><button id="mark-viewed" data-bx-click="a305" data-p0="${bxE(function(){return lessonId})}" class="px-5 py-2.5 ${viewedAlready?'bg-green-600':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-semibold transition">${viewedAlready?'¡Vista!':'Marcar como vista'}</button></div></div></div>`);
@@ -13209,6 +13243,11 @@ END:VCALENDAR`;
                     <div><label class="text-sm font-medium">Lección</label><select id="task-lesson" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="">Opcional</option></select></div>
                 </div>
                 <div><label class="text-sm font-medium">Fecha de entrega</label><input id="task-due" type="date" value="${t&&t.dueDate?t.dueDate:''}" class="w-full mt-1 px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
+                <div>
+                    <label class="text-sm font-medium">Materiales de la tarea (fotos, PDF, PowerPoint, documentos)</label>
+                    <input id="task-materials-file" type="file" multiple accept="image/*,application/pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt,.csv,.md" class="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 border-slate-300">
+                    <div id="task-materials-list" class="mt-2 space-y-1">${(t?.materials||[]).map(m=>`<p class="text-xs text-slate-600"><i class="fas fa-paperclip mr-1"></i>${escapeHTML(m.name||'archivo')}</p>`).join('')}</div>
+                </div>
                 <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cancelar</button><button class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">Guardar</button></div>
             </form></div>`);
             const updateLessons = ()=>{
@@ -13218,9 +13257,21 @@ END:VCALENDAR`;
                 sel.innerHTML = '<option value="">Opcional</option>' + lessons.map(l=>`<option value="${l.id}" ${t&&t.lessonId==l.id?'selected':''}>${l.title}</option>`).join('');
             };
             document.getElementById('task-cat').onchange = updateLessons; updateLessons();
-            document.getElementById('task-form').onsubmit = e=>{
+            document.getElementById('task-form').onsubmit = async e=>{
                 e.preventDefault();
                 const data = { title: document.getElementById('task-title').value.trim(), description: document.getElementById('task-desc').value.trim(), categoryId: parseInt(document.getElementById('task-cat').value), lessonId: document.getElementById('task-lesson').value?parseInt(document.getElementById('task-lesson').value):null, dueDate: document.getElementById('task-due').value, createdBy: currentUser.id, createdAt: new Date().toISOString() };
+                const materials = (t && t.materials) ? t.materials.slice() : [];
+                const matInput = document.getElementById('task-materials-file');
+                const matFiles = matInput && matInput.files ? Array.from(matInput.files) : [];
+                for (const f of matFiles) {
+                    try {
+                        const up = await window.Media.subir(f, { scope: 'tasks', title: f.name });
+                        if (up && up.url) materials.push({ name: f.name, url: up.url, mime: f.type || '' });
+                    } catch (err) {
+                        if (window.showToast) showToast('No se pudo subir ' + f.name + ' (' + (err.message || 'error') + ')', 'warning');
+                    }
+                }
+                data.materials = materials;
                 if (t) Object.assign(t, data); else { db.tasks.push({ id: Date.now(), ...data }); try{ const asignados = (data.assignedTo||[]).map(id=>db.users.find(u=>u.id===id)).filter(Boolean); enviarAviso('tarea', asignados, {tarea: data.title, vence: data.dueDate}); }catch(e){} }
                 saveDB(); closeModal(); navigateTo('tareas');
             };
@@ -13234,6 +13285,7 @@ END:VCALENDAR`;
                     const alumno = db.users.find(u=>u.id===s.studentId);
                     return `<tr><td class="px-4 py-2">${alumno?alumno.name:''}</td><td class="px-4 py-2">${s.type==='link'?`<a href="${s.content}" target="_blank" data-bx-click="a376" class="text-indigo-600 underline">Ver link</a>`:s.type==='file'?`<button data-bx-click="a399" data-p0="${bxE(function(){return s.id})}" class="text-emerald-600 underline">Descargar</button>`:`<span class="text-slate-600">${(s.content||'').substring(0,40)}...</span>`}</td><td class="px-4 py-2 capitalize">${s.status}</td><td class="px-4 py-2">${s.grade!=null?s.grade:'-'}</td><td class="px-4 py-2 text-right"><button data-bx-click="a400" data-p0="${bxE(function(){return s.id})}" class="text-indigo-600 text-xs">Calificar</button></td></tr>`;
                 }).join('')}${subs.length===0?'<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Sin entregas aún</td></tr>':''}</tbody></table></div>
+                ${renderMaterialsSection(t.materials)}
                 <div class="mt-4 flex justify-end gap-2"><button data-bx-click="a401" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 border rounded-lg text-sm">Editar tarea</button><button data-bx-click="a402" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm">Eliminar</button></div>
             </div>`);
         }
@@ -13242,7 +13294,7 @@ END:VCALENDAR`;
             const t = db.tasks.find(x=>x.id===taskId);
             const existing = db.taskSubmissions.find(s=>s.taskId===taskId && s.studentId===currentUser.id);
             const initType = existing && existing.type ? existing.type : 'link';
-            showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-1">${escapeHTML(t.title)}</h3><p class="text-sm text-slate-500 mb-4">${escapeHTML(t.description||'')}</p><form id="submit-form" class="space-y-4">
+            showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-1">${escapeHTML(t.title)}</h3><p class="text-sm text-slate-500 mb-4">${escapeHTML(t.description||'')}</p>${renderMaterialsSection(t.materials)}<form id="submit-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Tipo de entrega</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="link" ${initType==='link'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="file" ${initType==='file'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo (PDF/Doc/Img)</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="text" ${initType==='text'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Texto</span></label></div></div>
                 <div id="sub-link"><input id="sub-url" type="url" placeholder="https://..." value="${escapeHTML(existing&&existing.type==='link'?existing.content:'')}" class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                 <div id="sub-file-wrap" class="hidden"><input id="sub-file-input" type="file" accept=".pdf,.doc,.docx,image/*" class="w-full px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage sin saturar la base de datos.</p>${existing&&existing.fileName?`<p class="text-xs text-slate-500 mt-1">Archivo actual: <strong>${escapeHTML(existing.fileName)}</strong></p>`:''}</div>

@@ -7,3 +7,8 @@ backend/data/*.json
 .env*
 backups/
 
+
+# Datos de prueba locales, logs y PIDs de desarrollo
+*.log
+*.pid
+backend/data-demo/*.json

@@ -1294,10 +1294,10 @@ window.__bx.a429 = function (event) { addOfertaSlide() };
 window.__bx.a430 = function (event) { simGuardar() };
 
 /* js\legacy\04-modulo-d.js:414 · change */
-window.__bx.a431 = function (event) { localStorage.setItem('metaAgenteId',this.value);render() };
+window.__bx.a431 = function (event) { misMetasSeleccionar(this.value) };
 
 /* js\legacy\04-modulo-d.js:417 · click */
-window.__bx.a432 = function (event) { asignarMeta(agenteId) };
+window.__bx.a432 = function (event) { irAsignarMeta() };
 
 /* js\legacy\04-modulo-d.js:420 · click */
 window.__bx.a433 = function (event, bx0) { localStorage.setItem('metaRamo',(bx0));render() };

@@ -467,7 +467,7 @@ function verAuditoriaVentas(){
             notifications: []
         ,
             settings: {
-                logo: "https://i.ibb.co/0jQ3ZqX/guia-logo.png",
+                logo: "portal-modular/img/logo-icon-192.png",
                 institutionName: "Broker Booster",
                 primaryColor: "#0a2540",
                 primaryDark: "#081c30",
@@ -677,6 +677,8 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
                 db = JSON.parse(JSON.stringify(defaultDB));
             }
             if (!db.settings) db.settings = JSON.parse(JSON.stringify(defaultDB.settings));
+            /* Logo heredado (imgbb caído, 404): se cambia por el icono local. */
+            if (typeof db.settings.logo === 'string' && db.settings.logo.indexOf('i.ibb.co/0jQ3ZqX') !== -1) db.settings.logo = defaultDB.settings.logo;
             if (!db.settings.loginSubtitle) db.settings.loginSubtitle = "Excelencia académica, diseño premium";
             if (!db.settings.loginLine1) db.settings.loginLine1 = "Plataforma educativa";
             if (!db.settings.loginLine2) db.settings.loginLine2 = "Certificada ISO 21001";

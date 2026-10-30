@@ -24,7 +24,9 @@ const ABSOLUTA = /^https?:\/\/[^/]+\/uploads\/([^/?#]+)$/;
 const MIME = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
   gif: 'image/gif', svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp',
-  pdf: 'application/pdf', mp4: 'video/mp4', webm: 'video/webm',
+  pdf: 'application/pdf', ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp4: 'video/mp4', webm: 'video/webm',
 };
 
 /* Nombre de archivo de una ruta local, o null si no lo es. */

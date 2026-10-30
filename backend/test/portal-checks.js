@@ -171,23 +171,23 @@ describe('una sola X por modal', () => {
 
 describe('permisos de grupos', () => {
   it('Academia: solo docencia y staff escriben grupos e inscripciones', () => {
-    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia'].forEach((role) => {
+    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'agencia', 'editor'].forEach((role) => {
       assert.equal(roles.canWrite({ role }, 'groups'), true, role + ' debería gestionar grupos de Academia');
       assert.equal(roles.canWrite({ role }, 'enrollments'), true, role + ' debería inscribir alumnos');
     });
-    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto', 'editor'].forEach((role) => {
+    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto'].forEach((role) => {
       assert.equal(roles.canWrite({ role }, 'groups'), false, role + ' no debería escribir grupos de Academia');
       assert.equal(roles.canWrite({ role }, 'enrollments'), false, role + ' no debería inscribir ni quitar alumnos');
     });
   });
 
   it('Academia: el catálogo (generaciones, planes, categorías) es de docencia y staff', () => {
-    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador'].forEach((role) => {
+    ['admin', 'gm', 'desarrollador', 'maestro', 'capacitador', 'editor'].forEach((role) => {
       ['generations', 'planes', 'categories'].forEach((col) => {
         assert.equal(roles.canWrite({ role }, col), true, role + ' debería escribir ' + col);
       });
     });
-    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto', 'editor', 'agencia'].forEach((role) => {
+    ['alumno', 'agente_agencia', 'agente_desarrollo', 'prospecto', 'agencia'].forEach((role) => {
       ['generations', 'planes', 'categories'].forEach((col) => {
         assert.equal(roles.canWrite({ role }, col), false, role + ' no debería escribir ' + col);
       });
