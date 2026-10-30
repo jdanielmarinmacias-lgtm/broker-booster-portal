@@ -10326,15 +10326,52 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         /* Materiales de una lección o tarea: las imágenes se ven en la propia
          * vista; PDF, PowerPoint y documentos se abren en pestaña nueva, porque
          * la CSP (frame-src) no permite incrustarlos desde Storage. */
+        async function pintarPdfsMateriales(materials){
+            const pdfs = (Array.isArray(materials) ? materials : []).filter(m => m && m.url && iconoMaterial(m) === 'fa-file-pdf');
+            if(!pdfs.length) return;
+            let pdfjs;
+            try { pdfjs = await pdfJsListo(); } catch(e) { return; }
+            for(let i = 0; i < pdfs.length; i++){
+                const cont = document.getElementById('material-pdf-' + i);
+                if(!cont) continue;
+                try {
+                    const resp = await fetch(pdfs[i].url, { credentials: 'same-origin' });
+                    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const pdf = await pdfjs.getDocument({ data: await resp.arrayBuffer() }).promise;
+                    const page = await pdf.getPage(1);
+                    const vp = page.getViewport({ scale: 0.6 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.floor(vp.width);
+                    canvas.height = Math.floor(vp.height);
+                    canvas.className = 'rounded-xl border border-slate-200 bg-white w-full';
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+                    cont.innerHTML = '';
+                    cont.appendChild(canvas);
+                } catch(e) { /* sin vista previa: queda el enlace */ }
+            }
+        }
+
+        function iconoMaterial(m){
+            const n = String(m.name||'').toLowerCase();
+            if(/\.pdf$/.test(n) || /pdf/.test(m.mime||'')) return 'fa-file-pdf';
+            if(/\.(pptx?|odp|key)$/.test(n) || /presentation|powerpoint/.test(m.mime||'')) return 'fa-file-powerpoint';
+            if(/\.(docx?|odt|rtf)$/.test(n) || /wordprocessing|msword/.test(m.mime||'')) return 'fa-file-word';
+            if(/\.(xlsx?|csv)$/.test(n) || /spreadsheet|excel/.test(m.mime||'')) return 'fa-file-excel';
+            if(/\.(mp4|webm|mov)$/.test(n) || /^video\//.test(m.mime||'')) return 'fa-file-video';
+            return 'fa-file-alt';
+        }
+
         function renderMaterialsSection(materials){
             const list = Array.isArray(materials) ? materials.filter(m=>m && m.url) : [];
             if(!list.length) return '';
             const esImagen = m => /^image\//.test(m.mime||'') || /\.(png|jpe?g|gif|webp|svg)$/i.test(m.name||'');
             const imgs = list.filter(esImagen);
-            const otros = list.filter(m=>!esImagen(m));
+            const pdfs = list.filter(m=>!esImagen(m) && iconoMaterial(m)==='fa-file-pdf');
+            const otros = list.filter(m=>!esImagen(m) && iconoMaterial(m)!=='fa-file-pdf');
             return `<div class="mt-6"><h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-paperclip text-indigo-600"></i> Materiales</h4>
                 ${imgs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${imgs.map(m=>`<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(m.url)}" alt="${escapeHTML(m.name||'')}" class="rounded-xl border border-slate-200 w-full object-contain bg-white"></a>`).join('')}</div>`:''}
-                ${otros.length?`<ul class="space-y-2">${otros.map(m=>`<li><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white hover:bg-slate-50 text-sm text-indigo-700"><i class="fas fa-file-alt"></i>${escapeHTML(m.name||'archivo')}</a></li>`).join('')}</ul>`:''}
+                ${pdfs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${pdfs.map((m,i)=>`<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="block border rounded-xl bg-white hover:bg-slate-50 p-2"><div id="material-pdf-${i}" class="min-h-[120px] flex items-center justify-center text-slate-400"><i class="fas fa-file-pdf text-4xl"></i></div><p class="text-xs text-indigo-700 mt-2 truncate">${escapeHTML(m.name||'PDF')}</p></a>`).join('')}</div>`:''}
+                ${otros.length?`<ul class="space-y-2">${otros.map(m=>`<li><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white hover:bg-slate-50 text-sm text-indigo-700"><i class="fas ${iconoMaterial(m)} text-indigo-600 text-lg"></i><span class="truncate">${escapeHTML(m.name||'archivo')}</span></a></li>`).join('')}</ul>`:''}
             </div>`;
         }
 
@@ -10397,6 +10434,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 ${actionsHtml}
                 ${flashcardsHtml}
                 <div class="mt-8 pt-6 border-t flex justify-between items-center"><div>${lesson.quiz.length>0?`<span class="text-sm text-slate-600"><i class="fas fa-question-circle mr-1"></i>${lesson.quiz.length} preguntas en el quiz</span>`:''}</div><div class="flex gap-3"><button id="mark-viewed" data-bx-click="a305" data-p0="${bxE(function(){return lessonId})}" class="px-5 py-2.5 ${viewedAlready?'bg-green-600':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-semibold transition">${viewedAlready?'¡Vista!':'Marcar como vista'}</button></div></div></div>`);
+            pintarPdfsMateriales(lesson.materials);
         }
         function openDriveVideo(url) {
             // Convierte link de Drive a preview
@@ -13288,6 +13326,7 @@ END:VCALENDAR`;
                 ${renderMaterialsSection(t.materials)}
                 <div class="mt-4 flex justify-end gap-2"><button data-bx-click="a401" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 border rounded-lg text-sm">Editar tarea</button><button data-bx-click="a402" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm">Eliminar</button></div>
             </div>`);
+            pintarPdfsMateriales(t.materials);
         }
 
         function openTaskSubmit(taskId) {
