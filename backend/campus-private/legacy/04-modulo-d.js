@@ -4968,7 +4968,9 @@ function renderMiAgenda(){
     const calId = currentUser.googleCalendarId || 'primary';
     const agenda = (db.agendas||{})[currentUser.id] || '';
     const ahora = new Date();
-    const misClases = (db.liveClasses||[]).filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.end) >= ahora).sort((a,b)=> new Date(a.start)-new Date(b.start));
+    const misClases = (db.liveClasses||[]).filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.end) >= ahora)
+        .concat(typeof ccOcurrencias === 'function' ? ccOcurrencias(currentUser.id, 26).map(o => ({ id: o.id, title: o.title, start: o.start, end: o.end, zoomUrl: o.zoomUrl, instructorId: null, reunionSemanal: true })) : [])
+        .sort((a,b)=> new Date(a.start)-new Date(b.start));
     const proximasHtml = misClases.length ? misClases.map(c=>{
         const inicio = new Date(c.start);
         const fin = new Date(c.end);
@@ -4980,7 +4982,7 @@ function renderMiAgenda(){
                     <span class="text-lg font-bold text-indigo-700 leading-none">${inicio.getDate()}</span>
                 </div>
                 <div>
-                    <p class="font-medium text-slate-900">${c.title}</p>
+                    <p class="font-medium text-slate-900">${c.title}${c.reunionSemanal ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase">Semanal</span>' : ''}</p>
                     <p class="text-xs text-slate-500">${inicio.toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit'})} - ${fin.toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit'})} · ${instructor?.name||'Instructor'}</p>
                 </div>
             </div>

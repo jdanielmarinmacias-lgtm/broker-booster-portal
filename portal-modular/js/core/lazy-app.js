@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var V = '20261059a';
+  var V = '20261030a';
 
   /* El worker de PDF.js debe ser EXACTAMENTE la misma versión que la API
    * (3.11.174) y se sirve desde el propio dominio. Así la CSP sigue en

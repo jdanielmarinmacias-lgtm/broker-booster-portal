@@ -7386,17 +7386,53 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             if (!db.carruselCirculares || typeof db.carruselCirculares !== 'object') db.carruselCirculares = {};
             const defCirc = { titulo: 'Capacitación Semanal', dia: 'Martes', horario: '19:00', tema: 'Estrategias de Cierre', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?q=80&w=1200', zoom: 'https://zoom.us/j/123456789', participantes: [] };
             const defCarr = { titulo: 'Reunión Semanal', dia: 'Miércoles', horario: '19:00', tema: 'Productos y Argumentarios', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1200', zoom: 'https://zoom.us/j/987654321', participantes: [] };
+            const defTer = { titulo: 'Sesión Semanal', dia: 'Jueves', horario: '19:00', tema: 'Por definir', ponente: 'Equipo', invitado: '', imagen: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1200', zoom: 'https://zoom.us/j/555555555', participantes: [] };
             const circulares = Object.assign({}, defCirc, db.carruselCirculares.circulares || {});
             const carrusel = Object.assign({}, defCarr, db.carruselCirculares.carrusel || {});
+            const tercera = Object.assign({}, defTer, db.carruselCirculares.tercera || {});
             if (/^circulares?$/i.test(String(circulares.titulo || '').trim())) circulares.titulo = 'Capacitación Semanal';
             if (/^carrusel$/i.test(String(carrusel.titulo || '').trim())) carrusel.titulo = 'Reunión Semanal';
-            return { circulares, carrusel };
+            return { circulares, carrusel, tercera };
+        }
+        /* Tres sesiones semanales (Reunión y Capacitación). Cada una tiene su día
+         * (Lunes a Domingo) y horario editables; sus ocurrencias se calculan aquí y
+         * aparecen en Mi Agenda, en el calendario y en el próximo evento del dashboard. */
+        const CC_DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+        const CC_TIPOS = ['circulares','carrusel','tercera'];
+        const CC_COLORES = { circulares: '#0a2540', carrusel: '#c9a86a', tercera: '#4f46e5' };
+        function ccDiaIndex(dia){
+            const i = CC_DIAS.findIndex(d => d.toLowerCase() === String(dia || '').trim().toLowerCase());
+            return i < 0 ? -1 : (i + 1) % 7; // getDay(): domingo = 0
+        }
+        /* Ocurrencias desde hoy. userId null = todas (vista de maestro); si la sesión
+         * tiene participantes, solo las ven ellos. */
+        function ccOcurrencias(userId, semanas){
+            const d = ensureCarruselDefaults();
+            const out = [];
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            CC_TIPOS.forEach(tipo => {
+                const it = d[tipo];
+                const idx = ccDiaIndex(it.dia);
+                if (idx < 0) return;
+                if (userId != null && Array.isArray(it.participantes) && it.participantes.length && !it.participantes.map(String).includes(String(userId))) return;
+                const hm = String(it.horario || '19:00').split(':').map(Number);
+                for (let k = 0; k < semanas * 7; k++) {
+                    const f = new Date(hoy); f.setDate(hoy.getDate() + k);
+                    if (f.getDay() !== idx) continue;
+                    const ini = new Date(f); ini.setHours(hm[0] || 0, hm[1] || 0, 0, 0);
+                    const fin = new Date(ini.getTime() + 60 * 60000);
+                    const ymd = ini.getFullYear() + String(ini.getMonth() + 1).padStart(2, '0') + String(ini.getDate()).padStart(2, '0');
+                    out.push({ id: 'cc-' + tipo + '-' + ymd, tipo, title: it.titulo + (it.tema ? ' · ' + it.tema : ''), start: ini.toISOString(), end: fin.toISOString(), zoomUrl: it.zoom, ponente: it.ponente, color: CC_COLORES[tipo], reunionSemanal: true });
+                }
+            });
+            return out;
         }
         function canEditCarrusel(){ return hasRole(currentUser, ['admin','gm','desarrollador','editor']); }
         function renderCarruselCirculares(){
             const data = ensureCarruselDefaults();
             const circ = data.circulares;
             const carr = data.carrusel;
+            const ter = data.tercera;
             const canEdit = canEditCarrusel();
             const isInvited = (item) => {
                 if(canEdit) return true;
@@ -7455,6 +7491,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 <div class="grid lg:grid-cols-2 gap-6">
                     ${card(circ, 'circulares', '#0a2540')}
                     ${card(carr, 'carrusel', '#c9a86a')}
+                    ${card(ter, 'tercera', '#4f46e5')}
                 </div>
                 ${canEdit ? `<div class="mt-8 bg-amber-50 border border-amber-200 rounded-xl p-4">
                     <p class="text-sm text-amber-800"><i class="fas fa-info-circle mr-2"></i><strong>Tip:</strong> Usa el Control de Accesos para definir quién ve esta sección, y edita cada tarjeta con el botón <i class="fas fa-pen"></i>. Campos editables: liga Zoom, imagen, horario, ponente e invitado especial.</p>
@@ -7476,10 +7513,14 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     <button aria-label="Cerrar" data-bx-click="a1" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
                 </div>
                 <form id="carrusel-form" class="space-y-5">
-                    <div class="grid md:grid-cols-2 gap-4">
+                    <div class="grid md:grid-cols-3 gap-4">
                         <div>
                             <label class="text-sm font-medium text-slate-700 mb-1.5 block">Tema *</label>
                             <input id="cc-tema" type="text" value="${escapeHTML(item.tema||'')}" required class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white text-slate-900" placeholder="Ej: Estrategias de Cierre">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-slate-700 mb-1.5 block">Día *</label>
+                            <select id="cc-dia" required class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900">${CC_DIAS.map(d => `<option value="${d}" ${d === item.dia ? 'selected' : ''}>${d}</option>`).join('')}</select>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-slate-700 mb-1.5 block">Horario *</label>
@@ -7565,6 +7606,8 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 e.preventDefault();
                 const tema = document.getElementById('cc-tema').value.trim();
                 const horario = document.getElementById('cc-horario').value;
+                const dia = document.getElementById('cc-dia').value;
+                if(ccDiaIndex(dia) < 0){ uiToast('Elige un día válido'); return; }
                 const ponente = document.getElementById('cc-ponente').value.trim();
                 const invitado = document.getElementById('cc-invitado').value.trim();
                 const zoom = document.getElementById('cc-zoom').value.trim();
@@ -7573,6 +7616,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 const participantes = Array.from(document.querySelectorAll('.cc-participante:checked')).map(cb => parseInt(cb.value));
                 item.tema = tema;
                 item.horario = horario;
+                item.dia = dia;
                 item.ponente = ponente;
                 item.invitado = invitado;
                 item.zoom = zoom;
@@ -7961,7 +8005,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 </div>`;
                 })()}
 
-                ${isStudent(currentUser) && db.liveClasses ? (() => { const upcoming = db.liveClasses.filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.start) > new Date()).sort((a,b) => new Date(a.start) - new Date(b.start))[0]; return upcoming ? `<div class="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 rounded-xl shadow-sm flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-video"></i></div><div><p class="text-sm opacity-90">Próxima clase</p><p class="font-semibold">${upcoming.title} - ${new Date(upcoming.start).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})}</p></div></div><button data-bx-click="a213" class="px-4 py-2 bg-white text-indigo-700 rounded-lg font-medium hover:bg-slate-100">Ver</button></div>` : ''; })() : ''}
+                ${isStudent(currentUser) && db.liveClasses ? (() => { const upcoming = db.liveClasses.filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.start) > new Date()).concat(ccOcurrencias(currentUser.id, 2)).sort((a,b) => new Date(a.start) - new Date(b.start))[0]; return upcoming ? `<div class="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 rounded-xl shadow-sm flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-video"></i></div><div><p class="text-sm opacity-90">Próxima clase</p><p class="font-semibold">${upcoming.title} - ${new Date(upcoming.start).toLocaleString('es-MX',{dateStyle:'short', timeStyle:'short'})}</p></div></div><button data-bx-click="a213" class="px-4 py-2 bg-white text-indigo-700 rounded-lg font-medium hover:bg-slate-100">Ver</button></div>` : ''; })() : ''}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     ${!(isStudent(currentUser)) ? `
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><div class="flex items-center justify-between"><div><p class="text-slate-500 text-sm">Usuarios</p><p class="text-3xl font-bold">${stats.users}</p></div><div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center"><i class="fas fa-users"></i></div></div></div>
@@ -12402,7 +12446,7 @@ function renderLiveClasses() {
                     locale: 'es',
                     headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
                     height: 'auto',
-                    events: myClasses.map(c => {
+                    events: [...myClasses.map(c => {
                         const instructor = db.users.find(u=>u.id===(c.instructorId||c.createdBy));
                         const color = instructor?.calendarColor || '#0a2540';
                         return {
@@ -12414,8 +12458,17 @@ function renderLiveClasses() {
                             borderColor: color,
                             extendedProps: { zoomUrl: c.zoomUrl, assignedTo: c.assignedTo, createdBy: c.createdBy, instructorId: c.instructorId, instructorName: instructor?.name, instructorColor: color }
                         };
-                    }),
+                    }), ...ccOcurrencias(isTeacher ? null : currentUser.id, 26).map(o => ({
+                        id: o.id,
+                        title: o.title + (o.ponente ? ' - ' + o.ponente : ''),
+                        start: o.start,
+                        end: o.end,
+                        backgroundColor: o.color,
+                        borderColor: o.color,
+                        extendedProps: { zoomUrl: o.zoomUrl, reunionSemanal: true }
+                    }))],
                     eventClick: function(info) {
+                        if (info.event.extendedProps.reunionSemanal) { if (info.event.extendedProps.zoomUrl) window.open(info.event.extendedProps.zoomUrl, '_blank'); return; }
                         const ev = db.liveClasses.find(lc => String(lc.id) === info.event.id);
                         if (ev) openLiveClassDetail(ev);
                     }
