@@ -4964,13 +4964,57 @@ function exportarClientesCSV(){
 
 
 
+/* Mi Agenda: periodo de semana (lunes a domingo), mes calendario o año calendario,
+ * contando desde el periodo actual hacia adelante (off = 0 es el actual). */
+window.miAgendaVista = window.miAgendaVista || 'semana';
+window.miAgendaOff = window.miAgendaOff || 0;
+window.miAgendaCambiarVista = function(v){
+    window.miAgendaVista = v;
+    window.miAgendaOff = 0;
+    const c = document.getElementById('main-content');
+    if (c) c.innerHTML = renderMiAgenda();
+};
+window.miAgendaMover = function(d){
+    window.miAgendaOff = Math.max(0, (window.miAgendaOff || 0) + d);
+    const c = document.getElementById('main-content');
+    if (c) c.innerHTML = renderMiAgenda();
+};
+function miAgendaRango(vista, off){
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    let ini, fin, etiqueta;
+    if (vista === 'anio') {
+        ini = new Date(hoy.getFullYear() + off, 0, 1);
+        fin = new Date(hoy.getFullYear() + off + 1, 0, 1);
+        etiqueta = String(ini.getFullYear());
+    } else if (vista === 'mes') {
+        ini = new Date(hoy.getFullYear(), hoy.getMonth() + off, 1);
+        fin = new Date(hoy.getFullYear(), hoy.getMonth() + off + 1, 1);
+        etiqueta = ini.toLocaleString('es-MX',{month:'long', year:'numeric'});
+    } else {
+        ini = new Date(hoy); ini.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7) + off * 7);
+        fin = new Date(ini); fin.setDate(ini.getDate() + 7);
+        const corto = d => d.toLocaleString('es-MX',{day:'numeric', month:'short'});
+        const ultimo = new Date(fin); ultimo.setDate(fin.getDate() - 1);
+        etiqueta = corto(ini) + ' – ' + corto(ultimo);
+    }
+    return { ini, fin, etiqueta, hoy };
+}
 function renderMiAgenda(){
     const calId = currentUser.googleCalendarId || 'primary';
     const agenda = (db.agendas||{})[currentUser.id] || '';
     const ahora = new Date();
-    const misClases = (db.liveClasses||[]).filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.end) >= ahora)
-        .concat(typeof ccOcurrencias === 'function' ? ccOcurrencias(currentUser.id, 26).map(o => ({ id: o.id, title: o.title, start: o.start, end: o.end, zoomUrl: o.zoomUrl, instructorId: null, reunionSemanal: true })) : [])
+    const vista = ['semana','mes','anio'].includes(window.miAgendaVista) ? window.miAgendaVista : 'semana';
+    const off = window.miAgendaOff || 0;
+    const rango = miAgendaRango(vista, off);
+    const enRango = iso => { const s = new Date(iso); return s >= rango.ini && s < rango.fin; };
+    const semanas = Math.max(1, Math.ceil((rango.fin - rango.hoy) / 604800000) + 1);
+    const misClases = (db.liveClasses||[]).filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.end) >= ahora && enRango(c.start))
+        .concat(typeof ccOcurrencias === 'function' ? ccOcurrencias(currentUser.id, semanas).filter(o => enRango(o.start)).map(o => ({ id: o.id, title: o.title, start: o.start, end: o.end, zoomUrl: o.zoomUrl, instructorId: null, reunionSemanal: true })) : [])
         .sort((a,b)=> new Date(a.start)-new Date(b.start));
+    const botonVista = (v, txt) => `<button ${bxOn('click','miAgendaCambiarVista',[v])} class="px-3 py-1.5 rounded-lg text-xs font-semibold ${vista===v ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">${txt}</button>`;
+    const selectorVista = `<div class="flex items-center gap-1">${botonVista('semana','Semana')}${botonVista('mes','Mes')}${botonVista('anio','Año')}</div>`;
+    const botonMover = (d, icono, titulo) => `<button ${bxOn('click','miAgendaMover',[d])} ${d<0 && off===0 ? 'disabled' : ''} title="${titulo}" class="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"><i class="fas ${icono} text-xs"></i></button>`;
+    const navHtml = `<div class="flex items-center gap-1">${botonMover(-1,'fa-chevron-left','Anterior')}<span class="px-2 text-xs font-semibold text-slate-700 capitalize min-w-[9rem] text-center">${rango.etiqueta}</span>${botonMover(1,'fa-chevron-right','Siguiente')}</div>`;
     const proximasHtml = misClases.length ? misClases.map(c=>{
         const inicio = new Date(c.start);
         const fin = new Date(c.end);
@@ -5004,7 +5048,7 @@ function renderMiAgenda(){
         </div>
         
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
-            <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-video text-indigo-600"></i> Próximas Clases En Vivo (${misClases.length})</h3>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4"><h3 class="font-semibold flex items-center gap-2"><i class="fas fa-video text-indigo-600"></i> Próximas Clases En Vivo (${misClases.length})</h3>${navHtml}${selectorVista}</div>
             <div class="space-y-2 max-h-64 overflow-y-auto">
                 ${proximasHtml}
             </div>

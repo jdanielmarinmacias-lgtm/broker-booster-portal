@@ -7953,9 +7953,11 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     const canSee = db.rolePermissions[(currentUser.role||'').toLowerCase()]?.includes('carrusel-circulares');
                     if(!canSee) return '';
                     const isInvited = (it) => !it || !it.participantes?.length || it.participantes.includes(currentUser.id) || canEditCarrusel();
-                    return `<div class="mb-6 grid md:grid-cols-2 gap-4">
-                        ${[cc.circulares, cc.carrusel].filter(Boolean).map((it,idx) => {
-                            const color = idx===0 ? '#0a2540' : '#c9a86a';
+                    const _sesiones = [cc.circulares, cc.carrusel, cc.tercera].filter(Boolean);
+                    const _colores = ['#0a2540', '#c9a86a', '#4f46e5'];
+                    return `<div class="mb-6 grid md:grid-cols-${_sesiones.length>2?3:2} gap-4">
+                        ${_sesiones.map((it,idx) => {
+                            const color = _colores[idx] || '#0a2540';
                             const invited = isInvited(it);
                             return `<div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition group">
                                 <div class="flex">
