@@ -134,6 +134,26 @@
     }
   }
 
+  /* Fusiona la copia del servidor con los cambios locales que aún no se han
+   * subido (la sombra es la última foto del servidor). Sin esto, un pull que
+   * llega dentro de la ventana de 1,5 s del guardado (incluido el eco realtime
+   * de nuestro propio envío) reemplazaba la colección y borraba las preguntas,
+   * flashcards o lecciones editadas en este equipo. */
+  function fusionarRegistros(prevLocal, prevShadowArr, serverItems) {
+    const sh = {}; prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) sh[String(x.id)] = x; });
+    const loc = {}; prevLocal.forEach(function (x) { if (x && x.id !== undefined) loc[String(x.id)] = x; });
+    let pending = false;
+    const items = [];
+    serverItems.forEach(function (s) {
+      if (!s || s.id === undefined) { items.push(s); return; }
+      const id = String(s.id);
+      if (sh[id] && !loc[id]) { pending = true; return; } // borrado local aún no subido
+      if (sh[id] && loc[id] && !registrosIguales(loc[id], sh[id])) { pending = true; items.push(loc[id]); return; } // edición local aún no subida
+      items.push(s);
+    });
+    return { items: items, pending: pending };
+  }
+
   async function pullBundle(fallbackNames) {
     const db = legDb();
     if (!db) return false;
@@ -155,8 +175,10 @@
             const wasOnServer = {};
             prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
             const serverItems = normIds(v.items);
+            const fusion = fusionarRegistros(prevLocal, prevShadowArr, serverItems);
+            if (fusion.pending) hayPendienteLocal = true;
             if (shadow) shadow[n] = clone(serverItems);
-            replaceArray(db[n], serverItems);
+            replaceArray(db[n], fusion.items);
             const have = {};
             db[n].forEach(function (x) { if (x && x.id !== undefined) have[String(x.id)] = true; });
             prevLocal.forEach(function (x) {
@@ -245,8 +267,10 @@
         const wasOnServer = {};
         prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
         const serverItems = normIds(v.items);
+        const fusion = fusionarRegistros(prevLocal, prevShadowArr, serverItems);
+        if (fusion.pending) hadPendingLocal = true;
         if (shadow) shadow[n] = clone(serverItems);
-        replaceArray(db[n], serverItems);
+        replaceArray(db[n], fusion.items);
         const have = {};
         db[n].forEach(function (x) { if (x && x.id !== undefined) have[String(x.id)] = true; });
         prevLocal.forEach(function (x) {

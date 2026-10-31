@@ -10121,8 +10121,9 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         // --- QUIZ CON TIPO ---
         function openQuizModal(lessonId){
             const lesson = db.lessons.find(l=>l.id===lessonId);
-            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Quiz: ${lesson.title}</h3><div id="quiz-list" class="space-y-3 mb-4 max-h-60 overflow-y-auto">${lesson.quiz.map((q,i)=>`<div class="p-3 border rounded-lg"><p class="font-medium">${i+1}. ${q.question} <span class="text-xs px-2 py-0.5 rounded ${q.type==='multiple'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}">${q.type==='multiple'?'Opción múltiple':'V/F'}</span></p><p class="text-xs text-slate-500">Correcta: ${q.options[q.correct]}</p></div>`).join('') || '<p class="text-slate-500">Sin preguntas</p>'}</div>
-                <form id="quiz-form" class="border-t pt-4 space-y-3">
+            const qCount = lesson.quiz.length;
+            showModal(`<div class="p-6"><div class="flex items-center justify-between mb-4"><div><p class="text-xs uppercase tracking-wide text-green-600 font-semibold">Examen</p><h3 class="text-xl font-bold text-slate-900">Quiz: ${escapeHTML(lesson.title)}</h3></div><span class="px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-semibold">${qCount} ${qCount===1?'pregunta':'preguntas'}</span></div><div id="quiz-list" class="space-y-3 mb-5 max-h-64 overflow-y-auto pr-1">${lesson.quiz.map((q,i)=>`<div class="p-4 border border-slate-200 rounded-xl bg-white shadow-sm flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center">${i+1}</span><div class="min-w-0"><p class="font-medium text-slate-900">${escapeHTML(q.question)} <span class="ml-1 align-middle text-xs px-2 py-0.5 rounded-full ${q.type==='multiple'?'bg-blue-100 text-blue-700':'bg-emerald-100 text-emerald-700'}">${q.type==='multiple'?'Opción múltiple':'V/F'}</span></p><p class="text-xs text-slate-500 mt-1"><i class="fas fa-check-circle text-green-500 mr-1"></i>Correcta: ${escapeHTML(String(q.options[q.correct] ?? ''))}</p></div></div>`).join('') || '<div class="text-center py-6 rounded-xl border border-dashed border-slate-300"><i class="fas fa-question-circle text-3xl text-slate-300"></i><p class="text-slate-500 mt-2">Aún no hay preguntas. Agrega la primera abajo.</p></div>'}</div>
+                <form id="quiz-form" class="border-t border-slate-200 pt-4 space-y-3">
                     <div><label class="text-sm">Tipo</label><select id="q-type" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"><option value="multiple">Opción múltiple</option><option value="vf">Verdadero/Falso</option></select></div>
                     <div><label class="text-sm">Pregunta</label><input id="q-text" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
                     <div id="opts-multiple" class="grid grid-cols-2 gap-2">
@@ -10133,7 +10134,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     </div>
                     <div id="opts-vf" class="hidden"><p class="text-sm text-slate-600">Opciones: Verdadero / Falso</p></div>
                     <div><label class="text-sm">Correcta</label><select id="q-correct" class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300"></select></div>
-                    <div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-green-600 text-white">Agregar Pregunta</button></div>
+                    <div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm"><i class="fas fa-plus mr-1"></i>Agregar pregunta</button></div>
                 </form></div>`);
             
             const updateQuizUI = () => {
@@ -10283,7 +10284,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function openFlashcardsModal(lessonId){
             const lesson = db.lessons.find(l=>l.id===lessonId);
             if(!lesson.flashcards) lesson.flashcards = [];
-            showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Flashcards: ${escapeHTML(lesson.title)}</h3><div id="fc-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto">${lesson.flashcards.map((f,i)=>`<div class="p-3 border rounded-lg flex justify-between items-center"><div><p class="font-medium text-sm">${escapeHTML(f.front)}</p><p class="text-xs text-slate-500">${escapeHTML(f.back)}</p></div><button data-bx-click="a295" data-p0="${bxE(function(){return lessonId})}" data-p1="${bxE(function(){return i})}" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div>`).join('') || '<p class="text-slate-500">Sin flashcards</p>'}</div>
+            const fCount = lesson.flashcards.length;
+            showModal(`<div class="p-6"><div class="flex items-center justify-between mb-4"><div><p class="text-xs uppercase tracking-wide text-amber-600 font-semibold">Repaso</p><h3 class="text-xl font-bold text-slate-900">Flashcards: ${escapeHTML(lesson.title)}</h3></div><span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-sm font-semibold">${fCount} ${fCount===1?'tarjeta':'tarjetas'}</span></div><div id="fc-list" class="space-y-2 mb-5 max-h-64 overflow-y-auto pr-1">${lesson.flashcards.map((f,i)=>`<div class="p-4 border border-slate-200 rounded-xl bg-white shadow-sm flex justify-between items-center gap-3"><div class="min-w-0"><p class="font-medium text-slate-900 text-sm">${escapeHTML(f.front)}</p><p class="text-xs text-slate-500 mt-1">${escapeHTML(f.back)}</p></div><button data-bx-click="a295" data-p0="${bxE(function(){return lessonId})}" data-p1="${bxE(function(){return i})}" class="shrink-0 w-8 h-8 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button></div>`).join('') || '<div class="text-center py-6 rounded-xl border border-dashed border-slate-300"><i class="fas fa-layer-group text-3xl text-slate-300"></i><p class="text-slate-500 mt-2">Aún no hay flashcards. Crea la primera abajo.</p></div>'}</div>
                 <form id="fc-form" class="border-t pt-4 space-y-3"><div><label class="text-sm">Frente</label><input id="fc-front" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Pregunta o término"></div><div><label class="text-sm">Reverso</label><input id="fc-back" required class="w-full mt-1 px-3 py-2 border rounded-lg bg-white text-slate-900 border-slate-300" placeholder="Respuesta o definición"></div><div class="flex justify-end gap-2"><button type="button" data-bx-click="a1" class="px-4 py-2 rounded-lg border">Cerrar</button><button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white">Agregar</button></div></form></div>`);
             document.getElementById('fc-form').onsubmit = e => { e.preventDefault(); lesson.flashcards.push({ id: 'fc_' + Date.now() + '_' + Math.floor(Math.random()*1000), front: document.getElementById('fc-front').value.trim(), back: document.getElementById('fc-back').value.trim(), interval: 1, ease: 2.5, due: new Date(0).toISOString(), reps: 0, lapses: 0 }); saveDB(); openFlashcardsModal(lessonId); };
         }
@@ -10896,9 +10898,9 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 const myAttempts = db.examAttempts.filter(a => a.userId === currentUser.id);
                 
                 return `<div class="bg-white p-6 rounded-xl shadow-sm">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-clipboard-check text-indigo-600"></i> Mis Exámenes</h3>
-                        <div class="text-sm text-slate-500">${myExams.length} asignados</div>
+                    <div class="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-5 mb-6 flex justify-between items-center gap-4 shadow-sm">
+                        <div><p class="text-xs uppercase tracking-wider text-indigo-200 font-semibold">Evaluaciones</p><h3 class="text-2xl font-bold flex items-center gap-2"><i class="fas fa-clipboard-check"></i> Mis Exámenes</h3></div>
+                        <span class="px-3 py-1 rounded-full bg-white/20 text-sm font-semibold whitespace-nowrap">${myExams.length} asignados</span>
                     </div>
                     ${myExams.length === 0 ? '<p class="text-center py-12 text-slate-500">No tienes exámenes asignados</p>' : `
                     <div class="grid gap-4">
@@ -10906,11 +10908,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                             const attempts = myAttempts.filter(a => a.examId === exam.id).sort((a,b) => new Date(b.date) - new Date(a.date));
                             const lastAttempt = attempts[0];
                             const category = db.categories.find(c => c.id === exam.categoryId);
-                            return `<div class="border border-slate-200 rounded-xl p-5 hover:shadow-md transition">
+                            return `<div class="border border-slate-200 rounded-xl p-5 bg-white hover:shadow-lg hover:-translate-y-0.5 transition-all">
                                 <div class="flex justify-between items-start">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2 mb-2">
-                                            <h4 class="font-semibold text-lg">${exam.title}</h4>
+                                            <h4 class="font-semibold text-lg text-slate-900">${exam.title}</h4>
                                             <span class="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">${category?.name || 'Sin categoría'}</span>
                                         </div>
                                         <p class="text-sm text-slate-600 mb-3">${exam.description || 'Sin descripción'}</p>
