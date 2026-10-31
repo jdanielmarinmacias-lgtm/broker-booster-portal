@@ -10372,28 +10372,200 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         /* Materiales de una lección o tarea: las imágenes se ven en la propia
          * vista; PDF, PowerPoint y documentos se abren en pestaña nueva, porque
          * la CSP (frame-src) no permite incrustarlos desde Storage. */
-        async function pintarPdfsMateriales(materials){
+        async function pintarPdfsMateriales(materials, idPrefix='material-pdf-'){
+            pintarOfficeMateriales(materials, idPrefix);
             const pdfs = (Array.isArray(materials) ? materials : []).filter(m => m && m.url && iconoMaterial(m) === 'fa-file-pdf');
             if(!pdfs.length) return;
             let pdfjs;
             try { pdfjs = await pdfJsListo(); } catch(e) { return; }
             for(let i = 0; i < pdfs.length; i++){
-                const cont = document.getElementById('material-pdf-' + i);
+                const cont = document.getElementById(idPrefix + i);
                 if(!cont) continue;
                 try {
                     const resp = await fetch(pdfs[i].url, { credentials: 'same-origin' });
                     if(!resp.ok) throw new Error('HTTP ' + resp.status);
                     const pdf = await pdfjs.getDocument({ data: await resp.arrayBuffer() }).promise;
                     const page = await pdf.getPage(1);
-                    const vp = page.getViewport({ scale: 0.6 });
+                    const vp = page.getViewport({ scale: 1.2 });
                     const canvas = document.createElement('canvas');
                     canvas.width = Math.floor(vp.width);
                     canvas.height = Math.floor(vp.height);
-                    canvas.className = 'rounded-xl border border-slate-200 bg-white w-full';
+                    canvas.className = 'rounded-lg shadow-sm bg-white w-full';
                     await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
                     cont.innerHTML = '';
                     cont.appendChild(canvas);
                 } catch(e) { /* sin vista previa: queda el enlace */ }
+            }
+        }
+
+        /* Office (Word, Excel, PowerPoint): lectores ligeros que se cargan desde
+         * el CDN solo cuando hay un documento que mostrar. Sus scripts ya están
+         * permitidos en script-src. La lectura ocurre en el navegador: el archivo
+         * no sale hacia ningún servicio externo. Los binarios antiguos (.doc, .xls,
+         * .ppt) no tienen lector y quedan con Abrir y Descargar. */
+        const LECTORES_OFFICE = {
+            mammoth: { url: 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js', global: 'mammoth', promesa: null },
+            XLSX: { url: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', global: 'XLSX', promesa: null },
+            JSZip: { url: 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', global: 'JSZip', promesa: null },
+        };
+        const OFFICE_MINIATURA = { filas: 14, columnas: 6, diapositivas: 1 };
+        const OFFICE_VISOR = { filas: 200, columnas: 30, diapositivas: 30 };
+        const ESTILO_OFFICE = {
+            p: 'margin:0 0 .5em',
+            h1: 'font-size:1.6em;font-weight:700;margin:.5em 0',
+            h2: 'font-size:1.3em;font-weight:700;margin:.5em 0',
+            h3: 'font-size:1.1em;font-weight:700;margin:.5em 0',
+            ul: 'list-style:disc;padding-left:1.4em;margin:0 0 .5em',
+            ol: 'list-style:decimal;padding-left:1.4em;margin:0 0 .5em',
+            table: 'border-collapse:collapse;max-width:100%;margin:.5em 0',
+            td: 'border:1px solid #cbd5e1;padding:3px 5px;vertical-align:top',
+            th: 'border:1px solid #cbd5e1;padding:3px 5px;vertical-align:top;font-weight:700;background:#f1f5f9',
+            img: 'max-width:100%;height:auto'
+        };
+
+        function cargarLectorOffice(clave){
+            const cfg = LECTORES_OFFICE[clave];
+            if (window[cfg.global]) return Promise.resolve(window[cfg.global]);
+            if (!cfg.promesa) {
+                cfg.promesa = new Promise(function (resolve, reject) {
+                    const s = document.createElement('script');
+                    s.src = cfg.url;
+                    s.onload = function () {
+                        if (window[cfg.global]) resolve(window[cfg.global]);
+                        else { cfg.promesa = null; reject(new Error('lector no disponible: ' + clave)); }
+                    };
+                    s.onerror = function () { cfg.promesa = null; reject(new Error('no se pudo cargar ' + clave)); };
+                    document.head.appendChild(s);
+                });
+            }
+            return cfg.promesa;
+        }
+
+        /* Tipo Office por extensión (formatos abiertos). Devuelve null si no hay lector. */
+        function tipoOffice(texto){
+            const t = String(texto || '').toLowerCase();
+            if (/\.docx([?#]|$)/.test(t)) return 'word';
+            if (/\.xlsx([?#]|$)/.test(t)) return 'excel';
+            if (/\.pptx([?#]|$)/.test(t)) return 'pptx';
+            return null;
+        }
+
+        /* El HTML sale de la conversión del propio documento: se limpia antes de
+         * insertarlo (sin scripts, enlaces, eventos ni imágenes externas) y se le
+         * da un estilo legible, porque Tailwind resetea títulos, listas y tablas. */
+        function limpiarHtmlOffice(html){
+            const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            doc.body.querySelectorAll('script,style,iframe,object,embed,link,meta,form,input,button,svg,video,audio').forEach(n => n.remove());
+            doc.body.querySelectorAll('*').forEach(el => {
+                Array.from(el.attributes).forEach(a => {
+                    const n = a.name.toLowerCase();
+                    const imagenSegura = n === 'src' && /^data:image\//i.test(a.value);
+                    if (n.startsWith('on') || n === 'style' || n === 'href' || (n === 'src' && !imagenSegura)) el.removeAttribute(a.name);
+                });
+                const estilo = ESTILO_OFFICE[el.tagName.toLowerCase()];
+                if (estilo) el.setAttribute('style', estilo);
+            });
+            return doc.body.innerHTML;
+        }
+
+        async function leerDocx(buf){
+            const mammoth = await cargarLectorOffice('mammoth');
+            const r = await mammoth.convertToHtml({ arrayBuffer: buf });
+            return limpiarHtmlOffice(r.value);
+        }
+
+        /* Primera hoja del libro, recortada a lim.filas x lim.columnas. */
+        async function leerHojaExcel(buf, lim){
+            const XLSX = await cargarLectorOffice('XLSX');
+            const libro = XLSX.read(new Uint8Array(buf), { type: 'array' });
+            const nombres = libro.SheetNames || [];
+            if (!nombres.length) throw new Error('libro sin hojas');
+            const hoja = libro.Sheets[nombres[0]];
+            const rango = XLSX.utils.decode_range(hoja['!ref'] || 'A1');
+            const fin = { r: Math.min(rango.e.r, rango.s.r + lim.filas - 1), c: Math.min(rango.e.c, rango.s.c + lim.columnas - 1) };
+            const recortada = fin.r < rango.e.r || fin.c < rango.e.c;
+            const copia = Object.assign({}, hoja, { '!ref': XLSX.utils.encode_range({ s: rango.s, e: fin }) });
+            const tabla = limpiarHtmlOffice(XLSX.utils.sheet_to_html(copia, { header: '', footer: '' }));
+            const cabecera = `<p style="font-size:.85em;color:#64748b;margin:0 0 .5em">Hoja: ${escapeHTML(nombres[0])}${nombres.length > 1 ? ` · 1 de ${nombres.length}` : ''}</p>`;
+            const aviso = recortada ? '<p style="font-size:.85em;color:#64748b;margin:.5em 0 0">Vista parcial de la hoja. Usa "Abrir" para ver todo.</p>' : '';
+            return cabecera + tabla + aviso;
+        }
+
+        /* Texto de las diapositivas, en el orden de la presentación. */
+        async function leerDiapositivasPptx(buf, lim){
+            const JSZip = await cargarLectorOffice('JSZip');
+            const zip = await JSZip.loadAsync(buf);
+            const archivoPres = zip.file('ppt/presentation.xml');
+            const archivoRels = zip.file('ppt/_rels/presentation.xml.rels');
+            if (!archivoPres || !archivoRels) throw new Error('presentación sin índice');
+            const aXml = texto => new DOMParser().parseFromString(texto, 'application/xml');
+            const pres = aXml(await archivoPres.async('string'));
+            const rels = aXml(await archivoRels.async('string'));
+            const destinoPorId = {};
+            Array.from(rels.getElementsByTagName('Relationship')).forEach(r => { destinoPorId[r.getAttribute('Id')] = r.getAttribute('Target') || ''; });
+            const rutas = Array.from(pres.getElementsByTagName('p:sldId'))
+                .map(s => destinoPorId[s.getAttribute('r:id')])
+                .filter(Boolean)
+                .map(t => t.startsWith('/') ? t.slice(1) : 'ppt/' + t);
+            const diapositivas = [];
+            for (const ruta of rutas.slice(0, lim.diapositivas)) {
+                const f = zip.file(ruta);
+                if (!f) continue;
+                const d = aXml(await f.async('string'));
+                diapositivas.push(Array.from(d.getElementsByTagName('a:p'))
+                    .map(p => Array.from(p.getElementsByTagName('a:t')).map(t => t.textContent).join(''))
+                    .filter(t => t.trim()));
+            }
+            return { total: rutas.length, diapositivas };
+        }
+
+        function htmlDiapositivas(lista, total){
+            const tarjetas = lista.map((parrafos, i) => `<div style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,.06);aspect-ratio:16/9;overflow:hidden;padding:4%;margin:0 0 12px;text-align:left"><p style="margin:0 0 .4em;font-size:.8em;color:#94a3b8">Diapositiva ${i + 1}</p>${parrafos.map((t, j) => `<p style="margin:0 0 .35em;${j === 0 ? 'font-size:1.35em;font-weight:700;' : ''}">${escapeHTML(t)}</p>`).join('')}</div>`).join('');
+            const aviso = total > lista.length ? `<p style="font-size:.85em;color:#64748b;margin:0">Mostrando ${lista.length} de ${total} diapositivas. Usa "Abrir" para ver el resto.</p>` : '';
+            return tarjetas + aviso;
+        }
+
+        async function construirVistaOffice(tipo, buf, completo){
+            const lim = completo ? OFFICE_VISOR : OFFICE_MINIATURA;
+            if (tipo === 'word') return leerDocx(buf);
+            if (tipo === 'excel') return leerHojaExcel(buf, lim);
+            if (tipo === 'pptx') {
+                const r = await leerDiapositivasPptx(buf, lim);
+                return htmlDiapositivas(r.diapositivas, r.total);
+            }
+            throw new Error('formato sin vista previa');
+        }
+
+        async function descargarBytesOffice(url){
+            const resp = await fetch(url, { credentials: 'same-origin' });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            return resp.arrayBuffer();
+        }
+
+        /* Miniatura de la primera página (hoja o diapositiva) dentro de la tarjeta. */
+        async function pintarOfficeMateriales(materials, idPrefix='material-pdf-'){
+            const docs = (Array.isArray(materials) ? materials : []).filter(m => m && m.url && tipoOffice(m.name));
+            for (let i = 0; i < docs.length; i++){
+                const cont = document.getElementById(idPrefix + 'office-' + i);
+                if (!cont) continue;
+                try {
+                    const html = await construirVistaOffice(tipoOffice(docs[i].name), await descargarBytesOffice(docs[i].url), false);
+                    if (!cont.isConnected) continue;
+                    cont.innerHTML = `<div class="relative w-full h-56 overflow-hidden rounded-md bg-white"><div class="p-4 text-[10px] leading-snug text-slate-800">${html}</div><div class="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent"></div></div>`;
+                } catch (e) {
+                    if (cont.isConnected) cont.innerHTML = `<i class="fas ${iconoMaterial(docs[i])} text-4xl"></i>`;
+                }
+            }
+        }
+
+        async function pintarOfficeVisor(src, nombre, area){
+            try {
+                const html = await construirVistaOffice(tipoOffice(nombre) || tipoOffice(src), await descargarBytesOffice(src), true);
+                if (!area.isConnected) return;
+                area.innerHTML = `<div class="p-4"><div data-visor-zoom-target class="mx-auto max-w-none bg-white rounded-lg shadow-md p-6 sm:p-10 text-sm leading-relaxed text-slate-800 break-words">${html}</div></div>`;
+                aplicarZoomVisor();
+            } catch (e) {
+                if (area.isConnected) mensajeVisorSinVista(area);
             }
         }
 
@@ -10407,18 +10579,179 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             return 'fa-file-alt';
         }
 
-        function renderMaterialsSection(materials){
+        function materialDeEntrega(s, nombre){
+            const url = s.fileUrl || s.content || '';
+            const mime = (url.match(/^data:([^;,]+)/) || [])[1] || '';
+            return { name: nombre || s.fileName || 'entrega', url, mime };
+        }
+
+        /* Tarjeta de un material visual (imagen o PDF): al pulsarla abre el visor
+         * (ver abrirVisorDocumento); el href queda como respaldo para Ctrl+clic. */
+        function tarjetaMaterial(m, icono, cuerpo){
+            const url = escapeHTML(m.url);
+            const nombre = escapeHTML(m.name || 'archivo');
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" data-visor-src="${url}" data-visor-name="${nombre}" data-visor-title="${nombre}" class="group block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-300 transition">
+                <div class="bg-slate-100 p-3 flex items-center justify-center min-h-[140px]">${cuerpo}</div>
+                <div class="flex items-center gap-2 px-3 py-2 border-t border-slate-100"><i class="fas ${icono} text-indigo-500"></i><span class="text-xs font-medium text-slate-700 truncate flex-1">${nombre}</span><span class="text-[11px] font-semibold text-indigo-600 group-hover:underline whitespace-nowrap"><i class="fas fa-expand-alt mr-1"></i>Ver</span></div></a>`;
+        }
+
+        function renderMaterialsSection(materials, idPrefix='material-pdf-', titulo='Materiales'){
             const list = Array.isArray(materials) ? materials.filter(m=>m && m.url) : [];
             if(!list.length) return '';
             const esImagen = m => /^image\//.test(m.mime||'') || /\.(png|jpe?g|gif|webp|svg)$/i.test(m.name||'');
             const imgs = list.filter(esImagen);
             const pdfs = list.filter(m=>!esImagen(m) && iconoMaterial(m)==='fa-file-pdf');
-            const otros = list.filter(m=>!esImagen(m) && iconoMaterial(m)!=='fa-file-pdf');
-            return `<div class="mt-6"><h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-paperclip text-indigo-600"></i> Materiales</h4>
-                ${imgs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${imgs.map(m=>`<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(m.url)}" alt="${escapeHTML(m.name||'')}" class="rounded-xl border border-slate-200 w-full object-contain bg-white"></a>`).join('')}</div>`:''}
-                ${pdfs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${pdfs.map((m,i)=>`<a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="block border rounded-xl bg-white hover:bg-slate-50 p-2"><div id="material-pdf-${i}" class="min-h-[120px] flex items-center justify-center text-slate-400"><i class="fas fa-file-pdf text-4xl"></i></div><p class="text-xs text-indigo-700 mt-2 truncate">${escapeHTML(m.name||'PDF')}</p></a>`).join('')}</div>`:''}
+            const docs = list.filter(m=>!esImagen(m) && tipoOffice(m.name));
+            const otros = list.filter(m=>!esImagen(m) && iconoMaterial(m)!=='fa-file-pdf' && !tipoOffice(m.name));
+            return `<div class="mt-6"><h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-paperclip text-indigo-600"></i> ${titulo}</h4>
+                ${imgs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${imgs.map(m=>tarjetaMaterial(m, 'fa-file-image', `<img src="${escapeHTML(m.url)}" alt="${escapeHTML(m.name||'')}" class="max-h-56 w-full object-contain">`)).join('')}</div>`:''}
+                ${pdfs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${pdfs.map((m,i)=>tarjetaMaterial(m, 'fa-file-pdf', `<div id="${idPrefix}${i}" class="w-full flex items-center justify-center text-slate-400"><i class="fas fa-file-pdf text-4xl"></i></div>`)).join('')}</div>`:''}
+                ${docs.length?`<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">${docs.map((m,i)=>tarjetaMaterial(m, iconoMaterial(m), `<div id="${idPrefix}office-${i}" class="w-full flex items-center justify-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>`)).join('')}</div>`:''}
                 ${otros.length?`<ul class="space-y-2">${otros.map(m=>`<li><a href="${escapeHTML(m.url)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white hover:bg-slate-50 text-sm text-indigo-700"><i class="fas ${iconoMaterial(m)} text-indigo-600 text-lg"></i><span class="truncate">${escapeHTML(m.name||'archivo')}</span></a></li>`).join('')}</ul>`:''}
             </div>`;
+        }
+
+        /* Visor de documentos (materiales y entregas). Se monta como capa propia
+         * sobre la vista actual y no reemplaza el modal de fondo: así un formulario
+         * de entrega a medio llenar no se pierde. Trae zoom y páginas completas,
+         * con el mismo lenguaje visual que "Evidencia" en Mis clientes. */
+        const VISOR_ZOOM = { min: 0.5, max: 3, paso: 0.25 };
+        const VISOR_MAX_PAGINAS = 6;
+        let visorZoom = 1;
+
+        function visorTipo(src, nombre){
+            const s = String(src || '');
+            const n = String(nombre || '').toLowerCase();
+            if (/^data:application\/pdf/i.test(s) || /\.pdf$/.test(n) || (!n && /\.pdf([?#]|$)/i.test(s))) return 'pdf';
+            if (/^data:image\//i.test(s) || /\.(png|jpe?g|gif|webp|svg)$/.test(n) || (!n && /\.(png|jpe?g|gif|webp|svg)([?#]|$)/i.test(s))) return 'imagen';
+            if (tipoOffice(n) || (!n && tipoOffice(s))) return 'office';
+            return 'otro';
+        }
+
+        function aplicarZoomVisor(){
+            const area = document.getElementById('visor-doc-area');
+            if (!area) return;
+            area.querySelectorAll('[data-visor-zoom-target]').forEach(el => { el.style.width = Math.round(visorZoom * 100) + '%'; });
+            const lbl = document.getElementById('visor-zoom-lbl');
+            if (lbl) lbl.textContent = Math.round(visorZoom * 100) + '%';
+        }
+
+        function cambiarZoomVisor(accion){
+            if (accion === 'reset') visorZoom = 1;
+            else {
+                const delta = accion === 'in' ? VISOR_ZOOM.paso : -VISOR_ZOOM.paso;
+                visorZoom = Math.min(VISOR_ZOOM.max, Math.max(VISOR_ZOOM.min, +(visorZoom + delta).toFixed(2)));
+            }
+            aplicarZoomVisor();
+        }
+
+        function cerrarVisorDocumento(){
+            const o = document.getElementById('visor-doc-overlay');
+            if (o) o.remove();
+            document.removeEventListener('keydown', visorTeclas);
+        }
+
+        function visorTeclas(e){ if (e.key === 'Escape') cerrarVisorDocumento(); }
+
+        function mensajeVisorSinVista(area){
+            area.innerHTML = `<div class="py-16 px-6 text-center"><i class="fas fa-file-alt text-5xl text-slate-400"></i><p class="mt-3 text-sm text-slate-600">No hay vista previa para este formato.</p><p class="text-xs text-slate-500">Usa "Abrir" o "Descargar".</p></div>`;
+        }
+
+        async function pintarPdfVisor(src, area){
+            try {
+                const pdfjs = await pdfJsListo();
+                const resp = await fetch(src, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const pdf = await pdfjs.getDocument({ data: await resp.arrayBuffer() }).promise;
+                if (!area.isConnected) return;
+                area.innerHTML = '<div class="p-4 space-y-4"></div>';
+                const cont = area.firstElementChild;
+                const total = Math.min(pdf.numPages, VISOR_MAX_PAGINAS);
+                for (let n = 1; n <= total; n++) {
+                    const page = await pdf.getPage(n);
+                    if (!area.isConnected) return;
+                    const vp = page.getViewport({ scale: 2 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.floor(vp.width);
+                    canvas.height = Math.floor(vp.height);
+                    canvas.className = 'block mx-auto max-w-none bg-white rounded-lg shadow-md';
+                    canvas.setAttribute('data-visor-zoom-target', '');
+                    canvas.style.width = Math.round(visorZoom * 100) + '%';
+                    cont.appendChild(canvas);
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+                }
+                if (pdf.numPages > total) {
+                    cont.insertAdjacentHTML('beforeend', `<p class="text-center text-xs text-slate-600 pb-2">Mostrando ${total} de ${pdf.numPages} páginas. Usa "Abrir" para ver el resto.</p>`);
+                }
+                aplicarZoomVisor();
+            } catch (e) {
+                if (area.isConnected) mensajeVisorSinVista(area);
+            }
+        }
+
+        function abrirVisorDocumento(src, nombre, titulo){
+            cerrarVisorDocumento();
+            visorZoom = 1;
+            const tipo = visorTipo(src, nombre);
+            const tituloSeguro = escapeHTML(titulo || nombre || 'Documento');
+            const nombreSeguro = escapeHTML(nombre || 'documento');
+            const urlSegura = escapeHTML(src);
+            const icono = tipo === 'pdf' ? 'fa-file-pdf text-red-500' : tipo === 'imagen' ? 'fa-file-image text-indigo-500' : tipo === 'office' ? 'fa-file-alt text-blue-600' : 'fa-file-alt text-slate-500';
+            const o = document.createElement('div');
+            o.id = 'visor-doc-overlay';
+            o.className = 'fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6';
+            o.innerHTML = `<div role="dialog" aria-modal="true" aria-label="${tituloSeguro}" class="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden">
+                <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-200">
+                    <i class="fas ${icono} text-xl"></i>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-bold truncate">${tituloSeguro}</p>
+                        ${titulo && nombre && titulo !== nombre ? `<p class="text-[11px] text-slate-500 truncate">${nombreSeguro}</p>` : ''}
+                    </div>
+                    ${tipo !== 'otro' ? `<div class="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                        <button type="button" data-visor-zoom="out" title="Alejar" aria-label="Alejar" class="w-8 h-8 rounded-md hover:bg-white text-slate-600 flex items-center justify-center"><i class="fas fa-search-minus"></i></button>
+                        <button type="button" data-visor-zoom="reset" title="Tamaño normal" class="px-2 h-8 rounded-md hover:bg-white text-xs font-semibold text-slate-700 min-w-[3.5rem]"><span id="visor-zoom-lbl">100%</span></button>
+                        <button type="button" data-visor-zoom="in" title="Acercar" aria-label="Acercar" class="w-8 h-8 rounded-md hover:bg-white text-slate-600 flex items-center justify-center"><i class="fas fa-search-plus"></i></button>
+                    </div>` : ''}
+                    <button type="button" data-visor-close aria-label="Cerrar" title="Cerrar (Esc)" class="w-8 h-8 rounded-full hover:bg-red-50 hover:text-red-600 text-slate-500 flex items-center justify-center"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="visor-doc-area" class="flex-1 min-h-[240px] overflow-auto bg-slate-200/70">
+                    <div class="py-16 text-center text-slate-500"><i class="fas fa-spinner fa-spin text-2xl"></i><p class="text-xs mt-2">Cargando vista previa…</p></div>
+                </div>
+                <div class="flex items-center justify-between gap-2 px-4 py-3 border-t border-slate-200 bg-white">
+                    <p class="text-[11px] text-slate-500">${tipo === 'otro' ? '' : 'Usa + y − para acercar; desplázate para leer.'}</p>
+                    <div class="flex gap-2">
+                        <a href="${urlSegura}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="fas fa-external-link-alt mr-1"></i>Abrir</a>
+                        <a href="${urlSegura}" download="${nombreSeguro}" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"><i class="fas fa-download mr-1"></i>Descargar</a>
+                    </div>
+                </div>
+            </div>`;
+            o.addEventListener('click', function (e) {
+                if (e.target === o || e.target.closest('[data-visor-close]')) { cerrarVisorDocumento(); return; }
+                const z = e.target.closest('[data-visor-zoom]');
+                if (z) cambiarZoomVisor(z.getAttribute('data-visor-zoom'));
+            });
+            document.body.appendChild(o);
+            document.addEventListener('keydown', visorTeclas);
+            const area = document.getElementById('visor-doc-area');
+            if (tipo === 'otro') mensajeVisorSinVista(area);
+            else if (tipo === 'imagen') {
+                area.innerHTML = `<div class="p-4"><img src="${urlSegura}" alt="${nombreSeguro}" data-visor-zoom-target class="block mx-auto max-w-none rounded-lg bg-white shadow-md"></div>`;
+                aplicarZoomVisor();
+            } else if (tipo === 'office') pintarOfficeVisor(src, nombre, area);
+            else pintarPdfVisor(src, area);
+        }
+
+        /* Miniaturas de materiales y entregas: abren el visor. Captura, porque los
+         * modales detienen la propagación de clics (a141). Ctrl/Cmd/Shift+clic
+         * conserva el comportamiento normal de abrir en pestaña nueva. */
+        if (!window.__visorDocsBound) {
+            window.__visorDocsBound = true;
+            document.addEventListener('click', function (e) {
+                const a = e.target.closest && e.target.closest('a[data-visor-src]');
+                if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                abrirVisorDocumento(a.getAttribute('data-visor-src'), a.getAttribute('data-visor-name'), a.getAttribute('data-visor-title'));
+            }, true);
         }
 
         function openLesson(lessonId) {
@@ -13373,25 +13706,30 @@ END:VCALENDAR`;
         function openTaskDetail(taskId) {
             const t = db.tasks.find(x=>x.id===taskId);
             const subs = db.taskSubmissions.filter(s=>s.taskId===taskId);
+            const entregasArchivo = subs.filter(s=>s.type==='file' && (s.fileUrl||s.content)).map(s=>{ const al = db.users.find(u=>u.id===s.studentId); return materialDeEntrega(s, `${al?al.name:'Alumno'} — ${s.fileName||'entrega'}`); });
             showModal(`<div class="p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto"><div class="flex items-start justify-between mb-5"><div><h3 class="text-xl font-bold">${t.title}</h3><p class="text-sm text-slate-500">${t.description||''}</p></div><button aria-label="Cerrar" data-bx-click="a1" class="text-slate-400"><i class="fas fa-times"></i></button></div>
                 <div class="bg-white border rounded-xl overflow-hidden"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">Alumno</th><th class="px-4 py-2 text-left">Entrega</th><th class="px-4 py-2 text-left">Estado</th><th class="px-4 py-2 text-left">Calificación</th><th></th></tr></thead><tbody class="divide-y">${subs.map(s=>{
                     const alumno = db.users.find(u=>u.id===s.studentId);
                     return `<tr><td class="px-4 py-2">${alumno?alumno.name:''}</td><td class="px-4 py-2">${s.type==='link'?`<a href="${s.content}" target="_blank" data-bx-click="a376" class="text-indigo-600 underline">Ver link</a>`:s.type==='file'?`<button data-bx-click="a399" data-p0="${bxE(function(){return s.id})}" class="text-emerald-600 underline">Descargar</button>`:`<span class="text-slate-600">${(s.content||'').substring(0,40)}...</span>`}</td><td class="px-4 py-2 capitalize">${s.status}</td><td class="px-4 py-2">${s.grade!=null?s.grade:'-'}</td><td class="px-4 py-2 text-right"><button data-bx-click="a400" data-p0="${bxE(function(){return s.id})}" class="text-indigo-600 text-xs">Calificar</button></td></tr>`;
                 }).join('')}${subs.length===0?'<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Sin entregas aún</td></tr>':''}</tbody></table></div>
                 ${renderMaterialsSection(t.materials)}
+                ${renderMaterialsSection(entregasArchivo, 'entrega-pdf-', 'Entregas de archivo')}
                 <div class="mt-4 flex justify-end gap-2"><button data-bx-click="a401" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 border rounded-lg text-sm">Editar tarea</button><button data-bx-click="a402" data-p0="${bxE(function(){return t.id})}" class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm">Eliminar</button></div>
             </div>`);
             pintarPdfsMateriales(t.materials);
+            pintarPdfsMateriales(entregasArchivo, 'entrega-pdf-');
         }
 
         function openTaskSubmit(taskId) {
             const t = db.tasks.find(x=>x.id===taskId);
             const existing = db.taskSubmissions.find(s=>s.taskId===taskId && s.studentId===currentUser.id);
             const initType = existing && existing.type ? existing.type : 'link';
+            const miEntrega = existing && existing.type==='file' && (existing.fileUrl||existing.content) ? [materialDeEntrega(existing)] : [];
             showModal(`<div class="p-6 max-w-lg w-full"><h3 class="text-xl font-bold mb-1">${escapeHTML(t.title)}</h3><p class="text-sm text-slate-500 mb-4">${escapeHTML(t.description||'')}</p>${renderMaterialsSection(t.materials)}<form id="submit-form" class="space-y-4">
                 <div><label class="text-sm font-medium">Tipo de entrega</label><div class="flex gap-4 mt-2"><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="link" ${initType==='link'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Enlace</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="file" ${initType==='file'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Archivo (PDF/Doc/Img)</span></label><label class="flex items-center gap-2"><input type="radio" name="sub-type" value="text" ${initType==='text'?'checked':''} class="bg-white text-slate-900 border border-slate-300"> <span class="text-sm">Texto</span></label></div></div>
                 <div id="sub-link"><input id="sub-url" type="url" placeholder="https://..." value="${escapeHTML(existing&&existing.type==='link'?existing.content:'')}" class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300"></div>
-                <div id="sub-file-wrap" class="hidden"><input id="sub-file-input" type="file" accept=".pdf,.doc,.docx,image/*" class="w-full px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage sin saturar la base de datos.</p>${existing&&existing.fileName?`<p class="text-xs text-slate-500 mt-1">Archivo actual: <strong>${escapeHTML(existing.fileName)}</strong></p>`:''}</div>
+                <div id="sub-file-wrap" class="hidden"><input id="sub-file-input" type="file" accept=".pdf,.doc,.docx,image/*" class="w-full px-3 py-2.5 border rounded-lg text-sm bg-white text-slate-900 border-slate-300"><p class="text-[11px] text-emerald-700 mt-1"><i class="fas fa-cloud-upload-alt mr-1"></i>Se sube mediante Media.subir al Storage sin saturar la base de datos.</p>${existing&&existing.fileName?`<p class="text-xs text-slate-500 mt-1">Archivo actual: <strong>${escapeHTML(existing.fileName)}</strong></p>`:''}
+                ${miEntrega.length?renderMaterialsSection(miEntrega, 'mi-entrega-pdf-', 'Tu entrega actual'):''}</div>
                 <div id="sub-text" class="hidden"><textarea id="sub-textarea" rows="4" placeholder="Escribe tu respuesta..." class="w-full px-3 py-2.5 border rounded-lg bg-white text-slate-900 border-slate-300">${escapeHTML(existing&&existing.type==='text'?existing.content:'')}</textarea></div>
                 ${existing && existing.feedback?`<div class="p-3 bg-amber-50 border border-amber-200 rounded-lg"><p class="text-xs font-medium text-amber-800">Retroalimentación del maestro:</p><p class="text-sm text-amber-900 mt-1">${escapeHTML(existing.feedback)}</p>${existing.grade!=null?`<p class="text-sm font-semibold mt-1">Calificación: ${existing.grade}/100</p>`:''}</div>`:''}
                 <div class="flex gap-3 pt-2"><button type="button" data-bx-click="a1" class="flex-1 px-4 py-2.5 border rounded-lg">Cerrar</button>${!existing||existing.status!=='revisado'?`<button id="sub-save-btn" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg">${existing?'Actualizar':'Entregar'}</button>`:''}</div>
@@ -13402,6 +13740,8 @@ END:VCALENDAR`;
                 document.getElementById('sub-file-wrap').classList.toggle('hidden', type!=='file');
                 document.getElementById('sub-text').classList.toggle('hidden', type!=='text');
             };
+            pintarPdfsMateriales(t.materials);
+            pintarPdfsMateriales(miEntrega, 'mi-entrega-pdf-');
             document.querySelectorAll('input[name="sub-type"]').forEach(r=>r.onchange=toggle); toggle();
             document.getElementById('submit-form').onsubmit = async e=>{
                 e.preventDefault();

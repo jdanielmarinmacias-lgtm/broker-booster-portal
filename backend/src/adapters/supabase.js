@@ -546,9 +546,20 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     const touched = [...wanted].filter((c) => c !== 'users' && c !== 'auditoria');
     if (touched.length) {
       try {
-        const { data: existing } = await withRetry(
-          () => sb.from('documents').select('collection,doc_id').in('collection', touched), 2);
-        const stale = (existing || []).filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
+        /* Paginado: PostgREST devuelve como mucho 1000 filas por consulta. Sin
+         * paginar, los borrados que caen más allá de esa ventana nunca se
+         * eliminaban de la base y reaparecían en la siguiente carga. */
+        const existing = [];
+        for (let from = 0; ; from += 1000) {
+          const { data: page } = await withRetry(
+            () => sb.from('documents').select('collection,doc_id').in('collection', touched)
+              .order('collection', { ascending: true }).order('doc_id', { ascending: true })
+              .range(from, from + 999), 2);
+          const rowsPage = page || [];
+          existing.push(...rowsPage);
+          if (rowsPage.length < 1000) break;
+        }
+        const stale = existing.filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
         for (const r of stale) {
           try {
             await sb.from('documents').delete().eq('collection', r.collection).eq('doc_id', r.doc_id);

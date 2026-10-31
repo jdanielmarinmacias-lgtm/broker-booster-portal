@@ -45,6 +45,15 @@ function createStore(adapter) {
     cacheAt = Date.now();
     hydrateAudit();
   }
+  /* Aplica una colección recargada desde la base. Si la base ya no tiene filas
+   * de esa colección, la caché debe quedar vacía: antes se conservaba la copia
+   * vieja y el siguiente guardado de otra instancia reescribía los borrados. */
+  function applySubset(subset, col) {
+    if (col in subset) { cache[col] = subset[col]; return; }
+    const prev = cache[col];
+    if (Array.isArray(prev)) cache[col] = [];
+    else if (prev && typeof prev === 'object') cache[col] = {};
+  }
 
   return {
     adapter,
@@ -74,9 +83,7 @@ function createStore(adapter) {
       if (!list.length) return this.refreshIfStale();
       if (typeof adapter.loadCollections !== 'function') return this.refreshIfStale();
       const subset = await adapter.loadCollections(list);
-      for (const col of list) {
-        if (col in subset) cache[col] = subset[col];
-      }
+      for (const col of list) applySubset(subset, col);
       cacheAt = Date.now();
       return true;
     },
@@ -89,9 +96,7 @@ function createStore(adapter) {
       if (Array.isArray(collections) && collections.length && typeof adapter.loadCollections === 'function') {
         if (!list.length) return;
         const subset = await adapter.loadCollections(list);
-        for (const col of list) {
-          if (col in subset) cache[col] = subset[col];
-        }
+        for (const col of list) applySubset(subset, col);
         cacheAt = Date.now();
         if (!auditSeen) hydrateAudit();
         return;

@@ -303,6 +303,33 @@
       if (Array.isArray(db[k]) || isPlain(db[k])) shadow[k] = clone(db[k]);
     });
     if (usersPulled && Array.isArray(db.users)) shadow.users = clone(db.users);
+    saveSyncedIds();
+  }
+
+  /* La sombra vive solo en memoria: al recargar la página se perdía y todo lo
+   * que el servidor ya había borrado volvía a parecer "nuevo" y se re-subía.
+   * Guardamos solo los ids confirmados por el servidor (ligero) para que sobrevivan
+   * a la recarga. */
+  var SYNCED_IDS_KEY = 'pepes_sync_ids_v1';
+  function saveSyncedIds() {
+    try {
+      var ids = {};
+      Object.keys(shadow || {}).forEach(function (k) {
+        if (Array.isArray(shadow[k])) ids[k] = shadow[k].map(function (x) { return String(x && x.id); });
+      });
+      localStorage.setItem(SYNCED_IDS_KEY, JSON.stringify(ids));
+    } catch (e) { /* localStorage lleno: se usa solo la sombra en memoria */ }
+  }
+  function loadSyncedIds() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(SYNCED_IDS_KEY) || 'null');
+      if (!raw || typeof raw !== 'object') return null;
+      var out = {};
+      Object.keys(raw).forEach(function (k) {
+        if (Array.isArray(raw[k])) out[k] = raw[k].map(function (id) { return { id: id }; });
+      });
+      return out;
+    } catch (e) { return null; }
   }
 
   // Mutex: los pulls nunca se intercalan (un pull que reemplaza mientras otro
@@ -329,7 +356,7 @@
       if (SKIP[n] || n === 'users') return;
       if (Array.isArray(db[n]) || isPlain(db[n])) pre[n] = clone(db[n]);
     });
-    const prevShadow = shadow ? clone(shadow) : null;
+    const prevShadow = shadow ? clone(shadow) : loadSyncedIds();
     pulled = {}; usersPulled = false;
     try {
       await pullBundle();
@@ -732,6 +759,20 @@
     if (pushTimer) clearTimeout(pushTimer);
     pushTimer = setTimeout(pushNow, 1500);
   }
+
+  /* Si la pestaña se oculta o se recarga con un envío pendiente (p. ej. un borrado
+   * dentro de la ventana de 1,5 s), se envía ya: si no, el registro sigue en la base
+   * y reaparece en la siguiente carga. */
+  function flushPendingPush() {
+    if (!active || !pushTimer) return;
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    pushNow();
+  }
+  window.addEventListener('pagehide', flushPendingPush);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flushPendingPush();
+  });
 
   /* Envuelve el saveDB final del legacy (respeta sus wrappers previos). */
   /* Traduce fallos de red a mensajes accionables (no "Sin conexión" genérico). */
