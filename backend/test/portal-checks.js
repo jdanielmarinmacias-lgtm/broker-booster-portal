@@ -413,6 +413,61 @@ describe('secretos fuera del bundle (Fase 0)', () => {
   });
 });
 
+describe('Gu-IA: controles del chat', () => {
+  function entorno() {
+    const vm = require('node:vm');
+    const src = fs.readFileSync(LEGACY, 'utf8');
+    const bloque = src.slice(src.indexOf('function guiaMount(){'), src.indexOf('\nfunction cmCategorias(){'));
+    const elementos = {};
+    function elemento(id) {
+      return elementos[id] || (elementos[id] = {
+        id, innerHTML: '', value: '', placeholder: '', disabled: false, listeners: {}, attrs: {},
+        classList: { add() {}, remove() {} },
+        setAttribute(k,v) { this.attrs[k] = v; }, addEventListener(k,fn) { this.listeners[k] = fn; },
+        focus() {}, appendChild() {}, remove() {},
+      });
+    }
+    const avisos = [], guardado = [], copias = [];
+    const ctx = {
+      window: { confirm: () => true, Backend: { available: true }, IA: { chat: async () => ({ ok: false, status: 429, json: async () => ({ error: 'límite' }) }) } },
+      document: { getElementById: elemento, createElement: () => elemento('creado'), body: { appendChild() {} } },
+      navigator: { clipboard: { writeText: async (t) => copias.push(t) } },
+      guiaGetChat: () => guardado.slice(), guiaSaveChat: (v) => { guardado.splice(0, guardado.length, ...v); },
+      guiaRegistrar() {}, guiaContexto: () => '', guiaBaseContexto: () => '',
+      psEscape: (t) => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
+      showToast: (t) => avisos.push(t), GUIA_SYS: '', GUIA_MODEL: 'test', setTimeout,
+    };
+    vm.createContext(ctx);
+    vm.runInContext("let guiaEl=null, guiaOpen=false, guiaMsgs=null, guiaBusy=false, guiaRecognition=null, guiaMicOn=false, guiaDocText='';\n" + bloque, ctx);
+    return { ctx, elementos, elemento, avisos, guardado, copias };
+  }
+
+  it('prepara un atajo sin enviarlo, copia respuestas y permite quitar adjuntos', async () => {
+    const vm = require('node:vm');
+    const {ctx, elemento, copias} = entorno();
+    // Simula que el contenedor todavía no existe para montar los controles.
+    const get = ctx.document.getElementById; let primera = true;
+    ctx.document.getElementById = (id) => id === 'guia-fab' && primera ? (primera = false, null) : get(id);
+    ctx.guiaMount();
+    const texto = 'Ayúdame a preparar un primer contacto con un prospecto.';
+    elemento('guia-msgs').listeners.click({target:{closest: (s) => s === '[data-guia-prompt]' ? { getAttribute: () => texto } : null}});
+    assert.equal(elemento('guia-input').value, texto);
+    vm.runInContext("guiaMsgs=[{rol:'guia',texto:'Respuesta ficticia'}]; guiaDocText='contenido';", ctx);
+    await ctx.guiaCopiarRespuesta(0);
+    assert.deepEqual(copias, ['Respuesta ficticia']);
+    ctx.guiaQuitarDocumento();
+    assert.equal(vm.runInContext('guiaDocText', ctx), '');
+  });
+
+  it('muestra el error de cuota y reactiva el envío', async () => {
+    const {ctx, elemento, guardado} = entorno();
+    elemento('guia-input').value = 'Hola';
+    await ctx.guiaSend();
+    assert.match(guardado[1].texto, /muchas consultas/);
+    assert.equal(elemento('guia-send').disabled, false);
+  });
+});
+
 /* ---- 10) Teo: presupuesto para el razonamiento ----------------------- */
 
 describe('Teo con el modelo de razonamiento', () => {

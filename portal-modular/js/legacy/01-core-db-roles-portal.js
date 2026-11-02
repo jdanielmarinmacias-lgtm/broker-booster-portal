@@ -3884,40 +3884,45 @@ function guiaMount(){
   if(document.getElementById('guia-fab')) return;
   const fab=document.createElement('div'); fab.id='guia-fab';
   fab.innerHTML=`
-  <button id="guia-fab-btn" title="GUIA — tu asesor IA (clic derecho: limpiar chat)" class="fixed bottom-20 right-5 z-[60] w-14 h-14 rounded-full bg-gradient-to-br from-[var(--bb-forest)] to-[var(--bb-emerald)] text-white shadow-2xl border-2 border-[var(--bb-gold)] hover:scale-105 transition grid place-items-center text-xl">🤖</button>
-  <div id="guia-panel" class="hidden fixed bottom-36 right-5 z-[60] w-[380px] max-w-[92vw] h-[560px] max-h-[72vh] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-    <div class="px-4 py-3 bg-gradient-to-r from-[var(--bb-forest)] to-[var(--bb-emerald)] text-white flex items-center gap-3 border-b-2 border-[var(--bb-gold)]">
-      <div class="w-9 h-9 rounded-full bg-white/20 grid place-items-center text-lg">🤖</div>
-      <div class="flex-1 min-w-0">
-        <div class="font-bold text-sm leading-tight">Gu-IA</div>
-        <div class="text-[11px] text-white/80">Asesor senior IA · siempre directo</div>
-      </div>
-      <button id="guia-voz-btn" title="Voz de GUIA" class="px-2 py-1 rounded-lg bg-white/20 text-xs">🔊</button>
-      <button id="guia-close" class="p-1.5 rounded-lg hover:bg-white/20">✕</button>
+  <button id="guia-fab-btn" class="guia-launcher" type="button" aria-label="Abrir Gu-IA" aria-controls="guia-panel" aria-expanded="false" title="Abrir Gu-IA">
+    <span class="guia-symbol" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i><span>G</span></span><span class="guia-launcher-label">Gu-IA <small>Tu copiloto comercial</small></span><span class="guia-launcher-arrow" aria-hidden="true">↗</span>
+  </button>
+  <section id="guia-panel" class="guia-panel hidden" role="dialog" aria-label="Conversación con Gu-IA">
+    <header class="guia-header">
+      <div class="guia-header-top"><div class="guia-brand"><span class="guia-symbol guia-symbol-small" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i><span>G</span></span><div><span class="guia-eyebrow">BROKER BOOSTER <span> / </span> INTELIGENCIA COMERCIAL</span><h2>Gu-IA<span class="guia-brand-dot">.</span></h2></div></div>
+        <div class="guia-header-actions"><button id="guia-voz-btn" type="button" class="guia-header-btn" title="Activar voz" aria-label="Activar voz" aria-pressed="false"><i class="fas fa-volume-xmark" aria-hidden="true"></i></button><button id="guia-clear" type="button" class="guia-header-btn" title="Nueva conversación" aria-label="Nueva conversación"><i class="fas fa-rotate-left" aria-hidden="true"></i></button><button id="guia-close" type="button" class="guia-header-btn" title="Cerrar Gu-IA" aria-label="Cerrar Gu-IA"><i class="fas fa-xmark" aria-hidden="true"></i></button></div>
+      </div><p>Tu copiloto para pensar, preparar y avanzar.</p>
+      <div class="guia-header-meta"><span><i class="fas fa-circle" aria-hidden="true"></i> ASISTENTE COMERCIAL</span><span>HECHO PARA TUS IDEAS</span></div>
+    </header>
+    <div id="guia-msgs" class="guia-messages" aria-live="polite" aria-label="Mensajes de Gu-IA"></div>
+    <div id="guia-doc-zone" class="guia-doc-zone hidden"></div>
+    <div class="guia-composer">
+      <div class="guia-composer-box"><textarea id="guia-input" rows="2" aria-label="Escribe tu consulta" placeholder="Escribe lo que necesitas resolver…"></textarea>
+        <div class="guia-composer-actions"><div class="guia-tools"><label id="guia-attach" title="Adjuntar documento (PDF, TXT, CSV, MD o JSON)" class="guia-tool"><i class="fas fa-paperclip" aria-hidden="true"></i><span class="guia-sr-only">Adjuntar documento</span><input id="guia-file" type="file" accept=".pdf,.txt,.csv,.md,.json" class="guia-sr-only" multiple></label><button id="guia-mic" type="button" class="guia-tool" title="Hablar con Gu-IA" aria-label="Hablar con Gu-IA"><i class="fas fa-microphone" aria-hidden="true"></i></button><span class="guia-tool-hint">Adjunta o dicta</span></div><button id="guia-send" type="button" class="guia-send" aria-label="Enviar consulta"><span>Enviar</span><i class="fas fa-arrow-up" aria-hidden="true"></i></button></div>
+      </div><p class="guia-disclaimer">Verifica la información importante. Las consultas y documentos se envían al proveedor de IA; algunas consultas también usan búsqueda web.</p>
     </div>
-    <div id="guia-msgs" class="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/70"></div>
-    <div id="guia-doc-zone" class="hidden px-3 pb-1"></div>
-    <div class="p-3 border-t border-slate-200 bg-white">
-      <div class="flex items-end gap-2">
-        <label id="guia-attach" title="Adjuntar documento (PDF, TXT, CSV, MD)" class="p-2 rounded-xl border border-slate-300 text-slate-500 hover:bg-slate-50 cursor-pointer"><i class="fas fa-paperclip"></i><input id="guia-file" type="file" accept=".pdf,.txt,.csv,.md,.json" class="hidden" multiple></label>
-        <textarea id="guia-input" rows="1" placeholder="¿Qué necesitamos resolver hoy?" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900 resize-none outline-none focus:ring-2 focus:ring-[var(--bb-gold)]"></textarea>
-        <button id="guia-mic" title="Hablarle a GUIA" class="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50"><i class="fas fa-microphone"></i></button>
-        <button id="guia-send" class="px-3 py-2 rounded-xl bg-[var(--bb-forest)] text-white hover:bg-[var(--bb-emerald)]"><i class="fas fa-paper-plane"></i></button>
-      </div>
-    </div>
-  </div>`;
+  </section>`;
   document.body.appendChild(fab);
   document.getElementById('guia-fab-btn').onclick=()=>{ guiaOpen?guiaHide():guiaShow(); };
-  document.getElementById('guia-fab-btn').oncontextmenu=(e)=>{ e.preventDefault(); if(window.confirm('¿Borrar TODA tu conversación con GUIA?')){ guiaSaveChat([]); guiaMsgs=null; if(guiaEl){ document.getElementById('guia-msgs').innerHTML=''; } guiaRenderMsgs(); } };
+  document.getElementById('guia-fab-btn').oncontextmenu=(e)=>{ e.preventDefault(); guiaNuevaConversacion(); };
+  document.getElementById('guia-clear').onclick=guiaNuevaConversacion;
   document.getElementById('guia-close').onclick=()=>guiaHide();
-  document.getElementById('guia-voz-btn').onclick=()=>{ window.guiaVozOn=!window.guiaVozOn; const b=document.getElementById('guia-voz-btn'); b.textContent=window.guiaVozOn?'🔊':'🔇'; if(window.guiaVozOn) guiaSay('Voz activada'); };
+  document.getElementById('guia-panel').addEventListener('keydown',e=>{ if(e.key==='Escape'){ e.preventDefault(); guiaHide(); document.getElementById('guia-fab-btn').focus(); } });
+  document.getElementById('guia-msgs').addEventListener('click',e=>{
+    const suggestion=e.target.closest('[data-guia-prompt]');
+    if(suggestion){ const input=document.getElementById('guia-input'); if(input){ input.value=suggestion.getAttribute('data-guia-prompt'); input.focus(); } return; }
+    const copy=e.target.closest('[data-guia-copy]');
+    if(copy) guiaCopiarRespuesta(Number(copy.getAttribute('data-guia-copy')));
+  });
+  document.getElementById('guia-doc-zone').addEventListener('click',e=>{ if(e.target.closest('#guia-doc-remove')) guiaQuitarDocumento(); });
+  document.getElementById('guia-voz-btn').onclick=()=>{ window.guiaVozOn=!window.guiaVozOn; guiaVozBtn(); if(window.guiaVozOn) guiaSay('Voz activada'); else if(window.speechSynthesis) speechSynthesis.cancel(); };
   document.getElementById('guia-send').onclick=()=>guiaSend();
   const ri=document.getElementById('guia-input');
   ri.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); guiaSend(); } });
   document.getElementById('guia-file').onchange=(e)=>{ const fs=[...e.target.files]; fs.forEach(guiaLeerDocumento); e.target.value=''; };
   document.getElementById('guia-mic').onclick=()=>guiaToggleMic();
   if(window.guiaVozOn===undefined) window.guiaVozOn=false;
-  guiaRenderMsgs();
+  guiaVozBtn(); guiaRenderMsgs();
 }
 /* Traduce fallos de red o del proveedor a un mensaje útil (sin texto crudo). */
 function guiaMensajeError(e){
@@ -3927,13 +3932,17 @@ function guiaMensajeError(e){
   if(/Failed to fetch|NetworkError|network/i.test(m)) return '⚠️ Sin conexión con Gu-IA. Revisa tu internet e intenta de nuevo.';
   return '⚠️ Gu-IA no pudo responder en este momento. Intenta de nuevo.';
 }
-function guiaShow(){ guiaOpen=true; const p=document.getElementById('guia-panel'); if(p){ p.classList.remove('hidden'); guiaRenderMsgs(); setTimeout(()=>{ const i=document.getElementById('guia-input'); if(i) i.focus(); },80); } }
-function guiaHide(){ guiaOpen=false; const p=document.getElementById('guia-panel'); if(p) p.classList.add('hidden'); if(guiaMicOn) guiaToggleMic(); }
-function guiaBurbuja(m){
-  if(m.rol==='user') return `<div class="flex justify-end"><div class="max-w-[80%] bg-indigo-600 text-white rounded-2xl rounded-br-md px-3 py-2 text-sm shadow-sm">${psEscape(m.texto)}</div></div>`;
-  const doc=m.doc?`<div class="mt-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2 py-1 inline-block">📎 ${psEscape(m.doc)}</div><br>`:'';
-  const agn=m.agenda?`<div class="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-[12px] text-emerald-800">📅 Agendado en tu agenda del portal: <strong>${psEscape(m.agenda.titulo)}</strong> — ${psEscape(new Date(m.agenda.inicio).toLocaleString('es-MX'))}</div>`:'';
-  return `<div class="flex justify-start"><div class="max-w-[85%] bg-white border border-slate-200 rounded-2xl rounded-bl-md px-3 py-2 text-sm text-slate-800 shadow-sm">${doc}${guiaFmt(m.texto)}${agn}</div></div>`;
+function guiaShow(){ guiaOpen=true; const p=document.getElementById('guia-panel'); const b=document.getElementById('guia-fab-btn'); if(b) b.setAttribute('aria-expanded','true'); if(p){ p.classList.remove('hidden'); guiaRenderMsgs(); setTimeout(()=>{ const i=document.getElementById('guia-input'); if(i) i.focus(); },80); } }
+function guiaHide(){ guiaOpen=false; const p=document.getElementById('guia-panel'); const b=document.getElementById('guia-fab-btn'); if(b) b.setAttribute('aria-expanded','false'); if(p) p.classList.add('hidden'); if(guiaMicOn) guiaToggleMic(); }
+function guiaVozBtn(){ const b=document.getElementById('guia-voz-btn'); if(!b) return; b.setAttribute('aria-pressed',String(!!window.guiaVozOn)); b.setAttribute('aria-label',window.guiaVozOn?'Desactivar voz':'Activar voz'); b.title=window.guiaVozOn?'Desactivar voz':'Activar voz'; b.innerHTML=window.guiaVozOn?'<i class="fas fa-volume-high" aria-hidden="true"></i>':'<i class="fas fa-volume-xmark" aria-hidden="true"></i>'; }
+function guiaNuevaConversacion(){ if(guiaBusy){ showToast('Espera a que termine la respuesta antes de iniciar otra conversación','warning'); return; } if(!window.confirm('¿Borrar tu conversación con Gu-IA?')) return; guiaSaveChat([]); guiaMsgs=null; guiaQuitarDocumento(); guiaRenderMsgs(); }
+function guiaQuitarDocumento(){ guiaDocText=''; const z=document.getElementById('guia-doc-zone'); if(z){ z.classList.add('hidden'); z.innerHTML=''; } const i=document.getElementById('guia-input'); if(i) i.placeholder='Escribe lo que necesitas resolver…'; }
+async function guiaCopiarRespuesta(i){ const m=(guiaMsgs||[])[i]; if(!m || m.rol==='user') return; try{ if(!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('no disponible'); await navigator.clipboard.writeText(m.texto||''); showToast('Respuesta copiada','success'); }catch(e){ showToast('No se pudo copiar; selecciona el texto manualmente','warning'); } }
+function guiaBurbuja(m,i){
+  if(m.rol==='user') return `<div class="guia-message guia-message-user"><div class="guia-bubble guia-bubble-user">${psEscape(m.texto)}${m.doc?'<div class="guia-user-doc"><i class="fas fa-paperclip" aria-hidden="true"></i> Documento adjunto</div>':''}</div></div>`;
+  const doc=m.doc?`<div class="guia-document-label"><i class="fas fa-paperclip" aria-hidden="true"></i> ${psEscape(m.doc)}</div>`:'';
+  const agn=m.agenda?`<div class="guia-agenda"><i class="fas fa-calendar-check" aria-hidden="true"></i> Agendado: <strong>${psEscape(m.agenda.titulo)}</strong> — ${psEscape(new Date(m.agenda.inicio).toLocaleString('es-MX'))}</div>`:'';
+  return `<div class="guia-message guia-message-assistant"><span class="guia-avatar" aria-hidden="true">G</span><div class="guia-response"><div class="guia-message-name">GU-IA <span> / </span> COPILOTO COMERCIAL</div><div class="guia-bubble guia-bubble-assistant">${doc}${guiaFmt(m.texto)}${agn}</div><button type="button" class="guia-copy" data-guia-copy="${i}" aria-label="Copiar respuesta"><i class="far fa-copy" aria-hidden="true"></i> Copiar respuesta</button></div></div>`;
 }
 function guiaFmt(t){
   let h=psEscape(String(t||'')).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(?!\s)([^*\n]+?)\*/g,'<em>$1</em>').replace(/\n/g,'<br>');
@@ -3969,7 +3978,7 @@ function guiaRenderMsgs(){
   const box=document.getElementById('guia-msgs'); if(!box) return;
   guiaMsgs=guiaMsgs||guiaGetChat();
   if(!guiaMsgs.length){
-    box.innerHTML=`<div class="text-center py-6 px-3"><div class="text-3xl mb-2">🤖</div><div class="font-bold text-slate-800 text-sm">Soy Gu-IA.</div><p class="text-xs text-slate-500 mt-1">Tu colega IA dentro del portal: dudas de producto y ventas, analizo pólizas y documentos que me pases, y te agendo en tu agenda. Habla o escribe, y vamos al grano.</p></div>`;
+    box.innerHTML=`<div class="guia-welcome"><div class="guia-welcome-mark"><span class="guia-symbol guia-symbol-welcome" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i><span>G</span></span><span class="guia-welcome-index">01 / TU ESPACIO</span></div><span class="guia-welcome-kicker">TU COPILOTO COMERCIAL</span><h3>Buenas ideas,<br><em>mejores conversaciones.</em></h3><p>Soy Gu-IA. Hagamos más sencillo tu próximo paso comercial.</p><div class="guia-suggestion-title"><span>EMPIEZA POR AQUÍ</span><span>↘</span></div><div class="guia-suggestions"><button type="button" data-guia-prompt="Ayúdame a preparar un primer contacto con un prospecto."><span class="guia-suggestion-icon"><i class="fas fa-comment-dots" aria-hidden="true"></i></span><span><strong>Preparar un contacto</strong><small>Inicia una conversación con confianza</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></button><button type="button" data-guia-prompt="Ayúdame a manejar una objeción de un prospecto. Primero pregúntame cuál es."><span class="guia-suggestion-icon"><i class="fas fa-lightbulb" aria-hidden="true"></i></span><span><strong>Resolver una objeción</strong><small>Encuentra una respuesta clara</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></button><button type="button" data-guia-prompt="Ayúdame a organizar mis siguientes pasos comerciales."><span class="guia-suggestion-icon"><i class="fas fa-list-check" aria-hidden="true"></i></span><span><strong>Planear mis próximos pasos</strong><small>Ordena lo importante de hoy</small></span><i class="fas fa-arrow-right" aria-hidden="true"></i></button></div></div>`;
     return;
   }
   box.innerHTML=guiaMsgs.map(guiaBurbuja).join('');
@@ -3993,7 +4002,7 @@ async function guiaLeerDocumento(file){
     }
     guiaDocText=(guiaDocText?guiaDocText+'\n\n':'')+text.slice(0,60000);
     const dz=document.getElementById('guia-doc-zone');
-    if(dz){ dz.classList.remove('hidden'); dz.innerHTML='<div class="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2 py-1 mb-1">📎 <strong>'+psEscape(name)+'</strong> listo para analizar ('+Math.round(text.length/1024)+' KB)</div>'; }
+    if(dz){ dz.classList.remove('hidden'); dz.innerHTML='<div class="guia-document-chip"><i class="fas fa-file-lines" aria-hidden="true"></i><span><strong>'+psEscape(name)+'</strong> listo para analizar</span><button id="guia-doc-remove" type="button" aria-label="Quitar documentos adjuntos" title="Quitar documentos"><i class="fas fa-xmark" aria-hidden="true"></i></button></div>'; }
     const inp=document.getElementById('guia-input'); if(inp) inp.placeholder='Documento cargado. Pregúntame lo que quieras sobre él…';
   }catch(e){ showToast('No pude leer '+name+': '+e.message,'error'); }
 }
@@ -4005,7 +4014,8 @@ async function guiaSend(){
   if(!texto&&!tieneDoc) return;
   if(!texto&&tieneDoc){ if(inp) inp.value='Analiza este documento y dime lo importante: qué es, riesgos, fechas y qué acciones recomiendas.'; return guiaSend(); }
   guiaBusy=true;
-  if(inp){ inp.value=''; inp.placeholder='¿Qué necesitamos resolver hoy?'; }
+  if(inp){ inp.value=''; inp.placeholder='Escribe lo que necesitas resolver…'; }
+  const sendBtn=document.getElementById('guia-send'); if(sendBtn) sendBtn.disabled=true;
   const dz=document.getElementById('guia-doc-zone');
   if(dz){ dz.classList.add('hidden'); dz.innerHTML=''; }
   const arr=guiaMsgs||guiaGetChat();
@@ -4013,7 +4023,7 @@ async function guiaSend(){
   guiaSaveChat(arr); guiaRenderMsgs();
   const box=document.getElementById('guia-msgs');
   const th=document.createElement('div'); th.id='guia-typing'; th.className='flex justify-start';
-  th.innerHTML='<div class="bg-white border border-slate-200 rounded-2xl px-3 py-2 text-sm text-slate-400">GUIA está pensando…</div>';
+  th.innerHTML='<div class="guia-thinking"><span class="guia-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span> Gu-IA está preparando tu respuesta…</div>';
   if(box){ box.appendChild(th); box.scrollTop=box.scrollHeight; }
   let respuesta='';
   try{
@@ -4028,7 +4038,7 @@ async function guiaSend(){
     const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'};
     const res=usarServidor ? await window.IA.chat(payload) : await window.IA.completar(payload);
     const j=await res.json();
-    if(j.error) throw new Error(j.error.message||'API error');
+    if(!res.ok || j.error) throw new Error('HTTP '+res.status+': '+((typeof j.error==='string' ? j.error : (j.error&&j.error.message)) || 'error de IA'));
     respuesta=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'').trim()||'Me quedé sin palabras (respuesta vacía). Insiste o reformula.';
     guiaRegistrar(texto,'ok');
   }catch(e){ respuesta=guiaMensajeError(e); guiaRegistrar(texto,'error: '+(e&&e.message||'desconocido')); }
@@ -4039,7 +4049,7 @@ async function guiaSend(){
   arr.push({rol:'guia', texto:respuesta, ts:Date.now(), doc:tieneDoc?'documento adjunto':undefined, agenda:agendado||undefined});
   guiaSaveChat(arr); guiaRenderMsgs();
   if(window.guiaVozOn) guiaSay(respuesta);
-  guiaBusy=false;
+  guiaBusy=false; if(sendBtn) sendBtn.disabled=false;
 }
 function guiaDetectarAgenda(t){
   const tL=String(t||'').toLowerCase();
@@ -4082,8 +4092,9 @@ function guiaToggleMic(){
 }
 function guiaMicBtn(){
   const b=document.getElementById('guia-mic'); if(!b) return;
-  b.className=guiaMicOn?'p-2 rounded-xl bg-rose-600 text-white animate-pulse':'p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50';
-  b.innerHTML=guiaMicOn?'<i class="fas fa-stop"></i>':'<i class="fas fa-microphone"></i>';
+  b.className=guiaMicOn?'guia-tool guia-tool-recording':'guia-tool';
+  b.setAttribute('aria-label',guiaMicOn?'Detener micrófono':'Hablar con Gu-IA'); b.title=guiaMicOn?'Detener micrófono':'Hablar con Gu-IA';
+  b.innerHTML=guiaMicOn?'<i class="fas fa-stop" aria-hidden="true"></i>':'<i class="fas fa-microphone" aria-hidden="true"></i>';
 }
 function guiaSay(text){ if(!window.guiaVozOn) return; try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(String(text).replace(/[*#_`]/g,'').slice(0,400)); u.lang='es-MX'; u.rate=1.05; speechSynthesis.speak(u); }catch(e){} }
 function guiaMountForUser(){
