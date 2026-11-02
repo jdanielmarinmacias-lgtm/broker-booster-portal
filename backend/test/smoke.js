@@ -94,6 +94,34 @@ describe('auth propio', () => {
     assert.equal(r.json.user.username, 'admin');
     assert.ok(!('passwordHash' in r.json.user) && !('password' in r.json.user));
   });
+  it('informa la restricción de cuota sin exponer el error del proveedor ni iniciar sesión', async () => {
+    const original = store.adapter.getUserByUsername;
+    store.adapter.getUserByUsername = async () => { throw new Error('Supabase user: Service restricted: exceed_egress_quota'); };
+    try {
+      const r = await fetch(base + '/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'Test1234*' }),
+      });
+      const body = await r.json();
+      assert.equal(r.status, 503);
+      assert.equal(body.backend, true);
+      assert.equal(body.retryable, false);
+      assert.match(body.error, /cuota de transferencia/);
+      assert.doesNotMatch(body.error, /exceed_egress_quota/);
+      assert.equal(r.headers.get('set-cookie'), null);
+    } finally { store.adapter.getUserByUsername = original; }
+  });
+  it('/me distingue la restricción de cuota de una sesión inválida', async () => {
+    const original = store.adapter.getSession;
+    store.adapter.getSession = async () => { throw new Error('Supabase session: exceed_egress_quota'); };
+    try {
+      const r = await api('GET', '/api/auth/me');
+      assert.equal(r.status, 503);
+      assert.equal(r.json.backend, true);
+      assert.equal(r.json.retryable, false);
+      assert.match(r.json.error, /cuota de transferencia/);
+    } finally { store.adapter.getSession = original; }
+  });
   it('cambio de contraseña rota el hash y quita el flag', async () => {
     const r = await api('POST', '/api/auth/change-password', { current: 'Test1234*', next: 'NuevaClave99' });
     assert.equal(r.status, 200);

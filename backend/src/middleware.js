@@ -41,6 +41,7 @@ function loadSession(store) {
        * "loginAttempts/settings (HTTP 401: No autenticado)" y dejaba de
        * sincronizar por una caída pasajera de la base. */
       req.sessionLookupFailed = true;
+      req.dataQuotaExceeded = isDataQuotaExceeded(e);
       console.error('[backend] sesión no verificable:', e.message);
     }
     next();
@@ -55,12 +56,21 @@ function refreshCache(store) {
   };
 }
 
+function isDataQuotaExceeded(err) {
+  return /exceed_egress_quota/i.test(String(err && err.message || ''));
+}
+
+function dataUnavailable(res, quotaExceeded) {
+  if (quotaExceeded) {
+    return res.status(503).json({ ok: false, backend: true, retryable: false, error: 'El servicio de datos está restringido por su cuota de transferencia. Contacta al administrador del portal.' });
+  }
+  res.setHeader('Retry-After', '5');
+  return res.status(503).json({ ok: false, backend: true, retryable: true, error: 'No se puede verificar la sesión porque el servicio de datos no está disponible. Reintenta en unos segundos.' });
+}
+
 function requireAuth(req, res, next) {
   if (!req.user) {
-    if (req.sessionLookupFailed) {
-      res.setHeader('Retry-After', '5');
-      return res.status(503).json({ ok: false, backend: true, retryable: true, error: 'Base de datos ocupada: reintenta en unos segundos' });
-    }
+    if (req.sessionLookupFailed) return dataUnavailable(res, req.dataQuotaExceeded);
     return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
   }
   next();
@@ -68,10 +78,7 @@ function requireAuth(req, res, next) {
 
 const requireRole = (...allowed) => (req, res, next) => {
   if (!req.user) {
-    if (req.sessionLookupFailed) {
-      res.setHeader('Retry-After', '5');
-      return res.status(503).json({ ok: false, backend: true, retryable: true, error: 'Base de datos ocupada: reintenta en unos segundos' });
-    }
+    if (req.sessionLookupFailed) return dataUnavailable(res, req.dataQuotaExceeded);
     return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
   }
   if (!roles.hasRole(req.user, allowed)) {
@@ -183,12 +190,13 @@ async function forgiveLogin(req) {
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   console.error('[backend]', err);
+  // No confundir una restricción del proveedor con un fallo interno del portal.
+  if (isDataQuotaExceeded(err)) return dataUnavailable(res, true);
   /* Errores con status propio (413 por documento gigante, 409, etc.) llegan
    * con su código y su mensaje accionable. Antes TODO se volvía un 500
    * "Error interno" opaco: el portal no sabía qué arreglar. */
   const status = Number(err && (err.status || err.statusCode));
   if (status >= 400 && status < 500 && status !== 401 && err && err.message) {
-    if (status === 503) res.setHeader('Retry-After', '5');
     return res.status(status).json({ ok: false, retryable: status === 503, error: err.message });
   }
   res.status(500).json({ ok: false, error: 'Error interno' });

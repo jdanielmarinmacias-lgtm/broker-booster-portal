@@ -58,8 +58,7 @@ module.exports = (store) => {
     res.json({ ok: true });
   });
 
-  r.get('/me', (req, res) => {
-    if (!req.user) return res.status(401).json({ ok: false, backend: true, error: 'No autenticado' });
+  r.get('/me', mw.requireAuth, (req, res) => {
     res.json({ ok: true, user: req.user });
   });
 
