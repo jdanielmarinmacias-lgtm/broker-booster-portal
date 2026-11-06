@@ -68,7 +68,7 @@
    * CustomEvent('collection-version') para que sync.js haga pull quirúrgico
    * solo de esa colección. Funciona para TODAS (no solo las del feed) y
    * para ediciones/borrados (que no generan fila de feed). */
-  var lastVersions = {}; // collection -> updated_at (marca ya vista)
+  var lastVersions = Object.create(null); // collection -> última marca observada
   var versionsPrimed = false; // la primera carga solo calibra, no avisa
   function onVersion(collection) {
     if (!collection) return;
@@ -76,13 +76,22 @@
       document.dispatchEvent(new CustomEvent('collection-version', { detail: { collection: collection } }));
     } catch (e) { /* portada en otro estado: ignorar */ }
   }
+  function newerVersion(next, previous) {
+    if (!next) return false;
+    if (!previous) return true;
+    var a = Date.parse(next), b = Date.parse(previous);
+    return isFinite(a) && isFinite(b) ? a > b : String(next) > String(previous);
+  }
   function trackVersions(rows) {
+    var latest = Object.create(null);
     (rows || []).forEach(function (r) {
-      if (!r || !r.collection) return;
-      if (lastVersions[r.collection] !== r.updated_at) {
-        lastVersions[r.collection] = r.updated_at;
-        if (versionsPrimed) onVersion(r.collection);
-      }
+      if (!r || !r.collection || !r.updated_at) return;
+      if (newerVersion(r.updated_at, latest[r.collection])) latest[r.collection] = r.updated_at;
+    });
+    Object.keys(latest).forEach(function (collection) {
+      if (!newerVersion(latest[collection], lastVersions[collection])) return;
+      lastVersions[collection] = latest[collection];
+      if (versionsPrimed) onVersion(collection);
     });
     versionsPrimed = true;
   }
@@ -122,6 +131,7 @@
     try {
       const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
       const sb = mod.createClient(cfg.supabaseUrl, cfg.anonKey);
+      var versionsConnected = false;
       sb.channel('public-feed')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'public_feed' }, function (payload) {
           var row = payload.new || {};
@@ -131,8 +141,11 @@
            * quirúrgico de esa colección en los demás equipos. */
           var kind = String(row.kind || '');
           if (kind.indexOf('version:') === 0) {
-            versionsPrimed = true;
-            onVersion(kind.slice('version:'.length));
+            var collection = kind.slice('version:'.length);
+            if (collection && newerVersion(row.created_at, lastVersions[collection])) {
+              lastVersions[collection] = row.created_at;
+              onVersion(collection);
+            }
             return;
           }
           onItem(row);
@@ -142,49 +155,47 @@
       sb.channel('collection-versions')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_versions' }, function (payload) {
           var row = payload.new || {};
-          if (row.collection && lastVersions[row.collection] !== row.updated_at) {
+          if (row.collection && newerVersion(row.updated_at, lastVersions[row.collection])) {
             lastVersions[row.collection] = row.updated_at;
-            versionsPrimed = true;
             onVersion(row.collection);
           }
         })
-        .subscribe();
+        .subscribe(function (status) { versionsConnected = status === 'SUBSCRIBED'; });
       window.SupabaseFeed = sb;
-      // Calibra marcas iniciales (sin avisar) y deja sondeo ligero de
-      // respaldo: si el WebSocket se cae, los cambios llegan igual (45s).
-      // Solo lee la tabla de marcas (KBs), jamás los datos.
-      /* Sondeo de respaldo cada 45s. Si la tabla collection_versions no existe
-       * (migración sin ejecutar) se sondean las marcas 'version:<col>' de
-       * public_feed: mismo efecto y sin 404 repetidos en consola. */
+      // El feed alternativo solo se usa si la tabla realmente no existe o no
+      // se puede leer. Fallos transitorios y de cuota no cambian la fuente.
       var versionsSource = 'table';
-      (function pollVersions() {
-        var q = versionsSource === 'table'
-          ? sb.from('collection_versions').select('collection,updated_at')
-          : sb.from('public_feed').select('kind,created_at').like('kind', 'version:%')
-            .order('created_at', { ascending: false }).limit(200);
+      var nextTableProbe = 0;
+      var errors = 0;
+      async function pollVersions() {
+        var source = versionsSource === 'feed' && Date.now() >= nextTableProbe ? 'table' : versionsSource;
         try {
-          q.then(function (res) {
-            if (!res) return;
-            if (res.error) {
-              if (versionsSource === 'table') versionsSource = 'feed';
-              return;
+          var q = source === 'table'
+            ? sb.from('collection_versions').select('collection,updated_at')
+            : sb.from('public_feed').select('kind,created_at').like('kind', 'version:%')
+              .order('created_at', { ascending: false }).limit(200);
+          var res = await q;
+          if (res.error) {
+            if (source === 'table' && /^(42P01|42501|PGRST205)$/i.test(String(res.error.code || ''))) {
+              versionsSource = 'feed';
+              nextTableProbe = Date.now() + 5 * 60 * 1000;
             }
-            if (versionsSource === 'table') {
-              trackVersions(res.data);
-            } else {
-              trackVersions((res.data || []).map(function (r) {
-                return {
-                  collection: String(r.kind || '').slice('version:'.length),
-                  updated_at: r.created_at,
-                };
-              }));
-            }
-          }, function () {
-            if (versionsSource === 'table') versionsSource = 'feed';
-          });
-        } catch (e) {}
-        setTimeout(pollVersions, 45000);
-      })();
+            errors++;
+          } else {
+            errors = 0;
+            versionsSource = source;
+            trackVersions(source === 'table' ? res.data : (res.data || []).map(function (r) {
+              return { collection: String(r.kind || '').slice('version:'.length), updated_at: r.created_at };
+            }));
+          }
+        } catch (e) { errors++; }
+        // Realtime activo: comprobación de seguridad cada 5 min. Sin conexión:
+        // 45 s; en errores, espera progresiva hasta 5 min (incluye cuota).
+        var delay = errors ? Math.min(300000, 45000 * Math.pow(2, Math.min(errors, 3)))
+          : (versionsConnected ? 300000 : 45000);
+        setTimeout(pollVersions, delay);
+      }
+      pollVersions();
     } catch (e) { /* CDN bloqueado: modo sin realtime */ }
   }
 

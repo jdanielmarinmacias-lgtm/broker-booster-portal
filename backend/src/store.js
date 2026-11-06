@@ -32,6 +32,10 @@ function createStore(adapter) {
   let cache = {};
   let cacheAt = 0;
   let refreshPromise = null;
+  let cacheRevision = 0; // una carga completa no puede pisar cambios posteriores
+  let fullRevision = 0;
+  const collectionRevisions = new Map();
+  function markCollection(col) { collectionRevisions.set(col, ++cacheRevision); }
   /* Ids de auditoría ya presentes en el almacén (para subir SOLO las nuevas). */
   let auditSeen = null;
 
@@ -41,6 +45,8 @@ function createStore(adapter) {
     );
   }
   function setCache(next) {
+    fullRevision = ++cacheRevision;
+    collectionRevisions.clear();
     cache = next || {};
     cacheAt = Date.now();
     hydrateAudit();
@@ -49,6 +55,7 @@ function createStore(adapter) {
    * de esa colección, la caché debe quedar vacía: antes se conservaba la copia
    * vieja y el siguiente guardado de otra instancia reescribía los borrados. */
   function applySubset(subset, col) {
+    markCollection(col);
     if (col in subset) { cache[col] = subset[col]; return; }
     const prev = cache[col];
     if (Array.isArray(prev)) cache[col] = [];
@@ -66,9 +73,22 @@ function createStore(adapter) {
     set: (next) => setCache(next),
     async refreshIfStale() {
       const ttl = adapter.cacheTtlMs ?? Infinity;
-      if (Date.now() - cacheAt > ttl) {
+      if (cacheAt === 0 || Date.now() - cacheAt > ttl) {
         if (!refreshPromise) {
-          refreshPromise = adapter.loadDocuments().then((loaded) => setCache(loaded)).finally(() => {
+          const revision = cacheRevision;
+          refreshPromise = adapter.loadDocuments().then((loaded) => {
+            // Las rutas parciales y escrituras pueden completarse mientras la
+            // consulta estaba en vuelo; no reemplazar esas colecciones frescas.
+            if (fullRevision > revision) return;
+            const merged = loaded || {};
+            for (const [col, changedAt] of collectionRevisions) {
+              if (changedAt > revision) {
+                if (col in cache) merged[col] = cache[col];
+                else delete merged[col];
+              }
+            }
+            setCache(merged);
+          }).finally(() => {
             refreshPromise = null;
           });
         }
@@ -79,12 +99,11 @@ function createStore(adapter) {
      * >1000 documentos: recargar todo en cada GET de una colección tardaba
      * decenas de segundos y disparaba statement_timeout (HTTP 500). */
     async refreshCollections(names) {
-      const list = (names || []).filter((n) => n && n !== 'auditoria');
+      const list = (names || []).filter(Boolean);
       if (!list.length) return this.refreshIfStale();
       if (typeof adapter.loadCollections !== 'function') return this.refreshIfStale();
       const subset = await adapter.loadCollections(list);
       for (const col of list) applySubset(subset, col);
-      cacheAt = Date.now();
       return true;
     },
     /* Recarga INCONDICIONAL para rutas de escritura: en serverless la caché
@@ -97,20 +116,26 @@ function createStore(adapter) {
         if (!list.length) return;
         const subset = await adapter.loadCollections(list);
         for (const col of list) applySubset(subset, col);
-        cacheAt = Date.now();
         if (!auditSeen) hydrateAudit();
         return;
       }
       setCache(await adapter.loadDocuments());
     },
     async persist() {
-      await adapter.saveDocuments(cache);
+      fullRevision = ++cacheRevision;
+      const payload = JSON.parse(JSON.stringify(cache));
+      if (typeof adapter.saveDocuments === 'function') {
+        await adapter.saveDocuments(payload);
+      } else {
+        await adapter.saveDocuments(cache);
+      }
       cacheAt = Date.now();
     },
     /* Persist quirúrgico. La auditoría se manda entrada por entrada (solo las
      * nuevas): nunca se re-suben las 898 históricas en cada guardado. */
     async persistCollections(names) {
       let list = (names || []).filter(Boolean);
+      for (const col of list) markCollection(col);
       if (list.includes('auditoria')) {
         if (typeof adapter.pushAudit === 'function') {
           if (!auditSeen) hydrateAudit();
@@ -125,13 +150,13 @@ function createStore(adapter) {
         }
         list = list.filter((n) => n !== 'auditoria');
       }
-      if (!list.length) { cacheAt = Date.now(); return; }
+      if (!list.length) return;
       if (adapter.saveCollections) await adapter.saveCollections(cache, list);
       else await adapter.saveDocuments(cache);
-      cacheAt = Date.now();
     },
     /* Auditoría atómica: registra y persiste SOLO esa entrada. */
     async appendAudit(tipo, actor, detalle) {
+      markCollection('auditoria');
       const db = require('./db');
       const entry = db.audit(cache, tipo, actor, detalle);
       if (typeof adapter.pushAudit === 'function') {

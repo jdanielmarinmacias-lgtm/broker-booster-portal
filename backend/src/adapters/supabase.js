@@ -152,28 +152,28 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     const PAGE = 1000;
     const usersPromise = sb.from('app_users').select('*');
     for (;;) {
-      const { data, error } = await sb.from('documents').select('collection,doc_id,data').range(from, from + PAGE - 1);
-      if (error) throw new Error('Supabase documents: ' + error.message);        for (const row of data) {
-          if (row.collection === 'auditoria') auditSavedIds.add('auditoria∅' + row.doc_id);
-          if (row.doc_id === '__object__') {
-            // Colección-objeto (settings/autoHub/inmPublica/…): data IS el objeto.
-            objects[row.collection] = row.data || {};
-            savedHash.set(row.collection + '∅__object__', h1(row.data || {}));
-          } else {
-            savedHash.set(row.collection + '∅' + row.doc_id, h1(row.data || {}));
-            out[row.collection] = out[row.collection] || [];
-            out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
-          }
+      const { data, error } = await sb.from('documents').select('collection,doc_id,data')
+        .neq('collection', 'auditoria').range(from, from + PAGE - 1);
+      if (error) throw new Error('Supabase documents: ' + error.message);
+      for (const row of data) {
+        if (row.doc_id === '__object__') {
+          // Colección-objeto (settings/autoHub/inmPublica/…): data IS el objeto.
+          objects[row.collection] = row.data || {};
+          savedHash.set(row.collection + '∅__object__', h1(row.data || {}));
+        } else {
+          savedHash.set(row.collection + '∅' + row.doc_id, h1(row.data || {}));
+          out[row.collection] = out[row.collection] || [];
+          out[row.collection].push({ id: row.doc_id, ...(row.data || {}) });
         }
+      }
       if (data.length < PAGE) break;
       from += PAGE;
     }
     // El objeto gana si hubiera filas mixtas (colección migrada de array→objeto).
     for (const [c, v] of Object.entries(objects)) out[c] = v;
-    // Auditoría: solo las últimas AUDIT_KEEP (la app también la cota a 500).
-    if (Array.isArray(out.auditoria) && out.auditoria.length > AUDIT_KEEP) {
-      out.auditoria = out.auditoria.slice(-AUDIT_KEEP);
-    }
+    // Limitar en la consulta, no después de descargar el historial completo.
+    const audit = await loadCollections(['auditoria']);
+    if (audit.auditoria) out.auditoria = audit.auditoria;
     const { data: users, error: uerr } = await usersPromise;
     if (uerr) throw new Error('Supabase users: ' + uerr.message);
     out.users = (users || []).map(fromUserRow);
@@ -312,41 +312,50 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
   /* Ticker de versiones por colección (tabla pública collection_versions):
    * cada guardado avisa QUÉ cambió para que los otros PCs hagan pull
    * quirúrgico en tiempo real, sin exponer datos. Best-effort con timeout
-   * corto: jamás rompe el guardado. */
-  let versionsReady = null; // null = sin probar · true = tabla ok · false = usar public_feed
+   * corto: jamás rompe el guardado. */    let versionsReady = null; // null = sin probar · true = tabla ok · false = usar public_feed (cada worker decide)
+    let nextVersionProbe = 0;
+    let lastVersionPrune = 0;
+    let lastFeedPrune = 0;
+    let lastFeedPoll = 0;
+    let feedPollAttempts = 0;
 
   /* Sin la tabla (migración no ejecutada) el ticker viaja por public_feed, que
    * YA está en la publicación realtime y es de lectura pública. Así el
    * "subo contenido y aparece en los otros equipos" funciona sin pedirle al
-   * usuario que corra SQL a mano. */
-  async function touchViaFeed(list) {
+   * usuario que corra SQL a mano. */    async function touchViaFeed(list) {
     const rows = list.map((c) => ({ kind: 'version:' + c, title: 'sync', body: '' }));
     const { error } = await withTimeout(sb.from('public_feed').insert(rows), 'touchFeed', 8000);
     if (error) throw new Error('Supabase version feed: ' + error.message);
-    // Poda best-effort de las marcas viejas (el feed visible no las incluye).
-    sb.from('public_feed').delete().like('kind', 'version:%')
-      .lt('created_at', new Date(Date.now() - 12 * 3600 * 1000).toISOString())
-      .then(() => {}, () => {});
-  }
-  async function touchVersions(cols) {
+    if (Date.now() - lastVersionPrune >= 60 * 60 * 1000) {
+      lastVersionPrune = Date.now();
+      sb.from('public_feed').delete().like('kind', 'version:%')
+        .lt('created_at', new Date(Date.now() - 12 * 3600 * 1000).toISOString())
+        .then(() => {}, () => {});
+    }
+  }    async function touchVersions(cols) {
     const list = (cols || []).filter(Boolean);
     if (!list.length) return;
-    if (versionsReady === false) return touchViaFeed(list);
+    // Cada worker decide entre la tabla y el feed, según lo que haya podido leer.
+    if (versionsReady === false && Date.now() < nextVersionProbe) return touchViaFeed(list);
     const ts = new Date().toISOString();
     try {
       const { error } = await withTimeout(
         sb.from('collection_versions').upsert(
           list.map((c) => ({ collection: c, updated_at: ts })), { onConflict: 'collection' }),
         'touchVersions', 8000);
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (/^(42P01|42501|PGRST205)$/i.test(String(error.code || ''))) {
+          versionsReady = false;
+          nextVersionProbe = Date.now() + 5 * 60 * 1000;
+          return touchViaFeed(list);
+        }
+        throw new Error(error.message);
+      }
       versionsReady = true;
       return;
     } catch (e) {
-      if (versionsReady === null) {
-        console.warn('[backend] collection_versions ausente: ticker por public_feed —', e.message);
-      }
-      versionsReady = false;
-      return touchViaFeed(list);
+      // No convertir una caída o cuota agotada en escrituras extra al feed.
+      throw e;
     }
   }
 
@@ -504,20 +513,30 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
       if (savedHash.get(key) === h) { seen.add(key); return false; }
       pendingHash.set(key, h);
       return true;
-    });
-    // Auditoría incremental: filtra las entradas ya persistidas (siguen
-    // "vistas" para que el borrado de ausentes no las toque).
+    }    );
+    // Auditoría incremental para sync: filtra las entradas ya persistidas.
+    // El borrado de ausentes las ignora porque sus claves siguen 'vistas'.
     if (rows.some((r) => r.collection === 'auditoria')) {
       rows = rows.filter((r) => {
         if (r.collection !== 'auditoria') return true;
         return !auditSavedIds.has(r.collection + '∅' + r.doc_id);
       });
+      if (!rows.some((r) => r.collection === 'auditoria')) {
+        rows = rows.filter((r) => r.collection !== 'auditoria');
+      }
+    }
+    // Salida y persistencia de la historia de backend: dejar que la migración
+    // de historial sea atómica y fuera del lote de sync (ver backend/src/history.js).
+    if (typeof historyRecorder === 'function') {
+      const persisted = await historyRecorder(rows);
+      if (persisted) rows = rows.filter((r) => !persisted.has(r.collection + '∅' + r.doc_id));
     }
     // Guarda anti-cuelgue: un documento con base64 embebido de MBs colgaba el
     // upsert (statement timeout) y rompía el sync. Los archivos van por /api/media.
     for (const r of rows) {
       let bytes = 0;
       try { bytes = Buffer.byteLength(JSON.stringify(r.data), 'utf8'); } catch (e) { /* no medible: pasa */ }
+
       if (bytes > MAX_DOC_BYTES) {
         const err = new Error('Documento ' + r.collection + '/' + r.doc_id + ' demasiado grande (' +
           (bytes / 1048576).toFixed(1) + ' MB, límite ' + (MAX_DOC_BYTES / 1048576).toFixed(0) +
@@ -688,9 +707,12 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
       if (error) throw new Error('Supabase feed: ' + error.message);
       /* Poda best-effort: el feed crecía sin cota (llegó a 5.000 filas).
        * Se conservan 7 días; las marcas del ticker ya se podan a las 12h. */
-      sb.from('public_feed').delete()
-        .lt('created_at', new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString())
-        .then(() => {}, () => {});
+      if (Date.now() - lastFeedPrune >= 60 * 60 * 1000) {
+        lastFeedPrune = Date.now();
+        sb.from('public_feed').delete()
+          .lt('created_at', new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString())
+          .then(() => {}, () => {});
+      }
       return data;
     },
     async listFeed(limit) {
@@ -714,6 +736,16 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     getEstado,
     putEstado,
     bumpEstado,
+    /* Cuotas de voz: sin fallback no atómico ni reintentos que dupliquen el cargo. */
+    async bumpEstadoSeguro(collection, docId, field, delta) {
+      const { data, error } = await withTimeout(sb.rpc('bump_document_number', {
+        p_collection: collection, p_doc_id: String(docId), p_field: String(field), p_delta: delta,
+      }), 'voice-quota');
+      if (error) throw new Error('Contador atómico de voz no disponible');
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !Number.isFinite(Number(row[field]))) throw new Error('Contador de voz inválido');
+      return Number(row[field]);
+    },
     pruneEstado,
     loadRawDocuments,
     putRawDocument,

@@ -1210,6 +1210,79 @@ describe('IA por proxy con cupo (la clave no viaja al navegador)', () => {
   });
 });
 
+describe('caché y lecturas de Supabase', () => {
+  it('una carga parcial no sustituye ni prolonga una carga completa', async () => {
+    let completas = 0;
+    const adapter = {
+      cacheTtlMs: 60000,
+      async loadDocuments() { completas++; return { settings: { logo: 'ficticio' }, ventas: [{ id: 'venta' }] }; },
+      async loadCollections(names) { return Object.fromEntries(names.map((name) => [name, name === 'auditoria' ? [{ id: 'audit' }] : []])); },
+      async saveCollections() {},
+    };
+    const s = createStore(adapter);
+    await s.refreshForWrite(['messages']);
+    await s.persistCollections(['messages']);
+    assert.equal(s.isWarm(), false);
+    await Promise.all([s.refreshIfStale(), s.refreshIfStale()]);
+    assert.equal(completas, 1);
+    assert.equal(s.get().ventas[0].id, 'venta');
+    await s.refreshCollections(['auditoria']);
+    assert.equal(s.get().auditoria[0].id, 'audit');
+    adapter.cacheTtlMs = 1;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await s.refreshCollections(['messages']);
+    await s.persistCollections(['messages']);
+    await s.refreshIfStale();
+    assert.equal(completas, 2);
+  });
+
+  it('limita la auditoría en Supabase sin perder las demás colecciones', async () => {
+    const { createSupabaseAdapter } = require('../src/adapters/supabase');
+    const fetchReal = global.fetch;
+    const peticiones = [];
+    const auditoria = Array.from({ length: 350 }, (_, i) => ({ collection: 'auditoria', doc_id: String(i), data: { n: i } }));
+    global.fetch = async (url) => {
+      const u = new URL(String(url));
+      peticiones.push(u);
+      if (u.pathname.endsWith('/app_users')) return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (u.pathname.endsWith('/documents')) {
+        let rows = [{ collection: 'ventas', doc_id: 'v1', data: { monto: 123 } }, ...auditoria];
+        if (u.searchParams.get('collection') === 'neq.auditoria') rows = rows.filter((r) => r.collection !== 'auditoria');
+        if (u.searchParams.get('collection') === 'eq.auditoria') rows = rows.filter((r) => r.collection === 'auditoria').reverse();
+        if (u.searchParams.has('limit')) rows = rows.slice(0, Number(u.searchParams.get('limit')));
+        return new Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      throw new Error('Petición no esperada: ' + u.pathname);
+    };
+    try {
+      const adapter = createSupabaseAdapter({ url: 'https://ejemplo.invalid', serviceKey: 'clave-ficticia' });
+      const docs = await adapter.loadDocuments();
+      assert.equal(docs.ventas[0].monto, 123);
+      assert.equal(docs.auditoria.length, 300);
+      assert.equal(docs.auditoria[0].n, 50);
+      assert.equal(docs.auditoria[299].n, 349);
+      assert.ok(peticiones.some((u) => u.searchParams.get('collection') === 'neq.auditoria'));
+      assert.ok(peticiones.some((u) => u.searchParams.get('collection') === 'eq.auditoria' && u.searchParams.get('limit') === '300'));
+    } finally { global.fetch = fetchReal; }
+  });
+
+  it('una lectura de mensajes recarga sus dependencias una sola vez', async () => {
+    jar.cookie = null;
+    assert.equal((await api('POST', '/api/auth/login', { username: 'admin', password: 'NuevaClave99' }, false)).status, 200);
+    let llamadas = 0;
+    store.adapter.loadCollections = async (names) => {
+      llamadas++;
+      const all = await store.adapter.loadDocuments();
+      return Object.fromEntries(names.filter((name) => name in all).map((name) => [name, all[name]]));
+    };
+    try {
+      const r = await api('GET', '/api/data/messages');
+      assert.equal(r.status, 200);
+      assert.equal(llamadas, 1);
+    } finally { delete store.adapter.loadCollections; }
+  });
+});
+
 describe('rate-limit de login compartido entre instancias', () => {
   const mw = require('../src/middleware');
 

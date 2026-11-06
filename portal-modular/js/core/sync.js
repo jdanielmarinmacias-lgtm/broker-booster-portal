@@ -49,6 +49,8 @@
     chatGroups: '👥 Grupos actualizados'
   };
   var pushTimer = null;
+  var retryDelay = 8000;
+  var quotaPauseUntil = 0;
   var lastNoSessToast = 0; // limita el aviso de sesión vencida (1/min)
   var shadow = null; // {col: [{...}]} última foto DEL SERVIDOR (solo lo traído por pull)
   var pulled = {}; // colecciones confirmadas desde el servidor en el último pull
@@ -99,7 +101,7 @@
     const res = await fetch(path, { credentials: 'same-origin' });
     let json = null;
     try { json = await res.json(); } catch (e) { throw new Error('no-json'); }
-    if (!res.ok) { const err = new Error((json && json.error) || ('HTTP ' + res.status)); err.status = res.status; throw err; }
+    if (!res.ok) { const err = new Error((json && json.error) || ('HTTP ' + res.status)); err.status = res.status; err.json = json; throw err; }
     return json;
   }
 
@@ -154,9 +156,33 @@
     return { items: items, pending: pending };
   }
 
+  /* Permisos editables como mapa de claves. Un pull puede llegar antes de
+   * que el debounce de 1.5 s envíe el cambio (incluido el eco de nuestros
+   * propios PUT): conservar la clave local que difiere de la sombra. */
+  const PERMISSION_OBJECTS = { rolePermissions: 1, userPermissions: 1 };
+  function fusionarObjetoPendiente(name, prevLocal, prevShadow, serverVal) {
+    const merged = clone(serverVal);
+    let pending = false;
+    if (!PERMISSION_OBJECTS[name] || !prevShadow) return { value: merged, pending };
+    Object.keys(prevLocal).forEach(function (k) {
+      if ((k in prevShadow) && !mismoValor(prevLocal[k], prevShadow[k])) {
+        merged[k] = clone(prevLocal[k]);
+        pending = true;
+      }
+    });
+    Object.keys(prevShadow).forEach(function (k) {
+      if (!(k in prevLocal) && (k in merged)) {
+        delete merged[k];
+        pending = true;
+      }
+    });
+    return { value: merged, pending };
+  }
+
   async function pullBundle(fallbackNames) {
     const db = legDb();
     if (!db) return false;
+    if (!shadow) shadow = {};
     try {
       const r = await get('/api/data/bundle');
       if (r && r.bundle && typeof r.bundle === 'object') {
@@ -173,8 +199,11 @@
             const prevLocal = db[n].slice();
             const prevShadowArr = (shadow && Array.isArray(shadow[n])) ? shadow[n] : [];
             const wasOnServer = {};
-            prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
-            const serverItems = normIds(v.items);
+            const refSombra = prevShadowArr.length ? prevShadowArr : sombraPersistida(n);
+            refSombra.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
+            const crudos = normIds(v.items);
+            const serverItems = crudos.filter(function (x) { return !(x && isDeleted(n, x.id)); });
+            purgarLapidas(n, crudos.filter(function (x) { return x && isDeleted(n, x.id); }).map(function (x) { return x.id; }));
             const fusion = fusionarRegistros(prevLocal, prevShadowArr, serverItems);
             if (fusion.pending) hayPendienteLocal = true;
             if (shadow) shadow[n] = clone(serverItems);
@@ -182,25 +211,30 @@
             const have = {};
             db[n].forEach(function (x) { if (x && x.id !== undefined) have[String(x.id)] = true; });
             prevLocal.forEach(function (x) {
-              if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]) {
-                db[n].push(x);
-                hayPendienteLocal = true;
-              }
+              if (!x || x.id === undefined) return;
+              const id = String(x.id);
+              if (have[id] || isDeleted(n, id)) return;
+              if (wasOnServer[id]) { markDeleted(n, id); return; } // borrado en el servidor
+              db[n].push(x);
+              hayPendienteLocal = true;
             });
           } else if (v.shape === 'object') {
             if (!isPlain(db[n])) db[n] = {};
             const prevLocalObj = clone(db[n]);
             const prevShadowObj = (shadow && isPlain(shadow[n])) ? shadow[n] : null;
             const serverVal = normIds(v.value);
+            const fusionObj = fusionarObjetoPendiente(n, prevLocalObj, prevShadowObj, serverVal);
             if (shadow) shadow[n] = clone(serverVal);
             Object.keys(db[n]).forEach(function (k) { delete db[n][k]; });
-            Object.assign(db[n], serverVal);
+            Object.assign(db[n], fusionObj.value);
+            if (fusionObj.pending) hayPendienteLocal = true;
             Object.keys(prevLocalObj).forEach(function (k) {
               if (!(k in db[n]) && !(prevShadowObj && (k in prevShadowObj))) {
                 db[n][k] = prevLocalObj[k];
                 hayPendienteLocal = true;
               }
             });
+            limpiarClavesUsuario(n, db[n]);
           }
           pulled[n] = true;
         });
@@ -252,6 +286,7 @@
   async function pullNames(names) {
     const db = legDb();
     if (!db) return false;
+    if (!shadow) shadow = {};
     const jobs = names.map(function (n) {
       return pullCollectionOnce(n).then(function (v) { return { n, v }; });
     });
@@ -265,8 +300,11 @@
         const prevLocal = db[n].slice();
         const prevShadowArr = (shadow && Array.isArray(shadow[n])) ? shadow[n] : [];
         const wasOnServer = {};
-        prevShadowArr.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
-        const serverItems = normIds(v.items);
+        const refSombra = prevShadowArr.length ? prevShadowArr : sombraPersistida(n);
+        refSombra.forEach(function (x) { if (x && x.id !== undefined) wasOnServer[String(x.id)] = true; });
+        const crudos = normIds(v.items);
+        const serverItems = crudos.filter(function (x) { return !(x && isDeleted(n, x.id)); });
+        purgarLapidas(n, crudos.filter(function (x) { return x && isDeleted(n, x.id); }).map(function (x) { return x.id; }));
         const fusion = fusionarRegistros(prevLocal, prevShadowArr, serverItems);
         if (fusion.pending) hadPendingLocal = true;
         if (shadow) shadow[n] = clone(serverItems);
@@ -274,11 +312,13 @@
         const have = {};
         db[n].forEach(function (x) { if (x && x.id !== undefined) have[String(x.id)] = true; });
         prevLocal.forEach(function (x) {
-          // Conservar registros optimistas recién creados localmente que aún no suben al servidor
-          if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]) {
-            db[n].push(x);
-            hadPendingLocal = true;
-          }
+          // Conservar solo lo que nunca estuvo en el servidor (offline real).
+          if (!x || x.id === undefined) return;
+          const id = String(x.id);
+          if (have[id] || isDeleted(n, id)) return;
+          if (wasOnServer[id]) { markDeleted(n, id); return; } // borrado en el servidor
+          db[n].push(x);
+          hadPendingLocal = true;
         });
       } else {
         // Objeto: reemplaza por claves (el objeto puede almacenar arrays adentro:
@@ -287,15 +327,18 @@
         const prevLocalObj = clone(db[n]);
         const prevShadowObj = (shadow && isPlain(shadow[n])) ? shadow[n] : null;
         const serverVal = normIds(v.value);
+        const fusionObj = fusionarObjetoPendiente(n, prevLocalObj, prevShadowObj, serverVal);
         if (shadow) shadow[n] = clone(serverVal);
         Object.keys(db[n]).forEach(function (k) { delete db[n][k]; });
-        Object.assign(db[n], serverVal);
+        Object.assign(db[n], fusionObj.value);
+        if (fusionObj.pending) hadPendingLocal = true;
         Object.keys(prevLocalObj).forEach(function (k) {
           if (!(k in db[n]) && !(prevShadowObj && (k in prevShadowObj))) {
             db[n][k] = prevLocalObj[k];
             hadPendingLocal = true;
           }
         });
+        limpiarClavesUsuario(n, db[n]);
       }
       pulled[n] = true; // verdad del servidor: entra a la sombra
       changed = true;
@@ -318,14 +361,13 @@
   }
 
   function snapshot() {
-    // Solo lo confirmado del servidor. Lo solo-local queda FUERA para que el
-    // próximo push lo suba (si entrara a la sombra, se volvería invisible).
+    // La sombra la llenan pullBundle/pullNames con el payload del servidor.
+    // No copiar `db` aquí: contiene ediciones locales pendientes (y defaults
+    // recién migrados); si entraran a la sombra, el push las vería como ya
+    // sincronizadas y el siguiente pull borraría el cambio del usuario.
     const db = legDb();
     if (!db) return;
-    shadow = {};
-    Object.keys(pulled).forEach(function (k) {
-      if (Array.isArray(db[k]) || isPlain(db[k])) shadow[k] = clone(db[k]);
-    });
+    if (!shadow) shadow = {};
     if (usersPulled && Array.isArray(db.users)) shadow.users = clone(db.users);
     saveSyncedIds();
   }
@@ -356,6 +398,68 @@
     } catch (e) { return null; }
   }
 
+  /* Lápidas de borrado: ids que se borraron y NO deben volver desde la copia
+   * local de otro navegador. Sin esto, tras cada despliegue un equipo con datos
+   * viejos resucitaba exámenes o registros de prueba ya eliminados. */
+  var DELETED_KEY = 'pepes_deleted_ids_v1';
+  var deletedIds = null;
+  function loadDeleted() {
+    if (deletedIds) return deletedIds;
+    deletedIds = {};
+    try {
+      var raw = JSON.parse(localStorage.getItem(DELETED_KEY) || 'null');
+      if (raw && typeof raw === 'object') {
+        Object.keys(raw).forEach(function (k) {
+          if (Array.isArray(raw[k])) deletedIds[k] = raw[k].map(String);
+        });
+      }
+    } catch (e) { /* sin storage: se usan solo las de esta sesión */ }
+    return deletedIds;
+  }
+  function isDeleted(col, id) {
+    if (id === undefined || id === null) return false;
+    var m = loadDeleted();
+    return !!(m[col] && m[col].indexOf(String(id)) !== -1);
+  }
+  function markDeleted(col, id) {
+    if (id === undefined || id === null) return;
+    var m = loadDeleted();
+    var lista = m[col] || (m[col] = []);
+    if (lista.indexOf(String(id)) === -1) lista.push(String(id));
+    if (lista.length > 400) lista.splice(0, lista.length - 400);
+    try { localStorage.setItem(DELETED_KEY, JSON.stringify(m)); } catch (e) { /* cuota */ }
+  }
+  /* Si la lápida sigue en el servidor (un DELETE que no llegó), se reintenta
+   * sin bloquear el pull. */
+  function purgarLapidas(col, ids) {
+    (ids || []).forEach(function (id) {
+      send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null).catch(function () {});
+    });
+  }
+  /* Ids que el servidor confirmó en la última sesión y que sobreviven a la
+   * recarga (pepes_sync_ids_v1). En el primer pull `shadow` aún está vacía:
+   * sin esto, un registro borrado en otro equipo se re-agregaba desde la copia
+   * local y se volvía a subir. */
+  function sombraPersistida(name) {
+    var ids = loadSyncedIds();
+    return (ids && Array.isArray(ids[name])) ? ids[name] : [];
+  }
+  /* prospectos y expedientesProspectos se indexan por id de usuario. Un objeto
+   * plano ({id,nombre,titulo}) subido por error se contaba como 3 expedientes y
+   * 3 prospectos. Se descartan esas claves y se borran del servidor. */
+  var USER_KEYED_OBJECTS = { prospectos: 1, expedientesProspectos: 1 };
+  function limpiarClavesUsuario(name, obj) {
+    if (!USER_KEYED_OBJECTS[name] || !isPlain(obj)) return false;
+    var changed = false;
+    Object.keys(obj).forEach(function (k) {
+      if (/^[0-9]+$/.test(k)) return;
+      delete obj[k];
+      changed = true;
+      send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k), null).catch(function () {});
+    });
+    return changed;
+  }
+
   // Mutex: los pulls nunca se intercalan (un pull que reemplaza mientras otro
   // fusiona perdía lo solo-local). pullAll() es la única entrada.
   let pullChain = Promise.resolve();
@@ -381,13 +485,51 @@
       if (Array.isArray(db[n]) || isPlain(db[n])) pre[n] = clone(db[n]);
     });
     const prevShadow = shadow ? clone(shadow) : loadSyncedIds();
+    // Desde este punto la sombra existe y cada pull la actualiza SOLO con la
+    // respuesta del servidor; snapshot ya no la reemplaza por el estado local.
+    if (!shadow) shadow = {};
     pulled = {}; usersPulled = false;
     try {
       await pullBundle();
     } catch (e) { return false; }
+    /* Lista global de borrados (settings.deletedIds): un equipo que nunca tuvo
+     * la lápida local también elimina su copia vieja y no la vuelve a subir. */
+    try {
+      const dd = (db.settings && db.settings.deletedIds) || null;
+      if (dd && typeof dd === 'object') {
+        Object.keys(dd).forEach(function (col) {
+          (Array.isArray(dd[col]) ? dd[col] : []).forEach(function (id) {
+            markDeleted(col, id);
+            if (Array.isArray(db[col])) {
+              for (let i = db[col].length - 1; i >= 0; i--) {
+                if (String(db[col][i] && db[col][i].id) === String(id)) db[col].splice(i, 1);
+              }
+            }
+            send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null).catch(function () {});
+          });
+        });
+      }
+    } catch (eDd) { /* lista opcional: no bloquea el arranque */ }
     if (!usersPulled) {
       await pullUsers(); // fallback si el servidor no adjuntó users en /api/data/bundle
     }
+    /* Exámenes fantasma con título vacío: versiones anteriores insertaban el
+     * registro al abrir "Nuevo Examen" y cualquier pregunta lo guardaba. Se
+     * borran de la base (DELETE + lápida) para que no reaparezcan en ningún
+     * equipo. Va ANTES de ensureDbDefaults, que solo los oculta en memoria. */
+    try {
+      if (Array.isArray(db.exams)) {
+        const fantasmas = db.exams.filter(function (e) { return !e || String(e.title || '').trim() === ''; });
+        if (fantasmas.length) {
+          for (const f of fantasmas) {
+            if (!f || f.id === undefined) continue;
+            markDeleted('exams', f.id);
+            try { await send('DELETE', '/api/data/exams/' + encodeURIComponent(f.id), null); } catch (e3) { /* se reintenta al cargar */ }
+          }
+          db.exams = db.exams.filter(function (e) { return e && String(e.title || '').trim() !== ''; });
+        }
+      }
+    } catch (e4) { /* la limpieza nunca bloquea el arranque */ }
     try { if (typeof window.ensureDbDefaults === 'function') window.ensureDbDefaults(); } catch (e0) {}
     snapshot(); // foto del servidor ANTES de fusionar lo local
     /* Racha diaria: ahora que db.users tiene la verdad del servidor (y la
@@ -406,7 +548,7 @@
         pre[n].forEach(function (x) {
           // #2 Refuerzo (lápidas/tombstones): si el registro ya existía en la sombra previa
           // del servidor y ahora el servidor no lo trae, fue borrado en otro equipo → no resucitarlo.
-          if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]) {
+if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)] && !isDeleted(n, x.id)) {
             db[n].push(x); merged++;
           }
         });
@@ -622,6 +764,7 @@
     if (isPlain(local)) {
       const oldObj = (old && isPlain(old)) ? old : {};
       for (const k of Object.keys(local)) {
+        if (USER_KEYED_OBJECTS[name] && !/^[0-9]+$/.test(k)) continue;
         if (mismoValor(local[k], oldObj[k])) continue;
         // Clave nueva que solo trae el valor por defecto del panel: no se escribe.
         if (!(k in oldObj) && esValorPorDefecto(local[k])) continue;
@@ -659,6 +802,7 @@
     const seen = {};
     for (const rec of local) {
       const id = String(rec.id);
+      if (isDeleted(name, id)) continue; // borrado confirmado: no resucitarlo
       seen[id] = true;
       const prev = oldMap[id];
       const same = prev && registrosIguales(rec, prev);
@@ -689,12 +833,15 @@
     }
     for (const id of Object.keys(oldMap)) {
       if (seen[id]) continue;
-      try { await send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(id), null); }
-      catch (e) { await pullNames([name]); return; }
+      try {
+        await send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(id), null);
+        markDeleted(name, id); // el borrado ya es definitivo: no vuelve de otra copia
+      } catch (e) { await pullNames([name]); return; }
     }
   }
 
   async function pushNow() {
+    if (Date.now() < quotaPauseUntil) { retrySoon(quotaPauseUntil - Date.now()); return; }
     if (!window.Backend || !window.Backend.available) return;
     if (!active || !shadow) {
       // Backend sí, sesión no (expiró): intenta recuperarla una vez; si no,
@@ -725,6 +872,7 @@
     });
     const names = Object.keys(set);
     const failed = [];
+    let cuotaBloqueada = false;
     // Aislado por colección: una que falle no bloquea a las demás. La sombra
     // solo avanza en las que sí se sincronizaron (si no, se volverían invisibles).
     for (const n of names) {
@@ -732,6 +880,12 @@
         shadow[n] = clone(db[n] || []);
       } catch (e) {
         failed.push(n + ' (' + motivoFallo(e) + ')');
+        if (e && e.json && e.json.retryable === false) {
+          quotaPauseUntil = Date.now() + 5 * 60 * 1000;
+          cuotaBloqueada = true;
+          retrySoon(5 * 60 * 1000);
+          break;
+        }
         /* 401: puede ser la sesión vencida de verdad O una consulta de sesión
          * que falló por lentitud de la base. Antes se apagaba el sync para
          * siempre y TODO quedaba en localStorage hasta reingresar a mano.
@@ -751,12 +905,19 @@
         if (!e || !e.status || e.status >= 500) retrySoon();
       }
     }
-    if (Array.isArray(db.users)) {
+    if (!cuotaBloqueada && Array.isArray(db.users)) {
       try {
         await pushUsers(db.users, shadow.users || []);
         shadow.users = clone(db.users);
-      } catch (e) { failed.push('users (' + motivoFallo(e) + ')'); }
+      } catch (e) {
+        failed.push('users (' + motivoFallo(e) + ')');
+        if (e && e.json && e.json.retryable === false) {
+          quotaPauseUntil = Date.now() + 5 * 60 * 1000;
+          retrySoon(5 * 60 * 1000);
+        } else if (!e || !e.status || e.status >= 500) retrySoon();
+      }
     }
+    if (!failed.length) retryDelay = 8000;
     if (failed.length && window.showToast) {
       window.showToast('Sin sincronizar: ' + failed.join(', '), 'warning');
     }
@@ -764,6 +925,7 @@
 
   /* Motivo concreto de un fallo de sincronización, para mostrarlo en el aviso. */
   function motivoFallo(e) {
+    if (e && e.json && e.json.retryable === false) return 'cuota de transferencia agotada; cambios conservados localmente';
     if (e && e.status === 401) return 'sesión vencida, reingresa';
     if (e && e.status === 503) return 'base de datos ocupada, reintentando';
     if (e && e.status === 500) return 'servidor ocupado, reintentando';
@@ -775,20 +937,22 @@
   function retrySoon(ms) {
     if (!active) return;
     if (pushTimer) clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushNow, ms || 8000);
+    const delay = ms || retryDelay;
+    if (!ms) retryDelay = Math.min(retryDelay * 2, 5 * 60 * 1000);
+    pushTimer = setTimeout(pushNow, Math.max(delay, quotaPauseUntil - Date.now()));
   }
 
   function pushSoon() {
     if (!active) return;
     if (pushTimer) clearTimeout(pushTimer);
-    pushTimer = setTimeout(pushNow, 1500);
+    pushTimer = setTimeout(pushNow, Math.max(1500, quotaPauseUntil - Date.now()));
   }
 
   /* Si la pestaña se oculta o se recarga con un envío pendiente (p. ej. un borrado
    * dentro de la ventana de 1,5 s), se envía ya: si no, el registro sigue en la base
    * y reaparece en la siguiente carga. */
   function flushPendingPush() {
-    if (!active || !pushTimer) return;
+    if (!active || !pushTimer || Date.now() < quotaPauseUntil) return;
     clearTimeout(pushTimer);
     pushTimer = null;
     pushNow();
@@ -927,6 +1091,39 @@
         try { window.showToast(KIND_TOAST[kind], 'info'); } catch (e3) {}
       }
     }
+    // Unifica avisos cercanos del feed y de versiones. Si llega otro cambio
+    // durante una descarga, se hace un último pull para no perderlo.
+    var livePulls = Object.create(null);
+    function queueLivePull(key, kind) {
+      var state = livePulls[key] || (livePulls[key] = { dirty: false, running: false, timer: null, kind: null });
+      state.dirty = true;
+      if (kind) state.kind = kind;
+      if (state.running || state.timer) return;
+      state.timer = setTimeout(async function () {
+        state.timer = null;
+        state.running = true;
+        state.dirty = false;
+        var currentKind = state.kind;
+        state.kind = null;
+        try {
+          if (key === '__public__') {
+            if (await pullPublicShowcase()) {
+              var pp = document.getElementById('public-portal');
+              if (pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') window.renderPublicPortal();
+            }
+          } else {
+            if (key === 'users') await pullUsers();
+            else await pullNames(key === '__all__' ? SHOWCASE.concat(LIVE_WORK.filter(function (c) { return SHOWCASE.indexOf(c) === -1; })) : [key]);
+            liveRender(currentKind || key);
+          }
+        } catch (e) { /* la siguiente notificación vuelve a intentarlo */ }
+        finally {
+          state.running = false;
+          if (state.dirty) queueLivePull(key, state.kind);
+          else delete livePulls[key];
+        }
+      }, 300);
+    }
     // Novedades de otros usuarios → re-pull escaparate + trabajo + re-render.
     // Ej: agente carga solicitud → el cotizador la ve en ese momento + toast.
     document.addEventListener('public-feed', function (e) {
@@ -935,20 +1132,14 @@
       if (kind && String(kind).indexOf('version:') === 0) return;
       if (!active) {
         if (kind === 'autoHub' || kind === 'inmPublica' || kind === 'settings') {
-          pullPublicShowcase().then(function (ok) {
-            const pp = document.getElementById('public-portal');
-            if (ok && pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
-              try { window.renderPublicPortal(); } catch (e0) {}
-            }
-          });
+          queueLivePull('__public__', kind);
         }
         return;
       }
       var target = kind && KIND_TO_COL[kind];
       // Pull quirúrgico en Realtime: si sabemos qué colección cambió, solo
       // descargamos esa colección en vez de volver a bajar las 5 de SHOWCASE.
-      var cols = target ? [target] : SHOWCASE.concat(LIVE_WORK.filter(function (c) { return SHOWCASE.indexOf(c) === -1; }));
-      pullNames(cols).then(function () { liveRender(kind); }).catch(function () {});
+      queueLivePull(target || '__all__', kind);
     });
     // Ticker de versiones (TODAS las colecciones, ediciones y borrados
     // incluidos): pull quirúrgico de lo que cambió en otro equipo.
@@ -958,20 +1149,11 @@
       if (!active) {
         // Visitante sin sesión: solo refresca el escaparate público.
         if (col === 'autoHub' || col === 'inmPublica' || col === 'settings') {
-          pullPublicShowcase().then(function (ok) {
-            const pp = document.getElementById('public-portal');
-            if (ok && pp && !pp.classList.contains('hidden') && typeof window.renderPublicPortal === 'function') {
-              try { window.renderPublicPortal(); } catch (e0) {}
-            }
-          });
+          queueLivePull('__public__', col);
         }
         return;
       }
-      if (col === 'users') {
-        pullUsers().then(function () { liveRender(col); }).catch(function () {});
-        return;
-      }
-      pullNames([col]).then(function () { liveRender(col); }).catch(function () {});
+      queueLivePull(col, col);
     });
   }
 
