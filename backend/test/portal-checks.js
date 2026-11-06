@@ -70,6 +70,13 @@ describe('CSP de producción (vercel.json)', () => {
     });
   });
 
+  it('no permite Jitsi: la videoconferencia externa se abre en su propio sitio', () => {
+    const frame = csp['frame-src'] || [];
+    const script = csp['script-src'] || [];
+    assert.ok(!frame.includes('https://meet.jit.si'), 'frame-src no debe permitir Jitsi');
+    assert.ok(!script.includes('https://meet.jit.si'), 'script-src no debe permitir Jitsi');
+  });
+
   it('no abre la CSP de más', () => {
     const frame = csp['frame-src'] || [];
     assert.ok(!frame.includes('*'), 'frame-src no debe usar comodín');
@@ -88,6 +95,19 @@ describe('CSP de producción (vercel.json)', () => {
     assert.equal(cabeceraGlobal('X-Frame-Options'), 'DENY');
     assert.equal(cabeceraGlobal('X-Content-Type-Options'), 'nosniff');
     assert.equal(cabeceraGlobal('Referrer-Policy'), 'same-origin');
+  });
+});
+
+describe('permisos de cámara y micrófono (vercel.json)', () => {
+  const pp = cabeceraGlobal('Permissions-Policy');
+
+  it('deja cámara y micrófono solo al propio portal', () => {
+    ['camera', 'microphone'].forEach((feature) => {
+      const m = pp.match(new RegExp(feature + '=\\(([^)]*)\\)'));
+      assert.ok(m, 'falta ' + feature + ' en Permissions-Policy');
+      assert.ok(m[1].includes('self'), feature + ' debe permitir el propio portal');
+      assert.ok(!m[1].includes('meet.jit.si'), feature + ' no debe delegar en Jitsi');
+    });
   });
 });
 
@@ -217,6 +237,44 @@ describe('permisos de grupos', () => {
   });
 });
 
+/* ---- 4b) Catálogo de apps externas ---------------------------------- */
+
+describe('catálogo de apps externas', () => {
+  it('lo lee el equipo interno y solo contenido/dirección lo edita', () => {
+    ['admin', 'gm', 'desarrollador', 'editor'].forEach((role) => {
+      assert.equal(roles.canWrite({ role }, 'externalApps'), true, role + ' debería editar el catálogo');
+    });
+    ['alumno', 'maestro', 'capacitador', 'agencia', 'agente_agencia', 'agente_desarrollo', 'prospecto'].forEach((role) => {
+      assert.equal(roles.canWrite({ role }, 'externalApps'), false, role + ' no debería editar el catálogo');
+    });
+    ['admin', 'maestro', 'alumno'].forEach((role) => {
+      assert.equal(roles.canRead({ role }, 'externalApps'), true, role + ' debería ver el catálogo');
+    });
+    assert.equal(roles.canRead({ role: 'prospecto' }, 'externalApps'), false);
+  });
+});
+
+/* ---- 4c) Apps externas: editar descripción -------------------------- */
+
+describe('apps externas: editar descripción', () => {
+  const APPS = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '13-apps.js');
+  const CSS = path.join(RAIZ, 'portal-modular', 'css', 'apps.css');
+  const apps = fs.readFileSync(APPS, 'utf8');
+
+  it('cada tarjeta ofrece editar la descripción a quien administra', () => {
+    assert.ok(/data-apps-edit=/.test(apps), 'falta el botón de editar en la tarjeta');
+    assert.ok(/id="apps-edit-description"/.test(apps), 'falta el campo de descripción editable');
+    assert.ok(/function openEdit\(/.test(apps), 'falta abrir el formulario de edición');
+    assert.ok(fs.readFileSync(CSS, 'utf8').includes('.apps-edit'), 'falta el estilo del botón editar');
+  });
+
+  it('las apps fijas guardan su descripción sin duplicar la tarjeta', () => {
+    assert.ok(/overrideOf/.test(apps), 'la descripción editada de una app fija debe guardarse aparte');
+    assert.ok(/app\.overrideOf \|\| !app\.name/.test(apps), 'las descripciones guardadas no deben pintarse como apps nuevas');
+    assert.ok(/pushCollectionsImmediate\(\['externalApps'\]\)/.test(apps), 'la edición debe sincronizarse');
+  });
+});
+
 /* ---- 5) Mis Clientes: estatus, comisiones y evidencia ---------------- */
 
 describe('Mis Clientes', () => {
@@ -271,6 +329,119 @@ describe('PDFs de Biblioteca', () => {
     assert.ok(!/<iframe/.test(core.slice(marca, marca + 600)), 'el PDF de Biblioteca volvió a usar iframe');
     assert.ok(/id="library-pdf-preview"/.test(core), 'falta el contenedor de la vista previa PDF');
     assert.ok(/previsualizarPdfMaterial/.test(core), 'falta el render de PDF con PDF.js');
+  });
+});
+
+/* ---- 6b) Mi Agenda: no repetir la serie semanal --------------------- */
+
+describe('Mi Agenda: sesiones semanales', () => {
+  const AGENDA = path.join(RAIZ, 'backend', 'campus-private', 'legacy', '04-modulo-d.js');
+  const agenda = fs.readFileSync(AGENDA, 'utf8');
+
+  it('solo incluye las próximas ocurrencias de la semana en curso', () => {
+    assert.ok(/function ccSemanaActual\(/.test(agenda), 'falta el recorte a la semana actual');
+    assert.ok(/ccOcurrencias\(userId, 1\)/.test(agenda), 'debe pedir solo una semana de ocurrencias');
+    assert.ok(/rango\.ini < ccSemana\.fin && rango\.fin > ccSemana\.inicio/.test(agenda), 'debe omitir las semanas fuera del periodo visible');
+    assert.ok(!/ccOcurrencias\(currentUser\.id, semanas\)/.test(agenda), 'no debe clonar la serie para todas las semanas de la vista');
+  });
+});
+
+/* ---- 6d) Importador de exámenes largos ------------------------------ */
+
+describe('importador de exámenes', () => {
+  const IMPORT = path.join(RAIZ, 'portal-modular', 'js', 'legacy', '14-exam-import.js');
+  const src = fs.readFileSync(IMPORT, 'utf8');
+  const api = new Function('window', src + '\nreturn window.ExamImport;')({});
+
+  it('detecta pares pregunta/respuesta numerados', () => {
+    const r = api.parsearTexto(
+      '1. ¿Qué es una póliza?\nEs el contrato con la aseguradora y sus condiciones.\n' +
+      '2. ¿Qué cubre el seguro de auto?\nDaños materiales y responsabilidad civil.'
+    );
+    assert.equal(r.items.length, 2);
+    assert.equal(r.items[0].question, '¿Qué es una póliza?');
+    assert.equal(r.items[0].answer, 'Es el contrato con la aseguradora y sus condiciones.');
+    assert.equal(r.items[1].answer, 'Daños materiales y responsabilidad civil.');
+  });
+
+  it('también acepta pregunta y respuesta en la misma línea', () => {
+    const r = api.parsearTexto('1. ¿Qué es un deducible? = Lo que paga el asegurado antes de la cobertura.');
+    assert.equal(r.items.length, 1);
+    assert.equal(r.items[0].answer, 'Lo que paga el asegurado antes de la cobertura.');
+  });
+
+  it('entiende el formato Pregunta N · categoría con Respuesta correcta y explicación', () => {
+    const real = [
+      'Pregunta 1 · Accidentes y Enfermedades — Personas ¿Cuál gasto está EXCLUIDO? ✗ Tu respuesta: Honorarios del anestesiólogo ✓ Respuesta correcta: Cirugía plástica con fines estéticos 💡 Explicación: Los tratamientos estéticos se excluyen.',
+      'Pregunta 2 · Matemáticas y Cálculos Financieros ¿Cuál es la diferencia entre notación decimal y porcentual? ✓ Respuesta correcta: La porcentual multiplica por 100 la decimal 💡 Explicación: Ambas representan el mismo valor. Fuente: SistemayMercadosFinancieros.',
+      'Pregunta 35 · Embarcaciones Menores de Placer ✓ Respuesta correcta: Daños físicos a la embarcación 💡 Explicación: La cobertura básica del casco.',
+      'Pregunta 36 · Vida Individual En un seguro de vida, ¿qué se requiere para cambiar al beneficiario? ✓ Respuesta correcta: B) El consentimiento del beneficiario irrevocable 💡 Explicación: Se necesita su consentimiento expreso.',
+      'Pregunta 60 · Embarcaciones Menores de Placer ✓ Respuesta correcta: Generalmente cubre el motor 💡 Explicación: El motor está cubierto como parte de la embarcación.',
+      'Pregunta 111 · Jurídicos ¿Qué sucede si el asegurado comete suicidio? ✓ Respuesta correcta: C) Se paga después de 2 años 💡 Explicación: Lo establece el artículo 172. En materia de PLD, se considera operación relevante aquella que se realiza: ✓ Respuesta correcta: Con billetes o divisas por 10,000 dólares 💡 Explicación: Así lo definen las Disposiciones.',
+      'Pregunta 113 · Hogar — Casa Habitación La reposición a valor de nuevo significa que: ✓ Respuesta correcta: B) Se repone el bien por uno nuevo similar 💡 Explicación: No se aplica depreciación.'
+    ].join(' ');
+    const r = api.parsearTexto(real);
+    assert.equal(r.items.length, 6, 'deben quedar 6 reactivos válidos');
+    assert.equal(r.descartadas.length, 2, '35 y 60 no tienen enunciado');
+    assert.deepEqual(r.descartadas.map((d) => d.motivo), ['sin enunciado', 'sin enunciado']);
+    assert.equal(r.items.find((x) => x.numero === 1).question, '¿Cuál gasto está EXCLUIDO?');
+    assert.equal(r.items.find((x) => x.numero === 1).answer, 'Cirugía plástica con fines estéticos');
+    assert.equal(r.items.find((x) => x.numero === 36).answer, 'El consentimiento del beneficiario irrevocable');
+    const recuperada = r.items.find((x) => x.question.startsWith('En materia de PLD'));
+    assert.ok(recuperada, 'debe recuperar el reactivo sin marcador Pregunta 112');
+    assert.ok(recuperada.answer.startsWith('Con billetes'));
+    assert.ok(!r.items.some((x) => /Explicación|Respuesta correcta|Fuente:/.test(x.question + ' ' + x.answer)));
+    const qs = api.construirPreguntas(r.items, []);
+    assert.equal(qs.length, 6);
+    qs.forEach((q) => assert.equal(q.options.length, 4));
+  });
+
+  it('descarta reactivos sin enunciado y preguntas repetidas del documento', () => {
+    const r = api.parsearTexto(
+      'Pregunta 1 · Técnicos ¿Qué es el riesgo? ✓ Respuesta correcta: La posibilidad de pérdida 💡 Explicación: Uno. ' +
+      'Pregunta 2 · Técnicos ¿Qué es el riesgo? ✓ Respuesta correcta: La posibilidad de pérdida 💡 Explicación: Dos. ' +
+      'Pregunta 3 · Técnicos ✓ Respuesta correcta: Sin pregunta 💡 Explicación: Tres.'
+    );
+    assert.equal(r.items.length, 1);
+    assert.equal(r.descartadas.filter((d) => d.motivo === 'duplicada').length, 1);
+    assert.equal(r.descartadas.filter((d) => d.motivo === 'sin enunciado').length, 1);
+  });
+
+  it('soporta 410 reactivos del mismo formato sin perder ninguno', () => {
+    let bulk = '';
+    for (let i = 1; i <= 410; i++) {
+      bulk += 'Pregunta ' + i + ' · Técnicos ¿Pregunta de prueba ' + i + '? ✓ Respuesta correcta: Respuesta de prueba ' + i + ' 💡 Explicación: Explicación ' + i + '. ';
+    }
+    const r = api.parsearTexto(bulk);
+    assert.equal(r.items.length, 410);
+    const qs = api.construirPreguntas(r.items, []);
+    assert.equal(qs.length, 410);
+    qs.forEach((q) => assert.equal(q.options.length, 4));
+  });
+
+  it('genera 4 opciones con una sola correcta por reactivo', () => {
+    const items = ['uno', 'dos', 'tres', 'cuatro'].map((a, i) => ({ question: 'Pregunta ' + (i + 1), answer: 'Respuesta ' + a }));
+    const qs = api.construirPreguntas(items, []);
+    assert.equal(qs.length, 4);
+    qs.forEach((q) => {
+      assert.equal(q.options.length, 4);
+      assert.ok(q.correct >= 0 && q.correct < 4);
+      assert.equal(q.options.filter((o) => o === q.options[q.correct]).length, 1);
+      assert.equal(q.type, 'multiple');
+    });
+  });
+
+  it('no duplica preguntas que ya están en el examen', () => {
+    const qs = api.construirPreguntas([{ question: 'Pregunta 1', answer: 'x' }], [], ['Pregunta 1']);
+    assert.equal(qs.length, 0);
+  });
+
+  it('el modal ofrece importar y no guarda preguntas barajadas', () => {
+    const CORE = fs.readFileSync(LEGACY, 'utf8');
+    const INDEX = fs.readFileSync(path.join(RAIZ, 'portal-modular', 'index.html'), 'utf8');
+    assert.ok(!/_shuffled/.test(CORE), 'las preguntas barajadas no deben guardarse dentro de db.exams');
+    assert.ok(/window\.ExamImport\.mount\(/.test(CORE), 'el modal de examen debe montar el importador');
+    assert.ok(/js\/legacy\/14-exam-import\.js/.test(INDEX), 'falta cargar 14-exam-import.js en index.html');
   });
 });
 
@@ -410,6 +581,61 @@ describe('secretos fuera del bundle (Fase 0)', () => {
       assert.equal(roles.canRead({ role }, 'guiaBase'), true, role + ' sí debe leer guiaBase');
       assert.equal(roles.canRead({ role }, 'practicaConfig'), true, role + ' sí debe leer practicaConfig');
     });
+  });
+});
+
+describe('Voces de práctica', () => {
+  it('carga voces tardías y reproduce la voz elegida, incluso antes de iniciar sesión', async () => {
+    const vm = require('node:vm');
+    const src = fs.readFileSync(LEGACY, 'utf8');
+    const bloque = src.slice(src.indexOf('/* ==================== VOCES ==================== */'), src.indexOf('/* ==================== MOTOR DE RESPUESTA'));
+    let disponible = [];
+    let hablada = null;
+    const selector = { value: 'auto', innerHTML: '' };
+    const mensaje = { textContent: '' };
+    const synth = { getVoices: () => disponible, cancel() {}, speak(u) { hablada = u; } };
+    const contexto = {
+      window: { speechSynthesis: synth, psVoiceOn: true }, speechSynthesis: synth,
+      document: { getElementById(id) { return id === 'ps-voz' ? selector : id === 'ps-voz-info' ? mensaje : null; } },
+      psEscape: (s) => String(s), showToast: () => {}, SpeechSynthesisUtterance: function(text) { this.text = text; },
+      fetch: async () => ({ ok: true, json: async () => ({ disponible: true, voces: [{ id: 'vozA', nombre: 'Voz A' }, { id: 'vozB', nombre: 'Voz B' }] }) }),
+    };
+    vm.createContext(contexto);
+    vm.runInContext(bloque, contexto);
+    contexto.psLoadVoices();
+    assert.ok(!selector.innerHTML.includes('Voz tardía'));
+    disponible = [{ name: 'Voz tardía', lang: 'es-MX', voiceURI: 'voz-es' }];
+    contexto.psLoadVoices();
+    assert.ok(selector.innerHTML.includes('Voz tardía'));
+    selector.value = 'browser:voz-es';
+    contexto.psElegirVoz();
+    contexto.psSpeak('Prueba');
+    assert.equal(hablada.voice.voiceURI, 'voz-es');
+    await contexto.psCargarVocesNaturales();
+    assert.ok(selector.innerHTML.includes('Voz A') && selector.innerHTML.includes('Voz B'));
+    assert.equal(selector.value, 'browser:voz-es', 'conserva la selección al cargar voces naturales');
+  });
+
+  it('envía la voz natural elegida y divide el texto sin perder contenido', async () => {
+    const vm = require('node:vm');
+    const src = fs.readFileSync(LEGACY, 'utf8');
+    const bloque = src.slice(src.indexOf('/* ==================== VOCES ==================== */'), src.indexOf('/* ==================== MOTOR DE RESPUESTA'));
+    const selector = { value: 'eleven:vozB' };
+    const pedidos = [];
+    const contexto = {
+      window: { psVoiceOn: true }, document: { getElementById: () => selector },
+      psEscape: String, showToast: (msg) => { throw new Error(msg); }, AbortController,
+      URL: { createObjectURL: () => 'blob:prueba', revokeObjectURL: () => {} },
+      Audio: function() { this.pause = () => {}; this.play = () => { setImmediate(() => this.onended()); return Promise.resolve(); }; },
+      fetch: async (url, opts) => { pedidos.push(JSON.parse(opts.body)); return { ok: true, blob: async () => ({}) }; },
+    };
+    vm.createContext(contexto);
+    vm.runInContext(bloque, contexto);
+    const texto = 'palabra '.repeat(100).trim();
+    await new Promise((resolve) => contexto.psSpeak(texto, resolve));
+    assert.ok(pedidos.length > 1);
+    assert.ok(pedidos.every((p) => p.voz === 'vozB' && p.texto.length <= 500));
+    assert.equal(pedidos.map((p) => p.texto.trim()).join(' '), texto);
   });
 });
 
