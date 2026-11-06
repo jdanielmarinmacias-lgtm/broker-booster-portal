@@ -1,7 +1,6 @@
-/* Genera iconos + favicon + splashes iOS desde img/splash-source.webp.
- * El splash de iOS ahora va "cover" (pantalla completa, sin franjas blancas):
- * se extiende el mármol del fondo hacia abajo hasta el ratio del dispositivo
- * iOS más ancho (750x1334 = 0.5625) para no recortar jamás el logo. */
+/* Genera iconos + favicon desde img/splash-source.webp.
+ * El splash de carga (web + app/PWA) se genera aparte con tools/gen-splash.cjs:
+ * ese script produce el 16:9 de escritorio y el vertical de móvil/iOS. */
 const path = require('path');
 const sharp = require(path.join(__dirname, 'node_modules', 'sharp'));
 
@@ -13,38 +12,8 @@ const OUT = path.join(__dirname, '..', 'img');
   const W = meta.width, H = meta.height;
   console.log('fuente:', W + 'x' + H, meta.format);
 
-  // --- Splash iOS (portrait): imagen completa sobre pantalla completa ---
-  // Canvas extendida: mármol duplicado del fondo abajo, hasta ratio 0.5625.
-  const SAFE_RATIO = 0.5625;
-  const extH = Math.max(H, Math.round(W / SAFE_RATIO));
-  const bandH = extH - H;
-  let full;
-  if (bandH > 0) {
-    const band = await sharp(SRC)
-      .extract({ left: 0, top: H - bandH, width: W, height: bandH })
-      .png().toBuffer();
-    const base = await sharp(SRC).png().toBuffer();
-    full = await sharp({
-      create: { width: W, height: extH, channels: 3, background: '#ffffff' },
-    }).composite([
-      { input: base, left: 0, top: 0 },
-      { input: band, left: 0, top: H },
-    ]).png().toBuffer();
-  } else {
-    full = await sharp(SRC).png().toBuffer();
-  }
-  console.log('canvas splash: ' + W + 'x' + extH);
-
-  const sizes = [
-    [1290, 2796], [1179, 2556], [1284, 2778], [1170, 2532],
-    [828, 1792], [750, 1334], [2732, 2732], // incluye iPad
-  ];
-  for (const [w, h] of sizes) {
-    const name = (w > h) ? `splash-${h}x${w}-landscape.jpg` : `splash-${w}x${h}.jpg`;
-    await sharp(full).resize(w, h, { fit: 'cover', position: 'north' })
-      .jpeg({ mozjpeg: true }).toFile(path.join(OUT, name));
-    console.log('ok', name);
-  }
+  // El splash (web + app) vive en tools/gen-splash.cjs: no se toca aquí para
+  // que regenerar iconos no revierta el arte de carga.
 
   // --- Icono: recorte cuadrado centrado en el escudo (logo superior) ---
   const side = Math.min(W, Math.round(H * 0.5));
