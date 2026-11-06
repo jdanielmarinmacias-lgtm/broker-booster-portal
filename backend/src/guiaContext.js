@@ -42,9 +42,17 @@ function construirContexto(guiaBase, texto, opciones) {
 
   if (!rankeados.length) return '';
 
-  return '\n\n=== BASE DE CONOCIMIENTO DEL PORTAL (prioridad máxima: si el tema está aquí, respóndete SOLO con esto y no con conocimiento general) ===\n'
+  /* Cuando también viaja el catálogo real de Formación Académica, ese bloque
+   * manda para nombres de capacitaciones. AI Lobby queda como material de
+   * apoyo, nunca como fuente de nombres. */
+  const avisoPrioridad = opts.prioridadPortal
+    ? 'REGLA DE PRIORIDAD: los bloques FORMACIÓN ACADÉMICA — DATOS REALES DEL PORTAL y SECCIONES DEL PORTAL — DATOS REALES son la fuente única para capacitaciones, sesiones, apps y exámenes. No tomes datos de este material si contradicen esos bloques.\n'
+    : '';
+
+  return '\n\n' + avisoPrioridad
+    + '=== BASE DE CONOCIMIENTO DEL PORTAL (prioridad sobre conocimiento general; si el tema está aquí, respóndete con esto y no inventes datos internos) ===\n'
     + rankeados.map((r) => '[' + (r.doc.titulo || 'Doc') + ']\n' + String(r.doc.texto || '').slice(0, opts.maxChars || MAX_CHARS_POR_DOC)).join('\n---\n')
-    + '\n=== FIN DE LA BASE: usa estos datos con prioridad sobre tu conocimiento general; si la respuesta no está aquí, dilo y complementa con lo que sepas. ===';
+    + '\n=== FIN DE LA BASE: si la respuesta no está aquí, dilo; no inventes datos internos y complementa solo con conocimiento general cuando sea seguro. ===';
 }
 
 /* Añade el contexto al prompt del sistema sin romper proveedores que esperan

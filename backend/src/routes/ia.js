@@ -14,6 +14,8 @@
 const express = require('express');
 const mw = require('../middleware');
 const { construirContexto, inyectarContexto } = require('../guiaContext');
+const { esTemaFormacion, construirContextoFormacion, respuestaCatalogoFormacion } = require('../guiaPortal');
+const { temasDeSecciones, construirContextoSecciones, respuestaCatalogoSecciones } = require('../guiaSecciones');
 const { MODELOS_PERMITIDOS } = require('../iaCatalogo');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -117,21 +119,66 @@ module.exports = (store, config) => {
         if (body[k] !== undefined) cuerpo[k] = body[k];
       });
 
-      /* Base de conocimiento server-side: `guiaBase` ya no viaja en el bundle.
-       * Se eligen los 3 documentos más relevantes y se inyectan en el prompt.
-       * Si la colección no está disponible, se responde con el prompt del
-       * cliente (degradación limpia, sin bloquear la IA). */
+      /* Contexto server-side de Gu-IA:
+       *  - `guiaBase` (AI Lobby), como hasta ahora.
+       *  - `planes`/`generations`: catálogo real de Formación Académica.
+       *  - `liveClasses`, `externalApps` y `exams`: sesiones, apps y exámenes,
+       *    filtrados por el rol de la sesión autenticada.
+       * La consulta usa los últimos mensajes del usuario para resolver
+       * seguimientos como «¿y sus nombres?». Los listados se responden de
+       * forma determinista: no llaman al modelo, no consumen cupo y no pueden
+       * inventar datos. */
       try {
-        if (typeof store.refreshCollections === 'function') {
-          await store.refreshCollections(['guiaBase']);
-        }
-        const ultimo = [...mensajes].reverse().find((m) => m && m.role === 'user');
-        const consulta = ultimo
+        const usuarios = mensajes.filter((m) => m && m.role === 'user');
+        const ultimo = usuarios[usuarios.length - 1];
+        const consultaActual = ultimo
           ? (typeof ultimo.content === 'string' ? ultimo.content : JSON.stringify(ultimo.content))
           : '';
-        const contexto = construirContexto((store.get() || {}).guiaBase, consulta);
+        const consultaPortal = usuarios.slice(-3).map((m) => {
+          const texto = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+          /* Un documento adjunto puede contener cualquier palabra; no debe
+           * convertir una pregunta sobre el documento en un listado del portal. */
+          return texto.replace(/=== CONTENIDO DEL DOCUMENTO ADJUNTO ===[\s\S]*?=== FIN DEL DOCUMENTO ===/g, ' ');
+        }).join('\n').slice(-4000);
+        const esFormacion = esTemaFormacion(consultaPortal);
+        const temas = temasDeSecciones(consultaPortal);
+        const tieneDocumento = /CONTENIDO DEL DOCUMENTO ADJUNTO/i.test(consultaActual);
+        const refrescar = ['guiaBase'];
+        if (esFormacion) refrescar.push('planes', 'generations');
+        if (temas.sesiones) refrescar.push('liveClasses', 'enrollments', 'groups', 'users', 'guiaAgenda');
+        if (temas.apps) refrescar.push('externalApps');
+        if (temas.examenes) refrescar.push('exams', 'categories', 'examAttempts');
+        if (typeof store.refreshCollections === 'function') {
+          try { await store.refreshCollections(refrescar); } catch (e) { /* se usa la caché disponible */ }
+        }
+        const root = store.get() || {};
+        const directaFormacion = esFormacion && !tieneDocumento
+          ? respuestaCatalogoFormacion(root, consultaPortal)
+          : null;
+        const directaSecciones = !tieneDocumento
+          ? respuestaCatalogoSecciones(root, req.user, consultaPortal)
+          : null;
+        const directas = [directaFormacion, directaSecciones].filter(Boolean);
+        if (directas.length) {
+          return res.json({
+            id: 'guia-portal-' + Date.now(),
+            object: 'chat.completion',
+            model: modelo,
+            choices: [{ index: 0, message: { role: 'assistant', content: directas.join('\n\n') }, finish_reason: 'stop' }],
+            guia: {
+              fuente: [directaFormacion ? 'formacion' : '', directaSecciones ? 'secciones' : ''].filter(Boolean).join('+'),
+              directo: true,
+            },
+          });
+        }
+        const contextoFormacion = esFormacion ? construirContextoFormacion(root, consultaPortal) : '';
+        const contextoSecciones = construirContextoSecciones(root, req.user, consultaPortal);
+        const contextoBase = construirContexto(root.guiaBase, consultaActual, {
+          prioridadPortal: !!(contextoFormacion || contextoSecciones),
+        });
+        const contexto = contextoFormacion + contextoSecciones + contextoBase;
         if (contexto) cuerpo.messages = inyectarContexto(cuerpo.messages, contexto);
-      } catch (e) { /* sin base: se conserva el prompt original */ }
+      } catch (e) { /* sin contexto: se conserva el prompt original */ }
 
       /* Cupo: se reserva ANTES de llamar con incrementos atómicos. Si el
        * proveedor falla por red/5xx, se devuelve para no castigar al usuario. */

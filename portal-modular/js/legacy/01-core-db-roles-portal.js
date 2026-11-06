@@ -3693,8 +3693,9 @@ const GUIA_MODEL = 'openai/gpt-oss-120b';
 const GUIA_SYS = [
 'Eres Gu-IA, la IA asesora del Portal de Desarrollo Comercial (promotoría de seguros en México).',
 'Tienes acceso a búsqueda web cuando la conversación lo requiera: si el usuario pregunta por el mercado, competidores, precios, novedades o comparativas, BUSCA información actualizada en internet antes de responder y cita la fuente (nombre del sitio) al final entre paréntesis. No inventas datos de mercado: si no puedes verificar algo, lo dices y distingues claramente entre lo que sabes del portal y lo que encontraste en la web.',
+'DATOS DEL PORTAL: cuando el sistema incluya los bloques FORMACIÓN ACADÉMICA — DATOS REALES DEL PORTAL o SECCIONES DEL PORTAL — DATOS REALES, usa exclusivamente esos datos. No agregues capacitaciones, sesiones, apps, exámenes, preguntas ni respuestas que no aparezcan en los bloques. Si no hay datos o el bloque no está, dilo y ofrece abrir la sección correspondiente; nunca inventes. Para exámenes, si el rol es alumno no reveles preguntas ni respuestas correctas.',
 'VISIÓN DE MERCADO: no eres exclusiva de una sola compañía. Conoces y comparas el mercado mexicano de seguros y ahorro para retiro: Skandia (Crea Futuro: aportación mensual, plazo de contratación, ~2.7% anual de la aportación para el asesor), GNP, AXA, MetLife, Zurich, Mapfre, Qualitas, HDI, Plan Seguro, SURA, Banorte, Inbursa y Afores/PPEF. Cuando te pregunten por alternativas, das comparativas honestas con criterio profesional: comisiones, coberturas, fortalezas y debilidades. Vendemos consultoría primero y producto después; la confianza se gana mostrando el panorama completo.',
-'REGLA DE IDENTIDAD Y AUTONOMÍA: No eres un sirviente. Eres un colega senior: das tu opinión con criterio, cuestionas lo que está mal, propones mejoras sin que te las pidan y decides tu formato de respuesta. No pides permiso para opinar, no abres con disculpas ni con frases de servicio. No te llamas "IA" ni "asistente" salvo que te lo pregunten directo. No dices "no puedo" a la primera: si algo no está en tu contexto, dices qué necesitas y lo resuelves con lo que tengas.',
+'REGLA DE IDENTIDAD Y AUTONOMÍA: No eres un sirviente. Eres un colega senior: das tu opinión con criterio, cuestionas lo que está mal, propones mejoras sin que te las pidan y decides tu formato de respuesta. No pides permiso para opinar, no abres con disculpas ni con frases de servicio. No te llamas "IA" ni "asistente" salvo que te lo pregunten directo. No dices "no puedo" a la primera: si falta un dato interno, lo dices con claridad y ofreces la sección donde consultarlo; no lo inventas.',
 'DOMINIO: seguros y ahorro para retiro Skandia (Crea Futuro: aportación mensual, plazo de contratación en años, 2.7% anual de la aportación para el asesor), prospección, manejo de objeciones, agenda comercial, formación del portal y análisis de pólizas/documentos que te compartan.',
 'ESTILO: español mexicano natural, directo y cálido, sin relleno corporativo. Respuestas cortas por defecto (1-4 frases); te extiendes solo si el tema lo amerita. Usas negritas para lo clave. Cero emojis decorativos.'
 ].join('\n');
@@ -3716,6 +3717,34 @@ function guiaContexto(texto){
      * selecciona e inyecta en el servidor. En modo local (sin backend) se
      * agrega abajo, solo para no perder la función offline. */
     return `Contexto en vivo de ${currentUser.name} (rol ${currentUser.role}): ${misVentas.length} ventas registradas, aportación acumulada $${primas.toLocaleString('es-MX')}, ${clases} clases próximas, ${sesiones.length} sesiones de práctica${prom!==null?' (promedio '+prom+'/100)':''}. Usa estos datos si son relevantes; no los listes si no aportan.`;
+  }catch(e){ return ''; }
+}
+/* Modo local (sin backend): mismo catálogo real de Formación que el servidor,
+ * para que Gu-IA no invente nombres tampoco cuando trabaja offline. */
+function guiaEsTemaFormacion(texto){
+  const t=String(texto||'').toLowerCase();
+  return /\bformaci[oó]n(?:es)?\b|\bcapacitaci[oó]n(?:es)?\b|\bplanes?\b|\bcursos?\b|\btalleres?\b|\bcertificaci[oó]n(?:es)?\b|\bgeneraci[oó]n(?:es)?\b/.test(t);
+}
+function guiaFormacionContexto(texto){
+  try{
+    if(!guiaEsTemaFormacion(texto)) return '';
+    const limpiar=v=>String(v==null?'':v).replace(/\s+/g,' ').trim();
+    const planes=Array.isArray(db.planes)?db.planes.filter(p=>p&&limpiar(p.nombre)):null;
+    const cabecera='\n\n=== FORMACIÓN ACADÉMICA — DATOS REALES DEL PORTAL (fuente única para nombres de capacitaciones) ===\n'
+      +'Regla: usa exclusivamente estos nombres. No agregues capacitaciones que no aparezcan aquí. Si no hay datos, dilo; no los inventes.\n';
+    if(planes===null) return cabecera+'No se pudo leer el catálogo de Formación Académica. No inventes nombres; pide abrir la sección o reintentar.\n=== FIN FORMACIÓN ACADÉMICA ===';
+    if(!planes.length) return cabecera+'No hay planes/capacitaciones cargados en Formación Académica. No inventes nombres.\n=== FIN FORMACIÓN ACADÉMICA ===';
+    const gens=Array.isArray(db.generations)?db.generations:[];
+    const lineas=planes.map(p=>{
+      const propias=gens.filter(g=>String(g.planId)===String(p.id));
+      const nombres=propias.slice(0,6).map(g=>limpiar(g.name||g.nombre)+(limpiar(g.status)?' — '+limpiar(g.status):'')).filter(Boolean).join('; ');
+      return '- **'+limpiar(p.nombre)+'** | Tipo: '+(limpiar(p.tipo)||'Sin tipo')
+        +' | Duración: '+(limpiar(p.duracion)||'No indicada')+' | Generaciones: '+propias.length
+        +(nombres?' ('+nombres+(propias.length>6?'; +'+(propias.length-6)+' más':'')+')':'')
+        +'\n  Descripción: '+(limpiar(p.descripcion).slice(0,220)||'Sin descripción cargada.');
+    });
+    const texto=cabecera+'Total de planes/capacitaciones: '+planes.length+'.\nNombres exactos: '+planes.map(p=>'"'+limpiar(p.nombre)+'"').join(', ')+'\n\n'+lineas.join('\n')+'\n=== FIN FORMACIÓN ACADÉMICA ===';
+    return texto.length>12000?texto.slice(0,11910)+'\n[Contexto truncado; consulta Formación Académica para el listado exacto.]\n=== FIN FORMACIÓN ACADÉMICA ===':texto;
   }catch(e){ return ''; }
 }
 /* ==================== AI LOBBY: base de conocimiento de Gu-IA (solo GM) ==================== */
@@ -3811,9 +3840,9 @@ function lobbyProbar(){
     try{
       let web=''; if(guiaNecesitaWeb(q)) web=await guiaWebBloque(q);
       const usarServidor=!!(window.Backend && window.Backend.available);
-      const baseLocal=usarServidor?'':guiaBaseContexto(q);
+      const baseLocal=usarServidor?'':(guiaBaseContexto(q)+guiaFormacionContexto(q));
       const msgs=[{role:'system', content:GUIA_SYS+'\n'+baseLocal+web}].concat([{role:'user', content:q}]);
-      const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'};
+      const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.2,reasoning_effort:'low'};
       const res=usarServidor ? await window.IA.chat(payload) : await window.IA.completar(payload);
       const j=await res.json();
       if(j.error) throw new Error(j.error.message||'API error');
@@ -4032,10 +4061,10 @@ async function guiaSend(){
     const contenidoDoc=tieneDoc?('\n\n=== CONTENIDO DEL DOCUMENTO ADJUNTO ===\n'+guiaDocText+'\n=== FIN DEL DOCUMENTO ==='):'';
     guiaDocText='';
     const usarServidor=!!(window.Backend && window.Backend.available);
-    const baseLocal=usarServidor?'':guiaBaseContexto(texto);
+    const baseLocal=usarServidor?'':(guiaBaseContexto(texto)+guiaFormacionContexto(texto));
     const msgs=[{role:'system', content:GUIA_SYS+'\n'+guiaContexto(texto)+baseLocal+web}]
       .concat(arr.slice(-12).map((m,i,a)=>({role:m.rol==='user'?'user':'assistant', content:(m.doc&&i===a.length-1?(contenidoDoc+'\n'):'')+String(m.texto||'').slice(0,1500)})));
-    const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.7,reasoning_effort:'low'};
+    const payload={model:GUIA_MODEL,messages:msgs,max_tokens:700,temperature:0.2,reasoning_effort:'low'};
     const res=usarServidor ? await window.IA.chat(payload) : await window.IA.completar(payload);
     const j=await res.json();
     if(!res.ok || j.error) throw new Error('HTTP '+res.status+': '+((typeof j.error==='string' ? j.error : (j.error&&j.error.message)) || 'error de IA'));
