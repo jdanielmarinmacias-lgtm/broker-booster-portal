@@ -1336,6 +1336,57 @@ function sinAgenteVisible(agenteId){
     return String(agenteId)===String(currentUser.id);
 }
 function sinVisible(s){ return sinAgenteVisible(s.agenteId); }
+// Vincula un expediente con su cliente. Los expedientes nuevos traen clienteId;
+// los viejos se reconocen por póliza + nombre para no contarlos como huérfanos.
+function sinClienteCoincide(s, c){
+    if(!s || !c) return false;
+    if(s.clienteId !== undefined && s.clienteId !== null && s.clienteId !== '') return String(s.clienteId) === String(c.id);
+    const poliza = String(s.poliza||'').trim().toLowerCase();
+    const nombre = String(s.clienteNombre||'').trim().toLowerCase();
+    if(!poliza && !nombre) return false;
+    return (!poliza || String(c.poliza||'').trim().toLowerCase() === poliza)
+        && (!nombre || String(c.nombre||'').trim().toLowerCase() === nombre);
+}
+function sinExpedientesDeCliente(c){
+    if(!c) return [];
+    return sinDB().filter(s => sinClienteCoincide(s, c));
+}
+function sinClienteVigente(s){
+    if(!s) return false;
+    const clientes = Array.isArray(db.clientes) ? db.clientes : [];
+    return clientes.some(c => sinClienteCoincide(s, c));
+}
+// Lista y métricas solo con expedientes de clientes que siguen en cartera.
+function sinCasosVigentes(){
+    return sinDB().filter(s => sinVisible(s) && sinClienteVigente(s));
+}
+function sinNotificacionDeCliente(n, c, ids){
+    if(!n || n.type !== 'tramite' || !c) return false;
+    if(n.clienteId !== undefined && n.clienteId !== null && String(n.clienteId) === String(c.id)) return true;
+    if(n.refId !== undefined && n.refId !== null && ids && ids.has(String(n.refId))) return true;
+    const msg = String(n.msg||'').toLowerCase();
+    const nombre = String(c.nombre||'').trim().toLowerCase();
+    const poliza = String(c.poliza||'').trim().toLowerCase();
+    return /siniestro|cancelaci/i.test(msg) && !!nombre && msg.includes(nombre) && (!poliza || msg.includes(poliza));
+}
+function sinNotificacionDeExpediente(n, s){
+    if(!n || n.type !== 'tramite' || !s) return false;
+    if(n.refId !== undefined && n.refId !== null && String(n.refId) === String(s.id)) return true;
+    if(n.siniestroId !== undefined && n.siniestroId !== null && String(n.siniestroId) === String(s.id)) return true;
+    const msg = String(n.msg||'').toLowerCase();
+    const nombre = String(s.clienteNombre||'').trim().toLowerCase();
+    const poliza = String(s.poliza||'').trim().toLowerCase();
+    return /siniestro|cancelaci/i.test(msg) && !!nombre && msg.includes(nombre) && (!poliza || msg.includes(poliza));
+}
+function sinOlvidarChecks(ids){
+    try{ (ids||[]).forEach(id => { delete window['sinChecks_'+id]; }); }catch(e){}
+}
+function sinActualizarSnapshot(){
+    try{
+        window.sinSnapPrev = JSON.stringify(sinDB().map(x=>({id:x.id, e:x.estado})));
+        window.sinSnapPrevCount = sinDB().length;
+    }catch(e){}
+}
 // Clientes que puede seleccionar el usuario al crear un expediente (mismo alcance)
 function sinClientesVisibles(){
     const rol = (currentUser.role||'').toLowerCase();
@@ -1348,7 +1399,7 @@ function sinChecksDe(s){ return window['sinChecks_'+s.id] || {}; }
 
 function renderSiniestros(){
     if(!db.clientes) db.clientes = [];
-    const casos = sinDB().filter(sinVisible);
+    const casos = sinCasosVigentes();
     const puedeVerTodos = sinPuedeTodo() || (currentUser.role||'').toLowerCase()==='agencia'; // filtro de agente para roles con vista de equipo
     const esGMRol = (currentUser.role||'').toLowerCase()==='gm';
     const vencidos = casos.filter(s=>!['Cerrado','Pagado','Efectiva','Rechazada'].includes(s.estado) && sinDiasSinActualizar(s)>=21).length;
@@ -1525,15 +1576,16 @@ function renderSiniestros(){
 
 // ===== Siniestralidad: % de expedientes sobre la cartera de Mis Clientes =====
 function sinPanelSiniestralidad(casos){
-    const totalClientes = db.clientes.length;
+    const clientes = sinClientesVisibles();
+    const totalClientes = clientes.length;
     const porCompania = companiasClientes().map((c,i)=>{
-        const cli = db.clientes.filter(x=>String(x.compania||'').toUpperCase()===String(c).toUpperCase()).length;
+        const cli = clientes.filter(x=>String(x.compania||'').toUpperCase()===String(c).toUpperCase()).length;
         const sin = casos.filter(s=>String(s.compania||'').toUpperCase()===String(c).toUpperCase()).length;
         return { nombre:c, cli, sin, pct: cli>0 ? (sin/cli*100) : 0, color: gfColorPara('compania', c, i) };
     });
-    const ramosVisibles = [...new Set([...db.clientes.map(x=>x.ramo).filter(Boolean), ...casos.map(s=>s.ramo).filter(Boolean)])];
+    const ramosVisibles = [...new Set([...clientes.map(x=>x.ramo).filter(Boolean), ...casos.map(s=>s.ramo).filter(Boolean)])];
     const porRamo = ramosVisibles.map((r,i)=>{
-        const cli = db.clientes.filter(x=>(x.ramo||'')===r).length;
+        const cli = clientes.filter(x=>(x.ramo||'')===r).length;
         const sin = casos.filter(s=>(s.ramo||'')===r).length;
         return { nombre:r, cli, sin, pct: cli>0 ? (sin/cli*100) : 0, color: gfColorPara('ramo', r, i) };
     });
@@ -1552,7 +1604,7 @@ function sinPanelSiniestralidad(casos){
         <div class="bg-white rounded-2xl border border-slate-200 p-6">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <h3 class="font-semibold text-lg flex items-center gap-2"><i class="fas fa-chart-column text-orange-600"></i> Siniestralidad</h3>
-                <p class="text-xs text-slate-400">Casos sobre la cartera de Mis Clientes (${casos.length} expedientes / ${totalClientes} clientes = <b class="text-slate-700">${general.toFixed(1)}%</b>)</p>
+                <p class="text-xs text-slate-400">Casos con cliente vigente sobre la cartera visible de Mis Clientes (${casos.length} expedientes / ${totalClientes} clientes = <b class="text-slate-700">${general.toFixed(1)}%</b>)</p>
             </div>
             <div class="grid lg:grid-cols-2 gap-6">
                 <div>
@@ -1564,7 +1616,7 @@ function sinPanelSiniestralidad(casos){
                     ${barras(porRamo)}
                 </div>
             </div>
-            <p class="text-[11px] text-slate-400 mt-3"><i class="fas fa-circle-info mr-1"></i>El porcentaje compara los expedientes (siniestros + cancelaciones) contra el total de clientes de esa compañía o ramo en Mis Clientes. Permite detectar qué aseguradora o producto está generando más incidencias.</p>
+            <p class="text-[11px] text-slate-400 mt-3"><i class="fas fa-circle-info mr-1"></i>Solo se cuentan expedientes con cliente vigente. El porcentaje compara los casos (siniestros + cancelaciones) contra el total de clientes de esa compañía o ramo en Mis Clientes; un cliente o caso borrado ya no infla el resultado.</p>
         </div>`;
 }
 
@@ -1664,7 +1716,7 @@ function sinGuardar(tipo){
     };
     sinDB().unshift(nuevo);
     cmLog('Siniestros y Cancelaciones', tipo==='cancelacion'?'Nueva cancelación':'Nuevo siniestro', nuevo.clienteNombre+' ('+nuevo.compania+' / '+nuevo.poliza+')');
-    notificarNuevoTramite(tipo, (tipo==='cancelacion'?'⚠️ Nueva cancelación registrada: ':'⚠️ Nuevo siniestro registrado: ')+nuevo.clienteNombre+' ('+nuevo.compania+' / '+(nuevo.poliza||'s/n')+')');
+    notificarNuevoTramite(tipo, (tipo==='cancelacion'?'⚠️ Nueva cancelación registrada: ':'⚠️ Nuevo siniestro registrado: ')+nuevo.clienteNombre+' ('+nuevo.compania+' / '+(nuevo.poliza||'s/n')+')', {refTipo:tipo, refId:nuevo.id, clienteId:cli.id});
     try{ window.sinSnapPrev = JSON.stringify(sinDB().map(x=>({id:x.id, e:x.estado}))); }catch(e){}
     updateBadgeTramites();
     saveDB();
@@ -1918,13 +1970,17 @@ function sinDesdeCliente(clienteId, tipo){
 function sinEliminar(id){
     const rol = (currentUser.role||'').toLowerCase();
     if(rol!=='gm' && rol!=='admin'){ showToast('Solo GM/admin puede eliminar expedientes','warning'); return; }
-    if(!confirm('¿Eliminar este expediente de la sección Siniestros y Cancelaciones? (el cliente NO se borra)')) return;
-    const s = sinDB().find(x=>x.id===id);
-    db.siniestros = sinDB().filter(x=>x.id!==id);
-    cmLog('Siniestros y Cancelaciones','Eliminar expediente', s?(s.clienteNombre+' ('+s.poliza+')'):'');
+    if(!confirm('¿Eliminar este expediente y sus avisos? El cliente NO se borra.')) return;
+    const s = sinDB().find(x=>String(x.id)===String(id));
+    if(!s) return;
+    db.siniestros = sinDB().filter(x=>String(x.id)!==String(id));
+    if(Array.isArray(db.notifications)) db.notifications = db.notifications.filter(n=>!sinNotificacionDeExpediente(n,s));
+    sinOlvidarChecks([s.id]);
+    sinActualizarSnapshot();
+    cmLog('Siniestros y Cancelaciones','Eliminar expediente', s.clienteNombre+' ('+s.poliza+')');
     saveDB();
     closeModal();
-    showToast('Expediente eliminado','success');
+    showToast('Expediente y avisos eliminados','success');
     render();
 }
 /* ==================== AGENCIA AUTOMOTRIZ VIRTUAL (hub auto-cartera) ==================== */
@@ -4843,19 +4899,30 @@ async function renderEvidenciaPdf(src, cont, nombre){
 
 function borrarCliente(id){
     try{
-        const c = (db.clientes||[]).find(x=>x.id===id);
+        const c = (db.clientes||[]).find(x=>String(x.id)===String(id));
         if(!c) return;
         const puedeVerTodos = ['agencia','desarrollador','admin','gm'].includes((currentUser.role||'').toLowerCase());
         const puede = puedeVerTodos || String(c.agenteId)===String(currentUser.id);
         if(!puede){ uiToast('Sin permisos'); return; }
-        if(!confirm('¿Borrar este cliente?')) return;
-        db.clientes = db.clientes.filter(x=>x.id!==id);
+        const relacionados = sinExpedientesDeCliente(c);
+        const ids = new Set(relacionados.map(s=>String(s.id)));
+        const mensaje = relacionados.length
+            ? '¿Borrar este cliente y sus '+relacionados.length+' expediente(s) de siniestros/cancelaciones? También se eliminarán sus avisos.'
+            : '¿Borrar este cliente y sus avisos?';
+        if(!confirm(mensaje)) return;
+        db.clientes = (db.clientes||[]).filter(x=>String(x.id)!==String(id));
+        if(relacionados.length){
+            db.siniestros = sinDB().filter(x=>!ids.has(String(x.id)));
+            sinOlvidarChecks(relacionados.map(s=>s.id));
+        }
+        if(Array.isArray(db.notifications)) db.notifications = db.notifications.filter(n=>!sinNotificacionDeCliente(n,c,ids));
         db.auditoria = db.auditoria||[];
-        db.auditoria.push({id:Date.now(),tipo:'borrado_cliente',clienteId:id,usuarioId:currentUser.id,usuarioNombre:currentUser.name,fecha:new Date().toISOString(),antes:c,despues:null});
+        db.auditoria.push({id:Date.now(),tipo:'borrado_cliente',clienteId:id,usuarioId:currentUser.id,usuarioNombre:currentUser.name,fecha:new Date().toISOString(),antes:c,despues:null,siniestrosEliminados:relacionados.map(s=>s.id)});
+        sinActualizarSnapshot();
         saveDB();
         closeModal();
         render();
-        if(window.showToast) showToast('Cliente borrado','success');
+        if(window.showToast) showToast(relacionados.length?'Cliente y expedientes relacionados borrados':'Cliente borrado','success');
     }catch(e){ uiToast('Error: '+e.message); }
 }
 
@@ -4999,6 +5066,22 @@ function miAgendaRango(vista, off){
     }
     return { ini, fin, etiqueta, hoy };
 }
+function ccSemanaActual(userId, ahora){
+    const ref = ahora instanceof Date ? ahora : new Date();
+    const inicio = new Date(ref);
+    inicio.setHours(0,0,0,0);
+    inicio.setDate(inicio.getDate() - ((inicio.getDay() + 6) % 7));
+    const fin = new Date(inicio);
+    fin.setDate(fin.getDate() + 7);
+    const items = typeof ccOcurrencias === 'function'
+        ? ccOcurrencias(userId, 1).filter(o => {
+            const s = new Date(o.start);
+            const e = new Date(o.end);
+            return s >= inicio && s < fin && e >= ref;
+        })
+        : [];
+    return { inicio, fin, items };
+}
 function renderMiAgenda(){
     const calId = currentUser.googleCalendarId || 'primary';
     const agenda = (db.agendas||{})[currentUser.id] || '';
@@ -5007,9 +5090,15 @@ function renderMiAgenda(){
     const off = window.miAgendaOff || 0;
     const rango = miAgendaRango(vista, off);
     const enRango = iso => { const s = new Date(iso); return s >= rango.ini && s < rango.fin; };
-    const semanas = Math.max(1, Math.ceil((rango.fin - rango.hoy) / 604800000) + 1);
+    /* Reunión y Capacitación es semanal, pero Mi Agenda no debe clonar la
+     * serie para todas las semanas del mes/año: solo las próximas sesiones de
+     * la semana en curso. Si la semana actual no toca el periodo elegido, no
+     * se muestra ninguna ocurrencia recurrente. */
+    const ccSemana = ccSemanaActual(currentUser.id, ahora);
+    const ccEnRango = ccSemana.items.length > 0
+        && rango.ini < ccSemana.fin && rango.fin > ccSemana.inicio;
     const misClases = (db.liveClasses||[]).filter(c => c.assignedTo.includes(currentUser.id) && new Date(c.end) >= ahora && enRango(c.start))
-        .concat(typeof ccOcurrencias === 'function' ? ccOcurrencias(currentUser.id, semanas).filter(o => enRango(o.start)).map(o => ({ id: o.id, title: o.title, start: o.start, end: o.end, zoomUrl: o.zoomUrl, instructorId: null, reunionSemanal: true })) : [])
+        .concat(ccEnRango ? ccSemana.items.map(o => ({ id: o.id, title: o.title, start: o.start, end: o.end, zoomUrl: o.zoomUrl, instructorId: null, reunionSemanal: true })) : [])
         .sort((a,b)=> new Date(a.start)-new Date(b.start));
     const botonVista = (v, txt) => `<button ${bxOn('click','miAgendaCambiarVista',[v])} class="px-3 py-1.5 rounded-lg text-xs font-semibold ${vista===v ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">${txt}</button>`;
     const selectorVista = `<div class="flex items-center gap-1">${botonVista('semana','Semana')}${botonVista('mes','Mes')}${botonVista('anio','Año')}</div>`;
@@ -5052,7 +5141,7 @@ function renderMiAgenda(){
             <div class="space-y-2 max-h-64 overflow-y-auto">
                 ${proximasHtml}
             </div>
-            <p class="text-xs text-slate-500 mt-3">Estas clases se agregan automáticamente cuando te asignan una sesión.</p>
+            <p class="text-xs text-slate-500 mt-3">Estas clases se agregan automáticamente cuando te asignan una sesión. Las sesiones de Reunión y Capacitación solo se muestran durante la semana en curso.</p>
         </div>
         
         <div class="bg-white rounded-2xl border border-slate-200 p-6">

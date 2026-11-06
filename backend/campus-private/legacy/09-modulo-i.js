@@ -380,6 +380,56 @@ function guardarComoCursoEnVivo(liveClassId) {
   render();
 }
 
+// Una sala nueva solo está activa si su ventana de horario está vigente y el
+// presentador ya se conectó. Las sesiones viejas con participantes no cuentan.
+function enVivoSalaActiva(){
+  try{
+    const ahora = Date.now();
+    return (db.liveClasses||[])
+      .filter(c => c && (c.esEnVivoNuevo || c.tipo === 'en_vivo_studio'))
+      .filter(c => {
+        const ini = new Date(c.start).getTime();
+        const fin = new Date(c.end).getTime();
+        return Number.isFinite(ini) && Number.isFinite(fin) && ahora >= ini && ahora <= fin
+          && Array.isArray(c.participantesReales) && c.participantesReales.length > 0;
+      })
+      .sort((a,b) => new Date(b.start) - new Date(a.start))[0] || null;
+  }catch(e){ return null; }
+}
+
+// Próxima sesión programada: así el participante sabe cuándo volver aunque
+// ahora mismo no haya transmisión.
+function enVivoProximaSesion(){
+  try{
+    const ahora = Date.now();
+    return (db.liveClasses||[])
+      .filter(c => c && (c.esEnVivoNuevo || c.tipo === 'en_vivo_studio'))
+      .filter(c => {
+        const ini = new Date(c.start).getTime();
+        return Number.isFinite(ini) && ini > ahora;
+      })
+      .sort((a,b) => new Date(a.start) - new Date(b.start))[0] || null;
+  }catch(e){ return null; }
+}
+
+function entrarSalaEnVivoNueva(){
+  try{
+    const activa = enVivoSalaActiva();
+    if(activa){
+      if(typeof initEnVivoStudio === 'function') initEnVivoStudio(String(activa.id));
+      return;
+    }
+    // El presentador puede iniciar una sala nueva; un participante no debe
+    // abrir un modal vacío cuando todavía no hay transmisión.
+    if(isCapacitacionRole((currentUser||{}).role)){
+      if(typeof initEnVivoStudio === 'function') initEnVivoStudio('nueva');
+      return;
+    }
+    if(window.showToast) showToast('No hay una transmisión EN VIVO activa en este momento','info');
+  }catch(e){ console.warn('No se pudo abrir la sala EN VIVO', e); }
+}
+window.entrarSalaEnVivoNueva = entrarSalaEnVivoNueva;
+
 // v6.6 FIX ROLES: Todos los roles pueden entrar a sala EN VIVO nueva, alumno como viewer
 const originalOpenLiveClassDetail = window.openLiveClassDetail;
 window.openLiveClassDetail = function(ev) {
@@ -423,36 +473,48 @@ const originalRenderLiveClasses = window.renderLiveClasses;
 window.renderLiveClasses = function() {
   const html = originalRenderLiveClasses ? originalRenderLiveClasses() : '';
   const esTeacher = isCapacitacionRole(currentUser.role);
+  const activa = enVivoSalaActiva();
+  const tieneEnVivo = !!activa;
   
-  // Banner para todos los roles
+  // Un solo banner con estado real: activo = entrada; inactivo = espera.
   let banner = '';
   if (esTeacher) {
+    const color = tieneEnVivo ? 'from-red-600 to-red-700' : 'from-[#0a2540] to-[#1e3a5f]';
+    const boton = tieneEnVivo
+      ? '<button data-bx-click="a651" class="px-4 py-2.5 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 flex items-center gap-2"><i class="fas fa-video"></i> Entrar a la sala</button>'
+      : '<button data-bx-click="a651" class="px-4 py-2.5 bg-[#c9a86a] text-[#0a2540] rounded-lg font-semibold hover:bg-[#b8945a]">Iniciar transmisión</button>';
     banner = `
-      <div class="mb-6 bg-gradient-to-r from-[#0a2540] to-[#1e3a5f] text-white p-5 rounded-xl shadow-sm flex items-center justify-between">
+      <div class="mb-6 bg-gradient-to-r ${color} text-white p-5 rounded-xl shadow-sm flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-video"></i></div>
           <div>
             <p class="font-bold">Estudio EN VIVO - Solo Capacitación transmite</p>
-            <p class="text-xs opacity-80">YouTube style: tú transmites, los demás solo ven. Sin pedir cámara a participantes.</p>
+            <p class="text-xs opacity-80">${tieneEnVivo ? 'Hay una sala activa. Entra para retomarla y seguir transmitiendo.' : 'YouTube style: tú transmites, los demás solo ven. Sin pedir cámara a participantes.'}</p>
           </div>
         </div>
-        <button data-bx-click="a651" class="px-4 py-2.5 bg-[#c9a86a] text-[#0a2540] rounded-lg font-semibold hover:bg-[#b8945a]">Iniciar transmisión</button>
+        ${boton}
       </div>
     `;
   } else {
-    // Para alumno y demás roles - banner de que hay sala nueva disponible
-    const enVivoActivas = (db.liveClasses||[]).filter(c => c.participantesReales && c.participantesReales.length > 0);
-    const tieneEnVivo = enVivoActivas.length > 0 || (db.liveClasses||[]).some(c=>c.esEnVivoNuevo || c.tipo==='en_vivo_studio');
+    const color = tieneEnVivo ? 'from-red-600 to-red-700' : 'from-slate-700 to-slate-800';
+    const proxima = enVivoProximaSesion();
+    const cuando = proxima ? new Date(proxima.start).toLocaleString('es-MX',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    const estado = tieneEnVivo
+      ? 'Hay una transmisión activa ahora'
+      : (proxima ? 'No hay transmisión activa. Próxima sesión: '+cuando : 'No hay transmisión activa. Cuando Capacitación inicie, aparecerá aquí.');
+    const boton = tieneEnVivo
+      ? '<button data-bx-click="a652" class="px-4 py-2.5 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 flex items-center gap-2"><i class="fas fa-eye"></i> Entrar a la sala</button>'
+      : '<span class="px-4 py-2.5 bg-white/15 text-white/80 rounded-lg font-semibold text-sm">Esperando transmisión</span>';
     banner = `
-      <div class="mb-6 bg-gradient-to-r from-red-600 to-red-700 text-white p-5 rounded-xl shadow-sm flex items-center justify-between">
+      <div class="mb-6 bg-gradient-to-r ${color} text-white p-5 rounded-xl shadow-sm flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center animate-pulse"><i class="fas fa-broadcast-tower"></i></div>
+          <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center ${tieneEnVivo ? 'animate-pulse' : ''}"><i class="fas fa-broadcast-tower"></i></div>
           <div>
-            <p class="font-bold">🔴 Sala EN VIVO Nueva - Formato YouTube</p>
-            <p class="text-xs opacity-90">Eres ${currentUser.role} - Solo ves, no necesitas cámara. ${tieneEnVivo ? 'Hay transmisión activa ahora' : 'Cuando Capacitación inicie, aparecerá aquí'}</p>
+            <p class="font-bold">${tieneEnVivo ? '🔴 ' : ''}Sala EN VIVO Nueva - Formato YouTube</p>
+            <p class="text-xs opacity-90">Eres ${currentUser.role} - Solo ves, no necesitas cámara. ${estado}</p>
           </div>
         </div>
-        <button data-bx-click="a652" class="px-4 py-2.5 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 flex items-center gap-2"><i class="fas fa-eye"></i> Entrar a sala nueva</button>
+        ${boton}
       </div>
     `;
   }
