@@ -18,6 +18,8 @@
   },
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i portal-modular/css/tailwind.src.css -o portal-modular/css/tailwind.min.css --minify",
-    "test": "node --test backend/test/portal-checks.js backend/test/smoke.js backend/test/permissions.js backend/test/rate-limit.js backend/test/guia-context.js backend/test/ia-modelos.js"
+    "db:backup": "npm --prefix backend run db:backup",
+    "db:backup:verify": "npm --prefix backend run db:backup:verify",
+    "test": "node --test backend/test/portal-checks.js backend/test/smoke.js backend/test/permissions.js backend/test/rate-limit.js backend/test/guia-context.js backend/test/ia-modelos.js backend/test/ia-gateway.js"
   }
 }

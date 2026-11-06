@@ -49,6 +49,9 @@ function createApp(store) {
   app.use('/api/ia/modelos', mw.noStorePrivate, require('./routes/iaModelos')(store, config));
   app.use('/api/ia', mw.noStorePrivate, require('./routes/ia')(store, config));
   app.use('/api/users', mw.noStorePrivate, require('./routes/users')(store));
+  /* Respaldo descargable (GM/admin): antes de /api para que no lo capture el
+   * router genérico de colecciones. */
+  app.use('/api/backup', mw.noStorePrivate, require('./routes/backup')(store));
   app.use('/api', mw.noStorePrivate, require('./routes/collections')(store, config));
   app.use('/api', mw.noStorePrivate, require('./routes/media')(store, config));
   app.use('/api', mw.noStorePrivate, require('./routes/reporte')(store, config));

@@ -103,6 +103,7 @@ const COLLECTION_RULES = {
 const CONFIG_WRITE = ['admin', 'gm', 'desarrollador', 'editor'];
 const CONFIG_RULES = {
   rolePermissions: { read: null, write: ['admin', 'gm', 'desarrollador'] },
+  userPermissions: { read: null, write: ['admin', 'gm'] }, // exclusiones por perfil
   /* Catálogo de apps externas: lo lee todo el equipo interno y lo edita contenido/dirección. */
   externalApps:    { read: ALL_ROLES.filter((r) => r !== 'prospecto'), write: CONFIG_WRITE },
   settings:        { read: null, write: CONFIG_WRITE },
