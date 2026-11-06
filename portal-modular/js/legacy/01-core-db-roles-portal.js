@@ -248,6 +248,7 @@ window.saveDB = function() {
 let _saveDBTimer = null;
 let _saveDBPending = false;
 function _flushSaveDBSync() {
+    if (window.__bbNoGuardarLocal) return; // limpieza de caché en curso: no reescribir
     if (_saveDBTimer) { clearTimeout(_saveDBTimer); _saveDBTimer = null; }
     _saveDBPending = false;
     try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {}
@@ -279,12 +280,20 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
         // Verificar al cargar
         setTimeout(checkStorageUsage, 2000);
 
+        const ROLE_PERMS_MIGRATION_VERSION = 2; // versión compartida dentro de rolePermissions
         function ensureDbDefaults() {
             if (!db || typeof db !== 'object') db = {};
             if (!Array.isArray(db.users) || !db.users.length) db.users = JSON.parse(JSON.stringify(defaultDB.users));
             if (!Array.isArray(db.categories)) db.categories = JSON.parse(JSON.stringify(defaultDB.categories));
             if (!Array.isArray(db.lessons)) db.lessons = JSON.parse(JSON.stringify(defaultDB.lessons));
             if (!Array.isArray(db.progress)) db.progress = JSON.parse(JSON.stringify(defaultDB.progress));
+            /* Exámenes fantasma de versiones anteriores: "Nuevo Examen" insertaba
+             * un registro con título vacío ANTES de guardar, y cualquier pregunta
+             * lo persistía y lo sincronizaba a todos los equipos. Se ocultan aquí;
+             * el borrado real en la base lo hace sync.js (DELETE + lápida). */
+            if (Array.isArray(db.exams)) {
+                db.exams = db.exams.filter(e => e && String(e.title || '').trim() !== '');
+            }
             if (!Array.isArray(db.generations)) db.generations = [];
             if (!Array.isArray(db.groups)) db.groups = [];
             if (!Array.isArray(db.enrollments)) db.enrollments = [];
@@ -396,8 +405,27 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (!db.groupMessages) db.groupMessages = [];
             if (!db.library) db.library = [];
             if (!Array.isArray(db.siniestros)) db.siniestros = []; // Expedientes de la sección Siniestros y Cancelaciones
+            if (!db.userPermissions || typeof db.userPermissions !== 'object' || Array.isArray(db.userPermissions)) db.userPermissions = {};
+            /* prospectos/expedientesProspectos van indexados por id de usuario.
+             * Un objeto plano {id,nombre,titulo} colado por un cliente viejo se
+             * contaba como varios expedientes: solo quedan claves numéricas. */
+            ['prospectos','expedientesProspectos'].forEach(function(k){
+                var o = db[k];
+                if (o && typeof o === 'object' && !Array.isArray(o)) {
+                    Object.keys(o).forEach(function(key){ if (!/^[0-9]+$/.test(key)) delete o[key]; });
+                }
+            });
             if (!Array.isArray(db.autoCartera)) db.autoCartera = []; // Cartera Automotriz (Comercial Automotriz)
             if (!db.autoHub) db.autoHub = { unidades:[], clientes:[], metas:[], ventas:[], guion:null, publicidad:[], practica:[], simConfig:null }; // Agencia Automotriz virtual
+            /* Migraciones de rolePermissions: se aplican UNA sola vez por base.
+             * Antes corrían en cada navigateTo y volvían a añadir apps,
+             * live-classes, mis-metas... justo después de guardar en Control
+             * de Accesos, así que el cambio parecía revertirse. */
+            const rolePermsVersion = Number((db.rolePermissions && db.rolePermissions.__version) || 0);
+            const rolePermsNeedsMigration = rolePermsVersion < ROLE_PERMS_MIGRATION_VERSION
+                || !db.rolePermissions || typeof db.rolePermissions !== 'object'
+                || !Object.keys(db.rolePermissions).length;
+            if (rolePermsNeedsMigration) {
             Object.keys(db.rolePermissions||{}).forEach(function(r){ var perms=db.rolePermissions[r]; if(Array.isArray(perms)&&perms.indexOf('auto-cartera')>=0){ ['auto-unidades','auto-clientes','auto-equipo','auto-monitoreo','auto-metas','auto-simulador','auto-guion','auto-pauta','auto-practica'].forEach(function(s){ if(perms.indexOf(s)<0) perms.push(s); }); } });
             if (!Array.isArray(db.finCartera)) db.finCartera = []; // Cartera Financiera (Comercial Financiero)
             if (!Array.isArray(db.inmCartera)) db.inmCartera = []; // Cartera Inmobiliaria (Comercial Inmobiliario)
@@ -420,6 +448,10 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                 agente_agencia: ['dashboard','leaderboard','carrusel-circulares','my-aula','my-courses','tareas','biblioteca','live-classes','my-progress','exams','messages','mis-clientes','siniestros','auto-cartera','fin-cartera','inm-cartera','guion-llamadas','casos-exito','centro-mensajes'],
                 prospecto: ['mi-experiencia','oferta-valor','plan-carrera','chat-reclutador','agenda-prospectos']
             };
+            // Apps: el catálogo de enlaces externos está disponible para todo el equipo interno.
+            Object.keys(defaultPerms).forEach(function(r){
+                if (r !== 'prospecto' && defaultPerms[r].indexOf('apps') < 0) defaultPerms[r].push('apps');
+            });
             if (!db.rolePermissions || typeof db.rolePermissions !== 'object' || !Object.keys(db.rolePermissions).length) {
                 db.rolePermissions = JSON.parse(JSON.stringify(defaultPerms));
             } else {
@@ -479,6 +511,12 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                     const perms = (db.rolePermissions||{})[r];
                     if(Array.isArray(perms) && !perms.includes('live-classes')) perms.push('live-classes');
                 });
+                // PATCH apps: Gadgets y Apps para todo el equipo interno.
+                Object.keys(db.rolePermissions||{}).forEach(r => {
+                    if (r === 'prospecto') return;
+                    const perms = db.rolePermissions[r];
+                    if (Array.isArray(perms) && !perms.includes('apps')) perms.push('apps');
+                });
                 // PATCH mis-metas: todo rol comercial con mis-clientes/monitoreo puede ver Mis Metas (gráficas individuales)
                 Object.keys(db.rolePermissions||{}).forEach(r => {
                     const perms = db.rolePermissions[r];
@@ -508,6 +546,10 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                         perms.push('inm-unidades');
                     }
                 });
+            }
+
+            db.rolePermissions.__version = ROLE_PERMS_MIGRATION_VERSION;
+            try { saveDB(); } catch (e) {}
             }
 
             if (!db.tasks) db.tasks = [];
@@ -2751,38 +2793,97 @@ function psSaveDB(d){ try{ if(typeof db!=='undefined' && d===db){ saveDB(); retu
 function psSesionesUsuario(){ const d=psGetDB(); const uid=currentUser.id; return d.practicaSesiones.filter(s=>String(s.usuarioId)===String(uid)).sort((a,b)=>b.inicio-a.inicio); }
 
 /* ==================== VOCES ==================== */
-let psVoicesCache = [];
+let psVoicesCache = [], psVocesNaturales = [], psAudio = null, psAudioUrl = null, psAudioDone = null, psVoiceAbort = null, psVoiceRun = 0;
 function psLoadVoices(){
   try{ psVoicesCache = (window.speechSynthesis ? speechSynthesis.getVoices() : []).filter(v=>(v.lang||'').toLowerCase().startsWith('es')); }catch(e){ psVoicesCache=[]; }
-  // priorizar es-MX y luego es-419/latino; excluir voces de calidad media conocidas si hay mejores
   psVoicesCache.sort((a,b)=>{
-    const score = v => ((v.lang||'').toLowerCase().includes('mx')?2:0) + ((v.lang||'').toLowerCase().match(/419|us|latam/)?1:0) + (/google|microsoft/i.test(v.name)?1:0);
+    const score = v => ((v.lang||'').toLowerCase().includes('mx')?2:0) + ((v.lang||'').toLowerCase().match(/419|us|latam/)?1:0) + (/natural|neural|google|microsoft/i.test(v.name)?1:0);
     return score(b)-score(a);
   });
   const sel=document.getElementById('ps-voz');
   if(sel){
-    const prev = sel.value;
-    sel.innerHTML = '<option value="auto">Automática (mejor voz disponible)</option>'
-      + psVoicesCache.map((v,i)=>`<option value="${i}">${psEscape(v.name)} (${v.lang})</option>`).join('');
-    if(prev) sel.value = prev;
+    const prev = window.psVozSel || (window.psSesionActiva && window.psSesionActiva.voz) || sel.value || 'auto';
+    sel.innerHTML = '<option value="auto">Automática del dispositivo</option>'
+      + (psVocesNaturales.length ? '<optgroup label="Voces naturales (ElevenLabs)">' + psVocesNaturales.map(v=>`<option value="${psEscape('eleven:'+v.id)}">${psEscape(v.nombre)}${v.acento?' — '+psEscape(v.acento):''}</option>`).join('') + '</optgroup>' : '')
+      + (psVoicesCache.length ? '<optgroup label="Voces del dispositivo">' + psVoicesCache.map(v=>`<option value="${psEscape('browser:'+v.voiceURI)}">${psEscape(v.name)} (${psEscape(v.lang)})</option>`).join('') + '</optgroup>' : '');
+    sel.value = prev;
+    if(!sel.value) sel.value='auto';
   }
   return psVoicesCache;
 }
+async function psCargarVocesNaturales(){
+  try{
+    const r = await fetch('/api/ia/voces', {credentials:'same-origin'});
+    if(!r.ok) throw new Error('No se pudieron cargar las voces naturales');
+    const data = await r.json();
+    psVocesNaturales = Array.isArray(data.voces) ? data.voces : [];
+    const msg=document.getElementById('ps-voz-info');
+    if(msg) msg.textContent = data.disponible ? (psVocesNaturales.length ? 'Voces naturales de ElevenLabs: el texto se envía al proveedor y puede generar costo. No uses datos sensibles.' : 'La cuenta no tiene voces en español disponibles. Se usarán las voces del dispositivo.') : 'Voces naturales no configuradas; la disponibilidad y calidad dependen del dispositivo.';
+  }catch(e){ const msg=document.getElementById('ps-voz-info'); if(msg) msg.textContent='No se pudieron cargar las voces naturales. Puedes usar las voces del dispositivo.'; }
+  psLoadVoices();
+}
+function psElegirVoz(){
+  const sel=document.getElementById('ps-voz');
+  window.psVozSel=sel ? sel.value : 'auto';
+  if(window.psSesionActiva) window.psSesionActiva.voz=window.psVozSel;
+  psStopSpeak();
+}
+function psStopSpeak(){
+  psVoiceRun++;
+  if(psVoiceAbort){ psVoiceAbort.abort(); psVoiceAbort=null; }
+  if(psAudio){ psAudio.pause(); psAudio=null; }
+  if(psAudioDone){ psAudioDone(); psAudioDone=null; }
+  if(psAudioUrl){ URL.revokeObjectURL(psAudioUrl); psAudioUrl=null; }
+  try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){}
+}
 function psSpeak(text, cb){
   if(!window.psVoiceOn){ if(cb) cb(); return; }
+  const sel=document.getElementById('ps-voz');
+  const cfg=(window.psSesionActiva && window.psSesionActiva.voz) || (sel && sel.value) || window.psVozSel || 'auto';
+  const limpio=String(text).replace(/[*#]/g,'').trim();
+  psStopSpeak();
+  const run=psVoiceRun;
+  if(String(cfg).startsWith('eleven:')){
+    (async()=>{
+      try{
+        // Fragmentos acotados: no truncar respuestas largas ni enviar datos en la URL.
+        const partes=[]; let resto=limpio;
+        while(resto){
+          let corte=Math.min(500,resto.length);
+          if(corte<resto.length){ const espacio=resto.lastIndexOf(' ',corte-1); if(espacio>250) corte=espacio; }
+          partes.push(resto.slice(0,corte)); resto=resto.slice(corte).trimStart();
+        }
+        for(const parte of partes){
+          if(run!==psVoiceRun) return;
+          const ctrl=new AbortController(); psVoiceAbort=ctrl;
+          const r=await fetch('/api/ia/voz', {method:'POST', credentials:'same-origin', signal:ctrl.signal, headers:{'Content-Type':'application/json'}, body:JSON.stringify({voz:cfg.slice(7),texto:parte})});
+          if(!r.ok){ let j; try{ j=await r.json(); }catch(e){} throw new Error((j&&j.error)||'No se pudo reproducir la voz natural'); }
+          const blob=await r.blob();
+          if(run!==psVoiceRun) return;
+          psAudioUrl=URL.createObjectURL(blob); psAudio=new Audio(psAudioUrl);
+          await new Promise((resolve,reject)=>{
+            psAudioDone=resolve; psAudio.onended=resolve; psAudio.onerror=()=>reject(new Error('No se pudo reproducir el audio'));
+            psAudio.play().catch(reject);
+          });
+          if(run!==psVoiceRun) return;
+          URL.revokeObjectURL(psAudioUrl); psAudioUrl=null; psAudio=null; psAudioDone=null;
+        }
+        if(cb && run===psVoiceRun) cb();
+      }catch(e){ if(run===psVoiceRun){ psStopSpeak(); showToast(e.message||'No se pudo reproducir la voz natural','warning'); if(cb) cb(); } }
+    })();
+    return;
+  }
   if(!('speechSynthesis' in window)){ showToast('Tu navegador no soporta voz','warning'); if(cb) cb(); return; }
   try{
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(String(text).replace(/[*#]/g,''));
+    const u = new SpeechSynthesisUtterance(limpio);
     u.lang='es-MX'; u.rate = window.psSesionActiva && window.psSesionActiva.dificultad==='dificil' ? 1.05 : 1; u.pitch = 1;
-    const cfg = window.psSesionActiva ? (window.psSesionActiva.voz||'auto') : 'auto';
-    if(cfg!=='auto' && !String(cfg).startsWith('sim-') && psVoicesCache[Number(cfg)]) u.voice = psVoicesCache[Number(cfg)];
-    u.onend = ()=>{ if(cb) cb(); };
-    u.onerror = ()=>{ if(cb) cb(); };
+    const voz = String(cfg).startsWith('browser:') ? psVoicesCache.find(v=>v.voiceURI===String(cfg).slice(8)) : (/^\d+$/.test(String(cfg)) ? psVoicesCache[Number(cfg)] : psVoicesCache[0]);
+    if(voz){ u.voice=voz; u.lang=voz.lang; }
+    u.onend = ()=>{ if(cb && run===psVoiceRun) cb(); };
+    u.onerror = ()=>{ if(cb && run===psVoiceRun) cb(); };
     speechSynthesis.speak(u);
   }catch(e){ if(cb) cb(); }
 }
-function psStopSpeak(){ try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }
 
 /* ==================== MOTOR DE RESPUESTA (IA local; usa OpenAI-compatible si hay API key) ==================== */
 /* Saludos iniciales variados — nunca el mismo de entrada */
@@ -3031,7 +3132,7 @@ function psToggleVoz(){
   window.psVoiceOn = !window.psVoiceOn;
   const b = document.getElementById('ps-btn-voz');
   if(b){ b.className = window.psVoiceOn ? 'px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium' : 'px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-600 text-xs font-medium'; b.textContent = window.psVoiceOn ? '🔊 Voz activa' : '🔇 Silenciado'; }
-  if(window.psVoiceOn) psLoadVoices();
+  if(window.psVoiceOn) psLoadVoices(); else psStopSpeak();
 }
 
 /* ==================== MICRÓFONO Y MULETILLAS (Speech Recognition es-MX) ==================== */
@@ -3388,6 +3489,7 @@ function psRenderConfig(){
         <button data-bx-click="a70" id="ps-btn-voz" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium">🔊 Voz activa</button>
       </div>
       <div class="flex gap-2 mt-2"><button data-bx-click="a71" class="text-xs text-slate-500 hover:text-slate-700"><i class="fas fa-play mr-1"></i>Probar voz</button></div>
+      <p id="ps-voz-info" class="text-[11px] text-slate-500 mt-1">Las voces disponibles dependen del dispositivo y de la configuración del portal.</p>
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 p-5">
@@ -3662,7 +3764,7 @@ function psVerRubrica(){
   <div class="text-right mt-4"><button data-bx-click="a1" class="border px-4 py-2 rounded-xl">Cerrar</button></div></div>`;
   if(typeof showModal==='function') showModal(h); else uiToast('Rúbrica: '+PS_RUBRICA.map(r=>r.label).join(', '));
 }
-function initPracticaSesiones(){ psLoadVoices(); if(window.psVoiceOn===undefined) window.psVoiceOn=true; if(!window.psProvSel){ window.psProvSel=(psGetDB().practicaConfig||{}).proveedor||'groq'; } setTimeout(()=>{ try{ psValidarKeySilencioso(); }catch(e){} },50); }
+function initPracticaSesiones(){ psLoadVoices(); psCargarVocesNaturales(); if(window.speechSynthesis && speechSynthesis.addEventListener && !window.psVoicesListener){ speechSynthesis.addEventListener('voiceschanged', psLoadVoices); window.psVoicesListener=true; } if(window.psVoiceOn===undefined) window.psVoiceOn=true; if(!window.psProvSel){ window.psProvSel=(psGetDB().practicaConfig||{}).proveedor||'groq'; } setTimeout(()=>{ try{ psValidarKeySilencioso(); }catch(e){} },50); }
 
 /* chips de repaso: atajo global para la rúbrica desde el menú */
 window.psVerRubrica = psVerRubrica;
@@ -4903,13 +5005,29 @@ function borrarPublicidad(id){
         function tramiteVisto(mod){
             try{ const k = mod==='sin' ? 'tramitesSinVistosHasta' : 'tramitesCotVistosHasta'; return (currentUser||{})[k] ? new Date(currentUser[k]).getTime() : 0; }catch(e){ return 0; }
         }
+        // Un expediente solo cuenta si su cliente sigue existiendo y es visible
+        // para el rol actual. Así un caso borrado no deja el badge encendido.
+        function tramiteSiniestroVigente(s){
+            try{
+                if(!s) return false;
+                if(typeof sinVisible === 'function' && !sinVisible(s)) return false;
+                const clientes = Array.isArray(db.clientes) ? db.clientes : [];
+                if(s.clienteId !== undefined && s.clienteId !== null && s.clienteId !== ''){
+                    return clientes.some(c => String(c.id) === String(s.clienteId));
+                }
+                const poliza = String(s.poliza||'').trim().toLowerCase();
+                const nombre = String(s.clienteNombre||'').trim().toLowerCase();
+                if(!poliza && !nombre) return false;
+                return clientes.some(c => (!poliza || String(c.poliza||'').trim().toLowerCase()===poliza) && (!nombre || String(c.nombre||'').trim().toLowerCase()===nombre));
+            }catch(e){ return false; }
+        }
         function tramitesNuevos(){
             try{
                 if(!currentUser || !tramiteRoles()) return 0;
                 const vc = tramiteVisto('cot');
                 const vs = tramiteVisto('sin');
                 const cot = cotDB().filter(s => new Date(s.creado).getTime() > vc && String(s.creadoPor.id)!==String(currentUser.id)).length;
-                const sin = sinDB().filter(s => new Date(s.fechaReporte||s.fechaActualizacion||0).getTime() > vs).length;
+                const sin = sinDB().filter(s => tramiteSiniestroVigente(s) && new Date(s.fechaReporte||s.fechaActualizacion||0).getTime() > vs).length;
                 return cot + sin;
             }catch(e){ return 0; }
         }
@@ -4933,14 +5051,21 @@ function borrarPublicidad(id){
             }catch(e){}
             updateBadgeTramites();
         }
-        function notificarNuevoTramite(tipo, detalle){
+        function notificarNuevoTramite(tipo, detalle, ref){
             try{
                 if(!Array.isArray(db.notifications)) db.notifications = [];
                 const r = ((currentUser||{}).role||'').toLowerCase();
-                if(!['gm','admin','desarrollador','agencia'].includes(r)){
-                    db.notifications.unshift({ id:'tram-'+tipo+'-'+Date.now(), type:'tramite', userId:currentUser.id, msg:detalle, ts:new Date().toISOString(), readBy:[] });
+                const extra = {};
+                if(ref && typeof ref === 'object'){
+                    extra.refTipo = ref.refTipo || tipo;
+                    if(ref.refId !== undefined && ref.refId !== null) extra.refId = ref.refId;
+                    if(ref.clienteId !== undefined && ref.clienteId !== null) extra.clienteId = ref.clienteId;
                 }
-                db.notifications.unshift({ id:'tram-'+tipo+'-'+Date.now()+'-mgmt', type:'tramite', msg:detalle, ts:new Date().toISOString(), readBy:[] });
+                const base = Object.assign({ type:'tramite', msg:detalle, ts:new Date().toISOString(), readBy:[] }, extra);
+                if(!['gm','admin','desarrollador','agencia'].includes(r)){
+                    db.notifications.unshift(Object.assign({ id:'tram-'+tipo+'-'+Date.now(), userId:currentUser.id }, base));
+                }
+                db.notifications.unshift(Object.assign({ id:'tram-'+tipo+'-'+Date.now()+'-mgmt' }, base));
                 if(db.notifications.length>300) db.notifications.length = 300;
             }catch(e){}
         }
@@ -6909,7 +7034,7 @@ function initializeApp() {
             function renderNav() {
             const nav = document.getElementById('nav-menu');
             if (!nav || typeof currentUser === 'undefined' || !currentUser) return;
-            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, ...( (currentUser.role||'').toLowerCase() === 'gm' ? [{ id: 'reportes-progreso', label: 'Embudo Comercial y SLA', icon: 'fa-funnel-dollar' }] : [] ), { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
+            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, ...( (currentUser.role||'').toLowerCase() === 'gm' ? [{ id: 'reportes-progreso', label: 'Embudo Comercial y SLA', icon: 'fa-funnel-dollar' }] : [] ), { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'apps', label: 'Apps', icon: 'fa-th-large' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
             const adminItems = [
                 { id: 'users', label: 'Usuarios', icon: 'fa-users' },
                 { id: 'monitoreo', label: 'Monitoreo Agencias', icon: 'fa-chart-line' },
@@ -6979,7 +7104,7 @@ function initializeApp() {
             let items = [];
             // Prospecto: menú exclusivo, sin Dashboard/Ranking común
             if (currentUser && (currentUser.role||'').toLowerCase() === 'prospecto') {
-                items = [...prospectoItems];
+                items = prospectoItems.filter(item => !seccionDenegada(currentUser, item.id));
                 const progress = getProspectProgress(currentUser.id);
                 nav.innerHTML = items.map((item, idx) => {
                     const done = progress[item.id];
@@ -7069,6 +7194,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     {id:'comparador-productos', label:'Comparador de Productos', icon:'fa-right-left'},
                     {id:'control-accesos', label:'Control de Accesos', icon:'fa-shield-halved'},
                     {id:'mi-agenda', label:'Mi Agenda', icon:'fa-calendar-days'},
+                    {id:'apps', label:'Apps', icon:'fa-th-large'},
                     {id:'siniestros', label:'Procesos, Siniestros y Cancelaciones', icon:'fa-file-shield'},
                     {id:'ai-lobby', label:'AI Lobby (entrenar Gu-IA)', icon:'fa-graduation-cap'},
                     {id:'auto-unidades', label:'Inventario de Autos', icon:'fa-warehouse'},
@@ -7092,6 +7218,11 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 });
             }
 
+            // Exclusiones por perfil: se aplican al final, también a secciones
+            // agregadas por la matriz de roles.
+            const denyNav = seccionesExcluidas(currentUser);
+            if (denyNav.length) items = items.filter(it => denyNav.indexOf(String(it.id)) === -1);
+
             const liveCount = isStudent(currentUser) ? (db.notifications || []).filter(n => n.userId === currentUser.id && n.type === 'live-class' && !n.read).length : 0;
             const unreadMsgCount = currentUser ? (db.messages || []).filter(m => String(m.toId) === String(currentUser.id) && !m.read).length : 0;
 
@@ -7100,6 +7231,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const generalesIds = ['dashboard','reportes-progreso','messages','carrusel-circulares','mi-agenda','live-classes','control-accesos','editor','oferta-valor','solicitudes','personalizar','users','centro-mensajes','ai-lobby'];
             const comercialIds = ['monitoreo','mi-equipo','mis-clientes','mis-metas','mis-logros','convenciones','mi-experiencia','simulador','practica-sesiones','guion-llamadas','publicidad','cotizaciones','comparador-productos','siniestros'];
             const exitoIds = ['casos-exito'];
+            const gadgetsIds = ['apps'];
             const itemHtml = (item) => `
                 <a href="#" data-bx-click="a197" data-p0="${bxE(function(){return item.id})}" data-page="${item.id}" class="nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition ml-2">
                     <i class="fas ${item.icon} w-5 text-center text-slate-500"></i>
@@ -7121,6 +7253,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             const comFin = items.filter(i => finIds.includes(i.id));
             const comInm = items.filter(i => inmIds.includes(i.id));
             const exito = items.filter(i => exitoIds.includes(i.id));
+            const gadgets = items.filter(i => gadgetsIds.includes(i.id));
             const multiIds = MULTI_SECTOR_SECCIONES.map(x=>x.id);
             const permsMulti = (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'').toLowerCase()]) ? db.rolePermissions[(currentUser.role||'').toLowerCase()] : null;
             // migración legada: si la lista guardada no conoce ninguna sección ms-*, se muestran por defecto
@@ -7129,7 +7262,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 .filter(id => allowedRolesForMulti(id))
                 .filter(id => legacyMulti || permsMulti.includes(id))
                 .map(id => ({ id, label: (MULTI_SECTOR_SECCIONES.find(x=>x.id===id)||{}).label||id, icon: (MULTI_SECTOR_SECCIONES.find(x=>x.id===id)||{}).icon||'fa-shapes' }));
-            const academia = items.filter(i => !generalesIds.includes(i.id) && !comercialIds.includes(i.id) && !exitoIds.includes(i.id) && !autoIds.includes(i.id) && !finIds.includes(i.id) && !inmIds.includes(i.id) && !multiIds.includes(i.id));
+            const academia = items.filter(i => !generalesIds.includes(i.id) && !comercialIds.includes(i.id) && !exitoIds.includes(i.id) && !gadgetsIds.includes(i.id) && !autoIds.includes(i.id) && !finIds.includes(i.id) && !inmIds.includes(i.id) && !multiIds.includes(i.id));
 
             const groupHtml = (title, icon, id, list, open = true) => {
                 if (!list.length) return '';
@@ -7157,6 +7290,7 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 ${groupHtml('Comercial Inmobiliario', 'fa-house', 'com-inm', comInm, false)}
                 ${groupHtml('Comercial Multi-Sector', 'fa-shapes', 'com-multi', multiItems, false)}
                 ${groupHtml('Casos de Éxito', 'fa-trophy', 'exito', exito, false)}
+                ${groupHtml('Gadgets y Apps', 'fa-puzzle-piece', 'gadgets', gadgets, true)}
                 ${groupHtml('Academia', 'fa-graduation-cap', 'academia', academia, false)}
             `;
 
@@ -7232,6 +7366,19 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             ];
         }
 
+        /* Exclusiones individuales (Control de Accesos): un perfil puede perder
+         * secciones que su rol sí tiene. GM nunca se excluye para no quedarse
+         * sin administrador. */
+        function seccionesExcluidas(user) {
+            if (!user || user.id === undefined || user.id === null) return [];
+            if (String(user.role || '').toLowerCase() === 'gm') return [];
+            const conf = (db.userPermissions || {})[String(user.id)];
+            return (conf && Array.isArray(conf.deny)) ? conf.deny.map(String) : [];
+        }
+        function seccionDenegada(user, sec) {
+            return seccionesExcluidas(user).indexOf(String(sec)) !== -1;
+        }
+
         function renderMobileBottomNav() {
             const bar = document.getElementById('mobile-bottom-nav');
             if (!bar) return;
@@ -7240,20 +7387,22 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 return;
             }
             const tabs = getMobileBottomNavTabs();
+            const denyTabs = seccionesExcluidas(currentUser);
+            const tabsVisibles = denyTabs.length ? tabs.filter(t => t.id === '__menu__' || denyTabs.indexOf(String(t.id)) === -1) : tabs;
             const activePage = window.lastPage || 'dashboard';
             const unreadMsgCount = (db.messages || []).filter(m => String(m.toId) === String(currentUser.id) && !m.read).length;
             const dueCards = (typeof getDueFlashcardsCount === 'function') ? getDueFlashcardsCount(currentUser.id) : 0;
             const role = (currentUser.role || '').toLowerCase();
 
-            bar.style.gridTemplateColumns = `repeat(${tabs.length || 5}, minmax(0, 1fr))`;
-            bar.innerHTML = tabs.map(t => {
+            bar.style.gridTemplateColumns = `repeat(${tabsVisibles.length || 5}, minmax(0, 1fr))`;
+            bar.innerHTML = tabsVisibles.map(t => {
                 if (t.id === '__menu__') {
                     return `<button type="button" data-bx-click="a199" class="mob-nav-btn" data-mob-page="__menu__" aria-label="Abrir menú completo">
                         <i class="fas ${t.icon}"></i>
                         <span class="mob-nav-label">${t.label}</span>
                     </button>`;
                 }
-                const isLockedProspect = role === 'prospecto' && typeof canAccessProspectStep === 'function' && !canAccessProspectStep(currentUser.id, t.id);
+                const isLockedProspect = (role === 'prospecto' && typeof canAccessProspectStep === 'function' && !canAccessProspectStep(currentUser.id, t.id)) || seccionDenegada(currentUser, t.id);
                 const isActive = activePage === t.id;
                 let badge = 0;
                 if (t.id === 'messages' || t.id === 'chat-reclutador') badge = unreadMsgCount;
@@ -7292,6 +7441,15 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
             }
             // Guard: prospecto nunca va a dashboard
             if (page === 'dashboard' && (currentUser?.role||'').toLowerCase() === 'prospecto') page = 'mi-experiencia';
+            // Guard: exclusión individual, aunque escriban la sección a mano.
+            if (currentUser && seccionDenegada(currentUser, page)) {
+                const esProspecto = (currentUser.role||'').toLowerCase() === 'prospecto';
+                const libres = (esProspecto
+                    ? ['mi-experiencia','oferta-valor','plan-carrera','chat-reclutador','agenda-prospectos']
+                    : ['dashboard','messages','mi-agenda','apps']).filter(p => !seccionDenegada(currentUser, p));
+                if (typeof showToast === 'function') showToast('Tu perfil no tiene acceso a esa sección', 'warning');
+                page = libres[0] || (esProspecto ? 'mi-experiencia' : 'dashboard');
+            }
             window.lastPage = page;
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.toggle('bg-indigo-50', link.dataset.page === page);
@@ -7358,6 +7516,15 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                 case 'reports': content.innerHTML = renderReports(); break;
                 case 'reportes-progreso': content.innerHTML = renderReportesProgreso(); break;
                 case 'live-classes': content.innerHTML = renderLiveClasses() /* v6.5: sanitizado con escapeHTML dentro de render */; break;
+                case 'video-reuniones': // alias legado de enlaces guardados
+                case 'apps':
+                    if (typeof renderAppsExternas === 'function') {
+                        content.innerHTML = renderAppsExternas();
+                        setTimeout(function(){ if (window.AppsExternas && typeof window.AppsExternas.mount === 'function') window.AppsExternas.mount(); }, 0);
+                    } else {
+                        content.innerHTML = '<div class="bg-white border border-amber-200 rounded-2xl p-6 text-sm text-slate-600">El módulo de apps no cargó. Recarga la página para intentarlo de nuevo.</div>';
+                    }
+                    break;
                 case 'my-courses': content.innerHTML = renderMyCourses(); break;
                 case 'my-progress': content.innerHTML = renderMyProgress(); break;
                 case 'my-aula': content.innerHTML = renderMyAula(); setTimeout(()=>{ const e=(db.enrollments||[]).find(en=>en.userId===currentUser.id); if(e) initGroupChat(e.groupId); }, 0); break;
@@ -11034,9 +11201,21 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             });
         }
 
+        let examBorrador = null; // examen nuevo aún no guardado (no vive en db.exams)
         function openExamModal(examId = null) {
-            const exam = examId ? db.exams.find(e => e.id === examId) : { id: Date.now(), categoryId: db.categories[0]?.id || 1, title: '', description: '', duration: 30, passPercent: 60, exemptPercent: 80, questions: [], assignedTo: [], createdBy: currentUser.id, createdAt: new Date().toISOString() };
-            if (!examId) db.exams.push(exam);
+            /* Borrador en memoria: "Nuevo Examen" ya NO inserta un examen vacío en
+             * db.exams. Antes, agregar una pregunta guardaba ese registro sin
+             * título y se sincronizaba a la base (reaparecía en cada equipo).
+             * Solo se persiste al pulsar "Guardar Examen". */
+            let exam;
+            if (examId) {
+                exam = db.exams.find(e => e.id === examId)
+                    || (examBorrador && String(examBorrador.id) === String(examId) ? examBorrador : null);
+                if (!exam) return uiToast('Ese examen ya no existe');
+            } else {
+                examBorrador = { id: Date.now(), categoryId: db.categories[0]?.id || 1, title: '', description: '', duration: 30, passPercent: 60, exemptPercent: 80, questions: [], assignedTo: [], createdBy: currentUser.id, createdAt: new Date().toISOString() };
+                exam = examBorrador;
+            }
             
             showModal(`<div class="p-6 max-h-[90vh] overflow-y-auto">
                 <h3 class="text-xl font-bold mb-4">${examId ? 'Editar' : 'Nuevo'} Examen</h3>
@@ -11053,7 +11232,11 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                     </div>
                 </form>
                 
-                <h4 class="font-semibold mb-3">Preguntas (${exam.questions.length})</h4>
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <h4 class="font-semibold">Preguntas (${exam.questions.length})</h4>
+                    <button type="button" id="exam-import-toggle" class="px-3 py-1.5 text-xs bg-white border border-slate-300 hover:bg-slate-50 rounded-lg font-medium"><i class="fas fa-wand-magic-sparkles mr-1"></i>Importar con IA</button>
+                </div>
+                <div id="exam-import-host"></div>
                 <div id="exam-questions" class="space-y-2 mb-4 max-h-48 overflow-y-auto">${exam.questions.map((q,i)=>`<div class="p-3 border rounded-lg flex justify-between items-start"><div class="flex-1"><p class="text-sm font-medium">${i+1}. ${q.question} <span class="text-xs px-1.5 py-0.5 rounded ${q.type==='multiple'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}">${q.type==='multiple'?'Múltiple':'V/F'}</span></p><p class="text-xs text-slate-500 mt-1">Correcta: ${q.options[q.correct]}</p></div><button data-bx-click="a317" data-p0="${bxE(function(){return exam.id})}" data-p1="${bxE(function(){return i})}" class="text-red-500 ml-2"><i class="fas fa-times"></i></button></div>`).join('') || '<p class="text-slate-500 text-sm">Sin preguntas</p>'}</div>
                 
                 <form id="exam-q-form" class="border-t pt-4 space-y-3">
@@ -11076,6 +11259,19 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 </div>
             </div>`);
             
+            if (window.ExamImport && typeof window.ExamImport.mount === 'function') {
+                window.ExamImport.mount(exam, function (total) {
+                    saveDB();
+                    try {
+                        if (window.BackendSync && window.BackendSync.pushCollectionsImmediate) {
+                            window.BackendSync.pushCollectionsImmediate(['exams']);
+                        }
+                    } catch (e) { /* sync lo reintenta */ }
+                    uiToast(total + ' preguntas importadas');
+                    openExamModal(exam.id);
+                });
+            }
+
             const updateUI = () => {
                 const isVF = document.getElementById('eq-type').value === 'vf';
                 document.getElementById('eq-opts-multiple').classList.toggle('hidden', isVF);
@@ -11094,27 +11290,34 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 let options = type === 'vf' ? ['Verdadero', 'Falso'] : [0,1,2,3].map(i => document.getElementById('eq'+i).value).filter(v=>v);
                 if (type !== 'vf' && options.length < 2) return uiToast('Mínimo 2 opciones');
                 exam.questions.push({ question, options, correct, type: type==='vf'?'vf':'multiple' });
-                saveDB(); openExamModal(exam.id);
+                if (db.exams.indexOf(exam) !== -1) saveDB();
+                openExamModal(exam.id);
             };
         }
 
         function deleteExamQuestion(examId, idx) {
-            const exam = db.exams.find(e => e.id === examId);
-            exam._shuffled = prepararPreguntasExamen(exam);
+            const exam = db.exams.find(e => e.id === examId)
+                || (examBorrador && String(examBorrador.id) === String(examId) ? examBorrador : null);
+            if (!exam) return;
             exam.questions.splice(idx, 1);
-            saveDB(); openExamModal(examId);
+            if (db.exams.indexOf(exam) !== -1) saveDB();
+            openExamModal(examId);
         }
 
         function saveExam(examId) {
-            const exam = db.exams.find(e => e.id === examId);
-            exam._shuffled = prepararPreguntasExamen(exam);
+            const enDb = db.exams.find(e => e.id === examId);
+            const exam = enDb
+                || (examBorrador && String(examBorrador.id) === String(examId) ? examBorrador : null);
+            if (!exam) return uiToast('Ese examen ya no existe');
             exam.categoryId = parseInt(document.getElementById('ex-cat').value);
-            exam.title = document.getElementById('ex-title').value;
+            exam.title = String(document.getElementById('ex-title').value || '').trim();
             exam.description = document.getElementById('ex-desc').value;
             exam.duration = parseInt(document.getElementById('ex-duration').value);
             exam.passPercent = parseInt(document.getElementById('ex-pass').value);
             exam.exemptPercent = parseInt(document.getElementById('ex-exempt').value);
+            if (!exam.title) return uiToast('Ponle un título al examen');
             if (exam.questions.length === 0) return uiToast('Agrega al menos 1 pregunta');
+            if (!enDb) { db.exams.push(exam); examBorrador = null; }
             saveDB(); closeModal(); navigateTo('exams');
         }
 
@@ -11128,7 +11331,6 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
         function openAssignExamModal(examId) {
             const exam = db.exams.find(e => e.id === examId);
-            exam._shuffled = prepararPreguntasExamen(exam);
             const alumnos = db.users.filter(u => isStudent(u));
             showModal(`<div class="p-6"><h3 class="text-xl font-bold mb-4">Asignar: ${exam.title}</h3>
                 <div class="space-y-2 max-h-64 overflow-y-auto mb-4">${alumnos.map(a => `<label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded"><input type="checkbox" value="${a.id}" ${exam.assignedTo.includes(a.id)?'checked':''} class="assign-check bg-white text-slate-900 border border-slate-300"> <img src="${a.avatar}" class="w-8 h-8 rounded-full"> <span class="text-sm">${a.name}</span></label>`).join('')}</div>
@@ -11138,14 +11340,12 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
 
         function saveAssignExam(examId) {
             const exam = db.exams.find(e => e.id === examId);
-            exam._shuffled = prepararPreguntasExamen(exam);
             exam.assignedTo = Array.from(document.querySelectorAll('.assign-check:checked')).map(cb => parseInt(cb.value));
             saveDB(); closeModal(); navigateTo('exams');
         }
 
         function openExamResults(examId) {
             const exam = db.exams.find(e => e.id === examId);
-            exam._shuffled = prepararPreguntasExamen(exam);
             const attempts = db.examAttempts.filter(a => a.examId === examId).sort((a,b) => new Date(b.date) - new Date(a.date));
             showModal(`<div class="p-6 max-w-3xl"><h3 class="text-xl font-bold mb-4">Resultados: ${exam.title}</h3>
                 <div class="overflow-x-auto max-h-96"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-3 py-2 text-left">Alumno</th><th class="px-3 py-2 text-left">Fecha</th><th class="px-3 py-2 text-left">Score</th><th class="px-3 py-2 text-left">Resultado</th><th class="px-3 py-2 text-left">XP</th></tr></thead>
@@ -11158,7 +11358,6 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const exam = db.exams.find(e => e.id === examId);
             if (!exam) return;
             if (!exam.questions || exam.questions.length === 0) { uiToast('Este examen aún no tiene preguntas.'); return; }
-            exam._shuffled = prepararPreguntasExamen(exam);
             showModal(`<div class="p-6 text-center"><div class="w-16 h-16 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-4"><i class="fas fa-clipboard-check text-indigo-600 text-2xl"></i></div>
                 <h3 class="text-xl font-bold mb-2">${exam.title}</h3><p class="text-slate-600 mb-4">${exam.description||''}</p>
                 <div class="bg-slate-50 rounded-lg p-4 mb-6 text-sm space-y-1"><p><strong>Duración:</strong> ${exam.duration} minutos</p><p><strong>Preguntas:</strong> ${exam.questions.length}</p><p><strong>Para aprobar:</strong> ${exam.passPercent}% (+200 XP)</p><p><strong>Para exentar:</strong> ${exam.exemptPercent}% (+300 XP)</p></div>
@@ -11171,39 +11370,141 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             const exam = db.exams.find(e => e.id === examId);
             // --- MEJORA: preguntas y opciones aleatorias (copia segura con respuesta correcta remapeada) ---
             const shuffledQuestions = prepararPreguntasExamen(exam);
-            exam._shuffled = shuffledQuestions;
             window._inExam = true; window._examTabSwitches = 0;
             let currentQ = 0;
             let answers = Array(shuffledQuestions.length).fill(null);
             let timeLeft = exam.duration * 60;
             
+            const totalQuestions = shuffledQuestions.length;
+
+            const paletteHTML = () => shuffledQuestions.map((_, i) => {
+                const contestada = answers[i] !== null && answers[i] !== undefined;
+                const actual = i === currentQ;
+                return `<button type="button" data-exam-jump="${i}" data-answered="${contestada}" data-current="${actual}" aria-label="Ir a la pregunta ${i+1}. ${contestada ? 'Contestada' : 'Pendiente'}." ${actual ? 'aria-current="step"' : ''} class="aspect-square w-full flex items-center justify-center rounded-lg border text-xs font-semibold transition ${contestada ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-indigo-400 hover:text-indigo-700'} ${actual ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-white' : ''}">${i+1}</button>`;
+            }).join('');
+
             const renderExam = () => {
-                const q = exam._shuffled[currentQ];
+                const q = shuffledQuestions[currentQ];
                 const mins = Math.floor(timeLeft / 60);
                 const secs = timeLeft % 60;
-                showModal(`<div class="fixed inset-0 bg-white z-50 flex flex-col">
-                    <div class="border-b px-6 py-3 flex justify-between items-center">
-                        <h3 class="font-bold">${exam.title}</h3>
-                        <div class="flex items-center gap-4">
-                            <div class="text-sm"><span class="text-slate-500">Tiempo:</span> <span class="font-mono font-bold ${timeLeft<60?'text-red-600':''}">${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}</span></div>
-                            <button data-bx-click="a321" class="text-slate-400 hover:text-red-500"><i class="fas fa-times"></i></button>
+                const seleccionada = answers[currentQ] !== null && answers[currentQ] !== undefined;
+                const contestadas = answers.filter(a => a !== null && a !== undefined).length;
+                const pctContestadas = Math.round((contestadas / totalQuestions) * 100);
+                const pctPosicion = Math.round(((currentQ + 1) / totalQuestions) * 100);
+                showModal(`<div id="exam-shell" class="fixed inset-0 bg-slate-50 z-50 flex flex-col">
+                    <div class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3">
+                        <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Examen en curso</p>
+                                <h3 class="font-bold text-slate-900 truncate">${exam.title}</h3>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                                <div class="text-right"><span class="block text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Tiempo</span><span class="font-mono font-bold ${timeLeft<60?'text-red-600':''}">${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}</span></div>
+                                <button type="button" aria-label="Cerrar y abandonar examen" title="Cerrar y abandonar examen" data-bx-click="a321" class="w-9 h-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"><i class="fas fa-times"></i></button>
+                            </div>
                         </div>
                     </div>
-                    <div class="px-6 py-2 bg-slate-50 border-b"><div class="w-full bg-slate-200 rounded-full h-1.5"><div class="bg-indigo-600 h-1.5 rounded-full transition-all" style="width:${((currentQ+1)/exam.questions.length)*100}%"></div></div><p class="text-xs text-slate-500 mt-1">Pregunta ${currentQ+1} de ${exam.questions.length}</p></div>
-                    <div class="flex-1 overflow-y-auto p-6"><div class="max-w-2xl mx-auto"><p class="text-lg font-medium mb-6">${q.question}</p><div class="space-y-3">${q.options.map((opt,i)=>`<button data-bx-click="a322" data-p0="${bxE(function(){return i})}" class="w-full text-left p-4 border-2 rounded-xl hover:border-indigo-300 transition ${answers[currentQ]===i?'border-indigo-600 bg-indigo-50':''}">${String.fromCharCode(65+i)}. ${opt}</button>`).join('')}</div></div></div>
-                    <div class="border-t px-6 py-4 flex justify-between"><button data-bx-click="a323" ${currentQ===0?'disabled':''} class="px-4 py-2 border rounded-lg disabled:opacity-50">Anterior</button><button data-bx-click="a324" class="px-5 py-2.5 ${currentQ===exam.questions.length-1?'bg-green-600 hover:bg-green-700':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg font-medium">${currentQ===exam.questions.length-1?'Finalizar':'Siguiente'}</button></div>
+                    <div class="bg-white border-b border-slate-200 px-4 sm:px-6 py-2">
+                        <div class="max-w-6xl mx-auto">
+                            <div class="flex items-center justify-between gap-3 text-xs text-slate-500"><span class="font-semibold text-slate-700">Pregunta ${currentQ+1} de ${totalQuestions}</span><span><strong id="exam-answered-count" class="text-indigo-600">${contestadas}</strong> contestadas</span></div>
+                            <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full bg-indigo-600 transition-all" style="width:${pctPosicion}%"></div></div>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <div class="max-w-6xl mx-auto p-4 sm:p-6 flex flex-col-reverse lg:flex-row lg:items-start gap-5">
+                            <section class="min-w-0 flex-1">
+                                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-7">
+                                    <div class="flex items-center justify-between gap-3 mb-4">
+                                        <span class="text-[10px] uppercase tracking-wider font-bold text-indigo-600">Pregunta ${currentQ+1}</span>
+                                        <span id="exam-current-status" class="text-[10px] font-bold px-2 py-1 rounded-full ${seleccionada ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${seleccionada ? 'Contestada' : 'Pendiente'}</span>
+                                    </div>
+                                    <p class="text-lg sm:text-xl font-medium leading-relaxed text-slate-900">${q.question}</p>
+                                    <div class="mt-6 space-y-3">${q.options.map((opt,i)=>`<button type="button" data-exam-answer="${i}" data-selected="${answers[currentQ]===i}" aria-pressed="${answers[currentQ]===i}" title="Doble clic para avanzar a la siguiente" class="w-full text-left p-4 border-2 rounded-xl flex items-start gap-3 transition touch-manipulation ${answers[currentQ]===i?'border-indigo-600 bg-indigo-50':'border-slate-200 bg-white hover:border-indigo-300'}"><span class="exam-letter shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${answers[currentQ]===i?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}">${String.fromCharCode(65+i)}</span><span class="pt-0.5 text-sm sm:text-base text-slate-700">${opt}</span></button>`).join('')}</div>
+                                    <p class="mt-4 text-[11px] text-slate-400"><i class="fas fa-mouse-pointer mr-1"></i> Doble clic en una respuesta para avanzar. Puedes cambiar tu respuesta antes de continuar.</p>
+                                </div>
+                                <div class="mt-4 flex items-center justify-between gap-3">
+                                    <button type="button" data-bx-click="a323" ${currentQ===0?'disabled':''} class="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"><i class="fas fa-arrow-left mr-1"></i> Anterior</button>
+                                    <button type="button" data-bx-click="a324" class="px-5 py-2.5 ${currentQ===totalQuestions-1?'bg-emerald-600 hover:bg-emerald-700':'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-xl text-sm font-semibold shadow-sm"><span>${currentQ===totalQuestions-1?'Finalizar examen':'Siguiente'}</span><i class="fas ${currentQ===totalQuestions-1?'fa-check':'fa-arrow-right'} ml-2"></i></button>
+                                </div>
+                            </section>
+                            <aside class="w-full lg:w-72 lg:shrink-0">
+                                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div><p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Mapa de preguntas</p><h4 class="text-sm font-bold text-slate-900">${totalQuestions} preguntas</h4></div>
+                                        <span class="text-xs font-bold text-indigo-600 bg-indigo-50 rounded-full px-2 py-1">${contestadas}/${totalQuestions}</span>
+                                    </div>
+                                    <div class="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100"><div id="exam-answered-bar" class="h-full rounded-full bg-emerald-500 transition-all" style="width:${pctContestadas}%"></div></div>
+                                    <div id="exam-palette-grid" class="mt-3 grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-5 gap-1.5 max-h-56 overflow-y-auto pr-1">${paletteHTML()}</div>
+                                    <div class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+                                        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-indigo-600"></span>Contestada</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-white border-2 border-amber-400"></span>Actual</span>
+                                        <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-white border border-slate-300"></span>Pendiente</span>
+                                    </div>
+                                    <p class="mt-3 text-[11px] leading-relaxed text-slate-400">Haz clic en un número para saltar a esa pregunta.</p>
+                                </div>
+                            </aside>
+                        </div>
+                    </div>
                 </div>`);
+                const shell = document.getElementById('exam-shell');
+                if (!shell) return;
+                shell.addEventListener('click', (event) => {
+                    const jump = event.target.closest('[data-exam-jump]');
+                    if (jump) { currentQ = Number(jump.dataset.examJump); renderExam(); return; }
+                    const answer = event.target.closest('[data-exam-answer]');
+                    if (answer) selectAnswer(Number(answer.dataset.examAnswer));
+                });
+                shell.addEventListener('dblclick', (event) => {
+                    const answer = event.target.closest('[data-exam-answer]');
+                    if (!answer) return;
+                    selectAnswer(Number(answer.dataset.examAnswer));
+                    nextQ();
+                });
             };
-            
-            window.selectAnswer = (i) => { answers[currentQ] = i; renderExam(); };
-            window.nextQ = () => { if (currentQ < exam.questions.length - 1) { currentQ++; renderExam(); } else { finishExam(); } };
+
+            const paintExamState = () => {
+                const seleccionada = answers[currentQ];
+                document.querySelectorAll('[data-exam-answer]').forEach(btn => {
+                    const on = Number(btn.dataset.examAnswer) === seleccionada;
+                    btn.dataset.selected = on ? 'true' : 'false';
+                    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    btn.classList.toggle('border-indigo-600', on);
+                    btn.classList.toggle('bg-indigo-50', on);
+                    btn.classList.toggle('border-slate-200', !on);
+                    btn.classList.toggle('bg-white', !on);
+                    btn.classList.toggle('hover:border-indigo-300', !on);
+                    const letter = btn.querySelector('.exam-letter');
+                    if (letter) {
+                        letter.classList.toggle('bg-indigo-600', on);
+                        letter.classList.toggle('text-white', on);
+                        letter.classList.toggle('bg-slate-100', !on);
+                        letter.classList.toggle('text-slate-600', !on);
+                    }
+                });
+                const grid = document.getElementById('exam-palette-grid');
+                if (grid) grid.innerHTML = paletteHTML();
+                const contestadas = answers.filter(a => a !== null && a !== undefined).length;
+                const count = document.getElementById('exam-answered-count');
+                if (count) count.textContent = String(contestadas);
+                const bar = document.getElementById('exam-answered-bar');
+                if (bar) bar.style.width = Math.round((contestadas / totalQuestions) * 100) + '%';
+                const status = document.getElementById('exam-current-status');
+                if (status) {
+                    const on = seleccionada !== null && seleccionada !== undefined;
+                    status.textContent = on ? 'Contestada' : 'Pendiente';
+                    status.className = 'text-[10px] font-bold px-2 py-1 rounded-full ' + (on ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500');
+                }
+            };
+
+            window.selectAnswer = (i) => { answers[currentQ] = i; paintExamState(); };
+            window.nextQ = () => { if (currentQ < totalQuestions - 1) { currentQ++; renderExam(); } else { finishExam(); } };
             window.prevQ = () => { if (currentQ > 0) { currentQ--; renderExam(); } };
             
             const finishExam = () => {
                 clearInterval(examTimer); window._inExam=false;
                 let correct = 0;
-                exam._shuffled.forEach((q,i) => { if (answers[i] === q.correct) correct++; });
-                const score = Math.round((correct / exam._shuffled.length) * 100);
+                shuffledQuestions.forEach((q,i) => { if (answers[i] === q.correct) correct++; });
+                const score = Math.round((correct / shuffledQuestions.length) * 100);
                 let result = 'Reprobado', xpAwarded = 0;
                 if (score >= exam.exemptPercent) { result = 'EXENTADO'; xpAwarded = 300; }
                 else if (score >= exam.passPercent) { result = 'APROBADO'; xpAwarded = 200; }
@@ -11220,9 +11521,9 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 saveDB();
                 
                 showModal(`<div class="p-6 text-center max-w-lg"><div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${result==='EXENTADO'?'bg-purple-100 text-purple-600':result==='APROBADO'?'bg-green-100 text-green-600':'bg-red-100 text-red-600'}"><i class="fas ${result==='EXENTADO'?'fa-star':result==='APROBADO'?'fa-check':'fa-times'} text-3xl"></i></div>
-                    <h3 class="text-2xl font-bold mb-2">${result}</h3><p class="text-slate-600 mb-1">${correct} de ${exam._shuffled.length} correctas</p><p class="text-3xl font-bold mb-4 ${result==='EXENTADO'?'text-purple-600':result==='APROBADO'?'text-green-600':'text-red-600'}">${score}%</p>
+                    <h3 class="text-2xl font-bold mb-2">${result}</h3><p class="text-slate-600 mb-1">${correct} de ${shuffledQuestions.length} correctas</p><p class="text-3xl font-bold mb-4 ${result==='EXENTADO'?'text-purple-600':result==='APROBADO'?'text-green-600':'text-red-600'}">${score}%</p>
                     ${xpAwarded>0?`<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4"><p class="text-amber-800 font-medium"><i class="fas fa-bolt mr-1"></i>+${xpAwarded} XP ganados</p></div>`:''}
-                    <div class="text-left bg-slate-50 rounded-lg p-4 max-h-48 overflow-y-auto mb-4">${exam._shuffled.map((q,i)=>{ const ok = answers[i]===q.correct; return `<div class="text-xs mb-2 pb-2 border-b last:border-0"><p class="font-medium">${i+1}. ${q.question}</p><p class="${ok?'text-green-700':'text-red-700'}">Tu respuesta: ${q.options[answers[i]]||'Sin responder'} ${ok?'✓':'✗'}</p>${!ok?`<p class="text-green-700">Correcta: ${q.options[q.correct]}</p>`:''}</div>` }).join('')}</div>
+                    <div class="text-left bg-slate-50 rounded-lg p-4 max-h-48 overflow-y-auto mb-4">${shuffledQuestions.map((q,i)=>{ const ok = answers[i]===q.correct; return `<div class="text-xs mb-2 pb-2 border-b last:border-0"><p class="font-medium">${i+1}. ${q.question}</p><p class="${ok?'text-green-700':'text-red-700'}">Tu respuesta: ${q.options[answers[i]]||'Sin responder'} ${ok?'✓':'✗'}</p>${!ok?`<p class="text-green-700">Correcta: ${q.options[q.correct]}</p>`:''}</div>` }).join('')}</div>
                     <button data-bx-click="a325" class="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium">Volver a exámenes</button>
                 </div>`);
             };
@@ -13109,10 +13410,12 @@ END:VCALENDAR`;
             const categoriasAccesos = [
                 { titulo: 'General', icon: 'fa-house', secciones: [
                     {id:'dashboard', label:'Dashboard'}, {id:'reportes-progreso', label:'Embudo Comercial y SLA (GM)'}, {id:'leaderboard', label:'Ranking'},
-                    {id:'carrusel-circulares', label:'Reunión y Capacitación Semanal'}, {id:'mi-agenda', label:'Mi Agenda'},
+                    {id:'carrusel-circulares', label:'Reunión y Capacitación Semanal'}, {id:'mi-agenda', label:'Mi Agenda'}, {id:'live-classes', label:'Clases En Vivo'},
+                    {id:'apps', label:'Apps'}, {id:'practica-cliente', label:'Práctica Con Cliente'},
                     {id:'users', label:'Usuarios'}, {id:'centro-mensajes', label:'Centro de Mensajes'},
                     {id:'personalizar', label:'Personalización'}, {id:'editor', label:'Editor Portal'},
-                    {id:'oferta-valor', label:'Oferta de valor'}, {id:'control-accesos', label:'Control de Accesos'}
+                    {id:'oferta-valor', label:'Oferta de valor'}, {id:'resultados-prospectos', label:'Resultados Prospectos'}, {id:'ai-lobby', label:'AI Lobby (Gu-IA)'},
+                    {id:'control-accesos', label:'Control de Accesos'}
                 ]},
                 { titulo: 'Comercial Asegurador', icon: 'fa-briefcase', secciones: [
                     {id:'cotizaciones', label:'Cotizaciones y Emisiones'}, {id:'siniestros', label:'Siniestros y Cancelaciones'},
@@ -13134,6 +13437,7 @@ END:VCALENDAR`;
                     {id:'mi-equipo', label:'Mi Equipo'}, {id:'monitoreo', label:'Monitoreo Agencias'},
                     {id:'mis-clientes', label:'Mis Clientes'}, {id:'mis-metas', label:'Mis Metas'},
                     {id:'mis-logros', label:'Mis Logros'}, {id:'convenciones', label:'Convenciones'},
+                    {id:'practica-sesiones', label:'Practica Tus Sesiones'},
                     {id:'casos-exito', label:'Casos de Éxito'}
                 ]},
                 { titulo: 'Academia', icon: 'fa-graduation-cap', secciones: [
@@ -13144,12 +13448,28 @@ END:VCALENDAR`;
                     {id:'messages', label:'Mensajes'}, {id:'reports', label:'Kardex de Capacitación'},
                     {id:'glossary', label:'Glosario'}, {id:'my-groups', label:'Mis Grupos'},
                     {id:'my-aula', label:'Mi Aula'}, {id:'my-courses', label:'Mis Cursos'},
-                    {id:'my-progress', label:'Mi Progreso'}, {id:'mi-experiencia', label:'Mi experiencia'},
-                    {id:'chat-reclutador', label:'Chat reclutador'}, {id:'solicitudes', label:'Solicitudes'}
+                    {id:'my-progress', label:'Mi Progreso'}, {id:'solicitudes', label:'Solicitudes'}
+                ]},
+                { titulo: 'Portal y Prospectos', icon: 'fa-user-group', secciones: [
+                    {id:'mi-experiencia', label:'Mi experiencia'},
+                    {id:'plan-carrera', label:'Plan de carrera'},
+                    {id:'chat-reclutador', label:'Chat con reclutador'},
+                    {id:'agenda-prospectos', label:'Agenda de prospectos'}
                 ]}
             ];
             const allSections = categoriasAccesos.flatMap(c=>c.secciones);
             const roles = ['admin','gm','desarrollador','maestro','capacitador','agencia','editor','alumno','agente_desarrollo','agente_agencia','prospecto'];
+            const usuariosAcceso = (db.users || []).filter(u => u && u.id !== undefined);
+            let selId = String(window.__controlUsuarioSel || '');
+            if (!usuariosAcceso.some(u => String(u.id) === selId)) {
+                // No usar `id || ''`: el GM sembrado puede tener id 0 y quedaba
+                // como "sin perfil" (sin checkboxes de exclusiones).
+                selId = usuariosAcceso.length ? String(usuariosAcceso[0].id) : '';
+            }
+            window.__controlUsuarioSel = selId;
+            const selUsuario = usuariosAcceso.find(u => String(u.id) === selId) || null;
+            const denySel = selUsuario ? seccionesExcluidas(selUsuario) : [];
+            const selEsGM = selUsuario ? String(selUsuario.role || '').toLowerCase() === 'gm' : false;
             return `
                 <div class="space-y-6">
                     <div class="flex items-center justify-between flex-wrap gap-3">
@@ -13158,6 +13478,8 @@ END:VCALENDAR`;
                             <p class="text-slate-500 text-sm mt-1">Define qué secciones ve cada rol. Solo GM.</p>
                         </div>
                         <div class="flex gap-2">
+                            <a href="/api/backup" download class="px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 flex items-center gap-2 shadow-md" title="Descarga todas las colecciones y usuarios (sin contraseñas) en un JSON"><i class="fas fa-download"></i> Descargar respaldo</a>
+                            <button data-bx-click="a662" class="px-4 py-2.5 bg-amber-100 text-amber-800 rounded-lg font-medium hover:bg-amber-200 flex items-center gap-2" title="Borra la copia local de este navegador y recarga todo desde Supabase"><i class="fas fa-broom"></i> Limpiar caché local</button>
                             <button data-bx-click="a384" class="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 flex items-center gap-2"><i class="fas fa-rotate-left"></i> Restablecer</button>
                             <button data-bx-click="a385" class="px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-md"><i class="fas fa-save"></i> Guardar Cambios</button>
                         </div>
@@ -13177,7 +13499,10 @@ END:VCALENDAR`;
                                     </tr>
                                     ${cat.secciones.map(sec=>`
                                     <tr class="border-t hover:bg-slate-50">
-                                        <td class="px-4 py-2.5 font-medium text-slate-800 pl-8">${sec.label}</td>
+                                        <td class="px-4 py-2.5 font-medium text-slate-800 pl-8">
+                                            <span>${sec.label}</span>
+                                            <button data-bx-click="a666" data-p0="${bxP(sec.id)}" class="ml-2 align-middle text-slate-400 hover:text-indigo-600" title="Abrir esta sección"><i class="fas fa-arrow-up-right-from-square text-[10px]"></i></button>
+                                        </td>
                                         ${roles.map(r=>{
                                             const lista = db.rolePermissions[r]||[];
                                             const msExplicita = lista.some(x=>String(x).startsWith('ms-'));
@@ -13192,6 +13517,34 @@ END:VCALENDAR`;
                                 `).join('')}
                             </tbody>
                         </table>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                        <div class="flex items-center justify-between flex-wrap gap-3">
+                            <div>
+                                <h3 class="font-semibold text-lg text-slate-800"><i class="fas fa-user-lock mr-2 text-rose-600"></i>Exclusiones por perfil</h3>
+                                <p class="text-slate-500 text-xs mt-0.5">El rol define el menú general; aquí quitas secciones a una persona concreta. GM conserva acceso total.</p>
+                            </div>
+                            <select id="ua-user" data-bx-change="a663" class="px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 text-sm min-w-64">
+                                ${usuariosAcceso.map(u => `<option value="${u.id}" ${String(u.id) === selId ? 'selected' : ''}>${escapeHTML(u.name || u.username || ('Usuario ' + u.id))} · ${u.role || ''}</option>`).join('')}
+                            </select>
+                        </div>
+                        ${selUsuario ? `
+                        <div class="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+                            ${categoriasAccesos.map(cat => `
+                            <details class="rounded-lg border border-slate-200 bg-slate-50/60" ${denySel.some(id => cat.secciones.some(s => String(s.id) === String(id))) ? 'open' : ''}>
+                                <summary class="cursor-pointer px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600"><i class="fas ${cat.icon} mr-1 text-slate-400"></i>${cat.titulo}</summary>
+                                <div class="px-3 pb-3 space-y-1.5 max-h-52 overflow-y-auto">
+                                    ${cat.secciones.map(sec => `<label class="flex items-center gap-2 text-xs text-slate-600 ${selEsGM ? 'opacity-50' : ''}"><input type="checkbox" data-user-deny="${sec.id}" ${denySel.includes(String(sec.id)) ? 'checked' : ''} ${selEsGM ? 'disabled' : ''} class="w-3.5 h-3.5 rounded border-slate-300 text-rose-600"><span>${sec.label}</span></label>`).join('')}
+                                </div>
+                            </details>`).join('')}
+                        </div>
+                        <div class="mt-3 flex items-center justify-between flex-wrap gap-2">
+                            <p class="text-xs text-slate-500"><b>${denySel.length}</b> sección(es) excluidas${selEsGM ? ' (GM no se puede excluir)' : ''}. El resto del menú de su rol se mantiene.</p>
+                            <div class="flex gap-2">
+                                <button data-bx-click="a665" class="px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium hover:bg-slate-50" ${selEsGM ? 'disabled' : ''}><i class="fas fa-rotate-left mr-1"></i> Quitar exclusiones</button>
+                                <button data-bx-click="a664" class="px-3 py-2 bg-rose-600 text-white rounded-lg text-xs font-medium hover:bg-rose-700" ${selEsGM ? 'disabled' : ''}><i class="fas fa-user-lock mr-1"></i> Guardar exclusiones</button>
+                            </div>
+                        </div>` : `<p class="text-sm text-slate-400 mt-4">No hay usuarios para configurar.</p>`}
                     </div>
                     <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
                         <i class="fas fa-circle-info mr-2"></i><strong>Nota:</strong> "desarrollador" es supervisor de capacitadores, no tiene acceso a este control. Los cambios se aplican al recargar el menú.
@@ -13208,11 +13561,17 @@ END:VCALENDAR`;
                 if (!newPerms[role]) newPerms[role] = [];
                 if (ch.checked) newPerms[role].push(sec);
             });
+            if (!Array.isArray(newPerms.gm)) newPerms.gm = [];
+            if (!Array.isArray(newPerms.desarrollador)) newPerms.desarrollador = [];
+            newPerms.__version = ROLE_PERMS_MIGRATION_VERSION; // no perder la marca de migración al guardar
             if (!newPerms.gm.includes('control-accesos')) newPerms.gm.push('control-accesos');
             // asegurar que desarrollador nunca tenga control-accesos
             newPerms.desarrollador = newPerms.desarrollador.filter(s => s !== 'control-accesos');
             db.rolePermissions = newPerms;
             saveDB();
+            if (window.BackendSync && typeof window.BackendSync.pushCollectionsImmediate === 'function') {
+                window.BackendSync.pushCollectionsImmediate(['rolePermissions']).catch(() => {});
+            }
             showToast('Permisos guardados. Actualizando menú...', 'success');
             setTimeout(()=>{ renderNav(); navigateTo('control-accesos'); }, 600);
         }
@@ -13222,6 +13581,39 @@ END:VCALENDAR`;
             saveDB();
             location.reload();
         }
+        function saveUserPermissions() {
+            const uid = window.__controlUsuarioSel;
+            if (uid === undefined || uid === null || uid === '') { showToast('Selecciona un perfil', 'warning'); return; }
+            const deny = Array.from(document.querySelectorAll('input[data-user-deny]:checked')).map(ch => ch.getAttribute('data-user-deny')).filter(Boolean);
+            const unicos = Array.from(new Set(deny));
+            if (!db.userPermissions || typeof db.userPermissions !== 'object' || Array.isArray(db.userPermissions)) db.userPermissions = {};
+            if (unicos.length) db.userPermissions[String(uid)] = { deny: unicos };
+            else delete db.userPermissions[String(uid)];
+            saveDB();
+            if (window.BackendSync && typeof window.BackendSync.pushCollectionsImmediate === 'function') {
+                window.BackendSync.pushCollectionsImmediate(['userPermissions']).catch(() => {});
+            }
+            showToast(unicos.length ? 'Exclusiones guardadas para este perfil' : 'Perfil sin exclusiones', 'success');
+            renderNav();
+            setTimeout(() => navigateTo('control-accesos'), 150);
+        }
+        function resetUserPermissions() {
+            const uid = window.__controlUsuarioSel;
+            if (uid === undefined || uid === null || uid === '') return;
+            if (!confirm('¿Quitar todas las exclusiones de este perfil?')) return;
+            const uidKey = String(uid);
+            if (db.userPermissions) delete db.userPermissions[uidKey];
+            saveDB();
+            /* Borrado explícito: el diff de objetos no siempre conoce la clave
+             * (la sombra no se actualiza tras el PUT), así que quitarla del
+             * objeto local no basta para eliminarla en Supabase. */
+            fetch('/api/data/userPermissions/' + encodeURIComponent(uidKey), { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+            showToast('Exclusiones eliminadas', 'success');
+            renderNav();
+            setTimeout(() => navigateTo('control-accesos'), 150);
+        }
+        window.saveUserPermissions = saveUserPermissions;
+        window.resetUserPermissions = resetUserPermissions;
 
         // v6.9: fecha ISO -> valor admitido por <input type="datetime-local"> (local, sin TZ suffix)
         function toDatetimeLocalInput(iso) {
@@ -13430,7 +13822,7 @@ END:VCALENDAR`;
             </div>
             ${pendingLessons.length ? `<div class="mb-5 p-4 rounded-2xl border border-amber-200 bg-amber-50/60">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="text-xs font-bold uppercase text-amber-900 flex items-center gap-1.5"><i class="fas fa-sparkles text-amber-600"></i> Recomendado para ti (Lecciones pendientes por completar)</h4>
+                    <h4 class="text-xs font-bold uppercase text-amber-900 flex items-center gap-1.5"><i class="fas fa-wand-magic-sparkles text-amber-600"></i> Recomendado para ti (Lecciones pendientes por completar)</h4>
                     <button data-bx-click="a390" class="text-xs font-semibold text-amber-800 hover:underline">Ir a Lecciones →</button>
                 </div>
                 <div class="grid sm:grid-cols-3 gap-2.5">

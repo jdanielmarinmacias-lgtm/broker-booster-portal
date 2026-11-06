@@ -208,7 +208,7 @@ window.__bx.a67 = function (event) { psGuardarPerfil() };
 window.__bx.a68 = function (event, bx0) { psSetDif((bx0)) };
 
 /* js\legacy\01-core-db-roles-portal.js:3343 · change */
-window.__bx.a69 = function (event) { psLoadVoices() };
+window.__bx.a69 = function (event) { psElegirVoz() };
 
 /* js\legacy\01-core-db-roles-portal.js:3344 · click */
 window.__bx.a70 = function (event) { psToggleVoz() };
@@ -1954,10 +1954,9 @@ window.__bx.a649 = function (event) { sendForoQ() };
 window.__bx.a650 = function (event) { saveNota() };
 
 /* js\legacy\09-modulo-i.js:439 · click */
-window.__bx.a651 = function (event) { initEnVivoStudio('nueva') };
-
+window.__bx.a651 = function (event) { window.entrarSalaEnVivoNueva() };
 /* js\legacy\09-modulo-i.js:455 · click */
-window.__bx.a652 = function (event) { initEnVivoStudio('demo-en-vivo-001') };
+window.__bx.a652 = function (event) { window.entrarSalaEnVivoNueva() };
 
 /* index.html:75 · click */
 window.__bx.a653 = function (event) { exitLogin() };
@@ -1985,3 +1984,26 @@ window.__bx.a660 = function (event) { toggleNewsBar() };
 
 /* js/legacy/01-core-db-roles-portal.js · click (borrar grupo desde la tarjeta de Mensajes) */
 window.__bx.a661 = function (event, bx0) { event.stopPropagation(); eliminarGrupo((bx0)) };
+
+/* js/legacy/01-core-db-roles-portal.js · click (Control de Accesos: limpiar caché local) */
+window.__bx.a662 = function (event) {
+  if (!confirm('Se borrará la copia local del portal en este equipo, incluidos los cambios que aún no se hayan sincronizado. Después se recargará todo desde Supabase. ¿Continuar?')) return;
+  try {
+    window.__bbNoGuardarLocal = true;
+    localStorage.removeItem('pepes_v3_db');
+    localStorage.removeItem('pepes_sync_ids_v1');
+  } catch (e) {}
+  location.reload();
+};
+
+/* js/legacy/01-core-db-roles-portal.js · change (Control de Accesos: elegir perfil) */
+window.__bx.a663 = function (event) { window.__controlUsuarioSel = this.value; navigateTo('control-accesos') };
+
+/* js/legacy/01-core-db-roles-portal.js · click (guardar exclusiones por perfil) */
+window.__bx.a664 = function (event) { saveUserPermissions() };
+
+/* js/legacy/01-core-db-roles-portal.js · click (quitar exclusiones por perfil) */
+window.__bx.a665 = function (event) { resetUserPermissions() };
+
+/* js/legacy/01-core-db-roles-portal.js · click (abrir una sección desde la matriz) */
+window.__bx.a666 = function (event, sec) { if (sec && typeof navigateTo === 'function') navigateTo(sec) };
