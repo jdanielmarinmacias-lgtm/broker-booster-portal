@@ -517,6 +517,47 @@ describe('Gu-IA: sesión real de prospecto', () => {
   });
 });
 
+describe('datos de exámenes: bundle y ruta directa por rol', () => {
+  it('el bundle del prospecto no incluye exámenes ni preguntas', async () => {
+    const r = await api('GET', '/api/data/bundle', null, true, jarProspecto);
+    assert.equal(r.status, 200);
+    assert.ok(r.json && r.json.bundle, 'el bundle debe conservar su estructura');
+    assert.deepEqual(r.json.bundle.exams, { shape: 'array', items: [] });
+    const payload = JSON.stringify(r.json.bundle);
+    assert.ok(!payload.includes('¿Qué es una póliza?'), 'no debe viajar una pregunta de examen');
+    assert.ok(!payload.includes('Pregunta secreta'), 'no debe viajar el banco de otro alumno');
+    assert.ok(!payload.includes('Respuesta desarrollo'), 'no debe viajar una respuesta correcta');
+  });
+
+  it('el alumno solo recibe en el bundle el examen que tiene asignado', async () => {
+    const r = await api('GET', '/api/data/bundle', null, true, jarAlumno);
+    assert.equal(r.status, 200);
+    assert.equal(r.json.bundle.exams.shape, 'array');
+    assert.deepEqual(r.json.bundle.exams.items.map((e) => String(e.id)), ['2001']);
+    const payload = JSON.stringify(r.json.bundle.exams);
+    assert.ok(!payload.includes('Pregunta secreta'), 'no debe recibir el examen de otro usuario');
+    assert.ok(!payload.includes('Pregunta secreta de desarrollo'), 'no debe recibir el examen de un agente');
+  });
+
+  it('GET /api/data/exams filtra prospecto, alumno y agentes por asignación', async () => {
+    const casos = [
+      { rol: 'prospecto', jar: jarProspecto, ids: [], ajenos: ['¿Qué es una póliza?', '"Pregunta secreta"', '¿Pregunta secreta de desarrollo?', '¿Pregunta secreta de agencia?', 'Contrato', 'Respuesta desarrollo', 'Respuesta agencia'] },
+      { rol: 'alumno', jar: jarAlumno, ids: ['2001'], ajenos: ['"Pregunta secreta"', '¿Pregunta secreta de desarrollo?', '¿Pregunta secreta de agencia?', 'Respuesta desarrollo', 'Respuesta agencia'] },
+      { rol: 'agente de desarrollo', jar: jarAgenteDesarrollo, ids: ['2101'], ajenos: ['¿Qué es una póliza?', '"Pregunta secreta"', '¿Pregunta secreta de agencia?', 'Respuesta agencia'] },
+      { rol: 'agente de agencia', jar: jarAgenteAgencia, ids: ['2102'], ajenos: ['¿Qué es una póliza?', '"Pregunta secreta"', '¿Pregunta secreta de desarrollo?', 'Respuesta desarrollo'] },
+    ];
+    for (const caso of casos) {
+      const r = await api('GET', '/api/data/exams', null, true, caso.jar);
+      assert.equal(r.status, 200, caso.rol);
+      assert.deepEqual(r.json.items.map((e) => String(e.id)), caso.ids, caso.rol);
+      const payload = JSON.stringify(r.json.items);
+      for (const ajeno of caso.ajenos) {
+        assert.ok(!payload.includes(ajeno), caso.rol + ': no debe recibir ' + ajeno);
+      }
+    }
+  });
+});
+
 describe('Gu-IA: seguimientos y análisis sin inventar', () => {
   it('Formación: un seguimiento de fechas usa las generaciones reales', async () => {
     const r = await preguntarSeguimiento([

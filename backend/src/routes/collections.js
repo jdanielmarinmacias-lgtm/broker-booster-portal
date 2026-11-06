@@ -227,6 +227,12 @@ function filtrarLectura(user, collection, items, root) {
   }
   if (canReadAll(user)) return items;
   const uid = String(user.id);
+  /* Exámenes: el alumno/agente solo ve los asignados a su usuario. El
+   * prospecto no tiene exámenes, así que recibe la colección vacía. Antes el
+   * bundle entregaba todo el banco, incluidas preguntas y respuestas. */
+  if (collection === 'exams' && roles.isStudent(user)) {
+    return items.filter((e) => e && [].concat(e.assignedTo || []).map(String).includes(uid));
+  }
   /* Avance, entregas, intentos y cartera: el alumno/agente ve solo lo suyo. */
   const campo = campoDueno(collection);
   if (campo) return items.filter((x) => x && String(x[campo]) === uid);
