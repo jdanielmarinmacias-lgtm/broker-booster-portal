@@ -11,8 +11,9 @@ const roles = require('../roles');
 const mw = require('../middleware');
 
 /* loginAttempts es estado interno del servidor (rate-limit de login): no debe
- * salir en el bundle ni volver por la API desde el navegador. */
-const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts', 'iaUso']);
+ * salir en el bundle ni volver por la API desde el navegador. `meetings` quedó
+ * retirado con Jitsi: sus datos históricos no se exponen ni se pueden escribir. */
+const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts', 'iaUso', 'meetings']);
 /* Contenido que NUNCA viaja en el bundle inicial, ni siquiera para dirección:
  * son documentos grandes/config y el cliente los pide solo cuando abre su
  * pantalla (AI Lobby). Así una sesión normal no recibe la base de conocimiento
@@ -26,13 +27,6 @@ const FEED_COLLECTIONS = new Set([
   'messages', 'groupMessages', 'notifications',
   'lessons', 'liveClasses', 'exams',
   'chatGroups', 'forumPosts',
-]);
-
-/* Colecciones de conversación: se leen SIEMPRE frescas (bypass de la caché
- * cálida). Con caché de 30s por instancia, el receptor no veía mensajes
- * recientes hasta 30s después del envío — síntoma “no se envían”. */
-const LIVE_FRESH_COLLECTIONS = new Set([
-  'messages', 'groupMessages', 'chatGroups', 'forumPosts', 'notifications',
 ]);
 
 const feedTitle = (collection, rec) => rec.titulo || rec.title || rec.nombre || rec.name
@@ -297,6 +291,7 @@ function findPostDupe(col, body) {
 const KNOWN_OBJECTS = new Set([
   'settings', 'autoHub', 'inmPublica', 'carruselCirculares',
   'prospectos', 'expedientesProspectos', 'rolePermissions',
+  'userPermissions', // {[userId]: {deny:[secciones]}} — exclusiones individuales (GM)
   'guiaBase', // {docs:[]} — Gu-IA: base de conocimiento del comercial (legacy 3148)
   'guiaChats', // {[userId]: [...]} — historial de conversaciones Gu-IA por usuario
   'practicaConfig', // configuración del simulador de práctica con cliente
@@ -329,29 +324,30 @@ module.exports = (store, config) => {
 
   let publicPortalCache = null;
   let publicPortalCacheAt = 0;
+  let publicPortalPromise = null;
 
   /* ¿La portada trae algo que mostrar? Si no, es preferible reintentar la
    * lectura completa antes de servir una página en blanco. */
   const portalTieneContenido = (d) => !!d && (
     (d.settings && Object.keys(d.settings).length > 0)
-    || (Array.isArray(d.autoHub) && d.autoHub.length > 0)
-    || (Array.isArray(d.inmPublica) && d.inmPublica.length > 0)
+    || (d.autoHub && Object.keys(d.autoHub).length > 0)
+    || (d.inmPublica && Object.keys(d.inmPublica).length > 0)
   );
 
   r.get('/public/portal', async (req, res, next) => {
     try {
       let data = store.get();
-      if (typeof store.isWarm === 'function' && !store.isWarm() && typeof store.adapter.loadCollections === 'function') {
-        if (publicPortalCache && Date.now() - publicPortalCacheAt < 30000) {
-          data = publicPortalCache;
-        } else {
-          data = await store.adapter.loadCollections(['settings', 'autoHub', 'inmPublica']);
-          /* Nunca se guarda un recorte vacío: envenenaba 30 s de portada. */
-          if (portalTieneContenido(data)) {
-            publicPortalCache = data;
-            publicPortalCacheAt = Date.now();
+      if (store.adapter.kind === 'supabase' && typeof store.adapter.loadCollections === 'function') {
+        if (!publicPortalCache || Date.now() - publicPortalCacheAt >= 30000) {
+          if (!publicPortalPromise) {
+            publicPortalPromise = store.adapter.loadCollections(['settings', 'autoHub', 'inmPublica'])
+              .then((loaded) => {
+                if (portalTieneContenido(loaded)) { publicPortalCache = loaded; publicPortalCacheAt = Date.now(); }
+                return loaded;
+              }).finally(() => { publicPortalPromise = null; });
           }
-        }
+          data = await publicPortalPromise;
+        } else data = publicPortalCache;
       } else {
         await store.refreshIfStale(); // lectura: el TTL basta (eventual consistency)
         data = store.get();
@@ -359,7 +355,7 @@ module.exports = (store, config) => {
       /* Instancia recién arrancada con el recorte vacío (credenciales que aún
        * no ven las colecciones, caché parcial…): se reintenta por la vía
        * completa en vez de devolver la portada sin logo ni vehículos. */
-      if (!portalTieneContenido(data)) {
+      if (!portalTieneContenido(data) && store.adapter.kind !== 'supabase') {
         try {
           if (typeof store.refreshForWrite === 'function') {
             await store.refreshForWrite(['settings', 'autoHub', 'inmPublica']);
@@ -497,12 +493,6 @@ module.exports = (store, config) => {
       const { collection } = req.params;
       if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
       if (!roles.canRead(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de lectura' });
-      // Conversación: lectura FRESCA desde el adapter (sin caché cálida de
-      // instancia). Así el receptor ve el mensaje al instante y el cliente
-      // no reinventa lo ya guardado (duplicados por divergencia).
-      if (LIVE_FRESH_COLLECTIONS.has(collection)) {
-        await store.refreshForWrite([collection]); // revalida esa colección en caché
-      }
       /* Refresco SOLO de lo que esta respuesta necesita. Antes se recargaba la
        * tabla documents completa (~27 MB) en cada GET: latencia alta, timeouts
        * y los 500/401 en cascada que dejaban los cambios sin subir. */
