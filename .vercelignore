@@ -1,6 +1,23 @@
+# Secretos y datos locales
 .env
+.env.*
+**/.env
+**/.env.*
 backend/data
-backend/test
+backend/data-demo
+backend/tmp-browser-data
+backend/tmp-browser-files
+data
+backups
+.tmp-audit
+.freebuff
+.cloud-attachments
+
+# Artefactos de desarrollo
+*.log
+*.pid
+tmp-bundle.json
+screenshots
 portal.html
 .serve-modular.cjs
 portal-modular/tools

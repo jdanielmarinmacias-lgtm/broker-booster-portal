@@ -197,6 +197,29 @@ guarda `data/db.json`. `verify` comprueba formato, conteos y checksum SHA-256.
 Antes de una migración grande: `npm run db:backup`, copia el `.json` fuera del
 proyecto y prueba restaurarlo en un entorno de staging.
 
+### Respaldo desde el portal (sin llaves)
+
+GM/admin: **Control de Accesos → Descargar respaldo**. Genera
+`respaldo-portal-<fecha>.json` con todas las colecciones y los usuarios **sin
+contraseña ni hash**. La ruta es `GET /api/backup` y exige sesión GM/admin; no
+necesita `SUPABASE_SERVICE_KEY` porque corre dentro del backend desplegado.
+Sirve para archivar y revisar los datos fuera del portal. Para restaurar, usa el
+respaldo técnico de arriba o convierte `collections` a un JSON plano
+(`pepes_v3_db`) para `npm run import`.
+
+## Voces naturales en Practica Tus Sesiones
+
+El selector ofrece las voces en español disponibles en el dispositivo y, cuando
+se configura `ELEVENLABS_API_KEY` en el servidor, las voces en español de la
+cuenta de ElevenLabs. La clave no se envía al navegador. El audio de práctica se
+manda a ElevenLabs para sintetizarlo y puede generar cargos; no introduzcas datos
+sensibles. Los límites de seguridad son 10 solicitudes por usuario/minuto,
+50 globales/minuto, 100 por usuario/día y 1000 globales/día, hasta 500 caracteres
+por solicitud. Para Supabase se requiere la función atómica de
+`supabase/migration_rate_limit.sql`; sin ella las voces naturales no generan audio.
+La disponibilidad, acento y calidad de las voces dependen de la cuenta y del
+proveedor; sin configurar la clave siguen disponibles las voces del dispositivo.
+
 ## Rotación de claves y contenido sensible (Fase 0)
 
 - `guiaBase` y `practicaConfig` **ya no viajan en `/api/data/bundle`**. AI Lobby
@@ -237,6 +260,75 @@ bajo concurrencia, ejecuta una vez
 [`supabase/migration_rate_limit.sql`](supabase/migration_rate_limit.sql). Sin esa
 migración el backend usa GET+PUT (funciona, pero dos peticiones simultáneas
 pueden perder un incremento).
+
+## Respan Gateway local para Gu-IA
+
+Gu-IA puede salir por [Respan Gateway](https://github.com/respanai/respan-gateway?utm_source=freebuff&utm_medium=paid&utm_campaign=respan-gateway&bfcid=bfc_1.eyJpZCI6IjJjMDZiYjI1LTI3OTAtNDA4Yy04OGYwLTAyZjc2MTczMjhkMCIsImMiOiIyMDM2ODZkZS1mMzg0LTQ4NTQtYmViNC1hYzBiYWRmNmM1NTUiLCJrIjoiM2IxMGE4YmUtNzgyOS00MmJhLWFmNmEtYmI0YWUxZTRhY2Y4IiwiaWF0IjoxNzkzOTMwMDg2fQ.KLBM6soINpKvMVKjdbN999YtbxH4XbU_1ATqbY1lPS0),
+el gateway open-source que enruta las peticiones a tu propio proveedor con tus
+propias claves. **No** hace falta cuenta de Respan, ni créditos, ni tracing: el
+portal sigue pagando con su `GROQ_API_KEY`.
+
+- Código y guía: <https://github.com/respanai/respan-gateway/tree/v0.3.0> ·
+  [guía de Python](https://github.com/respanai/respan-gateway/blob/v0.3.0/python/README.md)
+- Versión fijada: `respan-gateway==0.3.0` en [`gateway/requirements.txt`](gateway/requirements.txt)
+  (Python 3.10+, ruedas para Windows x64, macOS y Linux).
+- Config: [`gateway/gateway.toml`](gateway/gateway.toml) declara el proveedor
+  `groq` con `key = "env:GROQ_API_KEY"`: **la clave nunca está en el archivo**,
+  sale del entorno o del `.env` más cercano (`backend/.env`, ignorado por Git).
+- Arranque: [`gateway/serve_gateway.py`](gateway/serve_gateway.py) escucha en
+  `127.0.0.1:8787` (cambiable con `IA_GATEWAY_PORT`). Solo loopback: el gateway
+  no acepta dirección pública sin `client_keys`.
+
+### Cómo usarlo
+
+En `.env` (ya existe, no se sube):
+
+```bash
+GROQ_API_KEY=gsk_...            # la misma clave de siempre
+IA_GATEWAY_URL=http://127.0.0.1:8787   # vacía = Groq directo, como antes
+```
+
+Dos terminales, desde `backend/`:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install --only-binary=:all: -r gateway/requirements.txt
+.venv\Scripts\python gateway/serve_gateway.py   # terminal 1 (o npm run ia:gateway)
+npm start                                        # terminal 2 (el portal)
+```
+
+Reinicio del gateway tras un cambio: `Ctrl-C` y de nuevo
+`.venv\Scripts\python gateway/serve_gateway.py` (el resto del portal no se
+reinicia). Si `IA_GATEWAY_URL` está definida y el gateway no escucha, Gu-IA
+responde 502 con "revisa que el Respan Gateway local esté en marcha".
+
+### Qué cambia en el código
+
+Solo el proxy de IA: [`src/iaGateway.js`](src/iaGateway.js) construye la petición
+OpenAI y [`src/routes/ia.js`](src/routes/ia.js) la manda a
+`IA_GATEWAY_URL/v1/chat/completions`. El cuerpo y la respuesta conservan el
+formato OpenAI (`choices[0].message.content`), así que el navegador no cambia.
+El modelo viaja como `groq/openai/gpt-oss-120b`: el prefijo le dice al gateway
+a qué proveedor ir (`openai/gpt-oss-120b` se confundiría con OpenAI). Al
+gateway se le manda una clave de cliente de relleno (`portal-local`), nunca la
+del proveedor; el cupo diario, el rate-limit, el contexto de Gu-IA y el
+catálogo de modelos siguen igual.
+
+### Resultado observado
+
+`npm test` en `backend/` incluye [`test/ia-gateway.js`](test/ia-gateway.js):
+3 pruebas nuevas. Usan un fixture HTTP local
+en loopback que habla el contrato del gateway y confirman que
+`POST /api/ia/chat` llega a `/v1/chat/completions` con el modelo
+`groq/openai/gpt-oss-120b`, sin la clave de Groq en las cabeceras, y que sin
+`IA_GATEWAY_URL` la llamada sigue yendo a Groq directo.
+
+**Petición real al proveedor a través del gateway: no verificada aquí**, porque
+el gateway necesita Python 3.10+ y la clave real de Groq. Para verificarla en tu
+máquina: arranca el gateway como arriba, con `IA_GATEWAY_URL` definida, abre
+Gu-IA y observa el log del gateway (`RESPAN_LOG=text` en su entorno lista cada
+petición). Una prueba de salud del puerto no cuenta como petición al modelo.
 
 ## Ticker realtime entre equipos (`collection_versions`)
 
