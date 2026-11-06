@@ -642,6 +642,51 @@ describe('Gu-IA: seguimientos y análisis sin inventar', () => {
     assert.match(system, /https:\/\/crm\.example\.com/);
     assert.ok(!/Herramienta Fantasma|app-falsa\.example/.test(system), 'no debe inventar herramientas');
   });
+
+  it('Exámenes: un seguimiento de preguntas no expone datos a ningún alumno', async () => {
+    const casos = [
+      { rol: 'alumno', jar: jarAlumno },
+      { rol: 'agente de desarrollo', jar: jarAgenteDesarrollo },
+      { rol: 'agente de agencia', jar: jarAgenteAgencia },
+    ];
+    for (const caso of casos) {
+      const r = await preguntarSeguimiento([
+        { role: 'user', content: '¿Qué exámenes tengo?' },
+        { role: 'assistant', content: 'Tienes un examen asignado.' },
+      ], '¿y sus preguntas y respuestas?', caso.jar);
+      assert.equal(r.status, 200, caso.rol);
+      assert.equal(r.json.guia.directo, true, caso.rol);
+      assert.equal(ultimoCuerpo, null, caso.rol + ': la negativa no debe depender del modelo');
+      const content = r.json.choices[0].message.content;
+      assert.match(content, /No puedo mostrarte ni responder/i, caso.rol);
+      assert.ok(!/Examen (?:de Ventas|de Desarrollo|de Agencia|interno)/.test(content),
+        caso.rol + ': no debe listar exámenes');
+      for (const prohibido of ['¿Qué es una póliza?', 'Contrato', '¿Pregunta secreta de desarrollo?', 'Respuesta desarrollo', '¿Pregunta secreta de agencia?', 'Respuesta agencia']) {
+        assert.ok(!content.includes(prohibido), caso.rol + ': no debe exponer ' + prohibido);
+      }
+    }
+  });
+
+  it('Exámenes: el análisis solo usa el examen del alumno y nunca preguntas', async () => {
+    const casos = [
+      { rol: 'alumno', jar: jarAlumno, propio: 'Examen de Ventas', ajeno: 'Examen interno', pregunta: '¿Qué es una póliza?', respuesta: 'Contrato' },
+      { rol: 'agente de desarrollo', jar: jarAgenteDesarrollo, propio: 'Examen de Desarrollo', ajeno: 'Examen de Agencia', pregunta: '¿Pregunta secreta de desarrollo?', respuesta: 'Respuesta desarrollo' },
+      { rol: 'agente de agencia', jar: jarAgenteAgencia, propio: 'Examen de Agencia', ajeno: 'Examen de Desarrollo', pregunta: '¿Pregunta secreta de agencia?', respuesta: 'Respuesta agencia' },
+    ];
+    for (const caso of casos) {
+      const r = await preguntar(`Analiza el ${caso.propio} y recomiéndame cómo prepararme`, caso.jar);
+      assert.equal(r.status, 200, caso.rol);
+      assert.ok(ultimoCuerpo, caso.rol + ': el análisis debe llegar al modelo con contexto');
+      const system = systemDelUltimo();
+      assert.match(system, /EXÁMENES — DATOS REALES DEL PORTAL/, caso.rol);
+      assert.ok(system.includes(caso.propio), caso.rol + ': debe incluir su examen');
+      assert.match(system, /no se incluyen preguntas ni respuestas correctas/i, caso.rol);
+      assert.ok(!system.includes(caso.ajeno), caso.rol + ': no debe ver exámenes ajenos');
+      assert.ok(!system.includes(caso.pregunta), caso.rol + ': no debe ver preguntas');
+      assert.ok(!system.includes(caso.respuesta), caso.rol + ': no debe ver respuestas correctas');
+      assert.ok(!system.includes('Correcta:'), caso.rol + ': no debe ver la respuesta marcada');
+    }
+  });
 });
 
 describe('Gu-IA: sesiones reales de agentes', () => {
