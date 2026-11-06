@@ -17,6 +17,7 @@ const { construirContexto, inyectarContexto } = require('../guiaContext');
 const { esTemaFormacion, construirContextoFormacion, respuestaCatalogoFormacion } = require('../guiaPortal');
 const { temasDeSecciones, construirContextoSecciones, respuestaCatalogoSecciones } = require('../guiaSecciones');
 const { MODELOS_PERMITIDOS } = require('../iaCatalogo');
+const iaGateway = require('../iaGateway');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MAX_CHARS = 120000;      // conversación completa (≈ 30k tokens)
@@ -34,16 +35,43 @@ const LIMITE_MINUTO_TOTAL = Number(process.env.IA_MINUTO_TOTAL || 120);
  * vive en iaCatalogo.js para que el cron vigile exactamente la misma. */
 const MODELOS = MODELOS_PERMITIDOS;
 
-/* Proveedor real. Los tests lo sustituyen para no salir a la red. */
-let proveedor = async function llamarGroq(cuerpo, apiKey) {
+/* Voces disponibles en la cuenta del portal, nunca IDs inventados por el cliente. */
+let vocesCache = null;
+let vocesCacheKey = null;
+let vocesCacheHasta = 0;
+async function cargarVoces(key) {
+  if (vocesCacheKey === key && vocesCache && Date.now() < vocesCacheHasta) return vocesCache;
+  const r = await fetch('https://api.elevenlabs.io/v2/voices?page_size=100&language=es', {
+    headers: { 'xi-api-key': key }, signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw new Error('Catálogo de voces no disponible');
+  const data = await r.json();
+  if (!Array.isArray(data.voices)) throw new Error('Catálogo de voces inválido');
+  const voices = data.voices.filter((v) => v && /^[a-zA-Z0-9_-]{1,80}$/.test(v.voice_id || '') && typeof v.name === 'string')
+    .map((v) => ({ id: v.voice_id, nombre: v.name.slice(0, 100), acento: String((v.labels || {}).accent || '').slice(0, 80) }));
+  vocesCacheKey = key; vocesCache = voices; vocesCacheHasta = Date.now() + 60000;
+  return voices;
+}
+
+/* Proveedor real. Los tests lo sustituyen para no salir a la red.
+ * Con gateway configurado (`IA_GATEWAY_URL`) la misma petición OpenAI va al
+ * Respan Gateway en loopback; sin él, a Groq directo como siempre. */
+let proveedor = async function llamarProveedor(cuerpo, apiKey, cfg) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 60000);
+  const destino = iaGateway.activo(cfg)
+    ? iaGateway.prepararPeticion(cuerpo, cfg)
+    : {
+      url: GROQ_URL,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
+      cuerpo,
+    };
   try {
-    const r = await fetch(GROQ_URL, {
+    const r = await fetch(destino.url, {
       method: 'POST',
       signal: ctrl.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-      body: JSON.stringify(cuerpo),
+      headers: destino.headers,
+      body: JSON.stringify(destino.cuerpo),
     });
     const texto = await r.text();
     let json = null;
@@ -66,7 +94,9 @@ module.exports = (store, config) => {
    * Con esto la interfaz decide si ofrece IA o el motor local, sin ver la clave. */
   r.get('/estado', mw.requireAuth, async (req, res, next) => {
     try {
-      const disponible = !!config.groqApiKey;
+      /* Con gateway local la IA está disponible aunque la clave viva solo en
+       * el gateway; sin gateway hace falta GROQ_API_KEY, como antes. */
+      const disponible = iaGateway.activo(config) || !!config.groqApiKey;
       /* Mismo contador que usa /chat: adaptador compartido o memoria local. */
       const usados = disponible ? (await leerUso(req.user.id)).usuario : 0;
       /* Huella (no la clave) para que el navegador pueda borrar copias viejas
@@ -86,7 +116,7 @@ module.exports = (store, config) => {
 
   r.post('/chat', mw.requireAuth, async (req, res, next) => {
     try {
-      if (!config.groqApiKey) {
+      if (!iaGateway.activo(config) && !config.groqApiKey) {
         return res.status(503).json({ ok: false, error: 'IA no configurada en el servidor' });
       }
       const body = req.body || {};
@@ -194,13 +224,18 @@ module.exports = (store, config) => {
 
       let salida;
       try {
-        salida = await proveedor(cuerpo, config.groqApiKey);
+        salida = await proveedor(cuerpo, config.groqApiKey, config);
       } catch (e) {
         await devolverCupo(cupo.reservas);
         if (e && e.name === 'AbortError') {
           return res.status(504).json({ ok: false, error: 'La IA tardó demasiado en responder' });
         }
-        return res.status(502).json({ ok: false, error: 'No se pudo contactar con la IA' });
+        return res.status(502).json({
+          ok: false,
+          error: iaGateway.activo(config)
+            ? 'No se pudo contactar con la IA: revisa que el Respan Gateway local esté en marcha'
+            : 'No se pudo contactar con la IA',
+        });
       }
 
       if (!salida.ok) {
@@ -220,6 +255,59 @@ module.exports = (store, config) => {
       }
       res.json(salida.json);
     } catch (e) { next(e); }
+  });
+
+  /* TTS natural: cuota independiente y compartida, falla cerrado si no se
+   * puede reservar. Cada intento consume cuota aun si la respuesta se pierde. */
+  r.get('/voces', mw.requireAuth, async (req, res) => {
+    if (!config.elevenLabsApiKey) return res.json({ ok: true, disponible: false, voces: [] });
+    try { res.json({ ok: true, disponible: true, voces: await cargarVoces(config.elevenLabsApiKey) }); }
+    catch (e) { res.status(503).json({ ok: false, error: 'No se pudo cargar el catálogo de voces naturales' }); }
+  });
+
+  r.post('/voz', mw.requireAuth, async (req, res) => {
+    const origin = req.get('origin');
+    if (!origin || origin !== req.protocol + '://' + req.get('host') || req.get('sec-fetch-site') === 'cross-site') {
+      return res.status(403).json({ ok: false, error: 'Origen no permitido' });
+    }
+    if (!config.elevenLabsApiKey) return res.status(503).json({ ok: false, error: 'Voces naturales no configuradas' });
+    const { voz, texto } = req.body || {};
+    if (typeof texto !== 'string' || !texto.trim() || texto.length > 500 || typeof voz !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Texto o voz inválidos (máximo 500 caracteres)' });
+    }
+    let voces;
+    try { voces = await cargarVoces(config.elevenLabsApiKey); }
+    catch (e) { return res.status(503).json({ ok: false, error: 'No se pudo verificar la voz seleccionada' }); }
+    if (!voces.some((v) => v.id === voz)) return res.status(400).json({ ok: false, error: 'Voz no disponible' });
+    const bumpSeguro = store.adapter.kind === 'supabase' ? store.adapter.bumpEstadoSeguro : store.adapter.bumpEstado;
+    if (typeof bumpSeguro !== 'function') return res.status(503).json({ ok: false, error: 'Control de cuota de voz no disponible' });
+    const now = new Date().toISOString();
+    const pasos = [
+      { key: 'voz:u:' + req.user.id + ':' + now.slice(0, 16), limit: 10 },
+      { key: 'voz:global:' + now.slice(0, 16), limit: 50 },
+      { key: 'voz:u:' + req.user.id + ':' + now.slice(0, 10), limit: 100 },
+      { key: 'voz:global:' + now.slice(0, 10), limit: 1000 },
+    ];
+    try {
+      for (const paso of pasos) {
+        const n = await bumpSeguro.call(store.adapter, 'iaUso', paso.key, 'n', 1);
+        if (!Number.isFinite(n)) throw new Error('Contador inválido');
+        if (n > paso.limit) return res.status(429).json({ ok: false, error: 'Límite de voz alcanzado; intenta más tarde' });
+      }
+    } catch (e) { return res.status(503).json({ ok: false, error: 'Control de cuota de voz no disponible' }); }
+    try {
+      const audio = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(voz), {
+        method: 'POST', signal: AbortSignal.timeout(30000),
+        headers: { 'xi-api-key': config.elevenLabsApiKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+        body: JSON.stringify({ text: texto.trim(), model_id: 'eleven_multilingual_v2' }),
+      });
+      if (!audio.ok || !(audio.headers.get('content-type') || '').toLowerCase().startsWith('audio/')) {
+        return res.status(502).json({ ok: false, error: 'La voz natural no está disponible; prueba otra voz' });
+      }
+      const bytes = Buffer.from(await audio.arrayBuffer());
+      if (!bytes.length || bytes.length > 4 * 1024 * 1024) return res.status(502).json({ ok: false, error: 'Audio inválido' });
+      res.type('audio/mpeg').send(bytes);
+    } catch (e) { res.status(502).json({ ok: false, error: 'No se pudo generar el audio' }); }
   });
 
   /* Contador compartido. Si el adaptador no tiene estado, se lleva en proceso:

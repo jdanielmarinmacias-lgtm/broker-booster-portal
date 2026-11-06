@@ -121,3 +121,57 @@ describe('IA: rate-limit por minuto', () => {
     assert.equal(despues, antes);
   });
 });
+
+describe('Voces naturales de práctica', () => {
+  const config = require('../src/config');
+  it('protege el catálogo y audio, valida voz, origen y cuota sin contactar al proveedor real', async () => {
+    await como('admin');
+    const keyAnterior = config.elevenLabsApiKey;
+    const fetchReal = global.fetch;
+    const pruebaKey = 'eleven-test-key';
+    let llamadasAudio = 0;
+    config.elevenLabsApiKey = pruebaKey;
+    global.fetch = async (url, opts) => {
+      if (String(url).startsWith('https://api.elevenlabs.io/v2/voices')) {
+        assert.equal(opts.headers['xi-api-key'], pruebaKey);
+        return new Response(JSON.stringify({ voices: [
+          { voice_id: 'vozA', name: 'Voz A', labels: { accent: 'mexicano' } },
+          { voice_id: 'vozB', name: 'Voz B', labels: {} },
+        ] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (String(url).startsWith('https://api.elevenlabs.io/v1/text-to-speech/')) {
+        llamadasAudio++;
+        assert.equal(opts.headers['xi-api-key'], pruebaKey);
+        assert.equal(JSON.parse(opts.body).model_id, 'eleven_multilingual_v2');
+        return new Response(Buffer.from('audio-ficticio'), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
+      }
+      return fetchReal(url, opts);
+    };
+    const pedir = (cookie, origin, body) => fetchReal(base + '/api/ia/voz', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body),
+    });
+    try {
+      const anon = await fetchReal(base + '/api/ia/voces');
+      assert.equal(anon.status, 401);
+      const catalogo = await fetchReal(base + '/api/ia/voces', { headers: { Cookie: jar.cookie } });
+      const lista = await catalogo.json();
+      assert.equal(catalogo.status, 200);
+      assert.deepEqual(lista.voces.map((v) => v.id), ['vozA', 'vozB']);
+      assert.ok(!JSON.stringify(lista).includes(pruebaKey));
+      assert.equal((await pedir(null, base, { voz: 'vozA', texto: 'Hola' })).status, 401);
+      assert.equal((await pedir(jar.cookie, 'https://ajeno.example', { voz: 'vozA', texto: 'Hola' })).status, 403);
+      assert.equal((await pedir(jar.cookie, base, { voz: 'ajena', texto: 'Hola' })).status, 400);
+      assert.equal((await pedir(jar.cookie, base, { voz: 'vozA', texto: 'x'.repeat(501) })).status, 400);
+      const audio = await pedir(jar.cookie, base, { voz: 'vozB', texto: 'Hola' });
+      assert.equal(audio.status, 200);
+      assert.match(audio.headers.get('content-type'), /^audio\/mpeg/);
+      assert.equal(await audio.text(), 'audio-ficticio');
+      for (let i = 0; i < 9; i++) assert.equal((await pedir(jar.cookie, base, { voz: 'vozA', texto: 'Hola' })).status, 200);
+      assert.equal((await pedir(jar.cookie, base, { voz: 'vozA', texto: 'Hola' })).status, 429);
+      assert.equal(llamadasAudio, 10, 'el proveedor no recibe solicitudes por encima del límite');
+    } finally {
+      global.fetch = fetchReal;
+      config.elevenLabsApiKey = keyAnterior;
+    }
+  });
+});

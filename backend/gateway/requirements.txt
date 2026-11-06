@@ -1,0 +1,5 @@
+﻿# Gateway local de IA (Respan) para el portal. Python 3.10+.
+# Instalar solo con wheels, desde el entorno virtual del proyecto:
+#   python -m venv .venv && .venv\Scripts\activate
+#   pip install --only-binary=:all: -r gateway/requirements.txt
+respan-gateway==0.3.0

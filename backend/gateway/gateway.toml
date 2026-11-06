@@ -1,0 +1,12 @@
+﻿# Respan Gateway local para Gu-IA (portal Broker Booster)
+#
+# - Escucha solo en loopback: el backend de Node lo llama desde la misma máquina.
+#   Sin `client_keys` el gateway no acepta arrancar en una dirección pública.
+# - La clave de Groq NO se escribe aquí: `env:GROQ_API_KEY` la lee del entorno
+#   o del .env más cercano (backend/.env), el mismo que ya usa el portal.
+# - El backend pide el modelo como "groq/openai/gpt-oss-120b" para que el
+#   gateway no confunda `openai/gpt-oss-120b` con un modelo de OpenAI.
+
+[providers.groq]
+vendor = "groq"
+key = "env:GROQ_API_KEY"

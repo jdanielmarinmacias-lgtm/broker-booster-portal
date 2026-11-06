@@ -29,6 +29,11 @@ module.exports = {
    * NUNCA se escribe la clave en el código (GitHub Push Protection) ni en
    * estáticos: solo la usa el proxy /api/ia/chat en el servidor. */
   groqApiKey: process.env.GROQ_API_KEY || null,
+  /* Gateway local de IA (Respan). Si IA_GATEWAY_URL está definida, /api/ia/chat
+   * sale por ese gateway en loopback (ver backend/gateway/) en vez de llamar a
+   * Groq directo. Vacía = comportamiento anterior. */
+  iaGatewayUrl: process.env.IA_GATEWAY_URL || null,
+  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || null,
   cookieName: 'bb_session',
   // Sirve ../portal-modular como frontend
   frontendDir: path.join(__dirname, '..', '..', 'portal-modular'),
