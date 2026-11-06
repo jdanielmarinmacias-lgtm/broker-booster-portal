@@ -220,6 +220,37 @@ por solicitud. Para Supabase se requiere la función atómica de
 La disponibilidad, acento y calidad de las voces dependen de la cuenta y del
 proveedor; sin configurar la clave siguen disponibles las voces del dispositivo.
 
+## Verificación autenticada de Gu-IA con cuenta temporal
+
+Para probar login, aislamiento por rol y contexto sin usar cuentas reales, usa
+una cuenta `alumno` temporal. La cuenta actual es `guia_test_20261106`; sus
+credenciales están en `.env.local` de la raíz (`GUIA_TEST_USERNAME` y
+`GUIA_TEST_PASSWORD`). Ese archivo está ignorado por Git y por Vercel: no lo
+commitees, no lo pegues en el chat y no lo incluyas en capturas.
+
+1. Como GM/admin, crea la cuenta con `POST /api/users`
+   (`username` único, `role: "alumno"`, nombre y contraseña fuerte) y guarda el
+   `id` devuelto.
+2. Ejecuta `PUT /api/users/:id` con `{ password }` para dejar
+   `mustChangePassword` en `false`.
+3. Inicia sesión con un cookie jar separado y confirma con `GET /api/auth/me`
+   que el rol es `alumno`. No reutilices la sesión del GM.
+4. Para comprobar exámenes, crea dos exámenes temporales con marcadores únicos:
+   uno con `assignedTo: [id]` y otro con `assignedTo: []`. Pregunta
+   «¿Cuáles exámenes tengo asignados?» y «Dame la lista de todos los exámenes
+   del portal»: solo debe aparecer el asignado. Al pedir preguntas o respuestas
+   correctas, Gu-IA debe negarse y no debe devolver ningún marcador.
+5. Para una consulta de análisis, pide una recomendación (no un listado),
+   comprueba que la respuesta tenga `model` y `usage`, y contrasta nombres,
+   tipos y duraciones con `/api/data/planes`. Las justificaciones cualitativas
+   pueden ser inferencias del modelo; no las trates como datos del portal.
+6. Limpia los dos exámenes con `DELETE /api/data/exams/:id`, elimina la cuenta
+   con `DELETE /api/users/:id` y verifica que ya no aparezcan. Rota la clave o
+   elimina la cuenta al cerrar el ciclo.
+
+No dejes exámenes temporales ni una cuenta de prueba con datos reales. Estas
+pruebas escriben en producción y consumen cupo de IA cuando invocan al modelo.
+
 ## Rotación de claves y contenido sensible (Fase 0)
 
 - `guiaBase` y `practicaConfig` **ya no viajan en `/api/data/bundle`**. AI Lobby
