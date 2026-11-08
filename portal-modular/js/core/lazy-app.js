@@ -163,7 +163,9 @@
     var conCompuerta = function () {
       var args = arguments, self = this;
       if (window.BBApp && !window.BBApp.listo()) {
-        window.BBApp.cargar().then(function () {
+        window.BBApp.cargar().then(function (resultado) {
+          /* Sin sesión el campus no carga: no ejecutar el núcleo a medias. */
+          if (resultado && resultado.fallos && resultado.fallos.length) return;
           try { original.apply(self, args); } catch (e) { console.error('[campus] initializeApp:', e); }
         });
         return;

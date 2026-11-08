@@ -1011,7 +1011,7 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         replaceArray(db.inmPublica.props, normIds(p.propiedades));
       }
       if (db.settings && isPlain(db.settings)) {
-        ['hero', 'caminos', 'comisiones', 'historias', 'aseguradoras', 'servicios', 'blog', 'privacidad', 'ctaFinal', 'empresa'].forEach(function (k) {
+        ['hero', 'caminos', 'comisiones', 'historias', 'aseguradoras', 'servicios', 'blog', 'privacidad', 'ctaFinal', 'empresa', 'video'].forEach(function (k) {
           if (p[k]) db.settings[k] = p[k];
         });
       }

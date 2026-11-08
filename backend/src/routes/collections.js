@@ -394,6 +394,7 @@ module.exports = (store, config) => {
           privacidad: settings.privacidad || null,
           ctaFinal: settings.ctaFinal || null,
           empresa: settings.empresa || null,
+          video: settings.video || null,
         },
       });
     } catch (e) { next(e); }

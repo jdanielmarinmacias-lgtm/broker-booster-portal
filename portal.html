@@ -893,8 +893,22 @@ function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
             document.querySelector('#login-screen h2').textContent = 'Acceso Administrativo';
         }
 
-        function login(username, password) {
-            const user = db.users.find(u => u.username === username && u.password === password);
+        async function login(username, password) {
+            let user = null;
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    user = data && data.user ? data.user : null;
+                }
+            } catch (e) {
+                user = null;
+            }
             if (user) {
                 const destination = sessionStorage.getItem('login_destination') || 'campus';
                 sessionStorage.removeItem('login_destination');
@@ -9763,7 +9777,7 @@ END:VCALENDAR`;
 
 
         // --- EVENT LISTENERS ---
-        document.getElementById('login-form').addEventListener('submit', e => { e.preventDefault(); const u=document.getElementById('username').value; const p=document.getElementById('password').value; if(!login(u,p)){ document.getElementById('login-error').textContent='Credenciales incorrectas'; document.getElementById('login-error').classList.remove('hidden'); } });
+        document.getElementById('login-form').addEventListener('submit', async e => { e.preventDefault(); const u=document.getElementById('username').value; const p=document.getElementById('password').value; if(!(await login(u,p))){ document.getElementById('login-error').textContent='Credenciales incorrectas'; document.getElementById('login-error').classList.remove('hidden'); } });
         document.getElementById('menu-toggle').addEventListener('click', toggleSidebar);
         function toggleSidebar(){
             const s=document.getElementById('sidebar');
@@ -10201,6 +10215,23 @@ function openConv(){
                 reader.readAsDataURL(file);
             };
 
+            window.uploadVideoInstitucional = async function(input) {
+                const file = input.files[0];
+                if (!file) return;
+                const estado = document.getElementById('video-estado');
+                const fallo = (msg) => { alert(msg); input.value = ''; if (estado) estado.textContent = 'sin video'; };
+                if (!(window.Media && typeof window.Media.subir === 'function')) return fallo('No hay conexión con el servidor para subir el video.');
+                if (file.size > 50 * 1024 * 1024) return fallo('El video supera 50 MB. Comprímelo antes de subirlo.');
+                if (estado) estado.textContent = 'subiendo video...';
+                try {
+                    const item = await window.Media.subir(file, { scope: 'media', title: 'video-institucional' });
+                    document.getElementById('video-url').value = item.url;
+                    if (estado) estado.textContent = 'video subido: falta guardar';
+                } catch (e) {
+                    fallo('No se pudo subir el video: ' + (e && e.message ? e.message : 'error desconocido'));
+                }
+            };
+
             window.agregarAseguradora = function() {
                 const cont = document.getElementById('lista-aseguradoras');
                 const idx = cont.children.length;
@@ -10217,6 +10248,10 @@ function openConv(){
                     db.settings.hero.monto = document.getElementById('hero-monto').value.trim();
                     db.settings.hero.subtitulo = document.getElementById('hero-subtitulo').value.trim();
                     db.settings.hero.imagenFondo = document.getElementById('hero-imagen').value.trim();
+                    db.settings.video = {
+                        url: (document.getElementById('video-url')?.value || '').trim(),
+                        poster: (document.getElementById('video-poster')?.value || '').trim()
+                    };
                     db.settings.hero.textoBoton1 = document.getElementById('hero-btn1').value.trim();
                     db.settings.hero.textoBoton2 = document.getElementById('hero-btn2').value.trim();
                     
@@ -10371,6 +10406,13 @@ function openConv(){
             html += '<div><label class="text-xs text-slate-600 font-medium">Subtítulo</label><textarea id="hero-subtitulo" class="w-full px-3 py-2 border rounded-lg text-sm mt-1 h-20 bg-white text-slate-900 border-slate-300">'+escapeHTML(h.subtitulo)+'</textarea></div>';
             html += '<div><label class="text-xs text-slate-600 font-medium">Imagen de fondo</label><div class="mt-1 space-y-2"><input type="file" accept="image/*" onchange="uploadImageBase64(this, \'hero-preview\', \'hero-imagen\')" class="w-full text-xs bg-white text-slate-900 border border-slate-300"><div class="flex gap-2 items-center"><img id="hero-preview" src="'+(h.imagenFondo||'')+'" class="h-16 w-24 object-cover rounded border '+(h.imagenFondo?'':'hidden')+'"><input id="hero-imagen" value="'+escapeHTML(h.imagenFondo)+'" placeholder="URL alternativa o base64" class="flex-1 px-2 py-1.5 border rounded text-xs bg-white text-slate-900 border-slate-300"></div></div></div>';
             html += '<div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-slate-600 font-medium">Texto botón 1</label><input id="hero-btn1" value="'+escapeHTML(h.textoBoton1)+'" class="w-full px-3 py-2 border rounded-lg text-sm mt-1 bg-white text-slate-900 border-slate-300"></div><div><label class="text-xs text-slate-600 font-medium">Texto botón 2</label><input id="hero-btn2" value="'+escapeHTML(h.textoBoton2)+'" class="w-full px-3 py-2 border rounded-lg text-sm mt-1 bg-white text-slate-900 border-slate-300"></div></div>';
+            var vid = db.settings.video || {};
+            html += '<div class="bg-white p-6 rounded-2xl border border-slate-200 mt-6">';
+            html += '<h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-circle-play text-rose-600"></i>QUIÉNES SOMOS: VIDEO INSTITUCIONAL</h3>';
+            html += '<div class="space-y-4">';
+            html += '<div><label class="text-xs text-slate-600 font-medium">Video (archivo MP4/WebM)</label><input type="file" accept="video/mp4,video/webm" onchange="uploadVideoInstitucional(this)" class="w-full text-xs mt-1 bg-white text-slate-900 border border-slate-300"><p class="text-[11px] text-slate-500 mt-1">Actual: <span id="video-estado">'+(vid.url ? 'video cargado' : 'sin video (se muestra "próximamente")')+'</span></p><input type="hidden" id="video-url" value="'+escapeHTML(vid.url||'')+'"></div>';
+            html += '<div><label class="text-xs text-slate-600 font-medium">Poster (imagen de portada del video)</label><div class="mt-1 space-y-2"><input type="file" accept="image/*" onchange="uploadImageBase64(this, \'video-poster-preview\', \'video-poster\')" class="w-full text-xs bg-white text-slate-900 border border-slate-300"><div class="flex gap-2 items-center"><img id="video-poster-preview" src="'+(vid.poster||'')+'" class="h-16 w-24 object-cover rounded border '+(vid.poster?'':'hidden')+'"><input id="video-poster" value="'+escapeHTML(vid.poster||'')+'" placeholder="Opcional" class="flex-1 px-2 py-1.5 border rounded text-xs bg-white text-slate-900 border-slate-300"></div></div></div>';
+            html += '</div></div>';
             html += '<div class="bg-white p-6 rounded-2xl border border-slate-200 mt-6">';
             html += '<h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-route text-emerald-600"></i>ELIGE TU CAMINO (3 tarjetas)</h3>';
             var cam=(db.settings.caminos && db.settings.caminos.cards)?db.settings.caminos.cards:[];

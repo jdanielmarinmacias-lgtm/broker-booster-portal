@@ -1565,6 +1565,9 @@ function renderPublicPortal() {
             const js = joinData();
             const content = db.settings.portalContent;
             const s = db.settings;
+            const WA_BASE = 'https://wa.me/526674611808';
+            const aseguradorasAliadas = (Array.isArray(db.settings.aseguradoras) && db.settings.aseguradoras.length) ? db.settings.aseguradoras.length : 14;
+            const divisionesServicio = servData().servicios.length;
             const agentesActivos = db.users.filter(u => (u.role||'').toLowerCase().includes('agente') || ['alumno','agente_desarrollo','agente_agencia'].includes((u.role||'').toLowerCase())).length;
             
             portal.innerHTML = `
@@ -1577,7 +1580,7 @@ function renderPublicPortal() {
                                 <img src="${LOGO_BB || s.logo}" alt="Broker Booster" class="h-8 sm:h-11 w-auto shrink-0">
                                 <span class="hidden sm:inline text-xl font-bold text-slate-800 truncate">${s.institutionName}</span>
                             </div>
-                            <nav class="hidden lg:flex items-center gap-5">
+                            <nav class="hidden lg:flex items-center gap-5" aria-label="Navegación principal">
                                 <a href="#servicios" data-pub-tab="servicios" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Servicios</a>
                                 <a href="#unirse" data-pub-tab="unirse" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Cómo ganarías</a>
                                 <a href="#ingresos" data-pub-tab="ingresos" class="text-sm font-medium text-slate-600 hover:text-[var(--bb-forest)] transition">Simulador</a>
@@ -1618,7 +1621,7 @@ function renderPublicPortal() {
                 <!-- Hero reclutamiento (formal, blanco/verde/negro) -->
                 <section class="pt-16 relative overflow-hidden min-h-[85vh] flex items-center bg-[var(--bb-marble)]">
                     <div class="absolute inset-0">
-                    <img loading="lazy" decoding="async" fetchpriority="high" src="${db.settings.hero?.imagenFondo || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=60&w=1440&fm=webp'}" class="w-full h-full object-cover opacity-25" alt="" data-bx-error="a48">
+                    <img loading="lazy" decoding="async" fetchpriority="high" src="${db.settings.hero?.imagenFondo || 'img/splash-landscape.webp'}" class="w-full h-full object-cover opacity-40" alt="" data-bx-error="a48">
                         <div class="absolute inset-0 bg-gradient-to-br from-[var(--bb-marble)] via-[var(--bb-marble)]/95 to-[#e9efe9]/80"></div>
                         <div class="absolute inset-0 bg-[radial-gradient(circle_at_85%_40%,rgba(201,168,106,0.22),transparent_45%)]"></div>
                     </div>
@@ -1641,17 +1644,16 @@ function renderPublicPortal() {
                                     ${db.settings.hero?.textoBoton1 || "Conoce nuestros servicios"}
                                     <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
                                 </a>
-                                <a href="https://wa.me/526674611808?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20los%20servicios%20de%20Broker%20Booster" target="_blank" class="px-8 py-4 bg-white text-slate-900 font-semibold rounded-2xl hover:bg-slate-100 transition border-2 border-slate-200 shadow-lg flex items-center justify-center gap-2">
+                                <a href="${WA_BASE}?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20los%20servicios%20de%20Broker%20Booster" target="_blank" class="px-8 py-4 bg-white text-slate-900 font-semibold rounded-2xl hover:bg-slate-100 transition border-2 border-slate-200 shadow-lg flex items-center justify-center gap-2">
                                     <i class="fab fa-whatsapp text-emerald-600"></i>
                                     ${db.settings.hero?.textoBoton2 || "Habla con un asesor"}
                                 </a>
                             </div>
                         </div>
                     </div>
-                    <!-- Floating stats -->
-                    </div></div></section>
+                </section>
 
-                <!-- Stats bar corregida -->
+                <!-- Stats bar -->
                 <section class="relative -mt-12 z-20">
                     <div class="max-w-7xl mx-auto px-4">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1660,18 +1662,17 @@ function renderPublicPortal() {
                                     <div class="text-xs text-slate-600">Agentes activos</div>
                                 </div>
                                 <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
-                                    <div class="text-2xl font-bold text-slate-900">14</div>
+                                    <div class="text-2xl font-bold text-slate-900">${aseguradorasAliadas}</div>
                                     <div class="text-xs text-slate-600">Aseguradoras aliadas</div>
                                 </div>
                                 <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
-                                    <div class="text-2xl font-bold text-slate-900">13</div>
+                                    <div class="text-2xl font-bold text-slate-900">${divisionesServicio}</div>
                                     <div class="text-xs text-slate-600">Divisiones de servicio</div>
                                 </div>
                                 <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xl">
                                     <div class="text-2xl font-bold text-slate-900">100%</div>
                                     <div class="text-xs text-slate-600">Independientes</div>
-                    </div>
-                </section>
+                                </div>
                         </div>
                     </div>
                 </section>
@@ -1699,37 +1700,26 @@ function renderPublicPortal() {
                                         </div>
                                         <h3 class="text-lg font-bold text-slate-900 mb-2">${psEscape(x.n)}</h3>
                                         <p class="text-sm text-slate-600 leading-relaxed">${psEscape(x.d)}</p>
-                                        <a href="https://wa.me/526674611808?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20${encodeURIComponent(x.n)}" target="_blank" class="mt-4 inline-flex items-center gap-1.5 min-h-[44px] py-2 text-sm font-semibold text-[var(--bb-forest)] hover:text-[var(--bb-emerald)]">Cotizar / agendar <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></a>
+                                        <a href="${WA_BASE}?text=Hola,%20quiero%20informaci%C3%B3n%20sobre%20${encodeURIComponent(x.n)}" target="_blank" class="mt-4 inline-flex items-center gap-1.5 min-h-[44px] py-2 text-sm font-semibold text-[var(--bb-forest)] hover:text-[var(--bb-emerald)]">Cotizar / agendar <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></a>
                                     </div>`).join('')}
                             </div>
                         </div>`).join('')}
                     </div>
                 </section>
 
-                <section id="blog" class="py-20 bg-white border-t border-slate-200">
-                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div class="text-center mb-12">
-                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Blog</p>
-                            <h2 class="text-4xl font-black text-slate-900 mb-3">${psEscape(blogData().titulo)}</h2>
-                            <p class="text-slate-600 text-lg max-w-3xl mx-auto">${psEscape(blogData().subtitulo)}</p>
+                <!-- Quiénes somos + video -->
+                <section id="quienes-somos" class="py-20 bg-white border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 items-center">
+                        <div>
+                            <p class="text-sm font-semibold text-emerald-700 uppercase tracking-wider mb-3">Quiénes somos</p>
+                            <h2 class="text-3xl lg:text-4xl font-black text-slate-900 mb-6 leading-tight">Un grupo financiero multi-sector con respaldo real</h2>
+                            <p class="text-slate-600 leading-relaxed mb-4">Broker Booster reúne seguros, inversiones, banca, autos, inmuebles, contabilidad, salud y educación en un solo lugar. Nuestro equipo acompaña a personas y empresas desde San Pedro Garza García, Nuevo León.</p>
+                            <p class="text-slate-600 leading-relaxed">Trabajamos con aseguradoras y aliados líderes del mercado para comparar opciones, cuidar tu patrimonio y resolver cada necesidad con un solo interlocutor.</p>
                         </div>
-                        <div class="grid md:grid-cols-3 gap-6">
-                            ${blogData().posts.map(p=>`
-                            <article class="group flex flex-col bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-[var(--bb-gold)] transition-all cursor-pointer" data-bx-click="a50" data-p0="${bxE(function(){return psEscape(String(p.id))})}">
-                                <div class="h-2 bg-gradient-to-r from-[var(--bb-gold)] to-[var(--bb-gold-deep)]"></div>
-                                <div class="p-6 flex flex-col flex-1">
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--bb-gold)] to-[var(--bb-gold-deep)] flex items-center justify-center"><i class="fas ${p.ico||'fa-newspaper'} text-sm text-white"></i></div>
-                                        <span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-[11px] font-bold rounded-full">${psEscape(p.tag||'General')}</span>
-                                    </div>
-                                    <h3 class="text-lg font-bold text-slate-900 mb-2 leading-snug group-hover:text-[var(--bb-gold-deep)] transition">${psEscape(p.titulo)}</h3>
-                                    <p class="text-sm text-slate-600 flex-1">${psEscape(p.resumen||'')}</p>
-                                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
-                                        <span class="text-xs text-slate-400">${psEscape(p.fecha||'')}</span>
-                                        <span class="text-sm font-semibold text-emerald-700 inline-flex items-center gap-1">Leer <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></span>
-                                    </div>
-                                </div>
-                            </article>`).join('')}
+                        <div class="relative rounded-3xl overflow-hidden shadow-xl bg-slate-900 aspect-video">
+                            ${db.settings.video?.url
+                                ? `<video class="w-full h-full object-cover" controls preload="metadata" playsinline poster="${db.settings.video?.poster || 'img/splash-landscape.webp'}"><source src="${db.settings.video.url}"></video>`
+                                : `<div class="w-full h-full flex flex-col items-center justify-center text-white gap-3 bg-[var(--bb-marble)]/10"><i class="fas fa-circle-play text-6xl text-[var(--bb-gold)]"></i><p class="text-sm text-slate-200">Video institucional próximamente</p></div>`}
                         </div>
                     </div>
                 </section>
@@ -2000,7 +1990,36 @@ function renderPublicPortal() {
                     </div>
                 </section>
 
-                
+
+                <!-- Blog -->
+                <section id="blog" class="py-20 bg-white border-t border-slate-200">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div class="text-center mb-12">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 mb-2">Blog</p>
+                            <h2 class="text-4xl font-black text-slate-900 mb-3">${psEscape(blogData().titulo)}</h2>
+                            <p class="text-slate-600 text-lg max-w-3xl mx-auto">${psEscape(blogData().subtitulo)}</p>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            ${blogData().posts.map(p=>`
+                            <button type="button" class="group text-left flex flex-col bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-[var(--bb-gold)] transition-all cursor-pointer" data-bx-click="a50" data-p0="${bxE(function(){return psEscape(String(p.id))})}">
+                                <span class="block h-2 bg-gradient-to-r from-[var(--bb-gold)] to-[var(--bb-gold-deep)]"></span>
+                                <span class="block p-6 flex flex-col flex-1">
+                                    <span class="flex items-center gap-2 mb-3">
+                                        <span class="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--bb-gold)] to-[var(--bb-gold-deep)] flex items-center justify-center"><i class="fas ${p.ico||'fa-newspaper'} text-sm text-white"></i></span>
+                                        <span class="px-2.5 py-1 bg-amber-100 text-amber-800 text-[11px] font-bold rounded-full">${psEscape(p.tag||'General')}</span>
+                                    </span>
+                                    <span class="block text-lg font-bold text-slate-900 mb-2 leading-snug group-hover:text-[var(--bb-gold-deep)] transition">${psEscape(p.titulo)}</span>
+                                    <span class="block text-sm text-slate-600 flex-1">${psEscape(p.resumen||'')}</span>
+                                    <span class="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                                        <span class="text-xs text-slate-400">${psEscape(p.fecha||'')}</span>
+                                        <span class="text-sm font-semibold text-emerald-700 inline-flex items-center gap-1">Leer <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i></span>
+                                    </span>
+                                </span>
+                            </button>`).join('')}
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Aseguradoras con logos deslizables -->
                 ${[
                     {key:'aseguradoras', titulo:'Trabajamos con las mejores', def:[
@@ -2071,15 +2090,15 @@ function renderPublicPortal() {
                         </div>
                         <div class="grid md:grid-cols-2 gap-6">
                             <button data-bx-click="a45" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-emerald-600 hover:shadow-2xl transition-all">
-                                <div class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mb-5"><i class="fas fa-car-side text-2xl text-emerald-700"></i></div>
-                                <h3 class="text-2xl font-bold text-slate-900 mb-2">Autos en venta <i class="fas fa-arrow-right text-sm text-emerald-600 group-hover:translate-x-1 transition-transform"></i></h3>
-                                <p class="text-slate-600 text-sm mb-4">Inventario de la agencia: origen claro (mexicano, americano o legalizado), precios transparentes y crédito precalificado en minutos.</p>
+                                <span class="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mb-5"><i class="fas fa-car-side text-2xl text-emerald-700"></i></span>
+                                <span class="block text-2xl font-bold text-slate-900 mb-2">Autos en venta <i class="fas fa-arrow-right text-sm text-emerald-600 group-hover:translate-x-1 transition-transform"></i></span>
+                                <span class="block text-slate-600 text-sm mb-4">Inventario de la agencia: origen claro (mexicano, americano o legalizado), precios transparentes y crédito precalificado en minutos.</span>
                                 <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-800 text-xs font-medium">${auPublicas().length} unidad(es) disponibles hoy</span>
                             </button>
                             <button data-bx-click="a34" class="group text-left bg-white rounded-3xl border-2 border-slate-200 p-8 hover:border-sky-600 hover:shadow-2xl transition-all">
-                                <div class="w-14 h-14 rounded-2xl bg-sky-100 flex items-center justify-center mb-5"><i class="fas fa-house text-2xl text-sky-700"></i></div>
-                                <h3 class="text-2xl font-bold text-slate-900 mb-2">Propiedades <i class="fas fa-arrow-right text-sm text-sky-600 group-hover:translate-x-1 transition-transform"></i></h3>
-                                <p class="text-slate-600 text-sm mb-4">Casas y departamentos en venta, renta y preventa, con acompañamiento completo: crédito, escrituración y firma.</p>
+                                <span class="w-14 h-14 rounded-2xl bg-sky-100 flex items-center justify-center mb-5"><i class="fas fa-house text-2xl text-sky-700"></i></span>
+                                <span class="block text-2xl font-bold text-slate-900 mb-2">Propiedades <i class="fas fa-arrow-right text-sm text-sky-600 group-hover:translate-x-1 transition-transform"></i></span>
+                                <span class="block text-slate-600 text-sm mb-4">Casas y departamentos en venta, renta y preventa, con acompañamiento completo: crédito, escrituración y firma.</span>
                                 <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-sky-50 border border-sky-200 rounded-full text-sky-800 text-xs font-medium">${inmPubLista().length} propiedad(es) publicadas</span>
                             </button>
                         </div>
@@ -2093,7 +2112,7 @@ function renderPublicPortal() {
                         <p class="text-xl opacity-90 mb-8">${db.settings.ctaFinal?.subtitulo || 'Agenda una llamada de 15 minutos. Sin compromiso, con información concreta.'}</p>
                         <div class="flex flex-col sm:flex-row gap-4 justify-center">
                             <button data-bx-click="a57" class="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition shadow-xl">${db.settings.ctaFinal?.boton || 'Agendar ahora'}</button>
-                            <a href="https://wa.me/526674611808?text=Hola,%20quiero%20informaci%C3%B3n%20para%20ser%20agente" target="_blank" class="px-8 py-4 bg-white/10 backdrop-blur border-2 border-white/30 font-semibold rounded-2xl hover:bg-white/20 transition">WhatsApp directo</a>
+                            <a href="${WA_BASE}?text=Hola,%20quiero%20informaci%C3%B3n%20para%20ser%20agente" target="_blank" class="px-8 py-4 bg-white/10 backdrop-blur border-2 border-white/30 font-semibold rounded-2xl hover:bg-white/20 transition">WhatsApp directo</a>
                         </div>
                     </div>
                 </section>
@@ -2331,7 +2350,18 @@ function auD(){
                  * checkSession puede correr por setTimeout antes de que la compuerta
                  * de window.initializeApp esté puesta, así que se espera aquí. */
                 if (window.BBApp && typeof window.BBApp.cargar === 'function') {
-                    window.BBApp.cargar().then(function () {
+                    window.BBApp.cargar().then(function (resultado) {
+                        /* Sin sesión válida en el servidor (401 en /api/campus) el campus
+                         * no carga: volver a la portada pública en vez de pintar un
+                         * campus incompleto (sinDB no definido). */
+                        if (resultado && resultado.fallos && resultado.fallos.length) {
+                            try { sessionStorage.removeItem('pepes_user'); } catch (e) {}
+                            currentUser = null;
+                            document.getElementById('main-app').classList.add('hidden');
+                            document.getElementById('public-portal').classList.remove('hidden');
+                            renderPublicPortal();
+                            return;
+                        }
                         try { initializeApp(); } catch (e) { console.error('[campus] checkSession:', e); }
                     });
                 } else {

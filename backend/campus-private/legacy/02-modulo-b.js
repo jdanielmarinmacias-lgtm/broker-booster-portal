@@ -267,6 +267,35 @@
                 }
                 uploadImageBase64Local(input, previewId, hiddenId);
             };
+            // Video institucional (Quiénes somos): se sube con Media.subir al backend,
+            // sin el límite de tamaño de localStorage. La URL queda en #video-url.
+            window.uploadVideoInstitucional = function() {
+                const input = this;
+                const file = input.files && input.files[0];
+                if (!file) return;
+                const estado = document.getElementById('video-estado');
+                if (file.size > 50 * 1024 * 1024) {
+                    if (window.showToast) showToast('El video supera 50 MB','error'); else alert('El video supera 50 MB');
+                    input.value = '';
+                    return;
+                }
+                if (!(window.Media && window.Backend && window.Backend.available)) {
+                    if (window.showToast) showToast('Se necesita conexión al backend para subir video','error');
+                    input.value = '';
+                    return;
+                }
+                if (estado) estado.textContent = 'Subiendo video…';
+                window.Media.subir(file, { scope: 'media' }).then(function(item){
+                    document.getElementById('video-url').value = item.url;
+                    const pv = document.getElementById('video-preview');
+                    pv.src = item.url; pv.classList.remove('hidden');
+                    if (estado) estado.textContent = 'Video subido. Pulsa "Guardar todo" para publicarlo.';
+                    if (window.showToast) showToast('Video subido','success');
+                }).catch(function(){
+                    if (estado) estado.textContent = 'Error al subir el video';
+                    if (window.showToast) showToast('No se pudo subir el video','error');
+                });
+            };
             window.uploadImageBase64Local = function(input, previewId, hiddenId) {
                 const file = input.files[0];
                 if (!file) return;
@@ -488,6 +517,13 @@
                         db.settings.empresa.ciudad = document.getElementById('emp-ciudad').value.trim() || 'San Pedro Garza García, NL';
                     }
                     
+                    // VIDEO INSTITUCIONAL (Quiénes somos)
+                    const videoUrlEl = document.getElementById('video-url');
+                    if (videoUrlEl) {
+                        const vUrl = videoUrlEl.value.trim();
+                        db.settings.video = vUrl ? { url: vUrl } : null;
+                    }
+
                     saveDB();
                     if (window.showToast) showToast('Editor guardado correctamente','success'); else uiToast('Guardado');
                 } catch(e) {
@@ -521,6 +557,13 @@
             html += '<div><label class="text-xs text-slate-600 font-medium">Imagen de fondo</label><div class="mt-1 space-y-2"><input type="file" accept="image/*" ' + bxOn('change','bxM.subirImagen',['hero-preview', 'hero-imagen']) + ' class="w-full text-xs bg-white text-slate-900 border border-slate-300"><div class="flex gap-2 items-center"><img loading="lazy" decoding="async" id="hero-preview" src="'+(h.imagenFondo||'')+'" class="h-16 w-24 object-cover rounded border '+(h.imagenFondo?'':'hidden')+'"><input id="hero-imagen" value="'+escapeHTML(h.imagenFondo)+'" placeholder="URL alternativa o base64" class="flex-1 px-2 py-1.5 border rounded text-xs bg-white text-slate-900 border-slate-300"></div></div></div>';
             html += '<div class="grid grid-cols-2 gap-3"><div><label class="text-xs text-slate-600 font-medium">Texto botón 1</label><input id="hero-btn1" value="'+escapeHTML(h.textoBoton1)+'" class="w-full px-3 py-2 border rounded-lg text-sm mt-1 bg-white text-slate-900 border-slate-300"></div><div><label class="text-xs text-slate-600 font-medium">Texto botón 2</label><input id="hero-btn2" value="'+escapeHTML(h.textoBoton2)+'" class="w-full px-3 py-2 border rounded-lg text-sm mt-1 bg-white text-slate-900 border-slate-300"></div></div>';
             html += '</div></div>'; // cierra space-y-4 y la tarjeta HERO (antes faltaban y colapsaban el layout)
+            var vid = db.settings.video || {};
+            html += '<div class="bg-white p-6 rounded-2xl border border-slate-200 mt-6">';
+            html += '<h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-video text-indigo-600"></i>VIDEO INSTITUCIONAL (Quiénes somos)</h3>';
+            html += '<div class="space-y-3"><input type="file" accept="video/mp4,video/webm" ' + bxOn('change','uploadVideoInstitucional',[]) + ' class="w-full text-xs bg-white text-slate-900 border border-slate-300"><p class="text-xs text-slate-500">MP4 o WebM, máximo 50 MB. Se guarda en el servidor.</p>';
+            html += '<input type="hidden" id="video-url" value="'+escapeHTML(vid.url||'')+'">';
+            html += '<video id="video-preview" controls class="w-full rounded-lg border '+(vid.url?'':'hidden')+'" src="'+escapeHTML(vid.url||'')+'"></video>';
+            html += '<p id="video-estado" class="text-xs text-slate-500">'+(vid.url?'Video guardado':'Sin video')+'</p></div></div>';
             html += '<div class="bg-white p-6 rounded-2xl border border-slate-200 mt-6">';
             html += '<h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-route text-emerald-600"></i>ELIGE TU CAMINO (3 tarjetas)</h3>';
             var cam=(db.settings.caminos && db.settings.caminos.cards)?db.settings.caminos.cards:[];
