@@ -4,7 +4,7 @@
   "private": true,
   "description": "Portal Broker Booster: frontend modular + backend propio, desplegable en Vercel con Supabase.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
