@@ -6189,7 +6189,7 @@ function initializeApp() {
             function renderNav() {
             const nav = document.getElementById('nav-menu');
             if (!nav || typeof currentUser === 'undefined' || !currentUser) return;
-            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
+            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }];
             const adminItems = [
                 { id: 'users', label: 'Usuarios', icon: 'fa-users' },
                 { id: 'monitoreo', label: 'Monitoreo Agencias', icon: 'fa-chart-line' },
@@ -6524,7 +6524,6 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     else content.innerHTML = renderDashboard();
                     break;
                 case 'solicitudes': content.innerHTML = renderSolicitudes(); if (typeof marcarSolicitudesVistas === 'function') marcarSolicitudesVistas(); break;
-                case 'practica-cliente': content.innerHTML = renderPracticaCliente(); break;
                 case 'practica-sesiones': content.innerHTML = renderPracticaSesiones(); setTimeout(()=>{ if(typeof initPracticaSesiones==='function') initPracticaSesiones(); }, 60); break;
                 case 'personalizar': content.innerHTML = renderBranding(); break;
                 case 'branding': content.innerHTML = renderBranding(); break;

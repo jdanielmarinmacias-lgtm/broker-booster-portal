@@ -7064,7 +7064,7 @@ function initializeApp() {
             function renderNav() {
             const nav = document.getElementById('nav-menu');
             if (!nav || typeof currentUser === 'undefined' || !currentUser) return;
-            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, ...( (currentUser.role||'').toLowerCase() === 'gm' ? [{ id: 'reportes-progreso', label: 'Embudo Comercial y SLA', icon: 'fa-funnel-dollar' }] : [] ), { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'apps', label: 'Apps', icon: 'fa-th-large' }, { id: 'practica-cliente', label: 'Práctica Con Cliente', icon: 'fa-user-tie' }];
+            const common = [{ id: 'dashboard', label: 'Dashboard', icon: 'fa-home' }, ...( (currentUser.role||'').toLowerCase() === 'gm' ? [{ id: 'reportes-progreso', label: 'Embudo Comercial y SLA', icon: 'fa-funnel-dollar' }] : [] ), { id: 'messages', label: 'Mensajes', icon: 'fa-comments' }, { id: 'carrusel-circulares', label: 'Reunión y Capacitación Semanal', icon: 'fa-bullhorn' }, { id: 'mi-agenda', label: 'Mi Agenda', icon: 'fa-calendar-days' }, { id: 'live-classes', label: 'Clases En Vivo', icon: 'fa-video' }, { id: 'apps', label: 'Apps', icon: 'fa-th-large' }];
             const adminItems = [
                 { id: 'users', label: 'Usuarios', icon: 'fa-users' },
                 { id: 'monitoreo', label: 'Monitoreo Agencias', icon: 'fa-chart-line' },
@@ -7568,7 +7568,6 @@ if (db.rolePermissions && currentUser && db.rolePermissions[(currentUser.role||'
                     break;
                 case 'solicitudes': content.innerHTML = renderSolicitudes(); if (typeof marcarSolicitudesVistas === 'function') marcarSolicitudesVistas(); break;
                 case 'mi-agenda': content.innerHTML = renderMiAgenda(); break;
-                case 'practica-cliente': content.innerHTML = renderPracticaCliente(); break;
                 case 'practica-sesiones': content.innerHTML = renderPracticaSesiones(); setTimeout(()=>{ if(typeof initPracticaSesiones==='function') initPracticaSesiones(); }, 60); break;
                 case 'personalizar': content.innerHTML = renderBranding(); break;
                 case 'branding': content.innerHTML = renderBranding(); break;
@@ -13441,7 +13440,7 @@ END:VCALENDAR`;
                 { titulo: 'General', icon: 'fa-house', secciones: [
                     {id:'dashboard', label:'Dashboard'}, {id:'reportes-progreso', label:'Embudo Comercial y SLA (GM)'}, {id:'leaderboard', label:'Ranking'},
                     {id:'carrusel-circulares', label:'Reunión y Capacitación Semanal'}, {id:'mi-agenda', label:'Mi Agenda'}, {id:'live-classes', label:'Clases En Vivo'},
-                    {id:'apps', label:'Apps'}, {id:'practica-cliente', label:'Práctica Con Cliente'},
+                    {id:'apps', label:'Apps'},
                     {id:'users', label:'Usuarios'}, {id:'centro-mensajes', label:'Centro de Mensajes'},
                     {id:'personalizar', label:'Personalización'}, {id:'editor', label:'Editor Portal'},
                     {id:'oferta-valor', label:'Oferta de valor'}, {id:'resultados-prospectos', label:'Resultados Prospectos'}, {id:'ai-lobby', label:'AI Lobby (Gu-IA)'},

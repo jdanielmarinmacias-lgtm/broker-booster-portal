@@ -19,7 +19,7 @@
     "ia:gateway": "python gateway/serve_gateway.py"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
