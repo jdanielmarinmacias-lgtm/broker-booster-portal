@@ -134,6 +134,16 @@ describe('base de conocimiento y configuración de Práctica', () => {
 });
 
 describe('configuración sensible', () => {
+  it('GET por clave de rolePermissions devuelve 200 (no 404) al staff y al alumno', async () => {
+    await como('admin');
+    const adm = await api('GET', '/api/data/rolePermissions/admin');
+    assert.equal(adm.status, 200, 'admin lee rolePermissions/admin');
+    assert.ok(adm.json && adm.json.ok === true, 'respuesta ok');
+    assert.ok('value' in adm.json, 'respuesta con clave value');
+    await como('alumno');
+    assert.equal((await api('GET', '/api/data/rolePermissions/alumno')).status, 200, 'alumno lee su rol');
+  });
+
   it('un alumno no escribe guiaBase, practicaConfig, carruselCirculares ni settings', async () => {
     await como('alumno');
     const casos = [

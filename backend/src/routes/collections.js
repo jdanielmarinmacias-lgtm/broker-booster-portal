@@ -698,6 +698,30 @@ module.exports = (store, config) => {
     } catch (e) { next(e); }
   });
 
+  /* Lectura de una clave de un objeto (p. ej. rolePermissions/admin) o de un
+   * registro por id. Usa las mismas reglas de lectura que GET /:collection. */
+  api.get('/:collection/:id', async (req, res, next) => {
+    try {
+      const { collection, id } = req.params;
+      if (FORBIDDEN.has(collection)) return res.status(404).json({ ok: false, error: 'No disponible' });
+      if (!roles.canRead(req.user, collection)) return res.status(403).json({ ok: false, error: 'Sin permiso de lectura' });
+      if (typeof store.refreshCollections === 'function') await store.refreshCollections([collection]);
+      else await store.refreshIfStale();
+      const root = store.get();
+      const objeto = RESTRICTED_OBJECTS.has(collection) && !canReadAll(req.user)
+        ? filtrarObjetoPrivado(req.user, root[collection])
+        : root[collection];
+      if (isPlain(objeto) || (!objeto && KNOWN_OBJECTS.has(collection))) {
+        let valor = objeto && objeto[id] !== undefined ? objeto[id] : null;
+        if (collection === 'practicaConfig') valor = sinSecretosConfig(valor).valor;
+        return res.json({ ok: true, value: valor });
+      }
+      const rec = db.byId(db.collection(root, collection), id);
+      if (!rec) return res.status(404).json({ ok: false, error: 'No encontrado' });
+      res.json({ ok: true, item: rec });
+    } catch (e) { next(e); }
+  });
+
   api.put('/:collection/:id', async (req, res, next) => {
     try {
       const { collection, id } = req.params;
