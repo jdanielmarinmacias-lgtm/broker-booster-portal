@@ -815,14 +815,6 @@ window.addEventListener('load', ()=>{
     setTimeout(()=>{ if(typeof initGreeting === 'function') initGreeting(); }, 400);
   }
 
-  // Listen for navigation to practica-cliente
-  const originalNavigate = window.navigateTo;
-  window.navigateTo = function(page, opts) {
-    originalNavigate(page, opts);
-    if(page === 'practica-cliente') {
-      setTimeout(initTeoWhenReady, 150);
-    }
-  };
 })();
 
             function renderMiExperiencia() {
