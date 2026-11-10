@@ -52,6 +52,9 @@
   var retryDelay = 8000;
   var quotaPauseUntil = 0;
   var lastNoSessToast = 0; // limita el aviso de sesión vencida (1/min)
+  // Colecciones que el servidor rechazó con 403 para este rol: no se reintentan
+  // en cada ciclo ni se vuelven a avisar. Se limpian al reingresar (sesión nueva).
+  var sinPermiso = {};
   var shadow = null; // {col: [{...}]} última foto DEL SERVIDOR (solo lo traído por pull)
   var pulled = {}; // colecciones confirmadas desde el servidor en el último pull
   var usersPulled = false;
@@ -473,6 +476,7 @@
     try { await window.Backend.me(); }
     catch (e) { active = false; return false; } // sin sesión: no tocar nada
     active = true;
+    sinPermiso = {}; // sesión (re)iniciada: el rol puede haber cambiado
     const db = legDb();
     if (!db) return false;
     // Foto local previa SIEMPRE: lo que solo existe en este equipo se fusiona
@@ -873,12 +877,21 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
     const names = Object.keys(set);
     const failed = [];
     let cuotaBloqueada = false;
+    const sinPermisoNuevos = [];
     // Aislado por colección: una que falle no bloquea a las demás. La sombra
     // solo avanza en las que sí se sincronizaron (si no, se volverían invisibles).
     for (const n of names) {
+      if (sinPermiso[n]) continue;
       try { await pushCollection(n, db[n] || [], shadow[n] || []);
         shadow[n] = clone(db[n] || []);
       } catch (e) {
+        if (e && e.status === 403) {
+          // Rol sin escritura en esta colección: el servidor lo rechaza siempre.
+          // Se deja de intentar y se avisa una vez; el dato queda en este equipo.
+          sinPermiso[n] = true;
+          sinPermisoNuevos.push(n);
+          continue;
+        }
         failed.push(n + ' (' + motivoFallo(e) + ')');
         if (e && e.json && e.json.retryable === false) {
           quotaPauseUntil = Date.now() + 5 * 60 * 1000;
@@ -916,6 +929,9 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
           retrySoon(5 * 60 * 1000);
         } else if (!e || !e.status || e.status >= 500) retrySoon();
       }
+    }
+    if (sinPermisoNuevos.length && window.showToast) {
+      window.showToast('Sin permiso para sincronizar en el servidor: ' + sinPermisoNuevos.join(', ') + ' (se conservan en este equipo)', 'info');
     }
     if (!failed.length) retryDelay = 8000;
     if (failed.length && window.showToast) {
