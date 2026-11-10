@@ -839,8 +839,11 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
       if (seen[id]) continue;
       try {
         await send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(id), null);
-        markDeleted(name, id); // el borrado ya es definitivo: no vuelve de otra copia
-      } catch (e) { await pullNames([name]); return; }
+      } catch (e) {
+        // 404: el registro ya no existe en el servidor (borrado previo): nada que reintentar.
+        if (!e || e.status !== 404) { await pullNames([name]); return; }
+      }
+      markDeleted(name, id); // el borrado ya es definitivo: no vuelve de otra copia
     }
   }
 
