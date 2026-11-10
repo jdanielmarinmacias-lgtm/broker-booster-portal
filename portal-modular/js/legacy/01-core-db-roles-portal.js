@@ -560,31 +560,6 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
             if (db.categories) { db.categories.forEach(c => { if (!c.image) c.image = ''; }); }
             if (db.generations) { db.generations.forEach(g => { if (!g.image) g.image = ''; }); }
             if (db.groups) { db.groups.forEach(g => { if (!g.image) g.image = ''; }); }
-            // FASE 2 - seed datos de prueba
-            if (!db.generations.length) {
-                db.generations.push({ id: 1, name: 'Generación 2025', startDate: '2025-01-01', endDate: '2025-12-31' });
-            }
-            if (!db.groups.length) {
-                db.groups.push({ id: 1, generationId: 1, name: 'Grupo A', tutorId: 2, schedule: 'Lun-Mié 18:00' });
-            }
-            if (!db.enrollments.some(e=>e.userId===3)) {
-                db.enrollments.push({ id: 1, userId: 3, generationId: 1, groupId: 1, enrolledAt: new Date().toISOString() });
-            }
-            const demoYaSembrado = !!db.demoSeeded;
-            db.demoSeeded = true;
-            if (!demoYaSembrado && !db.posts.some(p=>p.groupId===1)) {
-                if(!db.posts.some(p=>p.id)) db.posts.forEach(p=>{if(p.isBestAnswer===undefined) p.isBestAnswer=false;}); db.posts.push(
-                    { id: Date.now()-20000, groupId: 1, authorId: 2, content: '¡Bienvenidos a la nueva generación! Recuerden revisar el material de Álgebra.', pinned: true, createdAt: new Date(Date.now()-86400000*2).toISOString() },
-                    { id: Date.now()-10000, groupId: 1, authorId: 2, content: 'Recordatorio: clase en vivo mañana a las 18:00.', pinned: false, createdAt: new Date(Date.now()-86400000).toISOString() }
-                );
-            }
-            if (!demoYaSembrado && !db.groupMessages.some(m=>m.groupId===1)) {
-                db.groupMessages.push(
-                    { id: 1, groupId: 1, authorId: 3, content: 'Hola profe, ¿dónde encuentro la tarea?', createdAt: new Date(Date.now()-3600000*5).toISOString() },
-                    { id: 2, groupId: 1, authorId: 2, content: 'Hola Ana, está en Mis Cursos > Matemáticas', createdAt: new Date(Date.now()-3600000*4).toISOString() },
-                    { id: 3, groupId: 1, authorId: 3, content: '¡Perfecto, gracias!', createdAt: new Date(Date.now()-3600000*3).toISOString() }
-                );
-            }
         }
         window.ensureDbDefaults = ensureDbDefaults;
 
