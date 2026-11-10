@@ -8996,7 +8996,7 @@ function renderGlossary() {
         
         function deleteConcept(id) {
             if (!confirm('¿Eliminar este concepto?')) return;
-            db.glossaryConcepts = db.glossaryConcepts.filter(c => c.id !== id);
+            db.glossaryConcepts = db.glossaryConcepts.filter(c => c.id !== id); if(window.borrarExplicito) window.borrarExplicito('glossaryConcepts', id);
             saveDB();
             navigateTo('glossary');
         }
@@ -9699,7 +9699,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             inp.type = 'text';
             if(typeof showToast === 'function') showToast('Contraseña generada: ' + pass, 'info');
         }
-        function deleteUser(id){ const target=db.users.find(u=>String(u.id)===String(id)); if(target && isGM(target)){ uiToast('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ uiToast('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>String(u.id)!==String(id)); saveDB(); navigateTo('users'); } }
+        function deleteUser(id){ const target=db.users.find(u=>String(u.id)===String(id)); if(target && isGM(target)){ uiToast('Las cuentas GM están protegidas: no se pueden eliminar.'); return; } if(target && !canModifyUser(currentUser, target)){ uiToast('Solo un GM puede eliminar a otro usuario GM.'); return; } if(confirm('¿Eliminar usuario?')){ db.users=db.users.filter(u=>String(u.id)!==String(id)); if(window.borrarExplicito) window.borrarExplicito('users', id); saveDB(); navigateTo('users'); } }
 
         function openCategoryModal(id=null){
             if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
@@ -10059,8 +10059,8 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
                 saveDB(); closeModal(); navigateTo('lessons');
             };
         }
-        function deleteLesson(id){ if(confirm('¿Eliminar lección?')){ db.lessons=db.lessons.filter(l=>l.id!==id); saveDB(); navigateTo('lessons'); } }
-        function deleteCategory(id){ if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos'); if(confirm('¿Eliminar categoría? Se borrarán también sus lecciones.')){ db.categories=db.categories.filter(c=>c.id!==id); db.lessons=db.lessons.filter(l=>l.categoryId!==id); saveDB(); navigateTo('categories'); } }
+        function deleteLesson(id){ if(confirm('¿Eliminar lección?')){ db.lessons=db.lessons.filter(l=>l.id!==id); if(window.borrarExplicito) window.borrarExplicito('lessons', id); saveDB(); navigateTo('lessons'); } }
+        function deleteCategory(id){ if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos'); if(confirm('¿Eliminar categoría? Se borrarán también sus lecciones.')){ db.categories=db.categories.filter(c=>c.id!==id); db.lessons=db.lessons.filter(l=>l.categoryId!==id); if(window.borrarExplicito) window.borrarExplicito('categories', id); saveDB(); navigateTo('categories'); } }
 
         // --- QUIZ CON TIPO ---
         function openQuizModal(lessonId){
@@ -11062,6 +11062,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
             if (confirm('¿Eliminar examen? Se perderán todos los intentos.')) {
                 db.exams = db.exams.filter(e => e.id !== id);
                 db.examAttempts = db.examAttempts.filter(a => a.examId !== id);
+                if(window.borrarExplicito) window.borrarExplicito('exams', id);
                 saveDB(); navigateTo('exams');
             }
         }
@@ -12391,7 +12392,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function deletePlan(id) {
             if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Eliminar plan? Se desvinculará de las generaciones.')) return;
-            db.planes = db.planes.filter(p=>p.id!==id);
+            db.planes = db.planes.filter(p=>p.id!==id); if(window.borrarExplicito) window.borrarExplicito('planes', id);
             db.generations.forEach(g=>{ if(g.planId===id) g.planId=null; });
             saveDB(); navigateTo('formacion');
         }
@@ -12468,7 +12469,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function deleteGeneration(id) {
             if (!puedeGestionarCatalogoAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Eliminar generación? Se eliminarán grupos asociados.')) return;
-            db.generations = db.generations.filter(g=>g.id!==id);
+            db.generations = db.generations.filter(g=>g.id!==id); if(window.borrarExplicito) window.borrarExplicito('generations', id);
             db.groups = db.groups.filter(gr=>gr.generationId!==id);
             db.enrollments = db.enrollments.filter(e=>e.generationId!==id);
             saveDB(); navigateTo('generations');
@@ -12726,7 +12727,7 @@ ${isGM(currentUser) || user?.role==='gm' ? `<option value="gm" ${user?.role==='g
         function deleteGroup(id) {
             if (!puedeGestionarAcademia(currentUser)) return uiToast('Sin permisos');
             if (!confirm('¿Eliminar grupo? Se borrarán inscripciones, posts y mensajes del grupo.')) return;
-            db.groups = db.groups.filter(g=>g.id!==id);
+            db.groups = db.groups.filter(g=>g.id!==id); if(window.borrarExplicito) window.borrarExplicito('groups', id);
             db.enrollments = db.enrollments.filter(e=>e.groupId!==id);
             db.posts = db.posts.filter(p=>p.groupId!==id);
             db.groupMessages = db.groupMessages.filter(m=>m.groupId!==id);
@@ -13500,7 +13501,7 @@ END:VCALENDAR`;
         }
         function deleteLiveClass(id) {
             if (!confirm('¿Eliminar esta clase en vivo? Esta acción no se puede deshacer.')) return;
-            db.liveClasses = db.liveClasses.filter(c => c.id !== id);
+            db.liveClasses = db.liveClasses.filter(c => c.id !== id); if(window.borrarExplicito) window.borrarExplicito('liveClasses', id);
             saveDB();
             closeModal();
             navigateTo('live-classes');
@@ -13718,7 +13719,7 @@ END:VCALENDAR`;
         function deleteLibraryItem(id) {
             if (!['admin','gm','desarrollador','maestro','capacitador','agencia'].includes(currentUser.role)) return;
             if (!confirm('¿Eliminar material?')) return;
-            db.library = db.library.filter(m=>m.id!==id);
+            db.library = db.library.filter(m=>m.id!==id); if(window.borrarExplicito) window.borrarExplicito('library', id);
             saveDB(); navigateTo('biblioteca');
         }
 
@@ -13981,7 +13982,7 @@ END:VCALENDAR`;
 
         function deleteTask(id) {
             if (!confirm('¿Eliminar tarea y todas sus entregas?')) return;
-            db.tasks = db.tasks.filter(t=>t.id!==id);
+            db.tasks = db.tasks.filter(t=>t.id!==id); if(window.borrarExplicito) window.borrarExplicito('tasks', id);
             db.taskSubmissions = db.taskSubmissions.filter(s=>s.taskId!==id);
             saveDB(); closeModal(); navigateTo('tareas');
         }

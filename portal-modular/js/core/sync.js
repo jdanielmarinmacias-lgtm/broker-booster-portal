@@ -434,11 +434,7 @@
   }
   /* Si la lápida sigue en el servidor (un DELETE que no llegó), se reintenta
    * sin bloquear el pull. */
-  function purgarLapidas(col, ids) {
-    (ids || []).forEach(function (id) {
-      send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null).catch(function () {});
-    });
-  }
+  function purgarLapidas(col, ids) { /* sin DELETE automático: solo borrarExplicito() borra en el servidor */ }
   /* Ids que el servidor confirmó en la última sesión y que sobreviven a la
    * recarga (pepes_sync_ids_v1). En el primer pull `shadow` aún está vacía:
    * sin esto, un registro borrado en otro equipo se re-agregaba desde la copia
@@ -458,7 +454,6 @@
       if (/^[0-9]+$/.test(k)) return;
       delete obj[k];
       changed = true;
-      send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k), null).catch(function () {});
     });
     return changed;
   }
@@ -509,7 +504,6 @@
                 if (String(db[col][i] && db[col][i].id) === String(id)) db[col].splice(i, 1);
               }
             }
-            send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null).catch(function () {});
           });
         });
       }
@@ -517,23 +511,6 @@
     if (!usersPulled) {
       await pullUsers(); // fallback si el servidor no adjuntó users en /api/data/bundle
     }
-    /* Exámenes fantasma con título vacío: versiones anteriores insertaban el
-     * registro al abrir "Nuevo Examen" y cualquier pregunta lo guardaba. Se
-     * borran de la base (DELETE + lápida) para que no reaparezcan en ningún
-     * equipo. Va ANTES de ensureDbDefaults, que solo los oculta en memoria. */
-    try {
-      if (Array.isArray(db.exams)) {
-        const fantasmas = db.exams.filter(function (e) { return !e || String(e.title || '').trim() === ''; });
-        if (fantasmas.length) {
-          for (const f of fantasmas) {
-            if (!f || f.id === undefined) continue;
-            markDeleted('exams', f.id);
-            try { await send('DELETE', '/api/data/exams/' + encodeURIComponent(f.id), null); } catch (e3) { /* se reintenta al cargar */ }
-          }
-          db.exams = db.exams.filter(function (e) { return e && String(e.title || '').trim() !== ''; });
-        }
-      }
-    } catch (e4) { /* la limpieza nunca bloquea el arranque */ }
     try { if (typeof window.ensureDbDefaults === 'function') window.ensureDbDefaults(); } catch (e0) {}
     snapshot(); // foto del servidor ANTES de fusionar lo local
     /* Racha diaria: ahora que db.users tiene la verdad del servidor (y la
@@ -734,15 +711,8 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         throw e;
       }
     }
-    for (const id of Object.keys(oldMap)) {
-      if (seen[id]) continue;
-      try { await send('DELETE', '/api/users/' + encodeURIComponent(id), null); }
-      catch (e) {
-        await pullUsers();
-        if (window.showToast) window.showToast('No se pudo borrar usuario: ' + e.message, 'warning');
-        return;
-      }
-    }
+    // Usuarios ausentes en la copia local NO se borran aquí: solo un borrado
+    // explícito del usuario puede eliminarlos en el servidor.
   }
 
   async function pushCollection(name, local, old) {
@@ -790,10 +760,8 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         }
       }
       for (const k of Object.keys(oldObj)) {
-        if (!(k in local)) {
-          try { await send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(k)); }
-          catch (e) { await pullNames([name]); return; }
-        }
+        // Claves que faltan en la copia local NO se borran aquí: solo un
+        // borrarExplicito() (acción del usuario) puede eliminar en el servidor.
       }
       return;
     }
@@ -835,17 +803,23 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         throw e;
       }
     }
-    for (const id of Object.keys(oldMap)) {
-      if (seen[id]) continue;
-      try {
-        await send('DELETE', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(id), null);
-      } catch (e) {
-        // 404: el registro ya no existe en el servidor (borrado previo): nada que reintentar.
-        if (!e || e.status !== 404) { await pullNames([name]); return; }
-      }
-      markDeleted(name, id); // el borrado ya es definitivo: no vuelve de otra copia
-    }
+    // Registros que faltan en la copia local NO se borran del servidor: solo
+    // borrarExplicito() puede hacerlo. Un registro ausente aquí se conserva.
   }
+
+  /* Único borrado que llega al servidor: lo pide una acción directa del
+   * usuario (botón de borrar). Registra la lápida para que no vuelva. */
+  async function borrarExplicito(col, id) {
+    if (id === undefined || id === null || id === '') return false;
+    markDeleted(col, id);
+    try {
+      await send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null);
+    } catch (e) {
+      if (!e || e.status !== 404) { pushSoon(); return false; }
+    }
+    return true;
+  }
+  window.borrarExplicito = borrarExplicito;
 
   async function pushNow() {
     if (Date.now() < quotaPauseUntil) { retrySoon(quotaPauseUntil - Date.now()); return; }
@@ -933,13 +907,21 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         } else if (!e || !e.status || e.status >= 500) retrySoon();
       }
     }
-    if (sinPermisoNuevos.length && window.showToast) {
-      window.showToast('Sin permiso para sincronizar en el servidor: ' + sinPermisoNuevos.join(', ') + ' (se conservan en este equipo)', 'info');
+    if (sinPermisoNuevos.length) {
+      avisoUnaVez('sinPermiso:' + sinPermisoNuevos.join(','), 'Sin permiso para sincronizar en el servidor: ' + sinPermisoNuevos.join(', ') + ' (se conservan en este equipo)', 'info');
     }
     if (!failed.length) retryDelay = 8000;
-    if (failed.length && window.showToast) {
-      window.showToast('Sin sincronizar: ' + failed.join(', '), 'warning');
+    if (failed.length) {
+      avisoUnaVez('fallo:' + failed.join(','), 'Sin sincronizar: ' + failed.join(', '), 'warning');
     }
+  }
+
+  /* Muestra un aviso solo una vez por sesión para la misma clave. */
+  var avisosMostrados = {};
+  function avisoUnaVez(clave, mensaje, tipo) {
+    if (avisosMostrados[clave]) return;
+    avisosMostrados[clave] = true;
+    if (window.showToast) window.showToast(mensaje, tipo);
   }
 
   /* Motivo concreto de un fallo de sincronización, para mostrarlo en el aviso. */
