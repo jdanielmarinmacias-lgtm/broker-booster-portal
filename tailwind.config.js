@@ -6,7 +6,7 @@
  * Salida: portal-modular/css/tailwind.min.css (se versiona y se sirve estático).
  */
 module.exports = {
-  content: ['./portal-modular/**/*.html', './portal-modular/js/**/*.js'],
+  content: ['./portal-modular/**/*.html', './portal-modular/js/**/*.js', './backend/campus-private/**/*.js'],
   theme: { extend: {} },
   /* El portal arma algunas clases en tiempo de ejecución (no aparecen como
    * texto literal en el fuente). Estas son las que el escáner no puede ver;
