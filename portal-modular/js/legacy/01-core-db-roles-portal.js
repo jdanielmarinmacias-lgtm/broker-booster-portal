@@ -2834,7 +2834,8 @@ CÓMO RESPONDES: SOLO como ese personaje, español mexicano natural, nunca como 
     const txt = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
     return txt ? txt.trim() : 'Perdón, ¿me lo puedes repetir?';
   }catch(e){
-    showToast('IA no disponible (sin clave o sin conexión): la práctica continúa con el motor local','warning');
+    /* Un solo aviso por sesión: cada turno fallido lo repetía como spam. */
+    if(!window.psAvisoIAMostrado){ window.psAvisoIAMostrado = true; showToast('IA no disponible (sin clave o sin conexión): la práctica continúa con el motor local','warning'); }
     window.psAPIKey = '';
     return esInicio ? psSaludoLocal(s) : psMotorProspecto(mensajeAsesor);
   }
@@ -3198,6 +3199,7 @@ function psRenderConfig(){
           <option value="">Perfiles guardados…</option>
           ${guardados.map((g,i)=>`<option value="${i}">${psEscape(g.nombre)}</option>`).join('')}
         </select>
+        <button data-bx-click="a667" class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 text-xs font-medium hover:bg-rose-100">🗑 Borrar perfil</button>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="text-xs font-medium text-slate-600">Nombre</label><input id="ps-nombre" class="w-full mt-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white text-slate-900" placeholder="Marisela Ríos"></div>
@@ -3343,6 +3345,11 @@ function psCargarPerfilGuardado(i){ const g=psGetDB().practicaPerfilesGuardados[
   psSetCampo('ps-exp-inversion',g.expInversion||'basica'); psSetCampo('ps-exp-seguros',g.expSeguros||'empleo');
   psSetCampo('ps-decision',g.decision||'');
   document.getElementById('ps-memoria').value=g.memoria||''; }
+function psBorrarPerfilGuardado(){
+  const sel=document.getElementById('ps-perfil-guardado'); if(!sel||sel.value==='') { showToast('Elige un perfil guardado para borrar','warning'); return; }
+  const d=psGetDB(); const i=Number(sel.value); const g=d.practicaPerfilesGuardados[i]; if(!g) return;
+  if(!window.confirm('¿Borrar el perfil "'+g.nombre+'"? Esta acción no se puede deshacer.')) return;
+  d.practicaPerfilesGuardados.splice(i,1); psSaveDB(d); showToast('Perfil borrado','success'); render(); }
 function psGuardarPerfil(){ const g={ nombre:document.getElementById('ps-nombre').value.trim(), edad:document.getElementById('ps-edad').value, ocupacion:document.getElementById('ps-ocupacion').value.trim(), estudios:document.getElementById('ps-estudios').value.trim(), memoria:document.getElementById('ps-memoria').value.trim(), familia:(document.getElementById('ps-familia')||{}).value||'', ingresos:(document.getElementById('ps-ingresos')||{}).value||'', expInversion:(document.getElementById('ps-exp-inversion')||{}).value||'basica', expSeguros:(document.getElementById('ps-exp-seguros')||{}).value||'empleo', decision:(document.getElementById('ps-decision')||{}).value||'' };
   if(!g.nombre){ showToast('Escribe al menos un nombre','warning'); return; }
   const d=psGetDB(); d.practicaPerfilesGuardados.push(g); psSaveDB(d); showToast('Perfil guardado','success'); render(); }
@@ -3811,7 +3818,7 @@ function guiaMakeDraggable(btn, KEY='guia-fab-pos', onTap){
   btn.addEventListener('pointerup',end);
   btn.addEventListener('pointercancel',end);
   btn.addEventListener('click',e=>{ if(btn.dataset.dragged==='1'){ delete btn.dataset.dragged; e.preventDefault(); e.stopPropagation(); return; } if(onTap) onTap(e); });
-  addEventListener('resize',()=>{ const r=btn.getBoundingClientRect(); if(btn.style.left) place(r.left,r.top); });
+  window.addEventListener('resize',()=>{ const r=btn.getBoundingClientRect(); if(btn.style.left) place(r.left,r.top); });
 }
 function guiaShow(){ guiaOpen=true; const p=document.getElementById('guia-panel'); const b=document.getElementById('guia-fab-btn'); if(b) b.setAttribute('aria-expanded','true'); if(p){ p.classList.remove('hidden'); guiaRenderMsgs(); setTimeout(()=>{ const i=document.getElementById('guia-input'); if(i) i.focus(); },80); } }
 function guiaHide(){ guiaOpen=false; const p=document.getElementById('guia-panel'); const b=document.getElementById('guia-fab-btn'); if(b) b.setAttribute('aria-expanded','false'); if(p) p.classList.add('hidden'); if(guiaMicOn) guiaToggleMic(); }

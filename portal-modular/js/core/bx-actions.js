@@ -2007,3 +2007,6 @@ window.__bx.a665 = function (event) { resetUserPermissions() };
 
 /* js/legacy/01-core-db-roles-portal.js · click (abrir una sección desde la matriz) */
 window.__bx.a666 = function (event, sec) { if (sec && typeof navigateTo === 'function') navigateTo(sec) };
+
+/* js\legacy-core-db-roles-portal.js · click (borrar perfil guardado) */
+window.__bx.a667 = function (event) { psBorrarPerfilGuardado() };

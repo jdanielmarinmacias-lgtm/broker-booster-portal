@@ -655,7 +655,7 @@ describe('Gu-IA: controles del chat', () => {
     }
     const avisos = [], guardado = [], copias = [];
     const ctx = {
-      window: { confirm: () => true, Backend: { available: true }, IA: { chat: async () => ({ ok: false, status: 429, json: async () => ({ error: 'límite' }) }) } },
+      window: { confirm: () => true, addEventListener() {}, Backend: { available: true }, IA: { chat: async () => ({ ok: false, status: 429, json: async () => ({ error: 'límite' }) }) } },
       document: { getElementById: elemento, createElement: () => elemento('creado'), body: { appendChild() {} } },
       navigator: { clipboard: { writeText: async (t) => copias.push(t) } },
       guiaGetChat: () => guardado.slice(), guiaSaveChat: (v) => { guardado.splice(0, guardado.length, ...v); },
