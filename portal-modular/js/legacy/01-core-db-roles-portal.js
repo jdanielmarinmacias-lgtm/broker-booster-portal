@@ -3348,7 +3348,7 @@ function psBorrarPerfilGuardado(){
   const sel=document.getElementById('ps-perfil-guardado'); if(!sel||sel.value==='') { showToast('Elige un perfil guardado para borrar','warning'); return; }
   const d=psGetDB(); const i=Number(sel.value); const g=d.practicaPerfilesGuardados[i]; if(!g) return;
   if(!window.confirm('¿Borrar el perfil "'+g.nombre+'"? Esta acción no se puede deshacer.')) return;
-  d.practicaPerfilesGuardados.splice(i,1); psSaveDB(d); showToast('Perfil borrado','success'); render(); }
+  d.practicaPerfilesGuardados.splice(i,1); psSaveDB(d); if(window.borrarExplicito && g.id!=null) window.borrarExplicito('practicaPerfilesGuardados', g.id); showToast('Perfil borrado','success'); render(); }
 function psGuardarPerfil(){ const g={ nombre:document.getElementById('ps-nombre').value.trim(), edad:document.getElementById('ps-edad').value, ocupacion:document.getElementById('ps-ocupacion').value.trim(), estudios:document.getElementById('ps-estudios').value.trim(), memoria:document.getElementById('ps-memoria').value.trim(), familia:(document.getElementById('ps-familia')||{}).value||'', ingresos:(document.getElementById('ps-ingresos')||{}).value||'', expInversion:(document.getElementById('ps-exp-inversion')||{}).value||'basica', expSeguros:(document.getElementById('ps-exp-seguros')||{}).value||'empleo', decision:(document.getElementById('ps-decision')||{}).value||'' };
   if(!g.nombre){ showToast('Escribe al menos un nombre','warning'); return; }
   const d=psGetDB(); d.practicaPerfilesGuardados.push(g); psSaveDB(d); showToast('Perfil guardado','success'); render(); }
