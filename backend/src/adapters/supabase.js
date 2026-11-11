@@ -570,22 +570,30 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
          * eliminaban de la base y reaparecían en la siguiente carga. */
         const existing = [];
         for (let from = 0; ; from += 1000) {
-          const { data: page } = await withRetry(
+          const { data: page, error: eSel } = await withRetry(
             () => sb.from('documents').select('collection,doc_id').in('collection', touched)
               .order('collection', { ascending: true }).order('doc_id', { ascending: true })
               .range(from, from + 999), 2);
+          // supabase-js NO lanza excepciones: devuelve { error }. Sin este control,
+          // un select fallido parecía una lista vacía y los borrados se perdían en silencio.
+          if (eSel) throw eSel;
           const rowsPage = page || [];
           existing.push(...rowsPage);
           if (rowsPage.length < 1000) break;
         }
         const stale = existing.filter((r) => !seen.has(r.collection + '∅' + r.doc_id));
+        const fallidos = [];
         for (const r of stale) {
-          try {
-            await sb.from('documents').delete().eq('collection', r.collection).eq('doc_id', r.doc_id);
-            savedHash.delete(r.collection + '∅' + r.doc_id);
-          } catch (eDel) { /* no bloquea: el upsert nuevo ya está guardado */ }
+          const { error: eDel } = await sb.from('documents').delete().eq('collection', r.collection).eq('doc_id', r.doc_id);
+          if (eDel) { fallidos.push(eDel); continue; }
+          savedHash.delete(r.collection + '∅' + r.doc_id);
         }
-      } catch (eStale) { /* si el select de control falla, no revierte lo ya guardado */ }
+        // Un borrado no aplicado debe fallar la petición: así el cliente reintenta
+        // y el registro no reaparece tras la siguiente carga.
+        if (fallidos.length) throw fallidos[0];
+      } catch (eStale) {
+        throw eStale;
+      }
     }
     // Usuarios: solo si se tocó 'users' (ruta /api/users). Upsert + borrado
     // de ausentes contra la lista completa (el caller hizo refresh antes).

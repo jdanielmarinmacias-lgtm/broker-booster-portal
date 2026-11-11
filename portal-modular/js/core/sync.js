@@ -809,13 +809,47 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
 
   /* Único borrado que llega al servidor: lo pide una acción directa del
    * usuario (botón de borrar). Registra la lápida para que no vuelva. */
+  /* Borrados explícitos que no llegaron al servidor: se guardan y se reintentan
+   * en cada sincronización. Sin esto, el registro seguía en la base y volvía
+   * en la siguiente carga desde otro equipo. */
+  var PENDING_DEL_KEY = 'pepes_pending_deletes_v1';
+  function loadPendingDel() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(PENDING_DEL_KEY) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }
+  }
+  function savePendingDel(lista) {
+    try { localStorage.setItem(PENDING_DEL_KEY, JSON.stringify(lista)); } catch (e) { /* cuota */ }
+  }
+  async function flushPendingDel() {
+    var lista = loadPendingDel();
+    if (!lista.length) return;
+    var quedan = [];
+    for (var i = 0; i < lista.length; i++) {
+      var p = lista[i];
+      try {
+        await send('DELETE', '/api/data/' + encodeURIComponent(p.col) + '/' + encodeURIComponent(p.id), null);
+      } catch (e) {
+        if (!e || e.status !== 404) quedan.push(p); // 404: ya no existe en el servidor
+      }
+    }
+    savePendingDel(quedan);
+  }
+
   async function borrarExplicito(col, id) {
     if (id === undefined || id === null || id === '') return false;
     markDeleted(col, id);
     try {
       await send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null);
     } catch (e) {
-      if (!e || e.status !== 404) { pushSoon(); return false; }
+      if (!e || e.status !== 404) {
+        var lista = loadPendingDel();
+        lista.push({ col: col, id: String(id) });
+        savePendingDel(lista);
+        pushSoon();
+        return false;
+      }
     }
     return true;
   }
@@ -841,6 +875,7 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         return;
       }
     }
+    await flushPendingDel();
     const db = legDb();
     if (!db) return;
     // Unión sombra+local: las colecciones solo-locales (nunca en servidor) también suben.
