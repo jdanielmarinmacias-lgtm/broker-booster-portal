@@ -2834,8 +2834,7 @@ CÓMO RESPONDES: SOLO como ese personaje, español mexicano natural, nunca como 
     const txt = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
     return txt ? txt.trim() : 'Perdón, ¿me lo puedes repetir?';
   }catch(e){
-    /* Un solo aviso por sesión: cada turno fallido lo repetía como spam. */
-    if(!window.psAvisoIAMostrado){ window.psAvisoIAMostrado = true; showToast('IA no disponible (sin clave o sin conexión): la práctica continúa con el motor local','warning'); }
+    /* Si la IA falla, la práctica sigue con el motor local, sin avisos. */
     window.psAPIKey = '';
     return esInicio ? psSaludoLocal(s) : psMotorProspecto(mensajeAsesor);
   }

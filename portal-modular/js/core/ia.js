@@ -90,11 +90,13 @@
       var propia = clavePropia();
       if (propia) {
         var url = (opciones && opciones.url) || window.psAPIUrl || PROVEEDOR_POR_DEFECTO;
+        /* Si la clave propia falla (caducada, sin saldo, URL o modelo que el
+         * proveedor no acepta), se reintenta por el proxy del servidor. */
         return fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + propia },
           body: JSON.stringify(cuerpo || {}),
-        });
+        }).then(function (r) { return r.ok ? r : IA.chat(cuerpo); }, function () { return IA.chat(cuerpo); });
       }
       return IA.chat(cuerpo);
     },
