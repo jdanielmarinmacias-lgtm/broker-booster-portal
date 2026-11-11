@@ -3753,9 +3753,7 @@ function guiaMount(){
   if(document.getElementById('guia-fab')) return;
   const fab=document.createElement('div'); fab.id='guia-fab';
   fab.innerHTML=`
-  <button id="guia-fab-btn" class="guia-launcher" type="button" aria-label="Abrir Gu-IA" aria-controls="guia-panel" aria-expanded="false" title="Abrir Gu-IA">
-    <span class="guia-symbol" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i><span>G</span></span><span class="guia-launcher-label">Gu-IA <small>Tu copiloto comercial</small></span><span class="guia-launcher-arrow" aria-hidden="true">↗</span>
-  </button>
+  <button id="guia-fab-btn" class="guia-launcher" type="button" aria-label="Abrir Gu-IA (arrastra para mover)" aria-controls="guia-panel" aria-expanded="false" title="Abrir Gu-IA (arrastra para mover)"><span class="guia-symbol" aria-hidden="true"><span>G</span></span></button>
   <section id="guia-panel" class="guia-panel hidden" role="dialog" aria-label="Conversación con Gu-IA">
     <header class="guia-header">
       <div class="guia-header-top"><div class="guia-brand"><span class="guia-symbol guia-symbol-small" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i><span>G</span></span><div><span class="guia-eyebrow">BROKER BOOSTER <span> / </span> INTELIGENCIA COMERCIAL</span><h2>Gu-IA<span class="guia-brand-dot">.</span></h2></div></div>
@@ -3772,7 +3770,7 @@ function guiaMount(){
     </div>
   </section>`;
   document.body.appendChild(fab);
-  document.getElementById('guia-fab-btn').onclick=()=>{ guiaOpen?guiaHide():guiaShow(); };
+  guiaMakeDraggable(document.getElementById('guia-fab-btn'));
   document.getElementById('guia-fab-btn').oncontextmenu=(e)=>{ e.preventDefault(); guiaNuevaConversacion(); };
   document.getElementById('guia-clear').onclick=guiaNuevaConversacion;
   document.getElementById('guia-close').onclick=()=>guiaHide();
@@ -3800,6 +3798,20 @@ function guiaMensajeError(e){
   if(/429|rate|limit/i.test(m)) return '⏳ Gu-IA está atendiendo muchas consultas. Intenta de nuevo en un minuto.';
   if(/Failed to fetch|NetworkError|network/i.test(m)) return '⚠️ Sin conexión con Gu-IA. Revisa tu internet e intenta de nuevo.';
   return '⚠️ Gu-IA no pudo responder en este momento. Intenta de nuevo.';
+}
+function guiaMakeDraggable(btn){
+  const KEY='guia-fab-pos';
+  const clamp=(x,y)=>({x:Math.min(Math.max(0,x),innerWidth-btn.offsetWidth),y:Math.min(Math.max(0,y),innerHeight-btn.offsetHeight)});
+  const place=(x,y)=>{ const c=clamp(x,y); btn.style.left=c.x+'px'; btn.style.top=c.y+'px'; btn.style.right='auto'; btn.style.bottom='auto'; return c; };
+  try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&Number.isFinite(s.x)&&Number.isFinite(s.y)) place(s.x,s.y); }catch(e){}
+  let start=null, moved=false;
+  btn.addEventListener('pointerdown',e=>{ if(e.button!==0) return; const r=btn.getBoundingClientRect(); start={dx:e.clientX-r.left,dy:e.clientY-r.top,sx:e.clientX,sy:e.clientY}; moved=false; btn.setPointerCapture(e.pointerId); });
+  btn.addEventListener('pointermove',e=>{ if(!start) return; if(!moved && Math.hypot(e.clientX-start.sx,e.clientY-start.sy)<6) return; moved=true; btn.classList.add('dragging'); place(e.clientX-start.dx,e.clientY-start.dy); });
+  const end=e=>{ if(!start) return; const wasMoved=moved; start=null; btn.classList.remove('dragging'); if(wasMoved){ const r=btn.getBoundingClientRect(); const c=place(r.left,r.top); try{ localStorage.setItem(KEY,JSON.stringify(c)); }catch(err){} btn.dataset.dragged='1'; } };
+  btn.addEventListener('pointerup',end);
+  btn.addEventListener('pointercancel',end);
+  btn.addEventListener('click',e=>{ if(btn.dataset.dragged==='1'){ delete btn.dataset.dragged; e.preventDefault(); return; } guiaOpen?guiaHide():guiaShow(); });
+  addEventListener('resize',()=>{ const r=btn.getBoundingClientRect(); if(btn.style.left) place(r.left,r.top); });
 }
 function guiaShow(){ guiaOpen=true; const p=document.getElementById('guia-panel'); const b=document.getElementById('guia-fab-btn'); if(b) b.setAttribute('aria-expanded','true'); if(p){ p.classList.remove('hidden'); guiaRenderMsgs(); setTimeout(()=>{ const i=document.getElementById('guia-input'); if(i) i.focus(); },80); } }
 function guiaHide(){ guiaOpen=false; const p=document.getElementById('guia-panel'); const b=document.getElementById('guia-fab-btn'); if(b) b.setAttribute('aria-expanded','false'); if(p) p.classList.add('hidden'); if(guiaMicOn) guiaToggleMic(); }
