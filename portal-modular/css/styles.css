@@ -288,8 +288,12 @@ body.theme-obsidian #main-app input, body.theme-obsidian #main-app select, body.
 .guia-launcher .guia-symbol { width:100%; height:100%; border-radius:14px; pointer-events:none; }
 .guia-launcher:hover { transform:translateY(-2px); box-shadow:0 12px 28px rgba(12,42,31,.35); }
 .guia-launcher.dragging { cursor:grabbing; transform:none; box-shadow:0 14px 32px rgba(12,42,31,.4); }
-.news-fab { cursor:grab; touch-action:none; user-select:none; }
-.news-fab.dragging { cursor:grabbing; box-shadow:0 14px 32px rgba(0,0,0,.35); }
+.news-fab { cursor:grab; touch-action:none; user-select:none; width:52px; height:52px; padding:0 !important; border:2px solid rgba(255,255,255,.85); background:linear-gradient(145deg,#ef4444,#b91c1c) !important; box-shadow:0 10px 24px rgba(185,28,28,.4); transition:transform .2s,box-shadow .2s; }
+.news-fab:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(185,28,28,.5); }
+.news-fab i { font-size:18px; pointer-events:none; }
+.news-fab .news-badge-count { pointer-events:none; }
+.news-fab.dragging { cursor:grabbing; transform:none; box-shadow:0 16px 34px rgba(0,0,0,.35); }
+.news-fab:focus-visible { outline:3px solid #fbbf24; outline-offset:3px; }
 .guia-symbol { position:relative; display:grid; place-items:center; flex:none; width:43px; height:43px; border-radius:13px; color:#f2d998; background:linear-gradient(145deg,#27674b,#082d20); border:1px solid rgba(231,202,143,.5); font-family:Georgia,serif; font-size:27px; font-style:italic; line-height:1; }
 .guia-symbol i { position:absolute; top:4px; right:5px; font-size:9px; }
 .guia-panel { position:fixed; right:22px; bottom:160px; z-index:60; display:flex; flex-direction:column; width:410px; max-width:calc(100vw - 24px); height:720px; max-height:calc(100dvh - 180px); overflow:hidden; border:1px solid #d8e1da; border-radius:24px; background:#fff; box-shadow:0 24px 70px rgba(12,37,27,.24); }
