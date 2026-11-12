@@ -35,7 +35,7 @@
 
   function rawRead() {
     try {
-      var raw = localStorage.getItem(KEY);
+      var raw = window.__bbDbCache || null;
       return raw ? JSON.parse(raw) : null;
     } catch (e) {
       console.warn('[Store] DB corrupta:', e);
@@ -68,7 +68,7 @@
       var persist = function () {
         try {
           var payload = g.db || rawRead() || {};
-          localStorage.setItem(KEY, JSON.stringify(payload));
+          if (window.__bbDbSet) window.__bbDbSet(JSON.stringify(payload));
         } catch (e) {
           console.warn('[Store] No se pudo guardar (almacenamiento lleno):', e);
           if (window.showToast) window.showToast('No se pudo guardar (almacenamiento lleno)', 'warning');

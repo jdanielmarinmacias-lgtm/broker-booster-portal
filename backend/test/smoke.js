@@ -227,6 +227,19 @@ describe('permisos del catálogo de Academia', () => {
     const delPlan = await api('DELETE', '/api/data/planes/' + plan.json.item.id);
     assert.equal(delPlan.status, 200);
   });
+
+  it('un registro borrado no se puede volver a crear con el mismo id (lápida)', async () => {
+    await como('maestro', 'Test1234*');
+    const cat = await api('POST', '/api/data/categories', { name: 'Categoría con lápida' });
+    assert.equal(cat.status, 201);
+    const id = cat.json.item.id;
+    assert.equal((await api('DELETE', '/api/data/categories/' + id)).status, 200);
+    const again = await api('POST', '/api/data/categories', { id, name: 'Resucitada' });
+    assert.equal(again.status, 409);
+    const lista = await api('GET', '/api/data/categories');
+    const ids = (lista.json.items || []).map((x) => String(x.id));
+    assert.ok(!ids.includes(String(id)), 'el id borrado no debe reaparecer');
+  });
 });
 
 describe('colecciones que caían en la regla por defecto', () => {

@@ -251,7 +251,7 @@ function _flushSaveDBSync() {
     if (window.__bbNoGuardarLocal) return; // limpieza de caché en curso: no reescribir
     if (_saveDBTimer) { clearTimeout(_saveDBTimer); _saveDBTimer = null; }
     _saveDBPending = false;
-    try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {}
+    try { if (window.__bbDbSet) window.__bbDbSet(JSON.stringify(db)); } catch (e) {}
 }
 function saveDB(immediate) {
     if (immediate === true) { _flushSaveDBSync(); return; }
@@ -271,7 +271,7 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
                     }
                 }
                 const totalMB = (total / 1024 / 1024).toFixed(2);
-                const dbSize = localStorage.getItem('pepes_v3_db') ? (localStorage.getItem('pepes_v3_db').length / 1024 / 1024).toFixed(2) : 0;
+                const dbSize = window.__bbDbCache ? (window.__bbDbCache.length / 1024 / 1024).toFixed(2) : 0;
                 console.log(`Almacenamiento usado: ${totalMB}MB (DB: ${dbSize}MB)`);
                 return { total: totalMB, db: dbSize };
             } catch(e) { return null; }
@@ -565,15 +565,14 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
 
         function loadDB() {
             try {
-            const data = localStorage.getItem(DB_KEY);
+            const data = window.__bbDbCache;
             db = data ? JSON.parse(data) : JSON.parse(JSON.stringify(defaultDB));
             } catch(e) {
                 console.warn('DB corrupta, reiniciando:', e);
-                localStorage.removeItem(DB_KEY);
                 db = JSON.parse(JSON.stringify(defaultDB));
             }
             ensureDbDefaults();
-            try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {}
+            try { if (window.__bbDbSet) window.__bbDbSet(JSON.stringify(db)); } catch (e) {}
         }
 
         // --- AUTH ---
@@ -2186,8 +2185,6 @@ function renderPublicPortal() {
                         if (mRange && parseInt(mRange.value) !== mensual) mRange.value = mensual;
                         if (aRange && parseInt(aRange.value) !== anos) aRange.value = anos;
 
-                        localStorage.setItem('skandia_mensual', mensual);
-                        localStorage.setItem('skandia_anos', anos);
                     } else if (ramo === 'autos') {
                         const precio = parseInt(range.value);
                         const c = comisionesPortal();
@@ -2202,7 +2199,6 @@ function renderPublicPortal() {
                         breakPrima.textContent = '$' + precio.toLocaleString('es-MX');
                         breakPorc.textContent = Math.round(pU*100) + '% unidad + ' + Math.round(pF*100) + '% fin.';
                         breakAnual.textContent = '2 autos/mes = $' + ((comUnidad + comFin) * 2).toLocaleString('es-MX');
-                        localStorage.setItem('guia_prima', precio);
                     } else if (ramo === 'propiedades') {
                         const valor = parseInt(range.value);
                         const c = comisionesPortal();
@@ -2213,7 +2209,6 @@ function renderPublicPortal() {
                         breakPrima.textContent = '$' + valor.toLocaleString('es-MX');
                         breakPorc.textContent = Math.round(pP*100) + '% del valor';
                         breakAnual.textContent = '2 ventas/año = $' + (comProp * 2).toLocaleString('es-MX');
-                        localStorage.setItem('guia_prima', valor);
                     } else {
                         const prima = parseInt(range.value);
                         const comisiones = db.settings.comisiones || {autos: 0.10, vida: 0.20, gmm: 0.15, danos: 0.12};
@@ -2225,7 +2220,6 @@ function renderPublicPortal() {
                         breakPrima.textContent = '$' + prima.toLocaleString('es-MX');
                         breakPorc.textContent = ((porcentajes[ramo]||0)*100).toFixed(0) + '%';
                         breakAnual.textContent = '$' + (comision*12).toLocaleString('es-MX');
-                        localStorage.setItem('guia_prima', prima);
                     }
                 }
                 
@@ -2271,8 +2265,8 @@ function renderPublicPortal() {
                     if(skAnosRange) skAnosRange.addEventListener('input', syncSkandiaAnos);
 
                     // Restaurar valores guardados
-                    const savedMensual = parseInt(localStorage.getItem('skandia_mensual'));
-                    const savedAnos = parseInt(localStorage.getItem('skandia_anos'));
+                    const savedMensual = NaN; // ya no se guarda en el navegador (solo en la sesión de la página)
+                    const savedAnos = NaN;
                     if(savedMensual && savedMensual >= 2000) {
                         if(skMensual) skMensual.value = savedMensual;
                         if(skMensualRange) skMensualRange.value = savedMensual;
@@ -2520,14 +2514,21 @@ function psScrubApiKey(container){
   }catch(e){}
   return false;
 }
+/* La clave propia vive solo en el servidor (write-only): el navegador no la lee. */
+async function psGuardarClaveServidor(key, url){
+  try{
+    const r = await fetch('/api/ia/clave', { method: key ? 'PUT' : 'DELETE', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: key ? JSON.stringify({ apiKey: key, apiUrl: url }) : undefined });
+    if(!r.ok) showToast('No se pudo guardar la API key en el servidor', 'error');
+  }catch(e){ showToast('No se pudo guardar la API key (sin conexión)', 'error'); }
+}
 function psClavePropiaLocal(){
-  try{ return String(localStorage.getItem('bb_api_key_propia')||'').trim(); }catch(e){ return ''; }
+  return '';
 }
 function psGetDB(){
-  try{ if(typeof db!=='undefined' && db){ db.practicaSesiones=db.practicaSesiones||[]; db.practicaPerfilesGuardados=db.practicaPerfilesGuardados||[]; db.practicaConfig=db.practicaConfig||{}; if(db.practicaConfig.apiModel==='llama-3.3-70b-versatile'){ db.practicaConfig.apiModel='openai/gpt-oss-120b'; } if(psScrubApiKey(db)){ try{ localStorage.setItem('pepes_v3_db', JSON.stringify(db)); }catch(e){} } return db; } }catch(e){}
-  try{ const d = JSON.parse(localStorage.getItem('pepes_v3_db')||'{}'); d.practicaSesiones=d.practicaSesiones||[]; d.practicaPerfilesGuardados=d.practicaPerfilesGuardados||[]; d.practicaConfig=d.practicaConfig||{}; if(psScrubApiKey(d)){ try{ localStorage.setItem('pepes_v3_db', JSON.stringify(d)); }catch(e){} } return d; }catch(e){ return { practicaSesiones:[], practicaPerfilesGuardados:[], practicaConfig:{} }; }
+  try{ if(typeof db!=='undefined' && db){ db.practicaSesiones=db.practicaSesiones||[]; db.practicaPerfilesGuardados=db.practicaPerfilesGuardados||[]; db.practicaConfig=db.practicaConfig||{}; if(db.practicaConfig.apiModel==='llama-3.3-70b-versatile'){ db.practicaConfig.apiModel='openai/gpt-oss-120b'; } if(psScrubApiKey(db)){ try{ if(window.__bbDbSet) window.__bbDbSet(JSON.stringify(db)); }catch(e){} } return db; } }catch(e){}
+  try{ const d = JSON.parse(window.__bbDbCache||'{}'); d.practicaSesiones=d.practicaSesiones||[]; d.practicaPerfilesGuardados=d.practicaPerfilesGuardados||[]; d.practicaConfig=d.practicaConfig||{}; if(psScrubApiKey(d)){ try{ if(window.__bbDbSet) window.__bbDbSet(JSON.stringify(d)); }catch(e){} } return d; }catch(e){ return { practicaSesiones:[], practicaPerfilesGuardados:[], practicaConfig:{} }; }
 }
-function psSaveDB(d){ try{ if(typeof db!=='undefined' && d===db){ saveDB(); return; } localStorage.setItem('pepes_v3_db', JSON.stringify(d)); }catch(e){ showToast('No se pudo guardar (almacenamiento lleno)','warning'); } }
+function psSaveDB(d){ try{ if(typeof db!=='undefined' && d===db){ saveDB(); return; } if(window.__bbDbSet) window.__bbDbSet(JSON.stringify(d)); }catch(e){ showToast('No se pudo guardar (almacenamiento lleno)','warning'); } }
 function psSesionesUsuario(){ const d=psGetDB(); const uid=currentUser.id; return d.practicaSesiones.filter(s=>String(s.usuarioId)===String(uid)).sort((a,b)=>b.inicio-a.inicio); }
 
 /* ==================== VOCES ==================== */
@@ -3242,7 +3243,7 @@ function psRenderConfig(){
             </div>
             <p id="ps-api-hint" class="text-[11px] text-slate-500 mt-1">${psEscape(prov.nota)}${prov.consola?' Consigue tu key en: '+psEscape(prov.consola):''}</p>
           </div>
-          <input id="ps-api-key" type="password" value="${psEscape(psClavePropiaLocal())}" data-bx-input="a73" placeholder="Pega tu API key (${psEscape(prov.keyHint)}) — se guarda solo en tu navegador" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono bg-white text-slate-900">
+          <input id="ps-api-key" type="password" value="${psEscape(psClavePropiaLocal())}" data-bx-input="a73" placeholder="Pega tu API key (${psEscape(prov.keyHint)}) — se guarda en el servidor, no se muestra de nuevo" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono bg-white text-slate-900">
           <div class="flex gap-2 items-center">
             <input id="ps-api-url" value="${psEscape(api.apiUrl||prov.url)}" class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono bg-white text-slate-900">
             <button id="ps-btn-probar" data-bx-click="a74" disabled class="px-3 py-2 rounded-xl bg-slate-100 text-slate-400 text-xs font-medium whitespace-nowrap">⚡ Probar conexión</button>
@@ -3372,14 +3373,15 @@ function psIniciarSesion(){
     const key=kEl.value.trim();
     /* La clave del usuario vive SOLO en este navegador. Nunca se guarda en
      * `practicaConfig` (base compartida) ni se sincroniza a otros equipos. */
-    try{ if(key) localStorage.setItem('bb_api_key_propia', key); else localStorage.removeItem('bb_api_key_propia'); }catch(e){}
+    /* Se envía al servidor (write-only). El campo se vacía tras guardar. */
+    psGuardarClaveServidor(key, apiCfg.apiUrl || PS_PROVEEDORES[psProvActual()].url);
     delete apiCfg.apiKey;
     apiCfg.apiUrl=(document.getElementById('ps-api-url')||{}).value||apiCfg.apiUrl;
     apiCfg.apiModel=(document.getElementById('ps-api-model')||{}).value||apiCfg.apiModel;
     apiCfg.proveedor=psProvActual();
     const d=psGetDB(); d.practicaConfig=apiCfg; psSaveDB(d);
   }
-  window.psAPIKey=psClavePropiaLocal()||PS_DEFAULT_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
+  window.psAPIKey=PS_DEFAULT_KEY||''; window.psAPIUrl=apiCfg.apiUrl||PS_PROVEEDORES[psProvActual()].url; window.psAPIModel=apiCfg.apiModel||PS_PROVEEDORES[psProvActual()].model; window.psAPIExtra=(PS_PROVEEDORES[apiCfg.proveedor||psProvActual()]||{}).extra||{};
   if(!window.psDifSel) window.psDifSel='normal';
   window.psSesionActiva={ id:Date.now(), usuarioId:currentUser.id, usuarioNombre:currentUser.name, inicio:Date.now(), dificultad:window.psDifSel, escenario:window.psEscSel||'agendar', voz:(document.getElementById('ps-voz')||{}).value||'auto', personaje:{nombre,edad,ocupacion,estudios}, perfilExtra, memoria, mensajes:[], objeciones:[], micUsado:false, timerStart:Date.now(), timerInt:null };
   render();
@@ -3526,8 +3528,7 @@ const MARCA_SERVIDOR = 'servidor';
 function iaHayServidor() { return !!(window.IA && window.IA.servidor); }
 function psKeyIA() {
   try {
-    const propia = (window.IA && window.IA.clavePropia) ? window.IA.clavePropia() : (window.psAPIKey || '');
-    if (propia) return propia;
+    if (window.psAPIKey) return window.psAPIKey;
   } catch (e) { /* sigue abajo */ }
   return iaHayServidor() ? MARCA_SERVIDOR : '';
 }
@@ -14068,14 +14069,16 @@ END:VCALENDAR`;
         }
 
         // --- INIT ---
+        const __bootGate = (window.__bbDbReady || Promise.resolve()).then(() => {
         loadDB();
-        document.addEventListener("visibilitychange", ()=>{ if(window._inExam && document.hidden){ window._examTabSwitches=(window._examTabSwitches||0)+1; if(window._examTabSwitches>2){ uiToast("Cambio de pestaña detectado. Examen finalizado."); if(typeof submitExam==="function") submitExam(); } } });
         applyBranding();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', checkSession);
         } else {
             setTimeout(checkSession, 0);
         }
+        });
+        document.addEventListener("visibilitychange", ()=>{ if(window._inExam && document.hidden){ window._examTabSwitches=(window._examTabSwitches||0)+1; if(window._examTabSwitches>2){ uiToast("Cambio de pestaña detectado. Examen finalizado."); if(typeof submitExam==="function") submitExam(); } } });
     
 function agregarAgente(){
     // Solo agentes registrados en "Usuarios" y sin agencia asignada pueden agregarse al equipo

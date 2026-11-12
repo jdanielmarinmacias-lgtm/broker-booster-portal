@@ -42,7 +42,7 @@ smoke test de Store+servicios OK (roles, crearUsuario, permisos, ventas, notific
   `hasRole/isGM/isAdmin/isTeacher/isStudent/isAgencia/canModifyUser` (GM protegido).
 - **Persistencia**: 113 refs a `localStorage`, solo 5 a `'pepes_v3_db'` directo
   (`saveDB`, `loadDB`, `psGetDB/psSaveDB`, `vcSave`) + prefs UI sueltas
-  (`metaTab`, `newsHidden`, `teo_*`, `groq_api_key`...) — esas prefs NO van a Store, se quedan.
+  (`metaTab`, `newsHidden`, `teo_*`...) — esas prefs NO van a Store, se quedan. La clave IA del usuario (`groq_api_key` / `bb_api_key_propia`) ya NO se guarda en el navegador: va al servidor (`/api/ia/clave`) y se borra del navegador al cargar.
 - **Colecciones** (40+): users, lessons, categories, exams, examAttempts, enrollments, progress,
   liveClasses, groups, groupMessages, messages, posts, notifications, ventas, metas, convenciones,
   clientes, solicitudes, cotizaciones, siniestros, autoHub/autoCartera, finCartera,

@@ -17,7 +17,7 @@ const mw = require('../middleware');
 
 /* Estado interno del servidor: no aporta al respaldo y puede contener PII
  * innecesaria (intentos de login) o material que se gestiona aparte (guiaBase). */
-const INTERNAS = new Set(['sessions', 'loginAttempts', 'iaUso', 'guiaBase']);
+const INTERNAS = new Set(['sessions', 'loginAttempts', 'iaUso', 'guiaBase', 'iaClaves']);
 
 module.exports = (store) => {
   const r = express.Router();

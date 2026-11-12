@@ -1990,7 +1990,7 @@ window.__bx.a662 = function (event) {
   if (!confirm('Se borrará la copia local del portal en este equipo, incluidos los cambios que aún no se hayan sincronizado. Después se recargará todo desde Supabase. ¿Continuar?')) return;
   try {
     window.__bbNoGuardarLocal = true;
-    localStorage.removeItem('pepes_v3_db');
+    indexedDB.deleteDatabase('broker_booster_portal');
     localStorage.removeItem('pepes_sync_ids_v1');
   } catch (e) {}
   location.reload();

@@ -20,6 +20,13 @@ const { MODELOS_PERMITIDOS } = require('../iaCatalogo');
 const iaGateway = require('../iaGateway');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+/* Clave propia del usuario: guardada por usuario en el servidor, solo de escritura
+ * (nunca se devuelve al navegador). Solo se aceptan URLs de proveedores conocidos. */
+const COLECCION_CLAVE = 'iaClaves';
+const URLS_PROPIAS = Object.freeze([
+  'https://api.groq.com/openai/v1/chat/completions',
+  'https://api.openai.com/v1/chat/completions',
+]);
 const MAX_CHARS = 120000;      // conversación completa (≈ 30k tokens)
 const MAX_TOKENS = 4000;       // tope por respuesta
 const LIMITE_USUARIO = Number(process.env.IA_DIARIO || 300);
@@ -62,7 +69,7 @@ let proveedor = async function llamarProveedor(cuerpo, apiKey, cfg) {
   const destino = iaGateway.activo(cfg)
     ? iaGateway.prepararPeticion(cuerpo, cfg)
     : {
-      url: GROQ_URL,
+      url: (cfg && cfg.propiaUrl) || GROQ_URL,
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
       cuerpo,
     };
@@ -96,7 +103,8 @@ module.exports = (store, config) => {
     try {
       /* Con gateway local la IA está disponible aunque la clave viva solo en
        * el gateway; sin gateway hace falta GROQ_API_KEY, como antes. */
-      const disponible = iaGateway.activo(config) || !!config.groqApiKey;
+      const propia = await leerClavePropia(req.user.id);
+      const disponible = !!propia || iaGateway.activo(config) || !!config.groqApiKey;
       /* Mismo contador que usa /chat: adaptador compartido o memoria local. */
       const usados = disponible ? (await leerUso(req.user.id)).usuario : 0;
       /* Huella (no la clave) para que el navegador pueda borrar copias viejas
@@ -114,9 +122,45 @@ module.exports = (store, config) => {
     } catch (e) { next(e); }
   });
 
+  /* Clave propia: escritura y borrado. Nunca se devuelve la clave al navegador. */
+  r.put('/clave', mw.requireAuth, async (req, res, next) => {
+    try {
+      const origin = req.get('origin');
+      if (!origin || origin !== req.protocol + '://' + req.get('host') || req.get('sec-fetch-site') === 'cross-site') {
+        return res.status(403).json({ ok: false, error: 'Origen no permitido' });
+      }
+      const body = req.body || {};
+      const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
+      const apiUrl = typeof body.apiUrl === 'string' ? body.apiUrl.trim() : '';
+      if (!apiKey || apiKey.length > 300 || !URLS_PROPIAS.includes(apiUrl)) {
+        return res.status(400).json({ ok: false, error: 'Clave o proveedor no válidos' });
+      }
+      if (typeof store.adapter.putEstado !== 'function') {
+        return res.status(503).json({ ok: false, error: 'Almacén de claves no disponible' });
+      }
+      await store.adapter.putEstado(COLECCION_CLAVE, String(req.user.id), { apiKey, apiUrl });
+      res.json({ ok: true, guardada: true });
+    } catch (e) { next(e); }
+  });
+
+  r.delete('/clave', mw.requireAuth, async (req, res, next) => {
+    try {
+      const origin = req.get('origin');
+      if (!origin || origin !== req.protocol + '://' + req.get('host') || req.get('sec-fetch-site') === 'cross-site') {
+        return res.status(403).json({ ok: false, error: 'Origen no permitido' });
+      }
+      if (typeof store.adapter.putEstado !== 'function') {
+        return res.status(503).json({ ok: false, error: 'Almacén de claves no disponible' });
+      }
+      await store.adapter.putEstado(COLECCION_CLAVE, String(req.user.id), {});
+      res.json({ ok: true, guardada: false });
+    } catch (e) { next(e); }
+  });
+
   r.post('/chat', mw.requireAuth, async (req, res, next) => {
     try {
-      if (!iaGateway.activo(config) && !config.groqApiKey) {
+      const propia = await leerClavePropia(req.user.id);
+      if (!propia && !iaGateway.activo(config) && !config.groqApiKey) {
         return res.status(503).json({ ok: false, error: 'IA no configurada en el servidor' });
       }
       const body = req.body || {};
@@ -224,7 +268,10 @@ module.exports = (store, config) => {
 
       let salida;
       try {
-        salida = await proveedor(cuerpo, config.groqApiKey, config);
+        /* Con clave propia guardada se usa esa (y su URL); si no, la del servidor. */
+        salida = propia
+          ? await proveedor(cuerpo, propia.apiKey, { ...config, iaGatewayUrl: null, propiaUrl: propia.apiUrl })
+          : await proveedor(cuerpo, config.groqApiKey, config);
       } catch (e) {
         await devolverCupo(cupo.reservas);
         if (e && e.name === 'AbortError') {
@@ -244,7 +291,12 @@ module.exports = (store, config) => {
         await devolverCupo(cupo.reservas);
         if (salida.status === 401 || salida.status === 403) {
           console.error('[ia] el proveedor rechazó la clave:', salida.status);
-          return res.status(503).json({ ok: false, error: 'IA no disponible: la clave del servidor no es válida' });
+          return res.status(503).json({
+            ok: false,
+            error: propia
+              ? 'Tu API key no es válida o no tiene saldo: revísala en Práctica → Config IA'
+              : 'IA no disponible: la clave del servidor no es válida',
+          });
         }
         const detalle = (salida.json && salida.json.error && salida.json.error.message) || ('HTTP ' + salida.status);
         return res.status(502).json({ ok: false, error: 'La IA respondió con error: ' + String(detalle).slice(0, 200) });
@@ -340,6 +392,13 @@ module.exports = (store, config) => {
     const next = Math.max(0, Number((cur && cur[field]) || 0) + Number(delta || 0));
     await escribirEstado(collection, key, { ...(cur || {}), [field]: next });
     return next;
+  }
+
+  async function leerClavePropia(userId) {
+    try {
+      const doc = await leerEstado(COLECCION_CLAVE, String(userId));
+      return doc && doc.apiKey && URLS_PROPIAS.includes(doc.apiUrl) ? doc : null;
+    } catch (e) { return null; }
   }
 
   async function leerUso(userId) {

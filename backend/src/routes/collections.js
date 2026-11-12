@@ -13,7 +13,7 @@ const mw = require('../middleware');
 /* loginAttempts es estado interno del servidor (rate-limit de login): no debe
  * salir en el bundle ni volver por la API desde el navegador. `meetings` quedó
  * retirado con Jitsi: sus datos históricos no se exponen ni se pueden escribir. */
-const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts', 'iaUso', 'meetings']);
+const FORBIDDEN = new Set(['users', 'sessions', 'loginAttempts', 'iaUso', 'meetings', '_tombstones']);
 /* Contenido que NUNCA viaja en el bundle inicial, ni siquiera para dirección:
  * son documentos grandes/config y el cliente los pide solo cuando abre su
  * pantalla (AI Lobby). Así una sesión normal no recibe la base de conocimiento
@@ -546,9 +546,16 @@ module.exports = (store, config) => {
       // persist ya no guarda (respuesta 201 pero dato perdido en producción).
       /* Sin 'auditoria': es append-only y pesaba 26 MB. Se escribe por
        * entrada con adapter.pushAudit (ver store.persistCollections). */
-      await store.refreshForWrite([collection]);
+      await store.refreshForWrite([collection, '_tombstones']);
       const root = store.get();
       let body = req.body || {};
+      /* Un id con lápida ya fue borrado: no se vuelve a crear (evita que una
+       * copia vieja de otro equipo lo resucite tras un despliegue). */
+      const lapidasPost = root._tombstones && Array.isArray(root._tombstones[collection])
+        ? root._tombstones[collection] : [];
+      if (body && body.id !== undefined && lapidasPost.includes(String(body.id))) {
+        return res.status(409).json({ ok: false, error: 'Registro borrado: no se puede volver a crear' });
+      }
       /* Nunca persistir claves de API en la configuración compartida. */
       if (collection === 'practicaConfig') {
         const limpio = sinSecretosConfig(body);
@@ -734,7 +741,7 @@ module.exports = (store, config) => {
       }
       /* Sin 'auditoria': es append-only y pesaba 26 MB. Se escribe por
        * entrada con adapter.pushAudit (ver store.persistCollections). */
-      await store.refreshForWrite([collection]);
+      await store.refreshForWrite([collection, '_tombstones']);
       const root = store.get();
       // Objeto: :id es la CLAVE top-level a escribir/crear. { value }
       if (isPlain(root[collection]) || (!root[collection] && KNOWN_OBJECTS.has(collection))) {
@@ -810,7 +817,7 @@ module.exports = (store, config) => {
       }
       /* Sin 'auditoria': es append-only y pesaba 26 MB. Se escribe por
        * entrada con adapter.pushAudit (ver store.persistCollections). */
-      await store.refreshForWrite([collection]);
+      await store.refreshForWrite([collection, '_tombstones']);
       const data = store.get();
       // Objeto: borra la CLAVE top-level (diff del frontend baja borrados).
       if (isPlain(data[collection])) {
@@ -861,8 +868,14 @@ module.exports = (store, config) => {
       }
       data[collection] = (data[collection] || []).filter((x) => String(x.id) !== String(id));
       if (data[collection].length === before) return res.status(404).json({ ok: false, error: 'No encontrado' });
+      /* Lápida: el id queda registrado en el servidor para que un equipo con
+       * copia vieja no lo vuelva a subir ni lo recree tras un despliegue. */
+      const lapidas = data._tombstones && typeof data._tombstones === 'object' ? data._tombstones : {};
+      const lista = Array.isArray(lapidas[collection]) ? lapidas[collection] : [];
+      if (!lista.includes(String(id))) lista.push(String(id));
+      data._tombstones = { ...lapidas, [collection]: lista.slice(-2000) };
       db.audit(data, `borrado_${collection}`, req.user, { id });
-      await store.persistCollections([collection, 'auditoria']);
+      await store.persistCollections([collection, '_tombstones', 'auditoria']);
       if (FEED_COLLECTIONS.has(collection)) {
         store.pushFeed({ kind: collection, title: `Actualización en ${collection}` }).catch(() => {});
       }

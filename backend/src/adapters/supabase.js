@@ -153,7 +153,7 @@ function createSupabaseAdapter({ url, serviceKey, uploadsDir }) {
     const usersPromise = sb.from('app_users').select('*');
     for (;;) {
       const { data, error } = await sb.from('documents').select('collection,doc_id,data')
-        .neq('collection', 'auditoria').range(from, from + PAGE - 1);
+        .neq('collection', 'auditoria').neq('collection', 'iaClaves').range(from, from + PAGE - 1);
       if (error) throw new Error('Supabase documents: ' + error.message);
       for (const row of data) {
         if (row.doc_id === '__object__') {

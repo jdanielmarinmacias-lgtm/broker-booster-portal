@@ -380,25 +380,35 @@
    * Guardamos solo los ids confirmados por el servidor (ligero) para que sobrevivan
    * a la recarga. */
   var SYNCED_IDS_KEY = 'pepes_sync_ids_v1';
+  /* Se guarda en IndexedDB (almacén kv), no en localStorage. Se precarga en
+   * `syncedIdsCache` al arrancar y las lecturas síncronas usan esa copia. */
+  var syncedIdsCache = null;
   function saveSyncedIds() {
-    try {
-      var ids = {};
-      Object.keys(shadow || {}).forEach(function (k) {
-        if (Array.isArray(shadow[k])) ids[k] = shadow[k].map(function (x) { return String(x && x.id); });
-      });
-      localStorage.setItem(SYNCED_IDS_KEY, JSON.stringify(ids));
-    } catch (e) { /* localStorage lleno: se usa solo la sombra en memoria */ }
+    var ids = {};
+    Object.keys(shadow || {}).forEach(function (k) {
+      if (Array.isArray(shadow[k])) ids[k] = shadow[k].map(function (x) { return String(x && x.id); });
+    });
+    syncedIdsCache = ids;
+    try { if (window.__bbKvSet) window.__bbKvSet(SYNCED_IDS_KEY, ids); } catch (e) { /* IndexedDB no disponible */ }
   }
-  function loadSyncedIds() {
+  async function cargarSyncedIds() {
     try {
-      var raw = JSON.parse(localStorage.getItem(SYNCED_IDS_KEY) || 'null');
-      if (!raw || typeof raw !== 'object') return null;
+      var raw = window.__bbKvGet ? await window.__bbKvGet(SYNCED_IDS_KEY) : null;
+      if (!raw || typeof raw !== 'object') { syncedIdsCache = null; return; }
       var out = {};
       Object.keys(raw).forEach(function (k) {
         if (Array.isArray(raw[k])) out[k] = raw[k].map(function (id) { return { id: id }; });
       });
-      return out;
-    } catch (e) { return null; }
+      syncedIdsCache = out;
+    } catch (e) { syncedIdsCache = null; }
+  }
+  function loadSyncedIds() {
+    if (!syncedIdsCache) return null;
+    var out = {};
+    Object.keys(syncedIdsCache).forEach(function (k) {
+      out[k] = syncedIdsCache[k].map(function (id) { return (id && id.id !== undefined) ? id : { id: id }; });
+    });
+    return out;
   }
 
   /* Lápidas de borrado: ids que se borraron y NO deben volver desde la copia
@@ -406,17 +416,20 @@
    * viejos resucitaba exámenes o registros de prueba ya eliminados. */
   var DELETED_KEY = 'pepes_deleted_ids_v1';
   var deletedIds = null;
-  function loadDeleted() {
-    if (deletedIds) return deletedIds;
+  /* En IndexedDB (almacén kv), precargado en cargarDeleted() desde boot(). */
+  async function cargarDeleted() {
     deletedIds = {};
     try {
-      var raw = JSON.parse(localStorage.getItem(DELETED_KEY) || 'null');
+      var raw = window.__bbKvGet ? await window.__bbKvGet(DELETED_KEY) : null;
       if (raw && typeof raw === 'object') {
         Object.keys(raw).forEach(function (k) {
           if (Array.isArray(raw[k])) deletedIds[k] = raw[k].map(String);
         });
       }
-    } catch (e) { /* sin storage: se usan solo las de esta sesión */ }
+    } catch (e) { /* sin IndexedDB: se usan solo las de esta sesión */ }
+  }
+  function loadDeleted() {
+    if (!deletedIds) deletedIds = {};
     return deletedIds;
   }
   function isDeleted(col, id) {
@@ -430,7 +443,7 @@
     var lista = m[col] || (m[col] = []);
     if (lista.indexOf(String(id)) === -1) lista.push(String(id));
     if (lista.length > 400) lista.splice(0, lista.length - 400);
-    try { localStorage.setItem(DELETED_KEY, JSON.stringify(m)); } catch (e) { /* cuota */ }
+    try { if (window.__bbKvSet) window.__bbKvSet(DELETED_KEY, m); } catch (e) { /* IndexedDB no disponible */ }
   }
   /* Si la lápida sigue en el servidor (un DELETE que no llegó), se reintenta
    * sin bloquear el pull. */
@@ -813,17 +826,23 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
    * en cada sincronización. Sin esto, el registro seguía en la base y volvía
    * en la siguiente carga desde otro equipo. */
   var PENDING_DEL_KEY = 'pepes_pending_deletes_v1';
-  function loadPendingDel() {
+  /* La cola vive en IndexedDB (almacén kv de idb-gate), no en localStorage: así
+   * un borrado sin conexión sobrevive a recargas y se reintenta al reconectar. */
+  var pendingDel = null;
+  async function loadPendingDel() {
+    if (pendingDel) return pendingDel;
     try {
-      var raw = JSON.parse(localStorage.getItem(PENDING_DEL_KEY) || '[]');
-      return Array.isArray(raw) ? raw : [];
-    } catch (e) { return []; }
+      var raw = window.__bbKvGet ? await window.__bbKvGet(PENDING_DEL_KEY) : null;
+      pendingDel = Array.isArray(raw) ? raw : [];
+    } catch (e) { pendingDel = []; }
+    return pendingDel;
   }
-  function savePendingDel(lista) {
-    try { localStorage.setItem(PENDING_DEL_KEY, JSON.stringify(lista)); } catch (e) { /* cuota */ }
+  async function savePendingDel(lista) {
+    pendingDel = lista;
+    try { if (window.__bbKvSet) await window.__bbKvSet(PENDING_DEL_KEY, lista); } catch (e) { /* IndexedDB no disponible */ }
   }
   async function flushPendingDel() {
-    var lista = loadPendingDel();
+    var lista = await loadPendingDel();
     if (!lista.length) return;
     var quedan = [];
     for (var i = 0; i < lista.length; i++) {
@@ -834,7 +853,7 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
         if (!e || e.status !== 404) quedan.push(p); // 404: ya no existe en el servidor
       }
     }
-    savePendingDel(quedan);
+    await savePendingDel(quedan);
   }
 
   async function borrarExplicito(col, id) {
@@ -844,9 +863,9 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
       await send('DELETE', '/api/data/' + encodeURIComponent(col) + '/' + encodeURIComponent(id), null);
     } catch (e) {
       if (!e || e.status !== 404) {
-        var lista = loadPendingDel();
+        var lista = await loadPendingDel();
         lista.push({ col: col, id: String(id) });
-        savePendingDel(lista);
+        await savePendingDel(lista);
         pushSoon();
         return false;
       }
@@ -1060,6 +1079,8 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
   var bootDone = false;
   async function boot() {
     if (bootDone) return;
+    await cargarSyncedIds();
+    await cargarDeleted();
     let ok = false;
     try { ok = !!(window.Backend && await window.Backend.detect()); } catch (e) { ok = false; }
     if (!ok) return; // backend caído/desplegando: el intervalo de abajo reintenta
