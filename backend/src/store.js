@@ -14,6 +14,9 @@ const { createMemoryAdapter } = require('./adapters/memory');
 const { createJsonFileAdapter } = require('./adapters/jsonFile');
 
 function selectAdapter(config) {
+  /* BB_STORE=file fuerza el almacén local aunque haya credenciales de Supabase
+   * (pruebas locales sin tocar producción). Por defecto no cambia nada. */
+  if (process.env.BB_STORE === 'file' && config.dataDir) return createJsonFileAdapter(config.dataDir);
   if (config.supabaseUrl && config.supabaseServiceKey) {
     const { createSupabaseAdapter } = require('./adapters/supabase');
     /* uploadsDir: si un documento trae /uploads/<archivo> (subido con el backend

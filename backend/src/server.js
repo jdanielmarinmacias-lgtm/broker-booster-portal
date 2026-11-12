@@ -15,7 +15,7 @@ const CAMPUS_DIR = path.join(__dirname, '..', 'campus-private');
 const CAMPUS_ARCHIVOS = new Set([
   'legacy/02-modulo-b.js', 'legacy/03-config-73l.js', 'legacy/04-modulo-d.js',
   'legacy/05-modulo-e.js', 'legacy/06-modulo-f.js', 'legacy/07-modulo-g.js',
-  'legacy/08-snippet-h.js', 'legacy/09-modulo-i.js', 'legacy/10-modulo-j.js',
+  'legacy/08-snippet-h.js', 'legacy/09-modulo-i.js', 'legacy/10-modulo-j.js', 'legacy/11-publicidad.js',
   'modules/auth-custom.js', 'modules/dashboard.js', 'modules/chat.js',
   'modules/ventas.js', 'modules/inventario.js',
 ]);

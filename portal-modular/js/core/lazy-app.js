@@ -92,6 +92,7 @@
     'api/campus/modules/chat.js',
     'api/campus/modules/ventas.js',
     'api/campus/modules/inventario.js',
+    'api/campus/legacy/11-publicidad.js',
   ];
 
   var conVersion = function (ruta) { return ruta + '?v=' + V; };
