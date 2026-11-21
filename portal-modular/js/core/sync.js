@@ -437,6 +437,8 @@
     var m = loadDeleted();
     return !!(m[col] && m[col].indexOf(String(id)) !== -1);
   }
+  /* Consulta síncrona para el legacy (ensureDbDefaults no puede esperar a IndexedDB). */
+  window.__bbIsDeleted = isDeleted;
   function markDeleted(col, id) {
     if (id === undefined || id === null) return;
     var m = loadDeleted();
@@ -793,8 +795,16 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
       const same = prev && registrosIguales(rec, prev);
       if (same) continue;
       try {
-        if (!prev) await send('POST', '/api/data/' + encodeURIComponent(name), rec);
-        else {
+        if (!prev) {
+          try {
+            await send('POST', '/api/data/' + encodeURIComponent(name), rec);
+          } catch (ePost) {
+            /* 409: el servidor tiene una lápida para este id (ya se borró).
+             * Se descarta la copia local en vez de reintentar sin fin. */
+            if (ePost && ePost.status === 409) { markDeleted(name, id); continue; }
+            throw ePost;
+          }
+        } else {
           try {
             await send('PUT', '/api/data/' + encodeURIComponent(name) + '/' + encodeURIComponent(rec.id), rec);
           } catch (ePut) {
@@ -804,14 +814,18 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
              * se abortaba la colección y el registro quedaba bloqueado
              * para siempre. */
             if (!ePut || ePut.status !== 404) throw ePut;
-            await send('POST', '/api/data/' + encodeURIComponent(name), rec);
+            try {
+              await send('POST', '/api/data/' + encodeURIComponent(name), rec);
+            } catch (ePost2) {
+              if (ePost2 && ePost2.status === 409) { markDeleted(name, id); continue; }
+              throw ePost2;
+            }
           }
         }
       } catch (e) {
         // Registro no aceptado: se conserva local y se avisa; no se descarta.
-        if (e.status === 403 || e.status === 404 || e.status === 413) {
-          if (window.showToast) window.showToast(pushErrorMsg(e, name), 'error');
-          throw e;
+        if ([403, 404, 413].includes(e.status) && window.showToast) {
+          window.showToast(pushErrorMsg(e, name), 'error');
         }
         throw e;
       }
@@ -850,7 +864,8 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
       try {
         await send('DELETE', '/api/data/' + encodeURIComponent(p.col) + '/' + encodeURIComponent(p.id), null);
       } catch (e) {
-        if (!e || e.status !== 404) quedan.push(p); // 404: ya no existe en el servidor
+        // 404: ya no existe; 409: el servidor ya lo tiene como borrado (lápida).
+        if (!e || (e.status !== 404 && e.status !== 409)) quedan.push(p);
       }
     }
     await savePendingDel(quedan);
@@ -1081,6 +1096,16 @@ if (x && x.id !== undefined && !have[String(x.id)] && !wasOnServer[String(x.id)]
     if (bootDone) return;
     await cargarSyncedIds();
     await cargarDeleted();
+    /* Categorías sembradas por ensureDbDefaults antes de cargar la lista de
+     * borrados: se quitan aquí para que una base vacía no las reviva. */
+    try {
+      const dbLeg = legDb();
+      if (dbLeg && Array.isArray(dbLeg.categories)) {
+        const antes = dbLeg.categories.length;
+        const filtradas = dbLeg.categories.filter(function (c) { return !(c && isDeleted('categories', c.id)); });
+        if (filtradas.length !== antes) replaceArray(dbLeg.categories, filtradas);
+      }
+    } catch (e) { /* sin datos legacy: nada que limpiar */ }
     let ok = false;
     try { ok = !!(window.Backend && await window.Backend.detect()); } catch (e) { ok = false; }
     if (!ok) return; // backend caído/desplegando: el intervalo de abajo reintenta

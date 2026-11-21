@@ -215,6 +215,21 @@ function notificacionVisible(user, n) {
   return canReadAll(user);
 }
 
+/* Quita los registros borrados (lápidas). Sin esto, una categoría eliminada
+ * seguía entregándose en GET y en el bundle aunque el id ya estuviera en
+ * `_tombstones`. */
+/* Ids borrados (lápidas) de una colección. */
+function listaLapidas(root, collection) {
+  return root && root._tombstones && Array.isArray(root._tombstones[collection])
+    ? root._tombstones[collection] : [];
+}
+
+function sinLapidas(root, collection, items) {
+  const borrados = new Set(listaLapidas(root, collection).map(String));
+  if (!borrados.size) return items;
+  return items.filter((x) => !(x && borrados.has(String(x.id))));
+}
+
 function filtrarLectura(user, collection, items, root) {
   if (collection === 'notifications') {
     return items.filter((n) => notificacionVisible(user, n));
@@ -466,7 +481,7 @@ module.exports = (store, config) => {
         } else if (!data[col] && KNOWN_OBJECTS.has(col)) {
           bundle[col] = { shape: 'object', value: {} };
         } else {
-          bundle[col] = { shape: 'array', items: filtrarLectura(req.user, col, Array.isArray(data[col]) ? data[col] : [], data) };
+          bundle[col] = { shape: 'array', items: filtrarLectura(req.user, col, sinLapidas(data, col, Array.isArray(data[col]) ? data[col] : []), data) };
         }
       }
       // Todos los usuarios autenticados reciben el directorio de usuarios seguros
@@ -498,8 +513,8 @@ module.exports = (store, config) => {
        * tabla documents completa (~27 MB) en cada GET: latencia alta, timeouts
        * y los 500/401 en cascada que dejaban los cambios sin subir. */
       const deps = (collection === 'messages' || collection === 'groupMessages')
-        ? [collection, 'chatGroups', 'groups']
-        : [collection];
+        ? [collection, 'chatGroups', 'groups', '_tombstones']
+        : [collection, '_tombstones'];
       if (typeof store.refreshCollections === 'function') await store.refreshCollections(deps);
       else await store.refreshIfStale();
       const root = store.get();
@@ -520,6 +535,7 @@ module.exports = (store, config) => {
         return res.json({ ok: true, object: {} });
       }
       let items = Array.isArray(root[collection]) ? root[collection].slice() : [];
+      items = sinLapidas(root, collection, items);
       items = filtrarLectura(req.user, collection, items, root);
       if (req.query.q) {
         const q = String(req.query.q).toLowerCase();
@@ -551,9 +567,7 @@ module.exports = (store, config) => {
       let body = req.body || {};
       /* Un id con lápida ya fue borrado: no se vuelve a crear (evita que una
        * copia vieja de otro equipo lo resucite tras un despliegue). */
-      const lapidasPost = root._tombstones && Array.isArray(root._tombstones[collection])
-        ? root._tombstones[collection] : [];
-      if (body && body.id !== undefined && lapidasPost.includes(String(body.id))) {
+      if (body && body.id !== undefined && listaLapidas(root, collection).includes(String(body.id))) {
         return res.status(409).json({ ok: false, error: 'Registro borrado: no se puede volver a crear' });
       }
       /* Nunca persistir claves de API en la configuración compartida. */
@@ -849,8 +863,7 @@ module.exports = (store, config) => {
       // Registros personales: borrar solo lo propio (o con autoridad del área).
       if (campoDueno(collection)) {
         const recDel = (data[collection] || []).find((x) => x && String(x.id) === String(id));
-        if (!recDel) return res.status(404).json({ ok: false, error: 'No encontrado' });
-        if (esRegistroAjeno(collection, recDel, req.user)) {
+        if (recDel && esRegistroAjeno(collection, recDel, req.user)) {
           return res.status(403).json({ ok: false, error: 'Solo puedes borrar tus propios registros' });
         }
       }
@@ -867,15 +880,18 @@ module.exports = (store, config) => {
         }
       }
       data[collection] = (data[collection] || []).filter((x) => String(x.id) !== String(id));
-      if (data[collection].length === before) return res.status(404).json({ ok: false, error: 'No encontrado' });
       /* Lápida: el id queda registrado en el servidor para que un equipo con
-       * copia vieja no lo vuelva a subir ni lo recree tras un despliegue. */
+       * copia vieja no lo vuelva a subir ni lo recree tras un despliegue. Se
+       * registra también si el registro ya no existe (borrado repetido o desde
+       * otro equipo), para que nunca vuelva a aparecer. */
       const lapidas = data._tombstones && typeof data._tombstones === 'object' ? data._tombstones : {};
       const lista = Array.isArray(lapidas[collection]) ? lapidas[collection] : [];
       if (!lista.includes(String(id))) lista.push(String(id));
       data._tombstones = { ...lapidas, [collection]: lista.slice(-2000) };
+      const existia = data[collection].length !== before;
       db.audit(data, `borrado_${collection}`, req.user, { id });
       await store.persistCollections([collection, '_tombstones', 'auditoria']);
+      if (!existia) return res.status(404).json({ ok: false, error: 'No encontrado' });
       if (FEED_COLLECTIONS.has(collection)) {
         store.pushFeed({ kind: collection, title: `Actualización en ${collection}` }).catch(() => {});
       }

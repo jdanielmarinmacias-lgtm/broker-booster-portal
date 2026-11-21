@@ -284,7 +284,11 @@ window.addEventListener('beforeunload', function() { if (_saveDBPending) _flushS
         function ensureDbDefaults() {
             if (!db || typeof db !== 'object') db = {};
             if (!Array.isArray(db.users) || !db.users.length) db.users = JSON.parse(JSON.stringify(defaultDB.users));
-            if (!Array.isArray(db.categories)) db.categories = JSON.parse(JSON.stringify(defaultDB.categories));
+            /* Sembrar solo categorías no borradas: una base vacía no debe revivir
+             * lo que el usuario eliminó (lápida registrada por sync.js). */
+            if (!Array.isArray(db.categories)) db.categories = JSON.parse(JSON.stringify(defaultDB.categories)).filter(function (c) {
+                return !(typeof window.__bbIsDeleted === 'function' && window.__bbIsDeleted('categories', c.id));
+            });
             if (!Array.isArray(db.lessons)) db.lessons = JSON.parse(JSON.stringify(defaultDB.lessons));
             if (!Array.isArray(db.progress)) db.progress = JSON.parse(JSON.stringify(defaultDB.progress));
             /* Exámenes fantasma de versiones anteriores: "Nuevo Examen" insertaba

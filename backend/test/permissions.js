@@ -251,3 +251,27 @@ describe('matriz de escritura del servidor', () => {
     assert.equal(roles.canWrite({ role: 'gm' }, 'auditoria'), false);
   });
 });
+
+describe('registros borrados no vuelven', () => {
+  it('una categoría borrada desaparece de GET y del bundle, no se recrea y el borrado repetido no falla', async () => {
+    await como('admin');
+    const id = 'cat-lapida-' + Date.now();
+    const alta = await api('POST', '/api/data/categories', { id, name: 'Portafolios' });
+    assert.equal(alta.status, 201);
+
+    assert.equal((await api('DELETE', '/api/data/categories/' + id)).status, 200);
+
+    const lista = await api('GET', '/api/data/categories');
+    assert.ok(!lista.json.items.some((c) => String(c.id) === id), 'GET no debe devolver el borrado');
+
+    const bundle = await api('GET', '/api/data/bundle');
+    const enBundle = bundle.json.bundle.categories.items || [];
+    assert.ok(!enBundle.some((c) => String(c.id) === id), 'bundle no debe devolver el borrado');
+
+    const reAlta = await api('POST', '/api/data/categories', { id, name: 'Portafolios' });
+    assert.equal(reAlta.status, 409, 'no debe recrearse');
+
+    const otroBorrado = await api('DELETE', '/api/data/categories/' + id);
+    assert.equal(otroBorrado.status, 404, 'un segundo borrado responde 404 sin error');
+  });
+});
